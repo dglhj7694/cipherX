@@ -1,0 +1,13 @@
+streamlit
+cloudscraper
+beautifulsoup4
+google-generativeai
+google-api-python-client
+google-auth-oauthlib
+google-auth-httplib2
+google-auth
+st-copy-to-clipboard
+yfinance
+plotly
+pandas
+numpy
