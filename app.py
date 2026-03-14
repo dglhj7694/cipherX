@@ -179,136 +179,172 @@ SELL_SIGNALS = {k: v for k, v in SIGNAL_REGISTRY.items() if v['dir'] == 'sell'}
 ALL_CHART_SIGNALS = {**SIGNAL_REGISTRY, **COMPOSITE_SIGNALS}
 
 # ──────────────────────────────────────────
-# 신호 설명 사전 (사이드바용)
+# 신호 설명 사전 (사이드바용) — 차트 icon+label과 1:1 매칭
 # ──────────────────────────────────────────
 SIGNAL_DESCRIPTIONS = {
-    'Gold_Dot': {
-        'cat': '🏆 최강 매수',
-        'desc': '모든 매수 조건이 극단적으로 수렴. RSI<30 + MFI<30 + WT1<-60 + 상승 다이버전스가 동시 확인될 때 발생. 역사적으로 가장 높은 반등 확률을 보이는 최고 등급 매수 신호.',
-    },
-    'Green_Dot_T1': {
-        'cat': '🟢 강한 매수',
-        'desc': 'WT 과매도 영역에서 교차 + RSI<30 + MFI<30 + MF<0. 강력한 반전 신호로, 단기 바닥 가능성이 높음.',
-    },
-    'Green_Dot_T2': {
-        'cat': '🟩 매수',
-        'desc': 'T1보다 조건이 약간 완화된 매수 신호. WT 과매도 + RSI 또는 MFI 중 하나가 32 미만.',
-    },
-    'Blue_Diamond': {
-        'cat': '🔹 추세 매수',
-        'desc': 'WT2가 0 이하에서 상승 교차 + 상위 시간대(HTF) 강세 확인. 추세 초기 진입 신호.',
-    },
-    'Green_Circle': {
-        'cat': '✅ 과매도 반등',
-        'desc': 'WT 과매도 영역에서의 교차. Green Dot 조건 미달이지만 반등 가능성을 시사.',
-    },
-    'Bull_Divergence': {
-        'cat': '📈 상승 다이버전스',
-        'desc': '가격은 저점을 낮추지만 WT는 저점을 높이는 패턴. 하락 모멘텀 소진 → 반전 임박 신호.',
-    },
-    'Hidden_Bull_Div': {
-        'cat': '🔀 히든 상승 다이버전스',
-        'desc': '가격은 저점을 높이지만 오실레이터는 저점을 낮춤. 기존 상승 추세가 재개될 신호.',
-    },
-    'Squeeze_Fire_Buy': {
-        'cat': '💥 스퀴즈 매수',
-        'desc': 'TTM Squeeze 해소 + WT 상방. 볼린저밴드가 켈트너채널 안에 있다가 벗어나며 변동성 폭발.',
-    },
-    'Volume_Climax_Buy': {
-        'cat': '🌊 거래량 클라이맥스 매수',
-        'desc': '평균의 3배 이상 거래량 + 하락 캔들 + WT 과매도 + WT 반등 시작. 투매 후 반전 신호.',
-    },
-    'OBV_Div_Buy': {
-        'cat': '📊 OBV 다이버전스 매수',
-        'desc': 'OBV(누적거래량)와 가격 사이의 상승 다이버전스. 스마트머니 매집 가능성.',
-    },
-    'ADX_Momentum_Buy': {
-        'cat': '🚀 ADX 점화',
-        'desc': 'ADX가 20을 돌파 + Plus DI > Minus DI. 새로운 상승 추세의 시작 신호.',
-    },
-    'Fib_Bounce_Buy': {
-        'cat': '📐 피보나치 반등',
-        'desc': '0.618~0.786 피보나치 되돌림 레벨에서 지지 + WT 상승 교차. 핵심 지지대 반등.',
-    },
-    'Bullish_Engulfing': {
-        'cat': '☀️ 상승 장악형',
-        'desc': '전일 하락 캔들을 완전히 감싸는 상승 캔들 + WT 과매도. 강한 매수세 유입 신호.',
-    },
-    'Golden_Cross': {
-        'cat': '✨ 골든 크로스',
-        'desc': '50일 이동평균이 200일 이동평균을 상향 돌파. 중장기 강세 전환의 클래식 신호.',
-    },
-    'Blood_Diamond': {
-        'cat': '🩸 최강 매도',
-        'desc': '모든 매도 조건이 극단적으로 수렴. RSI>70 + MFI>70 + WT1>60 + 하락 다이버전스 동시 확인. 최고 등급 매도 신호.',
-    },
-    'Red_Dot_T1': {
-        'cat': '🔴 강한 매도',
-        'desc': 'WT 과매수 영역에서 하락 교차 + RSI>70 + MFI>70 + MF>0. 강한 하락 반전 가능성.',
-    },
-    'Red_Dot_T2': {
-        'cat': '🟥 매도',
-        'desc': 'T1보다 조건이 약간 완화된 매도 신호. WT 과매수 + RSI 또는 MFI 중 하나가 68 초과.',
-    },
-    'Red_Diamond': {
-        'cat': '🔸 추세 매도',
-        'desc': 'WT2가 0 이상에서 하락 교차 + 상위 시간대 약세 확인. 하락 추세 진입 신호.',
-    },
-    'Red_Circle': {
-        'cat': '⛔ 과매수 하락',
-        'desc': 'WT 과매수 영역에서의 하락 교차. Red Dot 조건 미달이지만 조정 가능성을 시사.',
-    },
-    'Bear_Divergence': {
-        'cat': '📉 하락 다이버전스',
-        'desc': '가격은 고점을 높이지만 WT는 고점을 낮추는 패턴. 상승 모멘텀 소진 → 하락 전환 임박.',
-    },
-    'Hidden_Bear_Div': {
-        'cat': '🔁 히든 하락 다이버전스',
-        'desc': '가격은 고점을 낮추지만 오실레이터는 고점을 높임. 기존 하락 추세 재개 신호.',
-    },
-    'Squeeze_Fire_Sell': {
-        'cat': '🧨 스퀴즈 매도',
-        'desc': 'TTM Squeeze 해소 + WT 하방. 응축된 변동성이 하방으로 폭발.',
-    },
-    'Volume_Climax_Sell': {
-        'cat': '🌋 거래량 클라이맥스 매도',
-        'desc': '평균의 3배 이상 거래량 + 상승 캔들 + WT 과매수 + WT 하락 시작. 클라이맥스 탑 신호.',
-    },
-    'OBV_Div_Sell': {
-        'cat': '🔻 OBV 다이버전스 매도',
-        'desc': 'OBV와 가격 사이의 하락 다이버전스. 스마트머니 이탈 가능성.',
-    },
-    'ADX_Momentum_Sell': {
-        'cat': '💨 ADX 하락 점화',
-        'desc': 'ADX가 20을 돌파 + Minus DI > Plus DI. 새로운 하락 추세의 시작.',
-    },
-    'Fib_Resistance_Sell': {
-        'cat': '🚧 피보나치 저항',
-        'desc': '0.618~0.786 피보나치 되돌림 저항대에서 WT 하락 교차. 핵심 저항대 돌파 실패.',
-    },
-    'Bearish_Engulfing': {
-        'cat': '🌑 하락 장악형',
-        'desc': '전일 상승 캔들을 완전히 감싸는 하락 캔들 + WT 과매수. 강한 매도세 유입.',
-    },
-    'Death_Cross': {
-        'cat': '☠️ 데드 크로스',
-        'desc': '50일 이동평균이 200일 이동평균을 하향 돌파. 중장기 약세 전환의 클래식 신호.',
-    },
+    # ── 매수 복합 신호 ──
     'Ultra_Buy': {
-        'cat': '⚡ 울트라 매수',
+        'chart_icon': '⚡', 'chart_label': 'ULTRA BUY',
+        'kor': '울트라 매수',
         'desc': 'Confluence Score ≥ 6 또는 (≥5 + 동시 3개 이상 매수 신호). 모든 지표가 극단적 매수를 가리킴.',
     },
     'Strong_Buy': {
-        'cat': '🔱 스트롱 매수',
+        'chart_icon': '🔱', 'chart_label': 'STRONG BUY',
+        'kor': '스트롱 매수',
         'desc': 'Confluence Score 3.5~6. 다수의 매수 시그널이 수렴하여 높은 신뢰도의 매수 구간.',
     },
+    # ── 매수 기본 신호 ──
+    'Gold_Dot': {
+        'chart_icon': '🏆', 'chart_label': 'GOLD DOT',
+        'kor': '최강 매수',
+        'desc': '모든 매수 조건이 극단적으로 수렴. RSI<30 + MFI<30 + WT1<-60 + 상승 다이버전스가 동시 확인될 때 발생. 역사적으로 가장 높은 반등 확률을 보이는 최고 등급 매수 신호.',
+    },
+    'Green_Dot_T1': {
+        'chart_icon': '🟢', 'chart_label': 'BUY T1',
+        'kor': '강한 매수',
+        'desc': 'WT 과매도 영역에서 교차 + RSI<30 + MFI<30 + MF<0. 강력한 반전 신호로, 단기 바닥 가능성이 높음.',
+    },
+    'Green_Dot_T2': {
+        'chart_icon': '🟩', 'chart_label': 'BUY T2',
+        'kor': '매수',
+        'desc': 'T1보다 조건이 약간 완화된 매수 신호. WT 과매도 + RSI 또는 MFI 중 하나가 32 미만.',
+    },
+    'Blue_Diamond': {
+        'chart_icon': '🔹', 'chart_label': 'BLUE DIA',
+        'kor': '추세 매수',
+        'desc': 'WT2가 0 이하에서 상승 교차 + 상위 시간대(HTF) 강세 확인. 추세 초기 진입 신호.',
+    },
+    'Green_Circle': {
+        'chart_icon': '✅', 'chart_label': 'BUY Circle',
+        'kor': '과매도 반등',
+        'desc': 'WT 과매도 영역에서의 교차. Green Dot 조건 미달이지만 반등 가능성을 시사.',
+    },
+    'Bull_Divergence': {
+        'chart_icon': '📈', 'chart_label': 'Bull Div',
+        'kor': '상승 다이버전스',
+        'desc': '가격은 저점을 낮추지만 WT는 저점을 높이는 패턴. 하락 모멘텀 소진 → 반전 임박 신호.',
+    },
+    'Hidden_Bull_Div': {
+        'chart_icon': '🔀', 'chart_label': 'Hidden Bull',
+        'kor': '히든 상승 다이버전스',
+        'desc': '가격은 저점을 높이지만 오실레이터는 저점을 낮춤. 기존 상승 추세가 재개될 신호.',
+    },
+    'Squeeze_Fire_Buy': {
+        'chart_icon': '💥', 'chart_label': 'Squeeze BUY',
+        'kor': '스퀴즈 매수',
+        'desc': 'TTM Squeeze 해소 + WT 상방. 볼린저밴드가 켈트너채널 안에 있다가 벗어나며 변동성 폭발.',
+    },
+    'Volume_Climax_Buy': {
+        'chart_icon': '🌊', 'chart_label': 'Vol Climax BUY',
+        'kor': '거래량 클라이맥스 매수',
+        'desc': '평균의 3배 이상 거래량 + 하락 캔들 + WT 과매도 + WT 반등 시작. 투매 후 반전 신호.',
+    },
+    'OBV_Div_Buy': {
+        'chart_icon': '📊', 'chart_label': 'OBV Div BUY',
+        'kor': 'OBV 다이버전스 매수',
+        'desc': 'OBV(누적거래량)와 가격 사이의 상승 다이버전스. 스마트머니 매집 가능성.',
+    },
+    'ADX_Momentum_Buy': {
+        'chart_icon': '🚀', 'chart_label': 'ADX Ignition',
+        'kor': 'ADX 점화',
+        'desc': 'ADX가 20을 돌파 + Plus DI > Minus DI. 새로운 상승 추세의 시작 신호.',
+    },
+    'Fib_Bounce_Buy': {
+        'chart_icon': '📐', 'chart_label': 'Fib Bounce',
+        'kor': '피보나치 반등',
+        'desc': '0.618~0.786 피보나치 되돌림 레벨에서 지지 + WT 상승 교차. 핵심 지지대 반등.',
+    },
+    'Bullish_Engulfing': {
+        'chart_icon': '☀️', 'chart_label': 'Bull Engulf',
+        'kor': '상승 장악형',
+        'desc': '전일 하락 캔들을 완전히 감싸는 상승 캔들 + WT 과매도. 강한 매수세 유입 신호.',
+    },
+    'Golden_Cross': {
+        'chart_icon': '✨', 'chart_label': 'Golden Cross',
+        'kor': '골든 크로스',
+        'desc': '50일 이동평균이 200일 이동평균을 상향 돌파. 중장기 강세 전환의 클래식 신호.',
+    },
+    # ── 매도 복합 신호 ──
     'Ultra_Sell': {
-        'cat': '🚨 울트라 매도',
+        'chart_icon': '🚨', 'chart_label': 'ULTRA SELL',
+        'kor': '울트라 매도',
         'desc': 'Confluence Score ≤ -6 또는 (≤-5 + 동시 3개 이상 매도 신호). 모든 지표가 극단적 매도를 가리킴.',
     },
     'Strong_Sell': {
-        'cat': '⚠️ 스트롱 매도',
+        'chart_icon': '⚠️', 'chart_label': 'STRONG SELL',
+        'kor': '스트롱 매도',
         'desc': 'Confluence Score -6~-3.5. 다수의 매도 시그널이 수렴하여 높은 신뢰도의 매도 구간.',
+    },
+    # ── 매도 기본 신호 ──
+    'Blood_Diamond': {
+        'chart_icon': '🩸', 'chart_label': 'BLOOD DIA',
+        'kor': '최강 매도',
+        'desc': '모든 매도 조건이 극단적으로 수렴. RSI>70 + MFI>70 + WT1>60 + 하락 다이버전스 동시 확인. 최고 등급 매도 신호.',
+    },
+    'Red_Dot_T1': {
+        'chart_icon': '🔴', 'chart_label': 'SELL T1',
+        'kor': '강한 매도',
+        'desc': 'WT 과매수 영역에서 하락 교차 + RSI>70 + MFI>70 + MF>0. 강한 하락 반전 가능성.',
+    },
+    'Red_Dot_T2': {
+        'chart_icon': '🟥', 'chart_label': 'SELL T2',
+        'kor': '매도',
+        'desc': 'T1보다 조건이 약간 완화된 매도 신호. WT 과매수 + RSI 또는 MFI 중 하나가 68 초과.',
+    },
+    'Red_Diamond': {
+        'chart_icon': '🔸', 'chart_label': 'RED DIA',
+        'kor': '추세 매도',
+        'desc': 'WT2가 0 이상에서 하락 교차 + 상위 시간대 약세 확인. 하락 추세 진입 신호.',
+    },
+    'Red_Circle': {
+        'chart_icon': '⛔', 'chart_label': 'SELL Circle',
+        'kor': '과매수 하락',
+        'desc': 'WT 과매수 영역에서의 하락 교차. Red Dot 조건 미달이지만 조정 가능성을 시사.',
+    },
+    'Bear_Divergence': {
+        'chart_icon': '📉', 'chart_label': 'Bear Div',
+        'kor': '하락 다이버전스',
+        'desc': '가격은 고점을 높이지만 WT는 고점을 낮추는 패턴. 상승 모멘텀 소진 → 하락 전환 임박.',
+    },
+    'Hidden_Bear_Div': {
+        'chart_icon': '🔁', 'chart_label': 'Hidden Bear',
+        'kor': '히든 하락 다이버전스',
+        'desc': '가격은 고점을 낮추지만 오실레이터는 고점을 높임. 기존 하락 추세 재개 신호.',
+    },
+    'Squeeze_Fire_Sell': {
+        'chart_icon': '🧨', 'chart_label': 'Squeeze SELL',
+        'kor': '스퀴즈 매도',
+        'desc': 'TTM Squeeze 해소 + WT 하방. 응축된 변동성이 하방으로 폭발.',
+    },
+    'Volume_Climax_Sell': {
+        'chart_icon': '🌋', 'chart_label': 'Vol Climax SELL',
+        'kor': '거래량 클라이맥스 매도',
+        'desc': '평균의 3배 이상 거래량 + 상승 캔들 + WT 과매수 + WT 하락 시작. 클라이맥스 탑 신호.',
+    },
+    'OBV_Div_Sell': {
+        'chart_icon': '🔻', 'chart_label': 'OBV Div SELL',
+        'kor': 'OBV 다이버전스 매도',
+        'desc': 'OBV와 가격 사이의 하락 다이버전스. 스마트머니 이탈 가능성.',
+    },
+    'ADX_Momentum_Sell': {
+        'chart_icon': '💨', 'chart_label': 'ADX Down',
+        'kor': 'ADX 하락 점화',
+        'desc': 'ADX가 20을 돌파 + Minus DI > Plus DI. 새로운 하락 추세의 시작.',
+    },
+    'Fib_Resistance_Sell': {
+        'chart_icon': '🚧', 'chart_label': 'Fib Resist',
+        'kor': '피보나치 저항',
+        'desc': '0.618~0.786 피보나치 되돌림 저항대에서 WT 하락 교차. 핵심 저항대 돌파 실패.',
+    },
+    'Bearish_Engulfing': {
+        'chart_icon': '🌑', 'chart_label': 'Bear Engulf',
+        'kor': '하락 장악형',
+        'desc': '전일 상승 캔들을 완전히 감싸는 하락 캔들 + WT 과매수. 강한 매도세 유입.',
+    },
+    'Death_Cross': {
+        'chart_icon': '☠️', 'chart_label': 'Death Cross',
+        'kor': '데드 크로스',
+        'desc': '50일 이동평균이 200일 이동평균을 하향 돌파. 중장기 약세 전환의 클래식 신호.',
     },
 }
 
@@ -1266,27 +1302,50 @@ with st.sidebar:
 
     st.markdown("### 📖 신호 가이드")
 
+    BUY_GUIDE_ORDER = [
+        'Ultra_Buy', 'Strong_Buy', 'Gold_Dot', 'Green_Dot_T1', 'Green_Dot_T2',
+        'Blue_Diamond', 'Green_Circle', 'Bull_Divergence', 'Hidden_Bull_Div',
+        'Squeeze_Fire_Buy', 'Volume_Climax_Buy', 'OBV_Div_Buy',
+        'ADX_Momentum_Buy', 'Fib_Bounce_Buy', 'Bullish_Engulfing', 'Golden_Cross',
+    ]
+    SELL_GUIDE_ORDER = [
+        'Ultra_Sell', 'Strong_Sell', 'Blood_Diamond', 'Red_Dot_T1', 'Red_Dot_T2',
+        'Red_Diamond', 'Red_Circle', 'Bear_Divergence', 'Hidden_Bear_Div',
+        'Squeeze_Fire_Sell', 'Volume_Climax_Sell', 'OBV_Div_Sell',
+        'ADX_Momentum_Sell', 'Fib_Resistance_Sell', 'Bearish_Engulfing', 'Death_Cross',
+    ]
+
     with st.expander("🟢 매수 신호 (BUY)", expanded=False):
-        for k in ['Ultra_Buy', 'Strong_Buy', 'Gold_Dot', 'Green_Dot_T1', 'Green_Dot_T2',
-                   'Blue_Diamond', 'Green_Circle', 'Bull_Divergence', 'Hidden_Bull_Div',
-                   'Squeeze_Fire_Buy', 'Volume_Climax_Buy', 'OBV_Div_Buy',
-                   'ADX_Momentum_Buy', 'Fib_Bounce_Buy', 'Bullish_Engulfing', 'Golden_Cross']:
+        for k in BUY_GUIDE_ORDER:
             if k in SIGNAL_DESCRIPTIONS:
                 info = SIGNAL_DESCRIPTIONS[k]
-                st.markdown(f"**{info['cat']}**", unsafe_allow_html=True)
+                # 차트에 표시되는 것과 동일한 아이콘+라벨을 제목으로 표시
+                chart_name = f"{info['chart_icon']} {info['chart_label']}"
+                st.markdown(
+                    f"**{chart_name}** · <span style='color:#888;font-size:0.82rem;'>{info['kor']}</span>",
+                    unsafe_allow_html=True,
+                )
                 st.caption(info['desc'])
-                st.markdown("<hr style='border:none;border-top:1px solid #222;margin:4px 0;'>", unsafe_allow_html=True)
+                st.markdown(
+                    "<hr style='border:none;border-top:1px solid #222;margin:4px 0;'>",
+                    unsafe_allow_html=True,
+                )
 
     with st.expander("🔴 매도 신호 (SELL)", expanded=False):
-        for k in ['Ultra_Sell', 'Strong_Sell', 'Blood_Diamond', 'Red_Dot_T1', 'Red_Dot_T2',
-                   'Red_Diamond', 'Red_Circle', 'Bear_Divergence', 'Hidden_Bear_Div',
-                   'Squeeze_Fire_Sell', 'Volume_Climax_Sell', 'OBV_Div_Sell',
-                   'ADX_Momentum_Sell', 'Fib_Resistance_Sell', 'Bearish_Engulfing', 'Death_Cross']:
+        for k in SELL_GUIDE_ORDER:
             if k in SIGNAL_DESCRIPTIONS:
                 info = SIGNAL_DESCRIPTIONS[k]
-                st.markdown(f"**{info['cat']}**", unsafe_allow_html=True)
+                chart_name = f"{info['chart_icon']} {info['chart_label']}"
+                st.markdown(
+                    f"**{chart_name}** · <span style='color:#888;font-size:0.82rem;'>{info['kor']}</span>",
+                    unsafe_allow_html=True,
+                )
                 st.caption(info['desc'])
-                st.markdown("<hr style='border:none;border-top:1px solid #222;margin:4px 0;'>", unsafe_allow_html=True)
+                st.markdown(
+                    "<hr style='border:none;border-top:1px solid #222;margin:4px 0;'>",
+                    unsafe_allow_html=True,
+                )
+                
 
     with st.expander("📊 지표 해석 가이드", expanded=False):
         st.markdown("""
