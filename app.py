@@ -98,12 +98,6 @@ section[data-testid="stSidebar"] .stMarkdown p { color: #AAAAAA !important; }
 .ind-bullish { background: rgba(0,230,118,0.15); color: #00E676; }
 .ind-bearish { background: rgba(255,23,68,0.15); color: #FF1744; }
 .ind-neutral { background: rgba(255,193,7,0.15); color: #FFC107; }
-.signal-history-grid {
-    display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0;
-}
-.signal-history-grid .indicator-mini {
-    flex-shrink: 0; white-space: nowrap;
-}
 .bias-gauge-track {
     height: 8px; border-radius: 4px; margin: 8px 0;
     background: linear-gradient(90deg, #FF1744 0%, #FF1744 20%, #FFC107 35%, #888 50%, #FFC107 65%, #00E676 80%, #00E676 100%);
@@ -113,22 +107,6 @@ section[data-testid="stSidebar"] .stMarkdown p { color: #AAAAAA !important; }
     width: 4px; height: 16px; background: white; border-radius: 2px;
     position: absolute; top: -4px; transform: translateX(-50%);
     box-shadow: 0 0 6px rgba(255,255,255,0.5);
-}
-.signal-group {
-    background: rgba(255,255,255,0.02); border: 1px solid #2D333B;
-    border-radius: 10px; padding: 12px 16px; margin: 6px 0;
-}
-.signal-group-title {
-    font-size: 0.75rem; color: #666; margin-bottom: 6px;
-    text-transform: uppercase; letter-spacing: 0.5px;
-}
-.analysis-block {
-    border: 1px solid #2D333B; border-radius: 14px;
-    padding: 16px; margin: 8px 0; background: #12151B;
-}
-.chat-divider {
-    border: none; border-top: 1px solid #2D333B;
-    margin: 16px 0;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -195,152 +173,152 @@ SIGNAL_DESCRIPTIONS = {
     'Gold_Dot': {
         'chart_icon': '🏆', 'chart_label': 'GOLD DOT',
         'kor': '최강 매수',
-        'desc': '모든 매수 조건이 극단적으로 수렴. RSI<30 + MFI<30 + WT1<-60 + 상승 다이버전스가 동시 확인될 때 발생.',
+        'desc': '모든 매수 조건이 극단적으로 수렴. RSI<30 + MFI<30 + WT1<-60 + 상승 다이버전스. 추세 필터 무시.',
     },
     'Green_Dot_T1': {
         'chart_icon': '🟢', 'chart_label': 'BUY T1',
         'kor': '강한 매수',
-        'desc': 'WT 과매도 영역에서 교차 + RSI<30 + MFI<30 + MF<0. 강력한 반전 신호.',
+        'desc': 'WT 과매도 교차 + RSI<30 + MFI<30 + MF<0. 극단적 하락장에서만 억제.',
     },
     'Green_Dot_T2': {
         'chart_icon': '🟩', 'chart_label': 'BUY T2',
         'kor': '매수',
-        'desc': 'T1보다 조건이 약간 완화된 매수 신호. WT 과매도 + RSI 또는 MFI 중 하나가 32 미만.',
+        'desc': 'T1 완화 버전. WT 과매도 + RSI 또는 MFI < 32. 강한 하락장에서 억제.',
     },
     'Blue_Diamond': {
         'chart_icon': '🔹', 'chart_label': 'BLUE DIA',
         'kor': '추세 매수',
-        'desc': 'WT2가 0 이하에서 상승 교차 + 상위 시간대(HTF) 강세 확인. 추세 초기 진입 신호.',
+        'desc': 'WT2≤0 상승교차 + HTF 강세 + 하락추세 아님 + 자금유출 심하지 않을 때 발동.',
     },
     'Green_Circle': {
         'chart_icon': '✅', 'chart_label': 'BUY Circle',
         'kor': '과매도 반등',
-        'desc': 'WT 과매도 영역에서의 교차. Green Dot 조건 미달이지만 반등 가능성을 시사.',
+        'desc': 'WT 과매도 교차. Green Dot 미달. 강한 하락장에서 억제.',
     },
     'Bull_Divergence': {
         'chart_icon': '📈', 'chart_label': 'Bull Div',
         'kor': '상승 다이버전스',
-        'desc': '가격은 저점을 낮추지만 WT는 저점을 높이는 패턴. 하락 모멘텀 소진 → 반전 임박.',
+        'desc': '가격 저점↓ vs WT 저점↑. 하락장에서 억제됨 (추세 중 다이버전스 실패 방지).',
     },
     'Hidden_Bull_Div': {
         'chart_icon': '🔀', 'chart_label': 'Hidden Bull',
         'kor': '히든 상승 다이버전스',
-        'desc': '가격은 저점을 높이지만 오실레이터는 저점을 낮춤. 기존 상승 추세 재개 신호.',
+        'desc': '가격 저점↑ vs 오실레이터 저점↓. 기존 상승 추세 재개 신호.',
     },
     'Squeeze_Fire_Buy': {
         'chart_icon': '💥', 'chart_label': 'Squeeze BUY',
         'kor': '스퀴즈 매수',
-        'desc': 'TTM Squeeze 해소 + 모멘텀 상방. 볼린저밴드가 켈트너채널 밖으로 벗어나며 변동성 폭발.',
+        'desc': 'TTM Squeeze 해소 + 모멘텀 상방. 강한 하락장에서 억제.',
     },
     'Volume_Climax_Buy': {
         'chart_icon': '🌊', 'chart_label': 'Vol Climax BUY',
         'kor': '거래량 클라이맥스 매수',
-        'desc': '평균의 3배 이상 거래량 + 하락 캔들 + WT 과매도 + 반등 시작. 투매 후 반전 신호.',
+        'desc': '평균 3배 거래량 + 하락캔들 + WT과매도 + 반등. 투매 후 반전.',
     },
     'OBV_Div_Buy': {
         'chart_icon': '📊', 'chart_label': 'OBV Div BUY',
         'kor': 'OBV 다이버전스 매수',
-        'desc': 'OBV(누적거래량)와 가격 사이의 상승 다이버전스. 스마트머니 매집 가능성.',
+        'desc': 'OBV-가격 상승 다이버전스. 극단 하락장에서 억제.',
     },
     'ADX_Momentum_Buy': {
         'chart_icon': '🚀', 'chart_label': 'ADX Ignition',
         'kor': 'ADX 점화',
-        'desc': 'ADX가 20을 돌파 + Plus DI > Minus DI. 새로운 상승 추세의 시작.',
+        'desc': 'ADX > 20 돌파 + Plus DI > Minus DI. 새 상승추세 시작.',
     },
     'Fib_Bounce_Buy': {
         'chart_icon': '📐', 'chart_label': 'Fib Bounce',
         'kor': '피보나치 반등',
-        'desc': '0.618~0.786 피보나치 되돌림 레벨에서 지지 + WT 상승 교차.',
+        'desc': '0.618~0.786 되돌림 지지 + WT 상승교차. 강한 하락장 억제.',
     },
     'Bullish_Engulfing': {
         'chart_icon': '☀️', 'chart_label': 'Bull Engulf',
         'kor': '상승 장악형',
-        'desc': '전일 하락 캔들을 완전히 감싸는 상승 캔들 + WT 약세 구간. 강한 매수세 유입.',
+        'desc': '전일 하락캔들을 감싸는 상승캔들 + WT 약세구간. 강한 하락장 억제.',
     },
     'Golden_Cross': {
         'chart_icon': '✨', 'chart_label': 'Golden Cross',
         'kor': '골든 크로스',
-        'desc': '50일 이동평균이 200일 이동평균을 상향 돌파. 중장기 강세 전환.',
+        'desc': '50일 MA > 200일 MA 상향돌파. 중장기 강세 전환.',
     },
     'Ultra_Sell': {
         'chart_icon': '🚨', 'chart_label': 'ULTRA SELL',
         'kor': '울트라 매도',
-        'desc': 'Confluence Score ≤ -6 또는 (≤-5 + 동시 3개 이상 매도 신호). 극단적 매도.',
+        'desc': 'Confluence Score ≤ -6 또는 (≤-5 + 동시 3개 이상 매도). 극단적 매도.',
     },
     'Strong_Sell': {
         'chart_icon': '⚠️', 'chart_label': 'STRONG SELL',
         'kor': '스트롱 매도',
-        'desc': 'Confluence Score -6~-3.5. 다수의 매도 시그널이 수렴.',
+        'desc': 'Confluence Score -6~-3.5. 다수 매도 시그널 수렴.',
     },
     'Blood_Diamond': {
         'chart_icon': '🩸', 'chart_label': 'BLOOD DIA',
         'kor': '최강 매도',
-        'desc': '모든 매도 조건이 극단적으로 수렴. RSI>70 + MFI>70 + WT1>60 + 하락 다이버전스.',
+        'desc': 'RSI>70 + MFI>70 + WT1>60 + 하락 다이버전스. 추세 필터 무시.',
     },
     'Red_Dot_T1': {
         'chart_icon': '🔴', 'chart_label': 'SELL T1',
         'kor': '강한 매도',
-        'desc': 'WT 과매수 영역에서 하락 교차 + RSI>70 + MFI>70 + MF>0. 강한 하락 반전.',
+        'desc': 'WT 과매수 하락교차 + RSI>70 + MFI>70 + MF>0. 극단적 상승장에서만 억제.',
     },
     'Red_Dot_T2': {
         'chart_icon': '🟥', 'chart_label': 'SELL T2',
         'kor': '매도',
-        'desc': 'T1보다 조건이 약간 완화된 매도 신호. WT 과매수 + RSI 또는 MFI 중 하나가 68 초과.',
+        'desc': 'T1 완화 버전. WT 과매수 + RSI 또는 MFI > 68. 강한 상승장에서 억제.',
     },
     'Red_Diamond': {
         'chart_icon': '🔸', 'chart_label': 'RED DIA',
         'kor': '추세 매도',
-        'desc': 'WT2가 0 이상에서 하락 교차 + 상위 시간대 약세 확인.',
+        'desc': 'WT2≥0 하락교차 + HTF 약세 + 상승추세 아님 + 자금유입 약할 때 발동.',
     },
     'Red_Circle': {
         'chart_icon': '⛔', 'chart_label': 'SELL Circle',
         'kor': '과매수 하락',
-        'desc': 'WT 과매수 영역에서의 하락 교차. Red Dot 조건 미달이지만 조정 가능성.',
+        'desc': 'WT 과매수 하락교차. Red Dot 미달. 강한 상승장에서 억제.',
     },
     'Bear_Divergence': {
         'chart_icon': '📉', 'chart_label': 'Bear Div',
         'kor': '하락 다이버전스',
-        'desc': '가격은 고점을 높이지만 WT는 고점을 낮추는 패턴. 상승 모멘텀 소진.',
+        'desc': '가격 고점↑ vs WT 고점↓. 상승장에서 억제됨 (추세 중 다이버전스 실패 방지).',
     },
     'Hidden_Bear_Div': {
         'chart_icon': '🔁', 'chart_label': 'Hidden Bear',
         'kor': '히든 하락 다이버전스',
-        'desc': '가격은 고점을 낮추지만 오실레이터는 고점을 높임. 하락 추세 재개.',
+        'desc': '가격 고점↓ vs 오실레이터 고점↑. 하락 추세 재개.',
     },
     'Squeeze_Fire_Sell': {
         'chart_icon': '🧨', 'chart_label': 'Squeeze SELL',
         'kor': '스퀴즈 매도',
-        'desc': 'TTM Squeeze 해소 + 모멘텀 하방. 응축된 변동성이 하방으로 폭발.',
+        'desc': 'TTM Squeeze 해소 + 모멘텀 하방. 강한 상승장에서 억제.',
     },
     'Volume_Climax_Sell': {
         'chart_icon': '🌋', 'chart_label': 'Vol Climax SELL',
         'kor': '거래량 클라이맥스 매도',
-        'desc': '평균의 3배 이상 거래량 + 상승 캔들 + WT 과매수 + 하락 시작. 클라이맥스 탑.',
+        'desc': '평균 3배 거래량 + 상승캔들 + WT과매수 + 하락. 클라이맥스 탑.',
     },
     'OBV_Div_Sell': {
         'chart_icon': '🔻', 'chart_label': 'OBV Div SELL',
         'kor': 'OBV 다이버전스 매도',
-        'desc': 'OBV와 가격 사이의 하락 다이버전스. 스마트머니 이탈 가능성.',
+        'desc': 'OBV-가격 하락 다이버전스. 극단 상승장에서 억제.',
     },
     'ADX_Momentum_Sell': {
         'chart_icon': '💨', 'chart_label': 'ADX Down',
         'kor': 'ADX 하락 점화',
-        'desc': 'ADX가 20을 돌파 + Minus DI > Plus DI. 새로운 하락 추세의 시작.',
+        'desc': 'ADX > 20 돌파 + Minus DI > Plus DI. 새 하락추세 시작.',
     },
     'Fib_Resistance_Sell': {
         'chart_icon': '🚧', 'chart_label': 'Fib Resist',
         'kor': '피보나치 저항',
-        'desc': '0.618~0.786 피보나치 되돌림 저항대에서 WT 하락 교차.',
+        'desc': '0.618~0.786 되돌림 저항 + WT 하락교차. 강한 상승장 억제.',
     },
     'Bearish_Engulfing': {
         'chart_icon': '🌑', 'chart_label': 'Bear Engulf',
         'kor': '하락 장악형',
-        'desc': '전일 상승 캔들을 완전히 감싸는 하락 캔들 + WT 강세 구간. 강한 매도세.',
+        'desc': '전일 상승캔들을 감싸는 하락캔들 + WT 강세구간. 강한 상승장 억제.',
     },
     'Death_Cross': {
         'chart_icon': '☠️', 'chart_label': 'Death Cross',
         'kor': '데드 크로스',
-        'desc': '50일 이동평균이 200일 이동평균을 하향 돌파. 중장기 약세 전환.',
+        'desc': '50일 MA < 200일 MA 하향돌파. 중장기 약세 전환.',
     },
 }
 
@@ -402,10 +380,10 @@ def get_yf_history(ticker):
 
 
 # ──────────────────────────────────────────
-# ✅ FIX 공통 유틸: 과거 lookback 바 이내 True 확인 (인과적, 미래 참조 없음)
+# 공통 유틸
 # ──────────────────────────────────────────
 def _recent_true(series, lookback=3):
-    """series가 최근 lookback 바 이내에 True였으면 True (현재 바 포함)"""
+    """series가 최근 lookback 바 이내에 True였으면 True (인과적, 미래 참조 없음)"""
     return series.rolling(window=lookback + 1, min_periods=1).max().fillna(0).astype(bool)
 
 
@@ -506,8 +484,7 @@ def detect_pivot_divergence_v2(price, oscillator, lookback=60, pivot_window=5,
     pv, ov = price.values, oscillator.values
     half = pivot_window
     min_gap = pivot_window * 2
-    pivot_lows = []
-    pivot_highs = []
+    pivot_lows, pivot_highs = [], []
     for i in range(2 * half, n):
         candidate = i - half
         window = pv[i - 2 * half: i + 1]
@@ -550,27 +527,19 @@ def compute_keltner_channel(high, low, close, ema_len=20, atr_len=10, atr_mult=1
     return mid + atr * atr_mult, mid, mid - atr * atr_mult
 
 
-# ──────────────────────────────────────────
-# ✅ FIX P2: TTM Squeeze — 표준 모멘텀 기반 방향 판정
-# ──────────────────────────────────────────
 def detect_ttm_squeeze(bb_up, bb_low, kc_up, kc_low, close, high, low, kc_mid):
     squeeze_on = (bb_up < kc_up) & (bb_low > kc_low)
     fire = (~squeeze_on) & squeeze_on.shift(1).fillna(False)
-    # ✅ FIX: 표준 TTM 모멘텀 = Close - (Donchian중심 + KC중심) / 2
     donchian_mid = (high.rolling(20).max() + low.rolling(20).min()) / 2
     momentum = close - (donchian_mid + kc_mid) / 2
     return squeeze_on, fire & (momentum > 0), fire & (momentum < 0)
 
 
-# ──────────────────────────────────────────
-# ✅ FIX P2: Volume Climax — WT 조건 완화
-# ──────────────────────────────────────────
 def detect_volume_climax(close, opn, volume, wt1, vol_mult=3.0, wt_buy=-40, wt_sell=40):
     avg = volume.rolling(20).mean()
     spike = volume > avg * vol_mult
     bear_c = close < opn
     bull_c = close > opn
-    # ✅ FIX: 1바 반등 또는 극단 과매도/과매수 자체를 허용
     wt_turning_up  = (wt1 > wt1.shift(1)) | (wt1 < -60)
     wt_turning_down = (wt1 < wt1.shift(1)) | (wt1 > 60)
     buy  = spike & bear_c & (wt1 < wt_buy) & wt_turning_up
@@ -588,10 +557,7 @@ def detect_obv_divergence(close, volume, wt1, lookback=60, pivot_window=5):
     return obv, buy, sell
 
 
-# ──────────────────────────────────────────
-# ✅ FIX P3: Engulfing — WT 임계값 완화
-# ──────────────────────────────────────────
-def detect_bearish_engulfing(close, opn, wt1, wt_thresh=20):  # ✅ FIX: 40→20
+def detect_bearish_engulfing(close, opn, wt1, wt_thresh=20):
     pb = close.shift(1) > opn.shift(1)
     cb = close < opn
     eng = pb & cb & (opn >= close.shift(1)) & (close <= opn.shift(1))
@@ -601,7 +567,7 @@ def detect_bearish_engulfing(close, opn, wt1, wt_thresh=20):  # ✅ FIX: 40→20
     return eng & (wt1 > wt_thresh)
 
 
-def detect_bullish_engulfing(close, opn, wt1, wt_thresh=-20):  # ✅ FIX: -40→-20
+def detect_bullish_engulfing(close, opn, wt1, wt_thresh=-20):
     pb = close.shift(1) < opn.shift(1)
     cb = close > opn
     eng = pb & cb & (opn <= close.shift(1)) & (close >= opn.shift(1))
@@ -635,14 +601,9 @@ def detect_ma_cross(ma_fast, ma_slow, wt1, wt2):
     return golden, death
 
 
-# ──────────────────────────────────────────
-# ✅ FIX P0: Confluence Score — 감쇠 커널 방향 수정
-# ──────────────────────────────────────────
 def compute_confluence_score(df, decay_window=5, decay_factor=0.7):
     buy_map  = {k: v['w'] for k, v in SIGNAL_REGISTRY.items() if v['dir'] == 'buy'}
     sell_map = {k: v['w'] for k, v in SIGNAL_REGISTRY.items() if v['dir'] == 'sell'}
-    # ✅ FIX: [::-1] 제거 → [1.0, 0.7, 0.49, 0.343, 0.24, 0.168]
-    # 오늘 시그널 = 1.0(최대), 5일 전 = 0.168(최소)
     decay_kernel = np.array([decay_factor ** i for i in range(decay_window + 1)])
     s = np.zeros(len(df))
     buy_count = np.zeros(len(df))
@@ -782,7 +743,7 @@ def compute_all_signal_stats(df_valid):
 
 
 # ──────────────────────────────────────────
-# 차트 + 분석 데이터 엔진 (✅ FIX 전체 적용)
+# 차트 + 분석 데이터 엔진 (✅ v2.2 추세 필터 통합)
 # ──────────────────────────────────────────
 def get_yfinance_data_and_chart(ticker, chart_period_days=252):
     try:
@@ -819,78 +780,169 @@ def get_yfinance_data_and_chart(ticker, chart_period_days=252):
 
         OB1, OB2, OS1, OS2 = 53, 60, -53, -60
 
-        # ✅ FIX P1: WT 교차를 ±3바 윈도우로 확장 (인과적, 미래 참조 없음)
         wt_up_recent = _recent_true(wt_up, lookback=3)
         wt_down_recent = _recent_true(wt_down, lookback=3)
 
-        df['Blue_Diamond'] = (df['WT2'] <= 0) & wt_up & htf1_bull & htf2_bull
-        df['Red_Diamond']  = (df['WT2'] >= 0) & wt_down & ~htf1_bull & ~htf2_bull
+        # ═══════════════════════════════════════════════════════
+        # ✅ NEW: 추세 레짐 감지 (Trend Regime Detection)
+        # ═══════════════════════════════════════════════════════
+        above_ma50  = df['Close'] > df['MA50']
+        above_ma200 = df['Close'] > df['MA200']
+        below_ma50  = df['Close'] < df['MA50']
+        below_ma200 = df['Close'] < df['MA200']
+        ma50_rising  = df['MA50'] > df['MA50'].shift(5)   # MA50이 5일 전보다 상승 중
+        ma50_falling = df['MA50'] < df['MA50'].shift(5)   # MA50이 5일 전보다 하락 중
 
-        df['Green_Dot_T1'] = wt_up & (df['WT1'] <= OS1) & (df['RSI'] < 30) & (df['MFI'] < 30) & (df['RSI_MFI'] < 0)
-        df['Green_Dot_T2'] = wt_up & (df['WT1'] <= OS1) & ((df['RSI'] < 32) | (df['MFI'] < 32)) & ~df['Green_Dot_T1']
+        # 강한 추세: ADX가 추세 확인 + DI 방향 + 가격이 MA50 위/아래
+        strong_bull = (df['ADX'] > 25) & (df['Plus_DI'] > df['Minus_DI']) & above_ma50
+        strong_bear = (df['ADX'] > 25) & (df['Minus_DI'] > df['Plus_DI']) & below_ma50
+
+        # 극단 추세: 강한 추세 + MA200 확인 + MA50 기울기 확인
+        extreme_bull = strong_bull & above_ma200 & ma50_rising
+        extreme_bear = strong_bear & below_ma200 & ma50_falling
+
+        # 자금 흐름 방향 (Money Flow 확인용)
+        mf_bullish = df['RSI_MFI'] > -10    # 자금 유출이 심하지 않음
+        mf_bearish = df['RSI_MFI'] < 10     # 자금 유입이 강하지 않음
+        # ═══════════════════════════════════════════════════════
+
+        # ──────────────────────────────────────
+        # ✅ IMPROVED: 티어별 시그널 정의
+        # ──────────────────────────────────────
+
+        # ── TIER 1: 절대 억제 금지 (Gold_Dot, Blood_Diamond) ──
+        # 이 신호들은 이미 극단적 조건 수렴이므로 추세 필터 불필요
+
+        # ── Green/Red Dot (TIER 2: 극단 역추세에서만 억제) ──
+        df['Green_Dot_T1'] = (
+            wt_up & (df['WT1'] <= OS1) &
+            (df['RSI'] < 30) & (df['MFI'] < 30) & (df['RSI_MFI'] < 0) &
+            (~extreme_bear)  # ✅ NEW: 극단 하락장에서만 억제
+        )
+        df['Green_Dot_T2'] = (
+            wt_up & (df['WT1'] <= OS1) &
+            ((df['RSI'] < 32) | (df['MFI'] < 32)) &
+            ~df['Green_Dot_T1'] &
+            (~strong_bear)   # ✅ NEW: 강한 하락장에서 억제
+        )
         df['Green_Dot'] = df['Green_Dot_T1'] | df['Green_Dot_T2']
 
-        df['Red_Dot_T1'] = wt_down & (df['WT1'] >= OB1) & (df['RSI'] > 70) & (df['MFI'] > 70) & (df['RSI_MFI'] > 0)
-        df['Red_Dot_T2'] = wt_down & (df['WT1'] >= OB1) & ((df['RSI'] > 68) | (df['MFI'] > 68)) & ~df['Red_Dot_T1']
+        df['Red_Dot_T1'] = (
+            wt_down & (df['WT1'] >= OB1) &
+            (df['RSI'] > 70) & (df['MFI'] > 70) & (df['RSI_MFI'] > 0) &
+            (~extreme_bull)  # ✅ NEW: 극단 상승장에서만 억제
+        )
+        df['Red_Dot_T2'] = (
+            wt_down & (df['WT1'] >= OB1) &
+            ((df['RSI'] > 68) | (df['MFI'] > 68)) &
+            ~df['Red_Dot_T1'] &
+            (~strong_bull)   # ✅ NEW: 강한 상승장에서 억제
+        )
         df['Red_Dot'] = df['Red_Dot_T1'] | df['Red_Dot_T2']
 
-        df['Green_Circle'] = wt_up & (df['WT1'] <= OS1) & ~df['Green_Dot']
-        df['Red_Circle']   = wt_down & (df['WT1'] >= OB1) & ~df['Red_Dot']
+        # ── TIER 3: 강한 역추세에서 억제 ──
+        df['Blue_Diamond'] = (
+            (df['WT2'] <= 0) & wt_up & htf1_bull & htf2_bull &
+            (~strong_bear) &  # ✅ NEW: 강한 하락장에서 억제
+            mf_bullish        # ✅ NEW: 자금 유출이 심하면 무시
+        )
+        df['Red_Diamond'] = (
+            (df['WT2'] >= 0) & wt_down & ~htf1_bull & ~htf2_bull &
+            (~strong_bull) &  # ✅ NEW: 강한 상승장에서 억제
+            mf_bearish        # ✅ NEW: 자금 유입이 강하면 무시
+        )
 
+        df['Green_Circle'] = (
+            wt_up & (df['WT1'] <= OS1) & ~df['Green_Dot'] &
+            (~strong_bear)    # ✅ NEW
+        )
+        df['Red_Circle'] = (
+            wt_down & (df['WT1'] >= OB1) & ~df['Red_Dot'] &
+            (~strong_bull)    # ✅ NEW
+        )
+
+        # ── 다이버전스 (TIER 2~3: 추세 중 다이버전스 실패 방지) ──
         bull_d, bear_d, hid_bull, hid_bear = detect_pivot_divergence_v2(
             df['Close'], df['WT1'], 60, 5, OS1, OB1)
 
-        # ✅ FIX P1: 다이버전스도 최근 3바 이내 확인으로 확장
         bull_d_recent = _recent_true(bull_d, lookback=3)
         bear_d_recent = _recent_true(bear_d, lookback=3)
 
-        # ✅ FIX P1: Gold_Dot — 다이버전스가 최근 3바 이내면 인정
+        # TIER 1: Gold_Dot — 절대 억제 금지
         df['Gold_Dot'] = df['Green_Dot_T1'] & (df['WT1'] <= OS2) & bull_d_recent
 
-        # ✅ FIX P1: Bull/Bear Divergence — WT교차가 최근 3바 이내면 인정
-        df['Bull_Divergence'] = bull_d & wt_up_recent & ~df['Green_Dot'] & ~df['Gold_Dot']
-        df['Bear_Divergence'] = bear_d & wt_down_recent & ~df['Red_Dot']
+        # TIER 2: 다이버전스 — 강한 역추세에서 억제
+        df['Bull_Divergence'] = (
+            bull_d & wt_up_recent &
+            ~df['Green_Dot'] & ~df['Gold_Dot'] &
+            (~strong_bear)    # ✅ NEW: 강한 하락장에서 다이버전스 실패 가능성 높음
+        )
+        df['Bear_Divergence'] = (
+            bear_d & wt_down_recent &
+            ~df['Red_Dot'] &
+            (~strong_bull)    # ✅ NEW: 강한 상승장에서 다이버전스 실패 가능성 높음
+        )
 
         df['Hidden_Bull_Div'] = hid_bull & (df['WT1'] < 0) & htf2_bull
         df['Hidden_Bear_Div'] = hid_bear & (df['WT1'] > 0) & ~htf2_bull
 
-        # ✅ FIX P1: Blood_Diamond — 다이버전스가 최근 3바 이내면 인정
+        # TIER 1: Blood_Diamond — 절대 억제 금지
         df['Blood_Diamond'] = df['Red_Dot_T1'] & (df['WT1'] >= OB2) & bear_d_recent
 
-        # ✅ FIX P2: TTM Squeeze — kc_mid 전달, 모멘텀 기반 방향
+        # ── TTM Squeeze (TIER 3) ──
         kc_u, kc_mid, kc_l = compute_keltner_channel(df['High'], df['Low'], df['Close'])
         df['KC_Upper'], df['KC_Lower'] = kc_u, kc_l
         sq_on, sq_fb, sq_fs = detect_ttm_squeeze(
             df['BB_Up'], df['BB_Low'], kc_u, kc_l,
-            df['Close'], df['High'], df['Low'], kc_mid  # ✅ FIX: 추가 인자
+            df['Close'], df['High'], df['Low'], kc_mid
         )
-        df['Squeeze_On'], df['Squeeze_Fire_Buy'], df['Squeeze_Fire_Sell'] = sq_on, sq_fb, sq_fs
+        df['Squeeze_On'] = sq_on
+        df['Squeeze_Fire_Buy']  = sq_fb & (~strong_bear)   # ✅ NEW
+        df['Squeeze_Fire_Sell'] = sq_fs & (~strong_bull)    # ✅ NEW
 
+        # ── Volume Climax (TIER 2: 이미 극단 조건이라 약하게 필터) ──
         vc_b, vc_s = detect_volume_climax(df['Close'], df['Open'], df['Volume'], df['WT1'])
-        df['Volume_Climax_Buy'], df['Volume_Climax_Sell'] = vc_b, vc_s
+        df['Volume_Climax_Buy']  = vc_b   # 투매는 하락장에서 발생하므로 필터링하면 안 됨
+        df['Volume_Climax_Sell'] = vc_s   # 클라이맥스 탑도 상승장에서 발생하므로 유지
 
+        # ── ADX Momentum (자체적으로 추세 방향 확인하므로 추가 필터 불필요) ──
         df['ADX_Momentum_Buy']  = (df['ADX'] > 20) & (df['ADX'].shift(1) <= 20) & (df['Plus_DI'] > df['Minus_DI']) & (wt1 > wt2)
         df['ADX_Momentum_Sell'] = (df['ADX'] > 20) & (df['ADX'].shift(1) <= 20) & (df['Minus_DI'] > df['Plus_DI']) & (wt1 < wt2)
 
-        df['Fib_Bounce_Buy'] = detect_fib_bounce_buy(df['High'], df['Low'], df['WT1'], df['WT2'])
-        df['Fib_Resistance_Sell'] = detect_fib_resistance_sell(df['High'], df['Low'], df['Close'], df['WT1'], df['WT2'])
+        # ── Fibonacci (TIER 4: 일반 역추세에서도 억제) ──
+        raw_fib_buy = detect_fib_bounce_buy(df['High'], df['Low'], df['WT1'], df['WT2'])
+        raw_fib_sell = detect_fib_resistance_sell(df['High'], df['Low'], df['Close'], df['WT1'], df['WT2'])
+        df['Fib_Bounce_Buy']     = raw_fib_buy & (~strong_bear)    # ✅ NEW
+        df['Fib_Resistance_Sell'] = raw_fib_sell & (~strong_bull)   # ✅ NEW
 
-        # ✅ FIX P3: Engulfing — 완화된 임계값 자동 적용 (함수 내부에서 변경됨)
-        df['Bearish_Engulfing'] = detect_bearish_engulfing(df['Close'], df['Open'], df['WT1'])
-        df['Bullish_Engulfing'] = detect_bullish_engulfing(df['Close'], df['Open'], df['WT1'])
+        # ── Engulfing (TIER 3) ──
+        raw_bull_eng = detect_bullish_engulfing(df['Close'], df['Open'], df['WT1'])
+        raw_bear_eng = detect_bearish_engulfing(df['Close'], df['Open'], df['WT1'])
+        df['Bullish_Engulfing'] = raw_bull_eng & (~strong_bear)    # ✅ NEW
+        df['Bearish_Engulfing'] = raw_bear_eng & (~strong_bull)    # ✅ NEW
 
+        # ── MA Cross (추세 전환 신호이므로 필터 불필요) ──
         gc, dc = detect_ma_cross(df['MA50'], df['MA200'], df['WT1'], df['WT2'])
         df['Golden_Cross'], df['Death_Cross'] = gc, dc
 
+        # ── OBV Divergence (TIER 4) ──
+        df['OBV_Div_Buy']  = obv_db & (~extreme_bear)    # ✅ NEW: 극단 하락장에서만 억제
+        df['OBV_Div_Sell'] = obv_ds & (~extreme_bull)     # ✅ NEW: 극단 상승장에서만 억제
+
+        # ── Small Dots (WT 교차만으로는 신호 불필요, 차트 표시용) ──
         df['Small_Green_Dot'] = wt_up & ~df['Green_Circle'] & ~df['Green_Dot'] & ~df['Gold_Dot'] & ~df['Blue_Diamond'] & ~df['Bull_Divergence']
         df['Small_Red_Dot']   = wt_down & ~df['Red_Circle'] & ~df['Red_Dot'] & ~df['Red_Diamond'] & ~df['Bear_Divergence']
 
-        # ✅ FIX P0: 수정된 Confluence Score 함수 호출
+        # ── Confluence Score (필터된 시그널 기반으로 계산) ──
         compute_confluence_score(df)
 
         buy_prox, sell_prox = compute_signal_proximity(
             df['WT1'], df['WT2'], df['RSI'], df['MFI'], df['RSI_MFI'], df['StochK'])
         df['Buy_Proximity'], df['Sell_Proximity'] = buy_prox, sell_prox
+
+        # ✅ NEW: 추세 레짐 정보를 meta에 전달
+        df['Strong_Bull'] = strong_bull
+        df['Strong_Bear'] = strong_bear
 
         df_valid = df.dropna(subset=['WT1', 'WT2'])
         df_chart = df_valid.tail(chart_period_days).copy()
@@ -919,6 +971,14 @@ def get_yfinance_data_and_chart(ticker, chart_period_days=252):
         bias, bscore = compute_bias_score(m4b, bool(htf1_bull.iloc[-1]), bool(htf2_bull.iloc[-1]))
         conf_now = float(df_chart['Confluence_Score'].iloc[-1])
 
+        # ✅ NEW: 추세 상태 문자열
+        if latest.get('Strong_Bull', False):
+            trend_regime = 'STRONG BULL 🟢'
+        elif latest.get('Strong_Bear', False):
+            trend_regime = 'STRONG BEAR 🔴'
+        else:
+            trend_regime = 'NEUTRAL ⚪'
+
         meta = {
             'ticker': ticker.upper(), 'price': latest['Close'],
             'price_change': p_chg, 'price_change_pct': p_chg_pct,
@@ -938,6 +998,7 @@ def get_yfinance_data_and_chart(ticker, chart_period_days=252):
             'buy_proximity': float(latest['Buy_Proximity']),
             'sell_proximity': float(latest['Sell_Proximity']),
             'squeeze_on': bool(latest.get('Squeeze_On', False)),
+            'trend_regime': trend_regime,   # ✅ NEW
         }
 
         # ── 차트 (5 패널) ──
@@ -1053,7 +1114,8 @@ def get_yfinance_data_and_chart(ticker, chart_period_days=252):
             fig.add_hline(y=lv, line_dash=d, line_color=c, line_width=1 if d == 'solid' else 0.8, row=5, col=1)
 
         fig.update_layout(
-            title=dict(text=f"📊 {ticker.upper()} | 💎 Market Cipher B+", font=dict(size=14, color='#FAFAFA')),
+            title=dict(text=f"📊 {ticker.upper()} | 💎 Market Cipher B+ | {trend_regime}",
+                       font=dict(size=14, color='#FAFAFA')),
             yaxis_title="USD", yaxis2_title="Vol", yaxis3_title="WT", yaxis4_title="MF", yaxis5_title="Conf",
             template="plotly_dark", margin=dict(l=0, r=0, t=50, b=0), height=1100, showlegend=True,
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5,
@@ -1090,6 +1152,7 @@ def get_yfinance_data_and_chart(ticker, chart_period_days=252):
             f"VWAP_Osc={latest['VWAP_Osc']:.2f}, MF_Area={latest['RSI_MFI']:.1f}, "
             f"ADX={latest['ADX']:.1f}, +DI={latest['Plus_DI']:.1f}, -DI={latest['Minus_DI']:.1f}, "
             f"Confluence={conf_now:.1f}, Bias={bias}({bscore:.1f}), "
+            f"Trend={trend_regime}, "
             f"{prox_text}, {sq_text}"
         )
         enhanced = f"{ps}\n\n📌 [지표]\n{inds}\n\n📌 [시그널]\n{st_text}"
@@ -1141,12 +1204,14 @@ def render_price_header(meta):
     rsi_lbl = _indicator_label('rsi', meta['rsi'])
     mfi_lbl = _indicator_label('mfi', meta['mfi'])
     stk_lbl = _indicator_label('stochk', meta['stochk'])
+    # ✅ NEW: 추세 레짐 표시
+    trend = meta.get('trend_regime', 'NEUTRAL ⚪')
 
     st.markdown(f"""
     <div class="price-header">
         <div style="display:flex;justify-content:space-between;align-items:center;">
             <div>
-                <p class="price-label">💎 {meta['ticker']} · {meta['last_date']}</p>
+                <p class="price-label">💎 {meta['ticker']} · {meta['last_date']} · <b>{trend}</b></p>
                 <p class="price-big" style="color:#FAFAFA;">${meta['price']:.2f}
                     <span class="{chg_cls}" style="font-size:1rem;margin-left:8px;">
                         {chg_ico} {abs(chg):.2f} ({abs(chg_pct):.2f}%)</span></p>
@@ -1247,21 +1312,18 @@ def render_signal_cards(meta):
         group = date_groups[d_str]
         buy_count = sum(1 for _, _, s in group if s == 'buy')
         sell_count = sum(1 for _, _, s in group if s == 'sell')
-
         if buy_count > sell_count:
             ct = 'signal-card-buy'
         elif sell_count > buy_count:
             ct = 'signal-card-sell'
         else:
             ct = 'signal-card-neutral'
-
         sig_html_parts = []
         for icon, lbl, side in group:
             badge_cls = 'ind-bullish' if side == 'buy' else 'ind-bearish'
             sig_html_parts.append(f'<span class="indicator-mini {badge_cls}">{icon} {lbl}</span>')
         sig_list_html = " ".join(sig_html_parts)
         count_text = f"{len(group)}개 신호" if len(group) > 1 else "1개 신호"
-
         st.markdown(f"""<div class="signal-card {ct}">
             <div style="display:flex;justify-content:space-between;align-items:center;">
                 <span style="font-weight:700;font-size:0.9rem;color:#FAFAFA;">📅 {d_str}</span>
@@ -1323,7 +1385,7 @@ def render_inline_analysis(msg):
 # ──────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 💎 CipherX")
-    st.markdown("<p style='color:#888;font-size:0.8rem;'>AI 주가 분석 · Market Cipher B+</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#888;font-size:0.8rem;'>AI 주가 분석 · Market Cipher B+ v2.2</p>", unsafe_allow_html=True)
     st.markdown("---")
 
     st.markdown("### 📅 차트 기간")
@@ -1335,7 +1397,7 @@ with st.sidebar:
     if st.button("🗑️ 대화 초기화", use_container_width=True, type="secondary"):
         st.session_state.messages = [
             {"role": "assistant", "type": "text",
-             "content": "안녕하세요! 💎 **CipherX** 입니다.\n\n분석할 **티커명**을 입력하세요. 채팅처럼 자유롭게 여러 종목을 이어서 분석할 수 있습니다."}
+             "content": "안녕하세요! 💎 **CipherX** 입니다.\n\n분석할 **티커명**을 입력하세요."}
         ]
         st.session_state.pending_ai_ticker = None
         st.session_state.pending_ai_prompt = None
@@ -1367,10 +1429,7 @@ with st.sidebar:
                     unsafe_allow_html=True,
                 )
                 st.caption(info['desc'])
-                st.markdown(
-                    "<hr style='border:none;border-top:1px solid #222;margin:4px 0;'>",
-                    unsafe_allow_html=True,
-                )
+                st.markdown("<hr style='border:none;border-top:1px solid #222;margin:4px 0;'>", unsafe_allow_html=True)
 
     with st.expander("🔴 매도 신호 (SELL)", expanded=False):
         for k in SELL_GUIDE_ORDER:
@@ -1382,36 +1441,41 @@ with st.sidebar:
                     unsafe_allow_html=True,
                 )
                 st.caption(info['desc'])
-                st.markdown(
-                    "<hr style='border:none;border-top:1px solid #222;margin:4px 0;'>",
-                    unsafe_allow_html=True,
-                )
+                st.markdown("<hr style='border:none;border-top:1px solid #222;margin:4px 0;'>", unsafe_allow_html=True)
+
+    # ✅ NEW: 추세 필터 설명 추가
+    with st.expander("🛡️ 추세 필터 시스템", expanded=False):
+        st.markdown("""
+**추세 레짐 감지**
+- `STRONG BULL 🟢`: ADX>25 + Plus DI > Minus DI + Close > MA50
+- `STRONG BEAR 🔴`: ADX>25 + Minus DI > Plus DI + Close < MA50
+- `EXTREME`: Strong + MA200 확인 + MA50 기울기 확인
+
+**티어별 필터링**
+- **Tier 1** (Gold Dot, Blood Diamond): ❌ 절대 억제 안 함
+- **Tier 2** (T1, Divergence): 극단 역추세에서만 억제
+- **Tier 3** (T2, Diamond, Circle, Squeeze, Engulfing): 강한 역추세에서 억제
+- **Tier 4** (Fib, OBV Div): 일반 역추세에서도 억제
+
+**자금 흐름 필터**
+- Blue Diamond: RSI_MFI > -10 (자금 대량 유출 중이면 억제)
+- Red Diamond: RSI_MFI < 10 (자금 대량 유입 중이면 억제)
+        """)
 
     with st.expander("📊 지표 해석 가이드", expanded=False):
         st.markdown("""
 **WaveTrend (WT1/WT2)**
-- WT1 < -53: 과매도 (반등 가능)
-- WT1 > 53: 과매수 (조정 가능)
+- WT1 < -53: 과매도 · WT1 > 53: 과매수
 - WT1이 WT2를 상향돌파: 매수 교차
 - WT1이 WT2를 하향돌파: 매도 교차
 
-**RSI (상대강도지수)**
-- < 30: 과매도 · > 70: 과매수
-
-**MFI (자금흐름지수)**
-- RSI + 거래량 결합 지표
+**RSI / MFI**
 - < 30: 과매도 · > 70: 과매수
 
 **Confluence Score**
-- ≥ 6.0: Ultra Buy
-- 3.5~6.0: Strong Buy
+- ≥ 6.0: Ultra Buy · 3.5~6.0: Strong Buy
 - -3.5~3.5: Neutral
-- -6.0~-3.5: Strong Sell
-- ≤ -6.0: Ultra Sell
-
-**Signal Proximity**
-- 50%+: 시그널 접근 중
-- 70%+: 시그널 매우 임박
+- -6.0~-3.5: Strong Sell · ≤ -6.0: Ultra Sell
 
 **TTM Squeeze**
 - ON: 변동성 응축 (폭발 대기)
@@ -1419,7 +1483,7 @@ with st.sidebar:
         """)
 
     st.markdown("---")
-    st.markdown("<p style='color:#555;font-size:0.7rem;text-align:center;'>CipherX v2.1 · Market Cipher B+ Engine</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#555;font-size:0.7rem;text-align:center;'>CipherX v2.2 · Trend-Filtered Engine</p>", unsafe_allow_html=True)
 
 
 # ──────────────────────────────────────────
@@ -1450,18 +1514,19 @@ def build_analysis_prompt(ticker_value, phist, scraped):
 ━━━━━━━━━━━━━
 【 🛠️ Task 】
 ━━━━━━━━━━━━━ 
-아래 데이터로 심층 주가 분석 보고서를 작성하세요. 함의와 투자자 행동을 구체적으로 설명하세요.
+아래 데이터로 심층 주가 분석 보고서를 작성하세요.
 
-💎 시그널 해석 필수: Gold Dot, Blood Diamond, Green/Red Dot T1/T2, Blue/Red Diamond,
-Hidden Divergence, Volume Climax, TTM Squeeze, ADX Ignition, Bullish/Bearish Engulfing,
-Golden/Death Cross, Fibonacci Bounce/Resistance, Confluence Score
+💎 시그널은 추세 필터가 적용되었습니다:
+- Tier 1 (Gold Dot, Blood Diamond): 추세 무관 항상 유효
+- Tier 2 (T1, Divergence): 극단 역추세에서만 억제됨
+- Tier 3 (T2, Diamond, Circle 등): 강한 역추세에서 억제됨
 
 🔥 Confluence Score (시간 감쇠 적용): ≥6 Ultra Buy | 3.5~6 Strong Buy | -3.5~3.5 Neutral | -6~-3.5 Strong Sell | ≤-6 Ultra Sell
-⚠️ Ultra 발동 조건: 점수 ≥6 또는 (점수≥5 + 동시 시그널 3개 이상)
 
+⚠️ Trend Regime: 현재 추세 상태를 반드시 고려하세요.
 ⚠️ Signal Proximity: 매수/매도 시그널 임박 여부를 반드시 언급하세요.
 
-주가변동이유/이벤트, 공매도, 콜/풋옵션 → DEEP SEARCH. 최신 데이터 필수.
+주가변동이유/이벤트, 공매도, 콜/풋옵션 → DEEP SEARCH.
 
 ---
 ━━━━━━━━━━━━━ 
@@ -1480,88 +1545,81 @@ Golden/Death Cross, Fibonacci Bounce/Resistance, Confluence Score
 【 ✍️ Guidelines 】
 ━━━━━━━━━━━━━ 
 ① 한국어, 전문적이면서 이해하기 쉽게
-② 확신형 어조 ("~할 가능성이 높습니다" ⭕)
+② 확신형 어조
 ③ 불릿/강조/이모티콘(🔵긍정 🔴부정 🟠중간)
-④ 거래량 배수 + 매집/투매, ATR 변동폭, WT구간, Diamond/Dot 신뢰도, MF방향,
-   Confluence Score + 감쇠 해석, Hidden Div, Vol Climax, ADX, Squeeze, Engulfing, MA Cross, Fib
+④ Trend Regime과 시그널의 신뢰도를 연계하여 분석
 ⑤ 시나리오별 확률(%) + 근거
 ⑥ 기술적 vs 심리지표 충돌 판단
-⑦ 섹터/지수 동조성, 베타, RS Ratio
-⑧ 지지/저항 → Volume Profile(POC, VAH, VAL) 기준
+⑦ 섹터/지수 동조성, 베타
+⑧ 지지/저항
 
 ━━━━━━━━━━━━━ 
 【 📄 Output Format 】
 ━━━━━━━━━━━━━ 
 
 [🔵/🔴/🟠] [{ticker_value}] 분석: [핵심 한 줄]
-[날짜], 전일 대비 [변동률]% [방향]. 거래량 [배수]. [패턴]. 지지 [가격], 저항 [가격].
+[날짜], 전일 대비 [변동률]% [방향]. 거래량 [배수]. 지지 [가격], 저항 [가격].
 
 ---
 ### 내용 요약
 [🔵/🔴/🟠] [3~4문장]
 
 ---
+### 🛡️ 추세 상태 & 시그널 신뢰도
+* 현재 추세 레짐: [STRONG BULL/BEAR/NEUTRAL]
+* 시그널 필터 상태: [어떤 시그널이 억제/통과되었는지]
+* 신뢰도 종합: [높음/중간/낮음 + 근거]
+
+---
 ### 💎 마켓 사이퍼 B+ 시그널 분석
 * WaveTrend: [WT1/WT2, 상태]
 * Money Flow: [방향]
-* 🔥 Confluence Score: [점수, 판정, 감쇠 상태]
+* 🔥 Confluence Score: [점수, 판정]
 * ⚠️ Signal Proximity: [매수/매도 임박 여부]
-* 최근 시그널: [전체 목록]
-* 시그널 신뢰도: [높음/중간/낮음 + 근거]
+* 최근 시그널: [목록]
 > 💎 해석:
 
 ---
 ### 주가 및 거래량 분석
-* 거래량: 평균 대비 [0.0배] 수준. 거래량 지표(Volume Oscillator): [값]
-* 현재 상태: [과매수/과매도 여부, 추세 강도 분석]
-> 해석: [거래량이 갖는 시장 심리 해석]  [긍정:🔵/부정 :🔴/중간:🟠]
-* 거래량 해석: [스마트 머니 유입/이탈 징후]  [긍정:🔵/부정 :🔴/중간:🟠]
+* 거래량: 평균 대비 [배수]
+* 거래량 해석: [스마트머니 유입/이탈]
 > 해석: [🔵/🔴/🟠]
 
 ---
 ### 장중 기술적 지표
-[식별된 기술적 패턴 이름]
-* 상태: [패턴에 대한 설명. ATR 기반 예상 변동 ±__%]
-* 해석: [패턴이 향후 주가에 미칠 영향]  [긍정:🔵/부정 :🔴/중간:🟠]
-역사적 유사패턴: [과거 12개월 내 동일 조건 발생 시 성공률 __%, 평균 수익률 __%]  [긍정:🔵/부정 :🔴/중간:🟠]
+* 패턴: [식별된 패턴]
 * ATR ±__%, ADX, TTM Squeeze, MA Cross
+> 해석: [🔵/🔴/🟠]
 
 ---
 ### 지지선 및 저항선
-* 지지선: [가격1] (설명), [가격2], [가격3]
-* 저항선: [가격1] (설명), [가격2], [가격3]
-[매물대(Volume Profile)상 가장 두터운 구간을 기준으로 현재 주가 위치 설명]
+* 지지선: [가격들]
+* 저항선: [가격들]
 
 ---
 ### 콜/풋옵션 현황
-* 시사점: [투자자들이 상방/하방 중 어디에 베팅하고 있는지 심리 분석]
-* 감마 스퀴즈 위험도: High/Medium/Low
-> [긍정:🔵/부정 :🔴/중간:🟠] 해석: 수급상 주가를 끌어올릴(혹은 내릴) '에너지'가 얼마나 축적되었는가?
+* 시사점: [심리 분석]
+> [🔵/🔴/🟠]
 
 ---
 ### 공매도현황
-* 시사점: [숏 스퀴즈 가능성 등]
-* 공매도 및 숏스퀴즈 가능성: [공매도 비중 및 대차잔고 흐름을 통한 하방 압력 분석. 숏커버링 압력 지수: High/Medium/Low]
+* 시사점: [숏스퀴즈 가능성]
+
 ---
 ### 주가변동이유 및 이벤트
- - [🔵/🔴/🟠] [이유] — 단발성/추세형 [현재 주가의 위치와 모멘텀에 대한 냉철한 평가]
- -
- -
- - 
+- [🔵/🔴/🟠] [이유] — 단발성/추세형
 
 ---
 ### 종합해석 및 전망
-* 🔵긍정적 시나리오 (Bullish): [조건] 충족 시 [목표가]까지 상승 예상.  확률: __% (근거: )
-* 🟠베이스 시나리오: [가장 확률 높은 시나리오]. 확률: __%
-* 🔴리스크 시나리오 (Bearish): [조건] 이탈 시 [목표가]까지 하락 예상.  확률: __% (근거: )
+* 🔵 Bullish: [조건] → [목표가]. 확률: __%
+* 🟠 Base: [시나리오]. 확률: __%
+* 🔴 Bearish: [조건] → [목표가]. 확률: __%
 
 전략:
-리스크/리워드 비율: 목표가 대비 손절가 간 비율 1:__ 확인
-공격적 매수 구간: [가격대] (ATR __% 이내 진입)
-보수적 진입 시점: [확인 매매 가격대]
-손절(Stop-loss) 라인: [필수 준수 가격] - 이 가격 붕괴 시 예측 시나리오 폐기, 즉시 대응
-분할 매도 전략: 1차 목표 [가격] 도달 시 __% 익실, 2차 목표 [가격] 도달 시 __% 추가 매도
-트레일링 스탑: [가격] 이상 진입 시 ATR 기준 트레일링 스탑 적용하여 이익 보존
+공격적 매수: [가격대]
+보수적 진입: [가격대]
+손절: [가격]
+분할매도: 1차 [가격] __%, 2차 [가격] __%
 
 ---
 ### 결론
@@ -1569,7 +1627,6 @@ Golden/Death Cross, Fibonacci Bounce/Resistance, Confluence Score
 
 ### 주가 예측 (다음 거래일)
 [🔵/🔴/🟠] 예상: [방향] · 근거: [...]
-[리스크/리워드 최적 진입] : [] 지지 확인 후 [] 공략, [] 리스크/리워드 최적 진입
 [GRADE/Score]: [이유]"""
 
 
@@ -1601,7 +1658,6 @@ for i, msg in enumerate(st.session_state.messages):
         else:
             st.markdown(msg.get("content", ""))
 
-# ── AI 심층 분석 버튼 ──
 if st.session_state.pending_ai_ticker and st.session_state.pending_ai_prompt:
     ticker_pending = st.session_state.pending_ai_ticker
     prompt_pending = st.session_state.pending_ai_prompt
@@ -1620,11 +1676,9 @@ if st.session_state.pending_ai_ticker and st.session_state.pending_ai_prompt:
                     pb.progress(min(40 + cc * 2, 95), text="AI 리포트 작성 중...")
                 pb.progress(100, text="✅ 분석 완료!"); time.sleep(0.5); pb.empty()
                 rph.empty()
-
                 st.session_state.messages.append({
                     "role": "assistant", "type": "report",
-                    "ticker": ticker_pending.upper(),
-                    "content": rpt,
+                    "ticker": ticker_pending.upper(), "content": rpt,
                 })
                 st.session_state.pending_ai_ticker = None
                 st.session_state.pending_ai_prompt = None
@@ -1634,43 +1688,28 @@ if st.session_state.pending_ai_ticker and st.session_state.pending_ai_prompt:
                 st.error(f"AI 분석 중 오류 발생: {e}")
 
 
-# ──────────────────────────────────────────
-# 티커 입력 처리
-# ──────────────────────────────────────────
 def process_ticker(ticker_value):
     ticker_value = ticker_value.strip().upper()
-
-    st.session_state.messages.append({
-        "role": "user", "type": "text",
-        "content": ticker_value,
-    })
-
+    st.session_state.messages.append({"role": "user", "type": "text", "content": ticker_value})
     with st.chat_message("assistant", avatar="✨"):
         pg = st.progress(0, text=f"🌐 {ticker_value} 데이터 수집 시작...")
         pg.progress(15, text="📡 SwingTradeBot 크롤링 중...")
         scraped = get_stock_data(ticker_value)
         pg.progress(40, text="📊 Yahoo Finance 주가 로딩 중...")
         cfig, phist, meta = get_yfinance_data_and_chart(ticker_value, chart_period_days=chart_days)
-        pg.progress(70, text="💎 마켓 사이퍼 + Confluence 분석 중...")
+        pg.progress(70, text="💎 마켓 사이퍼 + 추세 필터 분석 중...")
         time.sleep(0.3)
         pg.progress(90, text="📝 프롬프트 생성 중...")
-
         if scraped or cfig:
             prompt = build_analysis_prompt(ticker_value, phist, scraped)
-
             analysis_msg = {
-                "role": "assistant", "type": "analysis",
-                "ticker": ticker_value,
+                "role": "assistant", "type": "analysis", "ticker": ticker_value,
                 "content": f"✅ **{ticker_value}** 분석 완료! 아래에서 차트와 시그널을 확인하세요.",
-                "fig": cfig,
-                "meta": meta,
-                "prompt": prompt,
+                "fig": cfig, "meta": meta, "prompt": prompt,
             }
             st.session_state.messages.append(analysis_msg)
-
             st.session_state.pending_ai_ticker = ticker_value
             st.session_state.pending_ai_prompt = prompt
-
             pg.progress(100, text="✅ 완료!"); time.sleep(0.3); pg.empty()
             st.rerun()
         else:
