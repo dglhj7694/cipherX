@@ -1,5 +1,5 @@
 import streamlit as st
-import requests
+import cloudscraper
 from bs4 import BeautifulSoup
 import google.generativeai as genai
 import time
@@ -14,7 +14,7 @@ import numpy as np
 from plotly.subplots import make_subplots
 from collections import OrderedDict
 
-st.set_page_config(page_title="CipherX", page_icon="📈", layout="centered")
+st.set_page_config(page_title="CipherX V6", page_icon="📈", layout="centered")
 
 # ──────────────────────────────────────────
 # 🎨 CSS
@@ -67,7 +67,7 @@ div[data-testid="stTabs"] button[aria-selected="true"]{color:#667eea!important;b
 </style>""", unsafe_allow_html=True)
 
 # ──────────────────────────────────────────
-# 🔧 시그널 레지스트리 (V5.1)
+# 🔧 시그널 레지스트리 (V6.0 노이즈 캔들 패턴 제거)
 # ──────────────────────────────────────────
 _B, _S = 'buy', 'sell'
 def _sig(w,d,icon,label,sym,sz,clr,base,atr_m,kor,desc):
@@ -89,7 +89,6 @@ SIGNAL_REGISTRY = {
     'OBV_Div_Buy':           _sig(0.8,_B,'📊','OBV Div BUY','triangle-up',10,'#80DEEA','Low',-1.4,'OBV 다이버전스','OBV-가격↑ 다이버전스+WT<-30'),
     'ADX_Momentum_Buy':      _sig(1.5,_B,'🚀','ADX Ignition','arrow-up',11,'#76FF03','Low',-1.4,'ADX 점화','ADX>20돌파++DI>-DI'),
     'Bullish_Engulfing':     _sig(1.5,_B,'☀️','Bull Engulf','square',10,'#00E676','Low',-1.3,'상승 장악형','하락캔들 감싸는 상승캔들+WT<-20'),
-    'Hammer_Buy':            _sig(1.5,_B,'🔨','Hammer','triangle-up',11,'#4CAF50','Low',-1.3,'해머','긴 아래꼬리+작은 몸통+WT<-20'),
     'Golden_Cross':          _sig(1.5,_B,'✨','Golden Cross','cross',12,'#FFD700','Low',-0.8,'골든 크로스','50MA>200MA+ADX>15'),
     'EMA_Pullback_Buy':      _sig(2.0,_B,'🎯','EMA Pullback','triangle-up',13,'#00BFA5','Low',-1.8,'EMA 눌림목','상승추세 EMA조정후 WT반등'),
     'Momentum_Ignition_Buy': _sig(2.5,_B,'🔥','Mom. Ignition','star-diamond',15,'#FF6D00','Low',-2.5,'모멘텀 점화','장대양봉>ATR×1.5+거래량>2.5배'),
@@ -98,7 +97,7 @@ SIGNAL_REGISTRY = {
     'Parabolic_Bottom_Buy':  _sig(3.0,_B,'🧊','Parabolic Bot','diamond',16,'#00FFFF','Low',-3.0,'포물선 바닥','WT1<-85 꺾임+양봉'),
     'MACD_Cross_Buy':        _sig(1.0,_B,'〽️','MACD Cross','triangle-up',9,'#4CAF50','Low',-1.0,'MACD 골든크로스','MACD>시그널(0선 하방)'),
     'StochRSI_Cross_Buy':    _sig(0.8,_B,'🔄','StRSI Cross','circle-open',8,'#81C784','Low',-0.8,'StochRSI 매수교차','StochK>StochD(과매도)'),
-    'Three_Candle_Strike_Buy':_sig(1.8,_B,'🎰','3-Strike BUY','star',12,'#00E676','Low',-1.6,'3연속 반전','3하락후 감싸는 상승캔들'),
+
     # ── SELL ──
     'Blood_Diamond':         _sig(3.0,_S,'🩸','BLOOD DIA','diamond',18,'#DC143C','High',3.0,'최강 매도','RSI>70+MFI>70+WT1>60+하락 다이버전스'),
     'Red_Dot_T1':            _sig(2.5,_S,'🔴','SELL T1','circle',16,'#FF1744','High',2.5,'강한 매도','WT과매수하락교차+RSI>70+MFI>70'),
@@ -113,7 +112,6 @@ SIGNAL_REGISTRY = {
     'OBV_Div_Sell':          _sig(0.8,_S,'🔻','OBV Div SELL','triangle-down',10,'#FFAB91','High',1.4,'OBV 다이버전스','OBV-가격↓ 다이버전스+WT>30'),
     'ADX_Momentum_Sell':     _sig(1.5,_S,'💨','ADX Down','arrow-down',11,'#FF3D00','High',1.4,'ADX 하락 점화','ADX>20돌파+-DI>+DI'),
     'Bearish_Engulfing':     _sig(1.5,_S,'🌑','Bear Engulf','x',10,'#D50000','High',1.3,'하락 장악형','상승캔들 감싸는 하락캔들+WT>20'),
-    'ShootingStar_Sell':     _sig(1.5,_S,'⭐','Shooting Star','triangle-down',11,'#FF5252','High',1.3,'슈팅스타','긴 위꼬리+작은 몸통+WT>20'),
     'Death_Cross':           _sig(1.5,_S,'☠️','Death Cross','cross',12,'#FF1744','High',0.8,'데드 크로스','50MA<200MA+ADX>15'),
     'SuperTrend_Sell':       _sig(2.0,_S,'📉','ST Flip Bear','arrow-down',12,'#FF1744','High',1.5,'슈퍼트렌드 약세','SuperTrend 아래로 돌파'),
     'Parabolic_Top_Sell':    _sig(3.0,_S,'🌡️','Parabolic Top','diamond',16,'#FF0000','High',3.0,'포물선 천장','WT1>85 꺾임+음봉'),
@@ -122,7 +120,6 @@ SIGNAL_REGISTRY = {
     'VWAP_Reject_Sell':      _sig(1.5,_S,'🏛️','VWAP Reject','triangle-down',11,'#FF6E40','High',1.3,'VWAP 저항','VWAP 실패+WT교차'),
     'MACD_Cross_Sell':       _sig(1.0,_S,'〽️','MACD Dead','triangle-down',9,'#E57373','High',1.0,'MACD 데드크로스','MACD<시그널(0선 상방)'),
     'StochRSI_Cross_Sell':   _sig(0.8,_S,'🔄','StRSI Dead','circle-open',8,'#EF9A9A','High',0.8,'StochRSI 매도교차','StochK<StochD(과매수)'),
-    'Three_Candle_Strike_Sell':_sig(1.8,_S,'🎰','3-Strike SELL','star',12,'#FF1744','High',1.6,'3연속 반전','3상승후 감싸는 하락캔들'),
 }
 
 COMPOSITE_SIGNALS = {
@@ -142,12 +139,9 @@ _UA = ['Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/125.
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=GEMINI_API_KEY)
 
-# V5.1: 쿨다운 강화 (MACD 10→12, StochRSI 5→7)
 COOLDOWN_MAP = {
     'Squeeze_Fire_Buy':5,'Squeeze_Fire_Sell':5,
     'Bullish_Engulfing':5,'Bearish_Engulfing':5,
-    'Hammer_Buy':5,'ShootingStar_Sell':5,
-    'Three_Candle_Strike_Buy':7,'Three_Candle_Strike_Sell':7,
     'ADX_Momentum_Buy':10,'ADX_Momentum_Sell':10,
     'EMA_Pullback_Buy':7,'EMA_Pullback_Sell':7,
     'Momentum_Ignition_Buy':10,'Momentum_Ignition_Sell':10,
@@ -187,28 +181,26 @@ def _cls(val, lo, hi):
 @st.cache_data(ttl=300, show_spinner=False)
 def get_stock_data(ticker):
     url = f"https://swingtradebot.com/equities/{ticker.upper()}"
+    scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True})
     for att in range(3):
         try:
-            time.sleep(random.uniform(1.0,2.0)*(att+1))
-            r = requests.get(url, headers={'User-Agent':random.choice(_UA),'Referer':'https://www.google.com/',
-                'Accept':'text/html,application/xhtml+xml','Accept-Language':'en-US,en;q=0.9'}, timeout=15)
-            if r.status_code!=200:
-                if att<2: continue
+            time.sleep(random.uniform(1.0, 2.0) * (att + 1))
+            # V6.0 FIX: requests 대신 scraper.get 사용 (스크래핑 성공률 극대화)
+            r = scraper.get(url, headers={'Referer': 'https://www.google.com/'}, timeout=15)
+            if r.status_code != 200:
+                if att < 2: continue
                 return None
-            soup = BeautifulSoup(r.text,'html.parser'); parts=[]
-            for tag,attrs,label,sep in [('h2',{'itemprop':'headline'},'HEADLINE',' '),
-                ('div',{'class_':'recap-body'},'DAILY RECAP',' '),(None,{'id':'recap-tour'},'RECAP TOUR',' '),
-                (None,{'id':'indicators-tour'},'INDICATORS',' | '),
-                ('table',{'id':'trend-table-tour'},'TREND ANALYSIS',' | '),
-                ('table',{'id':'recent-signals-tour'},'RECENT SIGNALS',' | ')]:
-                el = soup.find(id=attrs['id']) if 'id' in attrs and not tag else soup.find(tag,attrs) if tag else None
-                if el: parts.append(f"#### [{label}]\n{el.get_text(separator=sep,strip=True)}")
-            for i,t in enumerate(soup.find_all('table',class_='table-sm')):
-                if t.get('id') not in ['trend-table-tour','recent-signals-tour']:
-                    parts.append(f"#### [EXTRA {i}]\n{t.get_text(separator=' | ',strip=True)}")
+            soup = BeautifulSoup(r.text, 'html.parser'); parts = []
+            for tag, attrs, label, sep in [('h2', {'itemprop': 'headline'}, 'HEADLINE', ' '),
+                                           ('div', {'class_': 'recap-body'}, 'DAILY RECAP', ' '), (None, {'id': 'recap-tour'}, 'RECAP TOUR', ' '),
+                                           (None, {'id': 'indicators-tour'}, 'INDICATORS', ' | '),
+                                           ('table', {'id': 'trend-table-tour'}, 'TREND ANALYSIS', ' | '),
+                                           ('table', {'id': 'recent-signals-tour'}, 'RECENT SIGNALS', ' | ')]:
+                el = soup.find(id=attrs['id']) if 'id' in attrs and not tag else soup.find(tag, attrs) if tag else None
+                if el: parts.append(f"#### [{label}]\n{el.get_text(separator=sep, strip=True)}")
             return "\n\n".join(parts) if parts else None
         except Exception:
-            if att<2: continue
+            if att < 2: continue
             return None
     return None
 
@@ -313,29 +305,12 @@ def detect_volume_climax(c,o,v,wt1,atr,vm=3.0):
     return (ps&(c.shift(1)<o.shift(1))&(wt1.shift(1)<-40)&(c>o),
             ps&(c.shift(1)>o.shift(1))&(wt1.shift(1)>40)&(c<o))
 
-# V5.1: 대칭 캔들 패턴 통합 헬퍼
 def _detect_engulfing_pair(c,o,wt1,wt_t=20):
     body=(c-o).abs(); big=body>body.rolling(20).mean()*0.8
     pb=c.shift(1)<o.shift(1); pp=c.shift(1)>o.shift(1)
     bull=pb&(c>o)&(o<=c.shift(1))&(c>=o.shift(1))&big&(wt1<-wt_t)
     bear=pp&(c<o)&(o>=c.shift(1))&(c<=o.shift(1))&big&(wt1>wt_t)
     return bull,bear
-
-def _detect_hammer_star_pair(h,l,c,o,atr,wt1):
-    body=(c-o).abs(); total=h-l
-    us=h-pd.concat([c,o],axis=1).max(axis=1)
-    ls=pd.concat([c,o],axis=1).min(axis=1)-l
-    sb=body<total*0.35; sig=total>atr*0.5
-    hammer=sb&(ls>body*2)&(us<body*0.5)&sig&(c<c.shift(5))&(wt1<-20)
-    star=sb&(us>body*2)&(ls<body*0.5)&sig&(c>c.shift(5))&(wt1>20)
-    return hammer,star
-
-def _detect_three_strike_pair(c,o,wt1):
-    td=(c.shift(3)<o.shift(3))&(c.shift(2)<o.shift(2))&(c.shift(1)<o.shift(1))
-    tu=(c.shift(3)>o.shift(3))&(c.shift(2)>o.shift(2))&(c.shift(1)>o.shift(1))
-    buy=td&(c>o)&(c>=o.shift(3))&(o<=c.shift(1))&(wt1<0)
-    sell=tu&(c<o)&(c<=o.shift(3))&(o>=c.shift(1))&(wt1>0)
-    return buy,sell
 
 def compute_supertrend(h,l,c,period=10,mult=3.0):
     atr=compute_tr(h,l,c).rolling(period).mean(); hl2=(h+l)/2
@@ -352,7 +327,6 @@ def compute_supertrend(h,l,c,period=10,mult=3.0):
         else: dv[i],sv[i]=(1,dn[i]) if cl[i]>up[i] else (-1,up[i])
     return pd.Series(sv,index=c.index),pd.Series(dv,index=c.index)
 
-# V5.1: 대칭 EMA 풀백 통합
 def _detect_ema_pullback_pair(c,h,l,v,e8,e21,atr,wt1,wt2):
     vok=_volf(v,0.5); ar=atr/c
     results={}
@@ -408,13 +382,11 @@ def compute_confluence(df, dw=5, df_=0.7):
             sc+=np.convolve(raw,ones,mode='full')[:len(raw)]
     wt1=df['WT1'].values
     s+=np.where(wt1<OS1,1,0)+np.where(wt1<OS2,0.5,0)-np.where(wt1>OB1,1,0)-np.where(wt1>OB2,0.5,0)
-    # V5.1: ADX 트렌드 가중치 — 강한 추세에서 해당 방향 신호 부스트
     adx=df['ADX'].values; pdi=df['Plus_DI'].values; mdi=df['Minus_DI'].values
     bull_trend=(adx>25)&(pdi>mdi); bear_trend=(adx>25)&(mdi>pdi)
-    s+=np.where(bull_trend&(s>0), s*0.1, 0)  # 강세추세+매수신호 → 10% 부스트
-    s+=np.where(bear_trend&(s<0), s*0.1, 0)  # 약세추세+매도신호 → 10% 부스트
+    s+=np.where(bull_trend&(s>0), s*0.1, 0)
+    s+=np.where(bear_trend&(s<0), s*0.1, 0)
     df['Confluence_Score']=s
-    # V5.1 FIX: 명시적 괄호로 연산자 우선순위 버그 수정
     df['Ultra_Buy']=(s>=6)|((s>=5)&(bc>=3))
     df['Ultra_Sell']=(s<=-6)|((s<=-5)&(sc>=3))
     df['Strong_Buy']=(s>=3.5)&(~df['Ultra_Buy'])
@@ -422,23 +394,19 @@ def compute_confluence(df, dw=5, df_=0.7):
     return s
 
 def compute_proximity(wt1,wt2,rsi,mfi,rmfi,stk,macd_h,bb_w,sb,sbe):
-    """V5.1: MACD Hist + BB Width 추가"""
     bp=pd.Series(0.0,index=wt1.index); sp=pd.Series(0.0,index=wt1.index)
     gap=(wt1-wt2).abs(); nc=gap<3
     cu=(wt1-wt2)>(wt1.shift(1)-wt2.shift(1)); cd=(wt1-wt2)<(wt1.shift(1)-wt2.shift(1))
     for cond,pts in [((wt1<-40)&nc,30),((wt1<-40)&cu&(gap<8),15),(wt1<OS2,20),
         ((wt1>=OS2)&(wt1<-40),10),(rsi<35,15),((rsi>=35)&(rsi<45),5),
         (mfi<35,15),((mfi>=35)&(mfi<45),5),(rmfi<-5,10),((rmfi>=-5)&(rmfi<0),5),
-        (stk<20,10),((stk>=20)&(stk<35),5),
-        (macd_h<0,3),(macd_h<macd_h.shift(1),2)]:  # V5.1: MACD 하락=매수접근
+        (stk<20,10),((stk>=20)&(stk<35),5),(macd_h<0,3),(macd_h<macd_h.shift(1),2)]:
         bp+=np.where(cond,pts,0)
     for cond,pts in [((wt1>40)&nc,30),((wt1>40)&cd&(gap<8),15),(wt1>OB1,20),
         ((wt1<=OB1)&(wt1>40),10),(rsi>65,15),((rsi<=65)&(rsi>55),5),
         (mfi>65,15),((mfi<=65)&(mfi>55),5),(rmfi>5,10),((rmfi<=5)&(rmfi>0),5),
-        (stk>80,10),((stk<=80)&(stk>65),5),
-        (macd_h>0,3),(macd_h>macd_h.shift(1),2)]:  # V5.1: MACD 상승=매도접근
+        (stk>80,10),((stk<=80)&(stk>65),5),(macd_h>0,3),(macd_h>macd_h.shift(1),2)]:
         sp+=np.where(cond,pts,0)
-    # V5.1: BB Width 좁음 → 양방향 근접도 부스트 (Squeeze 접근)
     bb_narrow=bb_w<bb_w.rolling(50).quantile(0.2)
     bp+=np.where(bb_narrow,5,0); sp+=np.where(bb_narrow,5,0)
     bp,sp=bp.clip(upper=100),sp.clip(upper=100)
@@ -494,7 +462,7 @@ def compute_indicators(df):
     df['EMA21']=c.ewm(span=21,adjust=False).mean()
     df['BB_Mid']=df['MA20']; s20=c.rolling(20).std()
     df['BB_Up'],df['BB_Low']=df['BB_Mid']+s20*2,df['BB_Mid']-s20*2
-    df['BB_Width']=(df['BB_Up']-df['BB_Low'])/df['BB_Mid']  # V5.1: BB Width
+    df['BB_Width']=(df['BB_Up']-df['BB_Low'])/df['BB_Mid'] 
     df['ATR']=compute_tr(h,l,c).rolling(14).mean()
     df['SuperTrend'],df['ST_Direction']=compute_supertrend(h,l,c)
     wt1,wt2,wu,wd=compute_wavetrend(h,l,c)
@@ -560,7 +528,6 @@ def detect_all_signals(df):
     df['Bear_Divergence']=brd&wdr&~_rd&(~ssb)&vok
     df['RSI_Bull_Divergence']=rbd&(wt1<-20)&(~bsb)&vok&~bd
     df['RSI_Bear_Divergence']=rbrd&(wt1>20)&(~ssb)&vok&~brd
-    # V5.1: Hidden Div에 거래량 필터 추가 (신뢰도 향상)
     vol_ok_hidden=_volf(V,0.7)
     df['Hidden_Bull_Div']=hb&(wt1<-25)&htf2&(~bsx)&vol_ok_hidden
     df['Hidden_Bear_Div']=hbr&(wt1>25)&~htf2&(~ssx)&vol_ok_hidden
@@ -581,23 +548,19 @@ def detect_all_signals(df):
     df['ADX_Momentum_Buy']=ax&(df['Plus_DI']>df['Minus_DI'])&(wt1>wt2)&vok
     df['ADX_Momentum_Sell']=ax&(df['Minus_DI']>df['Plus_DI'])&(wt1<wt2)&vok
 
-    # ── Candle Patterns (V5.1: 대칭 헬퍼 사용) ──
+    # ── Candle Patterns ──
     df['Bullish_Engulfing'],df['Bearish_Engulfing']=_detect_engulfing_pair(C,O,wt1)
     df['Bullish_Engulfing']&=(~bsb)&vok; df['Bearish_Engulfing']&=(~ssb)&vok
-    df['Hammer_Buy'],df['ShootingStar_Sell']=_detect_hammer_star_pair(H,L,C,O,atr,wt1)
-    df['Hammer_Buy']&=(~bsb)&vok; df['ShootingStar_Sell']&=(~ssb)&vok
-    df['Three_Candle_Strike_Buy'],df['Three_Candle_Strike_Sell']=_detect_three_strike_pair(C,O,wt1)
-    df['Three_Candle_Strike_Buy']&=(~bsb)&vok; df['Three_Candle_Strike_Sell']&=(~ssb)&vok
 
     # ── MA Cross ──
     gc=(m50>m200)&(m50.shift(1)<=m200.shift(1)); dc=(m50<m200)&(m50.shift(1)>=m200.shift(1))
     af=df['ADX']>15; vc=_volf(V,0.7)
     df['Golden_Cross']=gc&af&vc; df['Death_Cross']=dc&af&vc
 
-    # ── EMA Pullback (V5.1: 대칭 헬퍼) ──
+    # ── EMA Pullback ──
     df['EMA_Pullback_Buy'],df['EMA_Pullback_Sell']=_detect_ema_pullback_pair(C,H,L,V,e8,e21,atr,wt1,wt2)
 
-    # ── Momentum Ignition (V5.1: 대칭 헬퍼) ──
+    # ── Momentum Ignition ──
     df['Momentum_Ignition_Buy'],df['Momentum_Ignition_Sell']=_detect_mom_ignition_pair(C,O,V,df['BB_Up'],df['BB_Low'],atr,e8,e21,wt1)
 
     # ── SuperTrend ──
@@ -608,7 +571,7 @@ def detect_all_signals(df):
     df['Parabolic_Top_Sell']=para_top&((df['WT_Down']|wdr)|((C<O)&(C<C.shift(1))))&vp
     df['Parabolic_Bottom_Buy']=para_bot&((df['WT_Up']|wur)|((C>O)&(C>C.shift(1))))&vp
 
-    # ── VWAP (V5.1: 대칭 헬퍼) ──
+    # ── VWAP ──
     df['VWAP_Bounce_Buy'],df['VWAP_Reject_Sell']=_detect_vwap_pair(C,df['VWAP_Osc'],wt1,wt2,V,atr)
 
     # ── MACD Cross ──
@@ -626,10 +589,7 @@ def detect_all_signals(df):
         if s in df.columns: df[s]=_cooldown(df[s],cd)
 
     compute_confluence(df)
-    # V5.1: BB_Width + MACD_Hist를 proximity에 전달
-    df['Buy_Proximity'],df['Sell_Proximity']=compute_proximity(
-        wt1,wt2,df['RSI'],df['MFI'],df['RSI_MFI'],df['StochK'],
-        df['MACD_Hist'],df['BB_Width'],sb,sbe)
+    df['Buy_Proximity'],df['Sell_Proximity']=compute_proximity(wt1,wt2,df['RSI'],df['MFI'],df['RSI_MFI'],df['StochK'],df['MACD_Hist'],df['BB_Width'],sb,sbe)
 
     df['Strong_Bull'],df['Strong_Bear']=sb,sbe
     df['Parabolic_Blowoff']=para_top; df['Parabolic_Bottom_Raw']=para_bot
@@ -737,7 +697,7 @@ def build_chart(dc,ticker,regime,shield):
 
     stxt=f" | {shield}" if shield else ""
     fig.update_layout(
-        title=dict(text=f"📊 {ticker.upper()} | 💎 MCB+ V5.1 | {regime}{stxt}",font=dict(size=14,color='#FAFAFA')),
+        title=dict(text=f"📊 {ticker.upper()} | 💎 MCB+ V6.0 | {regime}{stxt}",font=dict(size=14,color='#FAFAFA')),
         yaxis_title="USD",yaxis2_title="Vol",yaxis3_title="WT",yaxis4_title="MF",yaxis5_title="Conf",
         template="plotly_dark",margin=dict(l=0,r=0,t=50,b=0),height=1100,showlegend=True,
         legend=dict(orientation="h",yanchor="bottom",y=1.02,xanchor="center",x=0.5,
@@ -747,7 +707,7 @@ def build_chart(dc,ticker,regime,shield):
     return fig
 
 # ──────────────────────────────────────────
-# 메타데이터 + 프롬프트
+# 메타데이터 + 프롬프트 생성 (V6.0 퀀트 전용 프롬프트)
 # ──────────────────────────────────────────
 def build_metadata(dc,dv,ticker):
     lat,prev=dc.iloc[-1],dc.iloc[-2] if len(dc)>=2 else dc.iloc[-1]
@@ -824,6 +784,73 @@ def build_prompt_text(dc,meta):
             if wr is not None: lines.append(f"  {sn}:{sv['count']}회,10일승률{wr:.0f}%,평균{avg:+.1f}%")
         if lines: st_txt="\n📌 [백테스트(2년,상위10)]\n"+"\n".join(lines)
     return f"{ps}\n\n📌 [지표]\n{inds}\n\n📌 [시그널]\n{st_text}{st_txt}"
+
+def build_ai_prompt(ticker,phist,scraped):
+    return f"""━━━━━━━━━━━━━
+【 🎯 Role & Persona 】
+━━━━━━━━━━━━━
+당신은 월스트리트 탑티어 헤지펀드의 수석 퀀트 애널리스트입니다.
+Market Cipher B+ 지표, 볼륨 프로파일, ATR 변동성 기반의 철저한 리스크 관리에 입각하여 데이터 중심의 객관적이고 냉철한 분석을 제공합니다.
+
+---
+━━━━━━━━━━━━━
+【 🛠️ Task & Rules 】
+━━━━━━━━━━━━━
+제공된 데이터를 바탕으로 투자자를 위한 심층 전략 리포트를 작성하세요.
+
+1. 🚫 환각(Hallucination) 엄금: 팩트 체크가 불가능한 콜/풋 옵션, 공매도 비율 데이터는 지어내지 말고, 현재 주어진 차트의 거래량과 보조지표를 토대로 수급 상태를 추정하세요.
+2. 🧮 기계적 리스크 관리 (ATR 활용): 손절가와 목표가는 임의로 정하지 말고 제공된 데이터의 **ATR**을 활용하여 계산하세요.
+   - 롱 포지션 손절가 = 현재가 - (ATR * 1.5) / 목표가 = 현재가 + (ATR * 2.0)
+   - 스윙 박스권 매매 시 = 지지선/저항선 인근에서 진입 타점 설정
+3. 🌊 추세 맞춤형 전략 (Trend Regime):
+   - [STRONG BULL]: 돌파 매수 또는 얕은 눌림목(EMA Pullback) 매수 전략 제시
+   - [STRONG BEAR]: 기술적 반등 시 숏(매도) 전략 또는 관망(Wait & See) 제시
+   - [NEUTRAL]: 박스권 하단 매수 / 상단 매도 트레이딩 전략 제시
+
+---
+━━━━━━━━━━━━━
+【 📥 Input Data 】
+━━━━━━━━━━━━━
+[티커: {ticker}]
+
+📌 [주가 + 지표 + 최근 시그널]
+{phist}
+
+📌 [SwingTradeBot 뉴스 및 수급 요약]
+{scraped if scraped else '데이터 미제공'}
+
+---
+━━━━━━━━━━━━━
+【 📄 Output Format (마크다운 적용) 】
+━━━━━━━━━━━━━
+# 💎 {ticker} 심층 퀀트 리포트
+**[🔵강세 / 🔴약세 / 🟠중립] 핵심 요약:** [가장 중요한 모멘텀 및 현재 상태를 한 줄로 요약]
+
+---
+### 1. 🛡️ 시장 추세 & 시스템 시그널 분석
+* **현재 추세 (Trend Regime):** [STRONG BULL / STRONG BEAR / NEUTRAL 중 택1] - [이유 1문장]
+* **마켓 사이퍼 시그널 종합:** Score [점수] → **[Ultra Buy / Strong Buy / Neutral / Strong Sell / Ultra Sell]**
+* **시그널 퀄리티 평가:** [최근 발동된 시그널들의 신뢰도 평가. 휩쏘 가능성 체크]
+* **Signal Proximity:** [매수/매도 시그널 임박 여부 및 대기 전략]
+
+### 2. 📊 수급 및 모멘텀 (스마트머니 동향)
+* **거래량 & 모멘텀:** [볼륨 클라이맥스나 MACD/Squeeze 등의 방향성을 통한 스마트머니 매집/이탈 판별]
+* **주요 촉매제 (Catalyst):** [가장 최근의 뉴스나 상승/하락을 견인한 핵심 이벤트 - 봇 데이터 참고]
+
+### 3. 🎯 실전 트레이딩 시나리오 및 타점 (ATR 기반)
+[마크다운 표 형식으로 작성]
+| 포지션 | 가격대 | 산출 근거 (ATR 및 지지/저항) |
+|---|---|---|
+| **1차 진입가** | $00.00 | [근거] |
+| **2차 진입가(물타기)** | $00.00 | [근거] |
+| **손절가 (Stop Loss)** | $00.00 | 현재가 기준 ATR _배 이탈 |
+| **1차 목표가 (TP 1)** | $00.00 | [근거] |
+| **2차 목표가 (TP 2)** | $00.00 | [근거] |
+
+### 4. ⚖️ 최종 결론 및 다음 거래일 예측
+* **단기 전망 (1~3일):** [상승/하락/횡보] 예상
+* **액션 플랜:** [지금 매수해야 하는가? 기다려야 하는가? 보유자는 팔아야 하는가? 명확한 행동 가이드 제시]
+"""
 
 # ──────────────────────────────────────────
 # 통합 분석
@@ -985,7 +1012,7 @@ def render_analysis(msg):
 # ──────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 💎 CipherX")
-    st.markdown("<p style='color:#888;font-size:.8rem'>AI 주가 분석 · MCB+ v5.1</p>",unsafe_allow_html=True)
+    st.markdown("<p style='color:#888;font-size:.8rem'>AI 퀀트 주가 분석 · MCB+ v6.0</p>",unsafe_allow_html=True)
     st.markdown("---")
     st.markdown("### 📅 기간")
     chart_period=st.radio("표시 기간",['3개월','6개월','1년','2년'],index=2,horizontal=True,key="period")
@@ -1005,7 +1032,7 @@ with st.sidebar:
             enabled.add(k)
         st.session_state['enabled_signals']=enabled
         st.caption(f"활성: {len(enabled)}개")
-    if st.button("🗑️ 초기화",use_container_width=True,type="secondary"):
+    if st.button("🗑️ 대화 초기화",use_container_width=True,type="secondary"):
         for key in ['messages','pending_ai_ticker','pending_ai_prompt','last_ticker']:
             st.session_state[key]=[{"role":"assistant","type":"text",
                 "content":"안녕하세요! 💎 **CipherX** 입니다.\n\n분석할 **티커명**을 입력하세요."}] if key=='messages' else None
@@ -1020,13 +1047,13 @@ with st.sidebar:
                 st.markdown(f"**{info['icon']} {info['label']}** (w={info['w']}) · "
                     f"<span style='color:#888;font-size:.82rem'>{info.get('kor','')}</span>",unsafe_allow_html=True)
                 st.caption(info.get('desc',''))
-    with st.expander("🛡️ 추세 필터",expanded=False):
+    with st.expander("🛡️ V6.0 업데이트",expanded=False):
         st.markdown("""
-**레짐**: STRONG BULL🟢 / STRONG BEAR🔴 / NEUTRAL⚪
-**🔓 쉴드 오버라이드**: Parabolic/SuperTrend Flip → 쉴드 해제
-**V5.1**: 연산자버그수정·Hidden Div거래량필터·MACD/BB→Proximity·ADX→Confluence가중·쿨다운강화
+- **노이즈 캔들 패턴 삭제:** 해머, 슈팅스타 등 단기 캔들 삭제로 휩쏘 방지
+- **AI 퀀트 모델 도입:** ATR 기반 정밀한 매수/매도 타점 테이블 지원
+- **스크래핑 강화:** 봇 방어 우회 기능 상향 및 로딩 안정성 확보
         """)
-    st.markdown("<p style='color:#555;font-size:.7rem;text-align:center'>CipherX v5.1</p>",unsafe_allow_html=True)
+    st.markdown("<p style='color:#555;font-size:.7rem;text-align:center'>CipherX v6.0</p>",unsafe_allow_html=True)
 
 # ──────────────────────────────────────────
 # 세션
@@ -1040,48 +1067,7 @@ if 'enabled_signals' not in st.session_state:
     st.session_state['enabled_signals']=set(ALL_CHART_SIGNALS.keys())
 
 # ──────────────────────────────────────────
-# AI 프롬프트
-# ──────────────────────────────────────────
-def build_ai_prompt(ticker,phist,scraped):
-    return f"""━━━━━━━━━━━━━
-【 🎯 Role 】 월스트리트 20년+ 경력 베테랑 주식 애널리스트. Market Cipher B 지표 해석 전문.
-
-【 🛠️ Task 】 아래 데이터만으로 심층 분석 보고서 작성. 미제공 데이터는 "데이터 미제공".
-
-💎 시그널 계층: Tier0(Parabolic,ST Flip)→Tier1(Gold/Blood)→Tier2(T1,Div,MomIgn)→Tier3(T2,Diamond,Circle등)
-🔥 Confluence: ≥6 Ultra Buy | 3.5~6 Strong Buy | ≤-6 Ultra Sell
-📡 Proximity: ≥70% 임박 | 50~70% 접근
-📊 백테스트 승률 60%+=높은 신뢰도 | <50%=주의
-
-━━━ Data ━━━
-[티커: {ticker}]
-{phist}
-
-📌 [SwingTradeBot]
-{scraped if scraped else '데이터 미제공'}
-
-━━━ Guidelines ━━━
-①한국어,전문적+쉽게 ②확신형,이모티콘(🔵🔴🟠) ③Trend+Tier+백테스트연계
-④시나리오별 신뢰도 ⑤MA/BB/ST 기반 지지/저항 ⑥Proximity+Squeeze 반영
-
-━━━ Output ━━━
-[🔵/🔴/🟠] [{ticker}] 분석: [핵심]
----
-### 내용 요약
-### 🛡️ 추세 & 시그널 신뢰도
-### 💎 MCB+ 시그널 분석
-### 주가 및 거래량
-### 기술적 지표
-### 지지/저항선
-### 주가변동이유
-### 종합전망
-* 🔵 Bullish→목표가.신뢰도 * 🟠 Base.신뢰도 * 🔴 Bearish→목표가.신뢰도
-전략: 진입/손절/분할매도
-### 결론
-### 다음 거래일 전망"""
-
-# ──────────────────────────────────────────
-# 메인
+# 메인 렌더링
 # ──────────────────────────────────────────
 st.markdown("<h2 style='text-align:center;color:#fff;margin-bottom:20px'>💎 CipherX</h2>",unsafe_allow_html=True)
 
@@ -1092,33 +1078,33 @@ for i,msg in enumerate(st.session_state.messages):
             st.markdown(msg.get("content",""))
             render_analysis(msg)
             if msg.get("prompt"):
-                with st.expander("📝 프롬프트",expanded=False):
+                with st.expander("📝 퀀트 프롬프트 확인",expanded=False):
                     st.code(msg["prompt"],language="markdown")
                     st_copy_to_clipboard(msg["prompt"],before_copy_label="📋 복사",after_copy_label="✅ 복사됨!")
         elif msg.get("type")=="report":
-            with st.expander(f"📊 {msg.get('ticker','')} AI 리포트",expanded=True):
+            with st.expander(f"📊 {msg.get('ticker','')} AI 퀀트 리포트",expanded=True):
                 st.markdown(msg["content"])
-            st.download_button("📥 다운로드",key=f"dl_{i}",
+            st.download_button("📥 다운로드",key=f"dl_{i}_{msg.get('ticker','RPT')}",
                 data=msg["content"].encode('utf-8'),
-                file_name=f"{msg.get('ticker','RPT').upper()}_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.md",
+                file_name=f"{msg.get('ticker','RPT').upper()}_Quant_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.md",
                 mime="text/markdown",use_container_width=True)
         else: st.markdown(msg.get("content",""))
 
 def _run_ai():
     tp=st.session_state.pending_ai_ticker; pp=st.session_state.pending_ai_prompt
     with st.chat_message("assistant",avatar="✨"):
-        pb=st.progress(0,text="AI 초기화...")
+        pb=st.progress(0,text="퀀트 엔진 로딩 중...")
         try:
-            pb.progress(10,text="Gemini 로딩...")
+            pb.progress(10,text="Gemini 모델 초기화 중...")
             model=genai.GenerativeModel('gemini-2.0-flash')
-            pb.progress(20,text="분석 중...")
+            pb.progress(20,text="시장 데이터 및 시그널 취합 중...")
             resp=model.generate_content(pp,stream=True)
-            pb.progress(40,text="리포트 생성...")
+            pb.progress(40,text="🚀 AI 리포트 생성 중...")
             rpt=""; rph=st.empty(); cc=0
             for chunk in resp:
                 rpt+=chunk.text; rph.markdown(rpt+" ▌"); cc+=1
-                pb.progress(min(40+cc*2,95),text="작성 중...")
-            pb.progress(100,text="✅완료!"); time.sleep(.5); pb.empty(); rph.empty()
+                pb.progress(min(40+cc*2,95),text="차트 타점 및 ATR 계산 중...")
+            pb.progress(100,text="✅ 퀀트 분석 완료!"); time.sleep(.5); pb.empty(); rph.empty()
             st.session_state.messages.append({"role":"assistant","type":"report","ticker":tp.upper(),"content":rpt})
             st.session_state.pending_ai_ticker=None; st.session_state.pending_ai_prompt=None
             st.rerun()
@@ -1137,19 +1123,20 @@ def process_ticker(tv,refresh=False):
         st.session_state.messages.append({"role":"assistant","type":"text",
             "content":f"⚠️ **{tv}** — Yahoo Finance에서 찾을 수 없습니다."})
         st.rerun(); return
+    
     st.session_state.messages.append({"role":"user","type":"text","content":tv})
     st.session_state.last_ticker=tv
     with st.chat_message("assistant",avatar="✨"):
-        pg=st.progress(0,text=f"🌐 {tv} 수집...")
-        pg.progress(15,text="📡 SwingTradeBot...")
+        pg=st.progress(0,text=f"🌐 {tv} 데이터 파이프라인 가동...")
+        pg.progress(15,text="📡 SwingTradeBot 뉴스/팩트 크롤링 중...")
         scraped=get_stock_data(tv)
-        pg.progress(40,text="📊 Yahoo Finance...")
+        pg.progress(40,text="📊 YFinance 주가 데이터 로딩 중...")
         fig,phist,meta=analyze(tv,chart_days,refresh)
-        pg.progress(80,text="📝 프롬프트...")
+        pg.progress(80,text="💎 마켓 사이퍼 시그널 엔진 교차 검증 중...")
         if scraped or fig:
             prompt=build_ai_prompt(tv,phist,scraped)
             st.session_state.messages.append({"role":"assistant","type":"analysis","ticker":tv,
-                "content":f"✅ **{tv}** 분석 완료!","fig":fig,"meta":meta,"prompt":prompt})
+                "content":f"✅ **{tv}** 분석 완료! 아래에서 정밀 차트를 확인하세요.","fig":fig,"meta":meta,"prompt":prompt})
             st.session_state.pending_ai_ticker=tv; st.session_state.pending_ai_prompt=prompt
             pg.progress(100,text="✅완료!"); time.sleep(.3); pg.empty()
             st.rerun()
@@ -1159,21 +1146,24 @@ def process_ticker(tv,refresh=False):
                 "content":f"⚠️ **{tv}** 로딩 실패."})
             st.rerun()
 
+# ──────────────────────────────────────────
+# 액션 버튼 (챗 인터페이스 하단 고정)
+# ──────────────────────────────────────────
 if st.session_state.last_ticker:
     lt=st.session_state.last_ticker
     c1,c2=st.columns([3,1])
     with c1:
         if st.session_state.pending_ai_ticker and st.session_state.pending_ai_prompt:
-            if st.button(f"🚀 {st.session_state.pending_ai_ticker.upper()} AI 심층 분석",
+            if st.button(f"🚀 {st.session_state.pending_ai_ticker.upper()} AI 심층 퀀트 분석",
                          type="primary",use_container_width=True):
                 _run_ai()
     with c2:
-        if st.button(f"🔄 {lt}",type="secondary",use_container_width=True,key="re"):
+        if st.button(f"🔄 {lt} 새로고침",type="secondary",use_container_width=True,key="re"):
             process_ticker(lt,refresh=True)
 elif st.session_state.pending_ai_ticker and st.session_state.pending_ai_prompt:
-    if st.button(f"🚀 {st.session_state.pending_ai_ticker.upper()} AI 심층 분석",
+    if st.button(f"🚀 {st.session_state.pending_ai_ticker.upper()} AI 심층 퀀트 분석",
                  type="primary",use_container_width=True):
         _run_ai()
 
-if ticker_input:=st.chat_input("분석할 티커 입력 (예: IREN, TSLA, AAPL)"):
+if ticker_input:=st.chat_input("분석할 미국 주식 티커를 입력하세요 (예: IREN, TSLA, AAPL)"):
     process_ticker(ticker_input)
