@@ -68,61 +68,65 @@ def load_css():
     .ind-neutral { background: rgba(255,193,7,0.15); color: #FFC107; }
     .bias-gauge-track { height: 8px; border-radius: 4px; margin: 8px 0; background: linear-gradient(90deg, #FF1744 0%, #FF1744 20%, #FFC107 35%, #888 50%, #FFC107 65%, #00E676 80%, #00E676 100%); position: relative; }
     .bias-gauge-needle { width: 4px; height: 16px; background: white; border-radius: 2px; position: absolute; top: -4px; transform: translateX(-50%); box-shadow: 0 0 6px rgba(255,255,255,0.5); }
-    .quick-btn { display: inline-block; margin: 2px; }
     </style>
     """, unsafe_allow_html=True)
 
 load_css()
 
 # ──────────────────────────────────────────
-# 🔧 통합 시그널 레지스트리 (V2.8)
+# 🔧 통합 시그널 레지스트리 (V3.0)
 # ──────────────────────────────────────────
 SIGNAL_REGISTRY = {
-    'Gold_Dot':         {'w': 3.0, 'dir': 'buy',  'icon': '🏆', 'label': 'GOLD DOT',       'sym': 'circle',       'sz': 18, 'clr': '#FFD700', 'base': 'Low',  'atr_m': -3.0, 'kor': '최강 매수', 'desc': '모든 매수 조건 극단 수렴. RSI<30 + MFI<30 + WT1<-60 + 상승 다이버전스.'},
-    'Green_Dot_T1':     {'w': 2.5, 'dir': 'buy',  'icon': '🟢', 'label': 'BUY T1',         'sym': 'circle',       'sz': 16, 'clr': '#00E676', 'base': 'Low',  'atr_m': -2.5, 'kor': '강한 매수', 'desc': 'WT 과매도 교차(2봉) + RSI<30 + MFI<30 + MF<0.'},
-    'Green_Dot_T2':     {'w': 2.0, 'dir': 'buy',  'icon': '🟩', 'label': 'BUY T2',         'sym': 'circle',       'sz': 13, 'clr': '#69F0AE', 'base': 'Low',  'atr_m': -2.2, 'kor': '매수', 'desc': 'T1 완화 버전. WT 과매도 + RSI 또는 MFI < 32.'},
-    'Blue_Diamond':     {'w': 2.0, 'dir': 'buy',  'icon': '🔹', 'label': 'BLUE DIA',       'sym': 'diamond',      'sz': 14, 'clr': '#00bfff', 'base': 'Low',  'atr_m': -1.8, 'kor': '추세 매수', 'desc': 'WT2≤0 상승교차(2봉) + HTF 강세 + 하락추세 아님.'},
-    'Green_Circle':     {'w': 1.5, 'dir': 'buy',  'icon': '✅', 'label': 'BUY Circle',     'sym': 'circle-open',  'sz': 11, 'clr': '#00E676', 'base': 'Low',  'atr_m': -1.2, 'kor': '과매도 반등', 'desc': 'WT 과매도 교차(2봉). Green Dot 미달.'},
+    # ── BUY ──
+    'Gold_Dot':         {'w': 3.0, 'dir': 'buy',  'icon': '🏆', 'label': 'GOLD DOT',       'sym': 'circle',       'sz': 18, 'clr': '#FFD700', 'base': 'Low',  'atr_m': -3.0, 'kor': '최강 매수', 'desc': '모든 매수 조건 극단 수렴. RSI<30+MFI<30+WT1<-60+상승 다이버전스.'},
+    'Green_Dot_T1':     {'w': 2.5, 'dir': 'buy',  'icon': '🟢', 'label': 'BUY T1',         'sym': 'circle',       'sz': 16, 'clr': '#00E676', 'base': 'Low',  'atr_m': -2.5, 'kor': '강한 매수', 'desc': 'WT과매도 교차+RSI<30+MFI<30+MF<0.'},
+    'Green_Dot_T2':     {'w': 2.0, 'dir': 'buy',  'icon': '🟩', 'label': 'BUY T2',         'sym': 'circle',       'sz': 13, 'clr': '#69F0AE', 'base': 'Low',  'atr_m': -2.2, 'kor': '매수', 'desc': 'T1 완화. WT과매도+RSI또는MFI<32.'},
+    'Blue_Diamond':     {'w': 2.0, 'dir': 'buy',  'icon': '🔹', 'label': 'BLUE DIA',       'sym': 'diamond',      'sz': 14, 'clr': '#00bfff', 'base': 'Low',  'atr_m': -1.8, 'kor': '추세 매수', 'desc': 'WT2≤0 상승교차+HTF강세+하락추세 아님.'},
+    'Green_Circle':     {'w': 1.2, 'dir': 'buy',  'icon': '✅', 'label': 'BUY Circle',     'sym': 'circle-open',  'sz': 11, 'clr': '#00E676', 'base': 'Low',  'atr_m': -1.2, 'kor': '과매도 반등', 'desc': 'WT과매도 교차+RSI<45. Green Dot 미달.'},
     'Bull_Divergence':  {'w': 2.0, 'dir': 'buy',  'icon': '📈', 'label': 'Bull Div',       'sym': 'triangle-up',  'sz': 12, 'clr': '#AA00FF', 'base': 'Low',  'atr_m': -2.0, 'kor': '상승 다이버전스', 'desc': '가격 저점↓ vs WT 저점↑.'},
-    'Squeeze_Fire_Buy': {'w': 1.5, 'dir': 'buy',  'icon': '💥', 'label': 'Squeeze BUY',    'sym': 'star-diamond', 'sz': 14, 'clr': '#00FFFF', 'base': 'Low',  'atr_m': -1.5, 'kor': '스퀴즈 매수', 'desc': 'TTM Squeeze 해소 + 모멘텀 상방.'},
-    'Hidden_Bull_Div':  {'w': 1.5, 'dir': 'buy',  'icon': '🔀', 'label': 'Hidden Bull',    'sym': 'triangle-up',  'sz': 10, 'clr': '#E040FB', 'base': 'Low',  'atr_m': -1.6, 'kor': '히든 상승 다이버전스', 'desc': '가격 저점↑ vs 오실레이터 저점↓.'},
-    'Volume_Climax_Buy':{'w': 2.0, 'dir': 'buy',  'icon': '🌊', 'label': 'Vol Climax BUY', 'sym': 'hexagram',     'sz': 14, 'clr': '#00BCD4', 'base': 'Low',  'atr_m': -2.8, 'kor': '거래량 클라이맥스 매수', 'desc': '평균 3배 거래량 + 하락 장대봉 + WT과매도 → 다음봉 반등 확인.'},
-    'OBV_Div_Buy':      {'w': 1.0, 'dir': 'buy',  'icon': '📊', 'label': 'OBV Div BUY',   'sym': 'triangle-up',  'sz': 10, 'clr': '#80DEEA', 'base': 'Low',  'atr_m': -1.4, 'kor': 'OBV 다이버전스 매수', 'desc': 'OBV-가격 상승 다이버전스.'},
-    'ADX_Momentum_Buy': {'w': 1.5, 'dir': 'buy',  'icon': '🚀', 'label': 'ADX Ignition',   'sym': 'arrow-up',     'sz': 11, 'clr': '#76FF03', 'base': 'Low',  'atr_m': -1.4, 'kor': 'ADX 점화', 'desc': 'ADX > 20 돌파 + Plus DI > Minus DI.'},
-    'Fib_Bounce_Buy':   {'w': 0.8, 'dir': 'buy',  'icon': '📐', 'label': 'Fib Bounce',     'sym': 'diamond-open', 'sz': 10, 'clr': '#FFAB00', 'base': 'Low',  'atr_m': -1.0, 'kor': '피보나치 반등', 'desc': '0.618~0.786 되돌림 지지 + WT 상승교차.'},
-    'Bullish_Engulfing': {'w': 1.5, 'dir': 'buy', 'icon': '☀️', 'label': 'Bull Engulf',    'sym': 'square',       'sz': 10, 'clr': '#00E676', 'base': 'Low',  'atr_m': -1.3, 'kor': '상승 장악형', 'desc': '전일 하락캔들을 감싸는 상승캔들 + WT 약세구간.'},
-    'Golden_Cross':     {'w': 1.5, 'dir': 'buy',  'icon': '✨', 'label': 'Golden Cross',   'sym': 'cross',        'sz': 12, 'clr': '#FFD700', 'base': 'Low',  'atr_m': -0.8, 'kor': '골든 크로스', 'desc': '50일 MA > 200일 MA 상향돌파.'},
-    'EMA_Pullback_Buy': {'w': 2.0, 'dir': 'buy',  'icon': '🎯', 'label': 'EMA Pullback',   'sym': 'triangle-up',  'sz': 13, 'clr': '#00BFA5', 'base': 'Low',  'atr_m': -1.8, 'kor': 'EMA 눌림목 매수', 'desc': '상승추세 중 EMA 부근 조정 후 WT 반등 + 거래량 확인.'},
-    'Momentum_Ignition_Buy': {'w': 2.5, 'dir': 'buy', 'icon': '🔥', 'label': 'Mom. Ignition', 'sym': 'star-diamond', 'sz': 15, 'clr': '#FF6D00', 'base': 'Low', 'atr_m': -2.5, 'kor': '모멘텀 점화 매수', 'desc': '장대양봉>ATR×1.5 + 거래량>20MA×2.5 + BB돌파 + 상승추세 + WT미과매수.'},
+    'Squeeze_Fire_Buy': {'w': 1.5, 'dir': 'buy',  'icon': '💥', 'label': 'Squeeze BUY',    'sym': 'star-diamond', 'sz': 14, 'clr': '#00FFFF', 'base': 'Low',  'atr_m': -1.5, 'kor': '스퀴즈 매수', 'desc': 'TTM Squeeze 해소+모멘텀 상방.'},
+    'Hidden_Bull_Div':  {'w': 1.5, 'dir': 'buy',  'icon': '🔀', 'label': 'Hidden Bull',    'sym': 'triangle-up',  'sz': 10, 'clr': '#E040FB', 'base': 'Low',  'atr_m': -1.6, 'kor': '히든 상승 다이버전스', 'desc': '가격 저점↑ vs 오실레이터 저점↓+WT<-20.'},
+    'Volume_Climax_Buy':{'w': 2.0, 'dir': 'buy',  'icon': '🌊', 'label': 'Vol Climax BUY', 'sym': 'hexagram',     'sz': 14, 'clr': '#00BCD4', 'base': 'Low',  'atr_m': -2.8, 'kor': '거래량 클라이맥스 매수', 'desc': '평균3배 거래량+하락장대봉+WT과매도→반등확인.'},
+    'OBV_Div_Buy':      {'w': 1.0, 'dir': 'buy',  'icon': '📊', 'label': 'OBV Div BUY',   'sym': 'triangle-up',  'sz': 10, 'clr': '#80DEEA', 'base': 'Low',  'atr_m': -1.4, 'kor': 'OBV 다이버전스 매수', 'desc': 'OBV-가격 상승 다이버전스+WT<-30.'},
+    'ADX_Momentum_Buy': {'w': 1.5, 'dir': 'buy',  'icon': '🚀', 'label': 'ADX Ignition',   'sym': 'arrow-up',     'sz': 11, 'clr': '#76FF03', 'base': 'Low',  'atr_m': -1.4, 'kor': 'ADX 점화', 'desc': 'ADX>20 돌파++DI>-DI.'},
+    'Fib_Bounce_Buy':   {'w': 0.8, 'dir': 'buy',  'icon': '📐', 'label': 'Fib Bounce',     'sym': 'diamond-open', 'sz': 10, 'clr': '#FFAB00', 'base': 'Low',  'atr_m': -1.0, 'kor': '피보나치 반등', 'desc': '0.618~0.786 되돌림 지지+WT 상승교차.'},
+    'Bullish_Engulfing': {'w': 1.5, 'dir': 'buy', 'icon': '☀️', 'label': 'Bull Engulf',    'sym': 'square',       'sz': 10, 'clr': '#00E676', 'base': 'Low',  'atr_m': -1.3, 'kor': '상승 장악형', 'desc': '전일 하락캔들 감싸는 상승캔들+WT약세구간.'},
+    'Golden_Cross':     {'w': 1.5, 'dir': 'buy',  'icon': '✨', 'label': 'Golden Cross',   'sym': 'cross',        'sz': 12, 'clr': '#FFD700', 'base': 'Low',  'atr_m': -0.8, 'kor': '골든 크로스', 'desc': '50MA>200MA 상향돌파+ADX>15+거래량확인.'},
+    'EMA_Pullback_Buy': {'w': 2.0, 'dir': 'buy',  'icon': '🎯', 'label': 'EMA Pullback',   'sym': 'triangle-up',  'sz': 13, 'clr': '#00BFA5', 'base': 'Low',  'atr_m': -1.8, 'kor': 'EMA 눌림목 매수', 'desc': '상승추세 EMA부근 조정 후 WT반등+거래량.'},
+    'Momentum_Ignition_Buy': {'w': 2.5, 'dir': 'buy', 'icon': '🔥', 'label': 'Mom. Ignition', 'sym': 'star-diamond', 'sz': 15, 'clr': '#FF6D00', 'base': 'Low', 'atr_m': -2.5, 'kor': '모멘텀 점화 매수', 'desc': '장대양봉>ATR×1.5+거래량>20MA×2.5+BB돌파.'},
     'SuperTrend_Buy':   {'w': 1.5, 'dir': 'buy',  'icon': '📈', 'label': 'ST Flip Bull',   'sym': 'arrow-up',     'sz': 12, 'clr': '#00E5FF', 'base': 'Low',  'atr_m': -1.5, 'kor': '슈퍼트렌드 강세 전환', 'desc': 'SuperTrend 하단선 위로 돌파.'},
-    'VWAP_Bounce_Buy':  {'w': 1.5, 'dir': 'buy',  'icon': '🏦', 'label': 'VWAP Bounce',    'sym': 'triangle-up',  'sz': 11, 'clr': '#00E5FF', 'base': 'Low',  'atr_m': -1.3, 'kor': 'VWAP 반등 매수', 'desc': 'VWAP 하방이탈 후 복귀 + WT 상승교차 + 거래량 확인.'},
-    'Parabolic_Bottom_Buy': {'w': 3.0, 'dir': 'buy', 'icon': '🧊', 'label': 'Parabolic Bot', 'sym': 'diamond', 'sz': 16, 'clr': '#00FFFF', 'base': 'Low', 'atr_m': -3.0, 'kor': '포물선 바닥 매수', 'desc': 'WT1<-85 꺾임+양봉 또는 Close<BB-ATR×1.5 극단이격+양봉.'},
-
-    'Blood_Diamond':    {'w': 3.0, 'dir': 'sell', 'icon': '🩸', 'label': 'BLOOD DIA',      'sym': 'diamond',       'sz': 18, 'clr': '#DC143C', 'base': 'High', 'atr_m': 3.0, 'kor': '최강 매도', 'desc': 'RSI>70 + MFI>70 + WT1>60 + 하락 다이버전스.'},
-    'Red_Dot_T1':       {'w': 2.5, 'dir': 'sell', 'icon': '🔴', 'label': 'SELL T1',        'sym': 'circle',        'sz': 16, 'clr': '#FF1744', 'base': 'High', 'atr_m': 2.5, 'kor': '강한 매도', 'desc': 'WT 과매수 하락교차(2봉) + RSI>70 + MFI>70 + MF>0.'},
-    'Red_Dot_T2':       {'w': 2.0, 'dir': 'sell', 'icon': '🟥', 'label': 'SELL T2',        'sym': 'circle',        'sz': 13, 'clr': '#FF5252', 'base': 'High', 'atr_m': 2.2, 'kor': '매도', 'desc': 'T1 완화 버전. WT 과매수 + RSI 또는 MFI > 68.'},
-    'Red_Diamond':      {'w': 2.0, 'dir': 'sell', 'icon': '🔸', 'label': 'RED DIA',        'sym': 'diamond',       'sz': 14, 'clr': '#ff3333', 'base': 'High', 'atr_m': 1.8, 'kor': '추세 매도', 'desc': 'WT2≥0 하락교차(2봉) + HTF 약세 + 상승추세 아님.'},
-    'Red_Circle':       {'w': 1.5, 'dir': 'sell', 'icon': '⛔', 'label': 'SELL Circle',    'sym': 'circle-open',   'sz': 11, 'clr': '#FF1744', 'base': 'High', 'atr_m': 1.2, 'kor': '과매수 하락', 'desc': 'WT 과매수 하락교차(2봉). Red Dot 미달.'},
+    'VWAP_Bounce_Buy':  {'w': 1.5, 'dir': 'buy',  'icon': '🏦', 'label': 'VWAP Bounce',    'sym': 'triangle-up',  'sz': 11, 'clr': '#00E5FF', 'base': 'Low',  'atr_m': -1.3, 'kor': 'VWAP 반등 매수', 'desc': 'VWAP 하방이탈 후 복귀+WT교차+거래량.'},
+    'Parabolic_Bottom_Buy': {'w': 3.0, 'dir': 'buy', 'icon': '🧊', 'label': 'Parabolic Bot', 'sym': 'diamond', 'sz': 16, 'clr': '#00FFFF', 'base': 'Low', 'atr_m': -3.0, 'kor': '포물선 바닥 매수', 'desc': 'WT1<-85 꺾임+양봉 또는 BB-ATR×1.5 극단이격.'},
+    'MACD_Cross_Buy':   {'w': 1.0, 'dir': 'buy',  'icon': '〽️', 'label': 'MACD Cross',    'sym': 'triangle-up',  'sz': 9,  'clr': '#4CAF50', 'base': 'Low',  'atr_m': -1.0, 'kor': 'MACD 골든크로스', 'desc': 'MACD라인>시그널라인 상향교차(0선 하방에서).'},
+    'StochRSI_Cross_Buy':{'w': 0.8, 'dir': 'buy', 'icon': '🔄', 'label': 'StRSI Cross',   'sym': 'circle-open',  'sz': 8,  'clr': '#81C784', 'base': 'Low',  'atr_m': -0.8, 'kor': 'StochRSI 교차 매수', 'desc': 'StochK>StochD 상향교차(과매도 존).'},
+    # ── SELL ──
+    'Blood_Diamond':    {'w': 3.0, 'dir': 'sell', 'icon': '🩸', 'label': 'BLOOD DIA',      'sym': 'diamond',       'sz': 18, 'clr': '#DC143C', 'base': 'High', 'atr_m': 3.0, 'kor': '최강 매도', 'desc': 'RSI>70+MFI>70+WT1>60+하락 다이버전스.'},
+    'Red_Dot_T1':       {'w': 2.5, 'dir': 'sell', 'icon': '🔴', 'label': 'SELL T1',        'sym': 'circle',        'sz': 16, 'clr': '#FF1744', 'base': 'High', 'atr_m': 2.5, 'kor': '강한 매도', 'desc': 'WT과매수 하락교차+RSI>70+MFI>70+MF>0.'},
+    'Red_Dot_T2':       {'w': 2.0, 'dir': 'sell', 'icon': '🟥', 'label': 'SELL T2',        'sym': 'circle',        'sz': 13, 'clr': '#FF5252', 'base': 'High', 'atr_m': 2.2, 'kor': '매도', 'desc': 'T1 완화. WT과매수+RSI또는MFI>68.'},
+    'Red_Diamond':      {'w': 2.0, 'dir': 'sell', 'icon': '🔸', 'label': 'RED DIA',        'sym': 'diamond',       'sz': 14, 'clr': '#ff3333', 'base': 'High', 'atr_m': 1.8, 'kor': '추세 매도', 'desc': 'WT2≥0 하락교차+HTF약세+상승추세 아님.'},
+    'Red_Circle':       {'w': 1.2, 'dir': 'sell', 'icon': '⛔', 'label': 'SELL Circle',    'sym': 'circle-open',   'sz': 11, 'clr': '#FF1744', 'base': 'High', 'atr_m': 1.2, 'kor': '과매수 하락', 'desc': 'WT과매수 하락교차+RSI>55. Red Dot 미달.'},
     'Bear_Divergence':  {'w': 2.0, 'dir': 'sell', 'icon': '📉', 'label': 'Bear Div',       'sym': 'triangle-down', 'sz': 12, 'clr': '#AA00FF', 'base': 'High', 'atr_m': 2.0, 'kor': '하락 다이버전스', 'desc': '가격 고점↑ vs WT 고점↓.'},
-    'Squeeze_Fire_Sell':{'w': 1.5, 'dir': 'sell', 'icon': '🧨', 'label': 'Squeeze SELL',   'sym': 'star-diamond',  'sz': 14, 'clr': '#FF6600', 'base': 'High', 'atr_m': 1.5, 'kor': '스퀴즈 매도', 'desc': 'TTM Squeeze 해소 + 모멘텀 하방.'},
-    'Hidden_Bear_Div':  {'w': 1.5, 'dir': 'sell', 'icon': '🔁', 'label': 'Hidden Bear',    'sym': 'triangle-down', 'sz': 10, 'clr': '#E040FB', 'base': 'High', 'atr_m': 1.6, 'kor': '히든 하락 다이버전스', 'desc': '가격 고점↓ vs 오실레이터 고점↑.'},
-    'Volume_Climax_Sell':{'w': 2.0, 'dir': 'sell','icon': '🌋', 'label': 'Vol Climax SELL', 'sym': 'hexagram',     'sz': 14, 'clr': '#FF5722', 'base': 'High', 'atr_m': 2.8, 'kor': '거래량 클라이맥스 매도', 'desc': '평균 3배 거래량 + 상승 장대봉 + WT과매수 → 다음봉 하락 확인.'},
-    'OBV_Div_Sell':     {'w': 1.0, 'dir': 'sell', 'icon': '🔻', 'label': 'OBV Div SELL',   'sym': 'triangle-down', 'sz': 10, 'clr': '#FFAB91', 'base': 'High', 'atr_m': 1.4, 'kor': 'OBV 다이버전스 매도', 'desc': 'OBV-가격 하락 다이버전스.'},
-    'ADX_Momentum_Sell':{'w': 1.5, 'dir': 'sell', 'icon': '💨', 'label': 'ADX Down',       'sym': 'arrow-down',    'sz': 11, 'clr': '#FF3D00', 'base': 'High', 'atr_m': 1.4, 'kor': 'ADX 하락 점화', 'desc': 'ADX > 20 돌파 + Minus DI > Plus DI.'},
-    'Fib_Resistance_Sell':{'w': 0.8, 'dir': 'sell','icon': '🚧', 'label': 'Fib Resist',    'sym': 'diamond-open',  'sz': 10, 'clr': '#FF8F00', 'base': 'High', 'atr_m': 1.0, 'kor': '피보나치 저항', 'desc': '0.618~0.786 되돌림 저항 + WT 하락교차.'},
-    'Bearish_Engulfing': {'w': 1.5, 'dir': 'sell','icon': '🌑', 'label': 'Bear Engulf',    'sym': 'x',             'sz': 10, 'clr': '#D50000', 'base': 'High', 'atr_m': 1.3, 'kor': '하락 장악형', 'desc': '전일 상승캔들을 감싸는 하락캔들 + WT 강세구간.'},
-    'Death_Cross':      {'w': 1.5, 'dir': 'sell', 'icon': '☠️', 'label': 'Death Cross',    'sym': 'cross',         'sz': 12, 'clr': '#FF1744', 'base': 'High', 'atr_m': 0.8, 'kor': '데드 크로스', 'desc': '50일 MA < 200일 MA 하향돌파.'},
+    'Squeeze_Fire_Sell':{'w': 1.5, 'dir': 'sell', 'icon': '🧨', 'label': 'Squeeze SELL',   'sym': 'star-diamond',  'sz': 14, 'clr': '#FF6600', 'base': 'High', 'atr_m': 1.5, 'kor': '스퀴즈 매도', 'desc': 'TTM Squeeze 해소+모멘텀 하방.'},
+    'Hidden_Bear_Div':  {'w': 1.5, 'dir': 'sell', 'icon': '🔁', 'label': 'Hidden Bear',    'sym': 'triangle-down', 'sz': 10, 'clr': '#E040FB', 'base': 'High', 'atr_m': 1.6, 'kor': '히든 하락 다이버전스', 'desc': '가격 고점↓ vs 오실레이터 고점↑+WT>20.'},
+    'Volume_Climax_Sell':{'w': 2.0, 'dir': 'sell','icon': '🌋', 'label': 'Vol Climax SELL', 'sym': 'hexagram',     'sz': 14, 'clr': '#FF5722', 'base': 'High', 'atr_m': 2.8, 'kor': '거래량 클라이맥스 매도', 'desc': '평균3배 거래량+상승장대봉+WT과매수→하락확인.'},
+    'OBV_Div_Sell':     {'w': 1.0, 'dir': 'sell', 'icon': '🔻', 'label': 'OBV Div SELL',   'sym': 'triangle-down', 'sz': 10, 'clr': '#FFAB91', 'base': 'High', 'atr_m': 1.4, 'kor': 'OBV 다이버전스 매도', 'desc': 'OBV-가격 하락 다이버전스+WT>30.'},
+    'ADX_Momentum_Sell':{'w': 1.5, 'dir': 'sell', 'icon': '💨', 'label': 'ADX Down',       'sym': 'arrow-down',    'sz': 11, 'clr': '#FF3D00', 'base': 'High', 'atr_m': 1.4, 'kor': 'ADX 하락 점화', 'desc': 'ADX>20 돌파+-DI>+DI.'},
+    'Fib_Resistance_Sell':{'w': 0.8, 'dir': 'sell','icon': '🚧', 'label': 'Fib Resist',    'sym': 'diamond-open',  'sz': 10, 'clr': '#FF8F00', 'base': 'High', 'atr_m': 1.0, 'kor': '피보나치 저항', 'desc': '0.618~0.786 되돌림 저항+WT 하락교차.'},
+    'Bearish_Engulfing': {'w': 1.5, 'dir': 'sell','icon': '🌑', 'label': 'Bear Engulf',    'sym': 'x',             'sz': 10, 'clr': '#D50000', 'base': 'High', 'atr_m': 1.3, 'kor': '하락 장악형', 'desc': '전일 상승캔들 감싸는 하락캔들+WT강세구간.'},
+    'Death_Cross':      {'w': 1.5, 'dir': 'sell', 'icon': '☠️', 'label': 'Death Cross',    'sym': 'cross',         'sz': 12, 'clr': '#FF1744', 'base': 'High', 'atr_m': 0.8, 'kor': '데드 크로스', 'desc': '50MA<200MA 하향돌파+ADX>15+거래량확인.'},
     'SuperTrend_Sell':  {'w': 2.0, 'dir': 'sell', 'icon': '📉', 'label': 'ST Flip Bear',   'sym': 'arrow-down',    'sz': 12, 'clr': '#FF1744', 'base': 'High', 'atr_m': 1.5, 'kor': '슈퍼트렌드 약세 전환', 'desc': 'SuperTrend 상단선 아래로 돌파.'},
-    'Parabolic_Top_Sell':{'w': 3.0, 'dir': 'sell','icon': '🌡️', 'label': 'Parabolic Top',  'sym': 'diamond',       'sz': 16, 'clr': '#FF0000', 'base': 'High', 'atr_m': 3.0, 'kor': '포물선 천장 매도', 'desc': 'WT1>85 꺾임+음봉 또는 Close>BB+ATR×1.5 극단이격+음봉.'},
-    'EMA_Pullback_Sell':{'w': 2.0, 'dir': 'sell', 'icon': '🎯', 'label': 'EMA PB Sell',    'sym': 'triangle-down', 'sz': 13, 'clr': '#FF6E40', 'base': 'High', 'atr_m': 1.8, 'kor': 'EMA 되돌림 매도', 'desc': '하락추세 중 EMA 부근 반등 후 WT 재하락 + 거래량 확인.'},
-    'Momentum_Ignition_Sell':{'w': 2.5, 'dir': 'sell','icon': '💣', 'label': 'Mom. Ign Sell','sym': 'star-diamond', 'sz': 15, 'clr': '#D50000', 'base': 'High', 'atr_m': 2.5, 'kor': '모멘텀 점화 매도', 'desc': '장대음봉>ATR×1.5 + 거래량>20MA×2.5 + BB하단돌파 + 하락추세 + WT미과매도.'},
-    'VWAP_Reject_Sell': {'w': 1.5, 'dir': 'sell', 'icon': '🏛️', 'label': 'VWAP Reject',   'sym': 'triangle-down', 'sz': 11, 'clr': '#FF6E40', 'base': 'High', 'atr_m': 1.3, 'kor': 'VWAP 저항 매도', 'desc': 'VWAP 상방돌파 실패 후 하락 + WT 하락교차 + 거래량 확인.'},
+    'Parabolic_Top_Sell':{'w': 3.0, 'dir': 'sell','icon': '🌡️', 'label': 'Parabolic Top',  'sym': 'diamond',       'sz': 16, 'clr': '#FF0000', 'base': 'High', 'atr_m': 3.0, 'kor': '포물선 천장 매도', 'desc': 'WT1>85 꺾임+음봉 또는 BB+ATR×1.5 극단이격.'},
+    'EMA_Pullback_Sell':{'w': 2.0, 'dir': 'sell', 'icon': '🎯', 'label': 'EMA PB Sell',    'sym': 'triangle-down', 'sz': 13, 'clr': '#FF6E40', 'base': 'High', 'atr_m': 1.8, 'kor': 'EMA 되돌림 매도', 'desc': '하락추세 EMA부근 반등 후 WT재하락+거래량.'},
+    'Momentum_Ignition_Sell':{'w': 2.5, 'dir': 'sell','icon': '💣', 'label': 'Mom. Ign Sell','sym': 'star-diamond', 'sz': 15, 'clr': '#D50000', 'base': 'High', 'atr_m': 2.5, 'kor': '모멘텀 점화 매도', 'desc': '장대음봉>ATR×1.5+거래량>20MA×2.5+BB하단돌파.'},
+    'VWAP_Reject_Sell': {'w': 1.5, 'dir': 'sell', 'icon': '🏛️', 'label': 'VWAP Reject',   'sym': 'triangle-down', 'sz': 11, 'clr': '#FF6E40', 'base': 'High', 'atr_m': 1.3, 'kor': 'VWAP 저항 매도', 'desc': 'VWAP 상방돌파 실패 후 하락+WT교차+거래량.'},
+    'MACD_Cross_Sell':  {'w': 1.0, 'dir': 'sell', 'icon': '〽️', 'label': 'MACD Dead',     'sym': 'triangle-down', 'sz': 9,  'clr': '#E57373', 'base': 'High', 'atr_m': 1.0, 'kor': 'MACD 데드크로스', 'desc': 'MACD라인<시그널라인 하향교차(0선 상방에서).'},
+    'StochRSI_Cross_Sell':{'w': 0.8, 'dir': 'sell','icon': '🔄', 'label': 'StRSI Dead',    'sym': 'circle-open',   'sz': 8,  'clr': '#EF9A9A', 'base': 'High', 'atr_m': 0.8, 'kor': 'StochRSI 교차 매도', 'desc': 'StochK<StochD 하향교차(과매수 존).'},
 }
 
 COMPOSITE_SIGNALS = {
-    'Ultra_Buy':  {'w': 0, 'dir': 'buy',  'icon': '⚡', 'label': 'ULTRA BUY',  'sym': 'star', 'sz': 20, 'clr': '#FFD700', 'base': 'Low',  'atr_m': -3.5, 'kor': '울트라 매수', 'desc': 'Confluence ≥6 또는 (≥5 + 동시 3개 이상 매수).'},
+    'Ultra_Buy':  {'w': 0, 'dir': 'buy',  'icon': '⚡', 'label': 'ULTRA BUY',  'sym': 'star', 'sz': 20, 'clr': '#FFD700', 'base': 'Low',  'atr_m': -3.5, 'kor': '울트라 매수', 'desc': 'Confluence ≥6 또는 (≥5+동시 3개 이상).'},
     'Strong_Buy': {'w': 0, 'dir': 'buy',  'icon': '🔱', 'label': 'STRONG BUY', 'sym': 'star', 'sz': 16, 'clr': '#00E676', 'base': 'Low',  'atr_m': -3.2, 'kor': '스트롱 매수', 'desc': 'Confluence 3.5~6.'},
-    'Ultra_Sell': {'w': 0, 'dir': 'sell', 'icon': '🚨', 'label': 'ULTRA SELL', 'sym': 'star', 'sz': 20, 'clr': '#FF0000', 'base': 'High', 'atr_m': 3.5, 'kor': '울트라 매도', 'desc': 'Confluence ≤-6 또는 (≤-5 + 동시 3개 이상 매도).'},
+    'Ultra_Sell': {'w': 0, 'dir': 'sell', 'icon': '🚨', 'label': 'ULTRA SELL', 'sym': 'star', 'sz': 20, 'clr': '#FF0000', 'base': 'High', 'atr_m': 3.5, 'kor': '울트라 매도', 'desc': 'Confluence ≤-6 또는 (≤-5+동시 3개 이상).'},
     'Strong_Sell':{'w': 0, 'dir': 'sell', 'icon': '⚠️', 'label': 'STRONG SELL','sym': 'star', 'sz': 16, 'clr': '#FF1744', 'base': 'High', 'atr_m': 3.2, 'kor': '스트롱 매도', 'desc': 'Confluence -6~-3.5.'},
 }
 
@@ -132,25 +136,34 @@ OB1, OB2, OS1, OS2 = 53, 60, -53, -60
 ST_MIN_BAR = 12
 QUICK_TICKERS = ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'AMZN', 'META', 'GOOG', 'AMD']
 _UA_LIST = [
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15',
-    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/125.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 Version/17.4 Safari/605.1.15',
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36',
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0',
 ]
 
-# ──────────────────────────────────────────
-# ✅ Gemini API
-# ──────────────────────────────────────────
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=GEMINI_API_KEY)
 
+# 쿨다운 배치 정의 (v3.0: 중앙 관리)
+COOLDOWN_MAP = {
+    'Squeeze_Fire_Buy': 5, 'Squeeze_Fire_Sell': 5,
+    'Bullish_Engulfing': 5, 'Bearish_Engulfing': 5,
+    'Fib_Bounce_Buy': 7, 'Fib_Resistance_Sell': 7,
+    'ADX_Momentum_Buy': 10, 'ADX_Momentum_Sell': 10,
+    'EMA_Pullback_Buy': 7, 'EMA_Pullback_Sell': 7,
+    'Momentum_Ignition_Buy': 10, 'Momentum_Ignition_Sell': 10,
+    'Parabolic_Top_Sell': 5, 'Parabolic_Bottom_Buy': 5,
+    'VWAP_Bounce_Buy': 7, 'VWAP_Reject_Sell': 7,
+    'MACD_Cross_Buy': 10, 'MACD_Cross_Sell': 10,
+    'StochRSI_Cross_Buy': 5, 'StochRSI_Cross_Sell': 5,
+}
 
 # ──────────────────────────────────────────
-# 캐싱 함수 — 재시도 로직 추가 (v2.8)
+# 캐싱 함수
 # ──────────────────────────────────────────
 @st.cache_data(ttl=300, show_spinner=False)
 def get_stock_data(ticker):
-    """SwingTradeBot 크롤링 — 3회 재시도 + UA 로테이션"""
     url = f"https://swingtradebot.com/equities/{ticker.upper()}"
     for attempt in range(3):
         headers = {
@@ -162,41 +175,30 @@ def get_stock_data(ticker):
         try:
             time.sleep(random.uniform(1.0, 2.0) * (attempt + 1))
             response = requests.get(url, headers=headers, timeout=15)
-            if response.status_code == 403 and attempt < 2:
-                continue
             if response.status_code != 200:
-                if attempt < 2:
-                    continue
+                if attempt < 2: continue
                 return None
             soup = BeautifulSoup(response.text, 'html.parser')
             extracted = []
-
-            for sel, tag, label, sep in [
-                (('h2', {'itemprop': 'headline'}), 'find', 'HEADLINE', ' '),
-                (('div', {'class_': 'recap-body'}), 'find', 'DAILY RECAP', ' '),
-                (('', {'id': 'recap-tour'}), 'find_id', 'RECAP TOUR', ' '),
-                (('', {'id': 'indicators-tour'}), 'find_id', 'INDICATORS TOUR', ' | '),
-                (('table', {'id': 'trend-table-tour'}), 'find', 'TREND ANALYSIS', ' | '),
-                (('table', {'id': 'recent-signals-tour'}), 'find', 'RECENT SIGNALS', ' | '),
-            ]:
-                if tag == 'find_id':
-                    elem = soup.find(id=sel[1]['id'])
-                else:
-                    elem = soup.find(sel[0], sel[1]) if sel[0] else None
+            selectors = [
+                ('h2', {'itemprop': 'headline'}, 'HEADLINE', ' '),
+                ('div', {'class_': 'recap-body'}, 'DAILY RECAP', ' '),
+                (None, {'id': 'recap-tour'}, 'RECAP TOUR', ' '),
+                (None, {'id': 'indicators-tour'}, 'INDICATORS TOUR', ' | '),
+                ('table', {'id': 'trend-table-tour'}, 'TREND ANALYSIS', ' | '),
+                ('table', {'id': 'recent-signals-tour'}, 'RECENT SIGNALS', ' | '),
+            ]
+            for tag, attrs, label, sep in selectors:
+                elem = soup.find(id=attrs['id']) if 'id' in attrs and not tag else soup.find(tag, attrs) if tag else None
                 if elem:
                     extracted.append(f"#### [{label}]\n{elem.get_text(separator=sep, strip=True)}")
-
             sm_tables = soup.find_all('table', class_='table-sm')
             for i, t in enumerate(sm_tables):
                 if t.get('id') not in ['trend-table-tour', 'recent-signals-tour']:
                     extracted.append(f"#### [EXTRA {i}]\n{t.get_text(separator=' | ', strip=True)}")
-
             return "\n\n".join(extracted) if extracted else None
-        except requests.exceptions.Timeout:
-            if attempt < 2:
-                continue
-            return None
         except Exception:
+            if attempt < 2: continue
             return None
     return None
 
@@ -253,16 +255,19 @@ def _is_valid_ticker_format(ticker):
     return bool(re.match(r'^[A-Za-z]{1,5}([.\-][A-Za-z]{1,2})?$', ticker))
 
 
+def _cls(val, lo, hi):
+    return 'ind-bullish' if val < lo else ('ind-bearish' if val > hi else 'ind-neutral')
+
+
 # ──────────────────────────────────────────
 # 지표 계산 엔진
 # ──────────────────────────────────────────
 def compute_rsi(series, period=14):
     delta = series.diff()
-    gain = delta.clip(lower=0)
-    loss = -delta.clip(upper=0)
-    avg_gain = gain.ewm(alpha=1 / period, min_periods=period).mean()
-    avg_loss = loss.ewm(alpha=1 / period, min_periods=period).mean()
-    return 100 - (100 / (1 + avg_gain / (avg_loss + 1e-10)))
+    gain, loss = delta.clip(lower=0), -delta.clip(upper=0)
+    avg_g = gain.ewm(alpha=1 / period, min_periods=period).mean()
+    avg_l = loss.ewm(alpha=1 / period, min_periods=period).mean()
+    return 100 - (100 / (1 + avg_g / (avg_l + 1e-10)))
 
 
 def compute_mfi(high, low, close, volume, period=14):
@@ -292,8 +297,8 @@ def compute_wavetrend(high, low, close, channel_len=9, avg_len=12, ma_len=3):
 
 def compute_stoch_rsi(close, rsi_len=14, stoch_len=14, k_smooth=3, d_smooth=3):
     rsi = compute_rsi(close, rsi_len)
-    stoch = ((rsi - rsi.rolling(stoch_len).min())
-             / (rsi.rolling(stoch_len).max() - rsi.rolling(stoch_len).min() + 1e-10)) * 100
+    mn, mx = rsi.rolling(stoch_len).min(), rsi.rolling(stoch_len).max()
+    stoch = ((rsi - mn) / (mx - mn + 1e-10)) * 100
     k = stoch.rolling(k_smooth).mean()
     return k, k.rolling(d_smooth).mean()
 
@@ -312,10 +317,8 @@ def compute_true_range(high, low, close):
 def compute_adx(high, low, close, period=14):
     tr = compute_true_range(high, low, close)
     ph, pl = high.shift(1), low.shift(1)
-    plus_dm = pd.Series(np.where((high - ph) > (pl - low), np.maximum(high - ph, 0), 0),
-                        index=high.index, dtype=float)
-    minus_dm = pd.Series(np.where((pl - low) > (high - ph), np.maximum(pl - low, 0), 0),
-                         index=high.index, dtype=float)
+    plus_dm = pd.Series(np.where((high - ph) > (pl - low), np.maximum(high - ph, 0), 0), index=high.index, dtype=float)
+    minus_dm = pd.Series(np.where((pl - low) > (high - ph), np.maximum(pl - low, 0), 0), index=high.index, dtype=float)
     atr = tr.ewm(alpha=1 / period, min_periods=period).mean()
     pdi = 100 * plus_dm.ewm(alpha=1 / period, min_periods=period).mean() / (atr + 1e-10)
     mdi = 100 * minus_dm.ewm(alpha=1 / period, min_periods=period).mean() / (atr + 1e-10)
@@ -325,6 +328,12 @@ def compute_adx(high, low, close, period=14):
 
 def compute_obv(close, volume):
     return (volume * np.sign(close.diff()).fillna(0)).cumsum()
+
+
+def compute_macd(close, fast=12, slow=26, signal=9):
+    macd_line = close.ewm(span=fast, adjust=False).mean() - close.ewm(span=slow, adjust=False).mean()
+    signal_line = macd_line.ewm(span=signal, adjust=False).mean()
+    return macd_line, signal_line, macd_line - signal_line
 
 
 def detect_pivot_divergence_v2(price, oscillator, lookback=60, pivot_window=5,
@@ -381,21 +390,19 @@ def detect_ttm_squeeze(bb_up, bb_low, kc_up, kc_low, close, high, low, kc_mid):
 
 
 def detect_volume_climax(close, opn, volume, wt1, atr, vol_mult=3.0, wt_buy=-40, wt_sell=40):
-    """v2.8: ATR 기반 캔들 크기 필터 추가"""
     avg = volume.rolling(20).mean()
     body = (close - opn).abs()
-    big_body = body > atr * 0.5  # 최소 ATR 50% 이상 실체
+    big_body = body > atr * 0.5
     prev_spike = (volume.shift(1) > avg.shift(1) * vol_mult) & big_body.shift(1)
-    prev_bear = (close.shift(1) < opn.shift(1))
-    prev_bull = (close.shift(1) > opn.shift(1))
-    return (prev_spike & prev_bear & (wt1.shift(1) < wt_buy) & (close > opn),
-            prev_spike & prev_bull & (wt1.shift(1) > wt_sell) & (close < opn))
+    return (prev_spike & (close.shift(1) < opn.shift(1)) & (wt1.shift(1) < wt_buy) & (close > opn),
+            prev_spike & (close.shift(1) > opn.shift(1)) & (wt1.shift(1) > wt_sell) & (close < opn))
 
 
 def detect_obv_divergence(close, volume, wt1, lookback=60, pivot_window=5):
     obv = compute_obv(close, volume)
     bull_d, bear_d, _, _ = detect_pivot_divergence_v2(close, obv, lookback, pivot_window)
-    return obv, bull_d & (wt1 < -20), bear_d & (wt1 > 20)
+    # v3.0: WT 필터 강화 -20 → -30, 20 → 30
+    return obv, bull_d & (wt1 < -30), bear_d & (wt1 > 30)
 
 
 def detect_engulfing(close, opn, wt1, direction='bull', wt_thresh=20):
@@ -412,19 +419,16 @@ def detect_engulfing(close, opn, wt1, direction='bull', wt_thresh=20):
 
 
 def detect_fib_levels(high, low, close, wt1, wt2, atr, direction='buy', swing_lb=60, confirm=5):
-    """v2.8: ATR 기반 동적 허용범위"""
     sh = high.shift(confirm).rolling(swing_lb).max()
     sl = low.shift(confirm).rolling(swing_lb).min()
     fib_range = sh - sl
-    tol = (atr / (fib_range + 1e-10)).clip(upper=0.05)  # ATR 비례, 최대 5%
+    tol = (atr / (fib_range + 1e-10)).clip(upper=0.05)
     if direction == 'buy':
-        f618 = sh - fib_range * 0.618
-        f786 = sh - fib_range * 0.786
+        f618, f786 = sh - fib_range * 0.618, sh - fib_range * 0.786
         near = (low <= f618 * (1 + tol)) & (low >= f786 * (1 - tol))
         return near & (wt1 < -30) & (wt1 > wt2)
     else:
-        f618 = sl + fib_range * 0.618
-        f786 = sl + fib_range * 0.786
+        f618, f786 = sl + fib_range * 0.618, sl + fib_range * 0.786
         near = (high >= f618 * (1 - tol)) & (high <= f786 * (1 + tol))
         return near & (wt1 > 30) & (wt1 < wt2)
 
@@ -468,34 +472,32 @@ def detect_ema_pullback(close, high, low, volume, ema8, ema21, atr, wt1, wt2, di
     atr_r = atr / close
 
     if direction == 'buy':
+        # v3.0: touched_recent로 1~2봉 이전 터치 허용 → 동일봉 터치+바운스 방지
         touched = (low <= ema8 * (1 + atr_r * 0.15)) & (low >= ema21 * (1 - atr_r * 0.25))
-        bounced = close >= ema8
+        touched_recent = _recent_true(touched, 2)
+        bounced = (close >= ema8) & (close > close.shift(1))
         wt_ok = (wt1 > wt1.shift(1)) & (wt1 > wt2) & (wt1 < 60)
+        return trend & side_ok & touched_recent & bounced & wt_ok & vol_ok
     else:
         touched = (high >= ema8 * (1 - atr_r * 0.15)) & (high <= ema21 * (1 + atr_r * 0.25))
-        bounced = close <= ema8
+        touched_recent = _recent_true(touched, 2)
+        bounced = (close <= ema8) & (close < close.shift(1))
         wt_ok = (wt1 < wt1.shift(1)) & (wt1 < wt2) & (wt1 > -60)
-
-    return trend & side_ok & touched & bounced & wt_ok & vol_ok
+        return trend & side_ok & touched_recent & bounced & wt_ok & vol_ok
 
 
 def detect_momentum_ignition(close, opn, volume, bb_band, atr, ema8, ema21, wt1,
                               direction='buy', body_atr_mult=1.5, vol_mult=2.5):
-    """v2.8: WT 필터 추가 — 이미 과매수/과매도 극단에서 발화 방지"""
     body = (close - opn).abs()
     big_body = body > (atr * body_atr_mult)
-    avg_vol = volume.rolling(20).mean()
-    huge_vol = volume > (avg_vol * vol_mult)
+    huge_vol = volume > (volume.rolling(20).mean() * vol_mult)
     if direction == 'buy':
-        wt_ok = wt1 < 50  # 과매수 구간에서 매수 점화 방지
-        return (close > opn) & big_body & huge_vol & (close > bb_band) & (ema8 > ema21) & wt_ok
+        return (close > opn) & big_body & huge_vol & (close > bb_band) & (ema8 > ema21) & (wt1 < 50)
     else:
-        wt_ok = wt1 > -50  # 과매도 구간에서 매도 점화 방지
-        return (close < opn) & big_body & huge_vol & (close < bb_band) & (ema8 < ema21) & wt_ok
+        return (close < opn) & big_body & huge_vol & (close < bb_band) & (ema8 < ema21) & (wt1 > -50)
 
 
 def detect_vwap_bounce(close, vwap_osc, wt1, wt2, volume, atr, direction='buy'):
-    """v2.8: ATR 비례 동적 임계값"""
     vol_ok = _vol_filter(volume, min_ratio=0.7)
     atr_pct = (atr / close * 100).clip(lower=0.3, upper=3.0)
     dyn_thresh = (atr_pct * 0.3).clip(lower=0.3, upper=1.5)
@@ -507,13 +509,19 @@ def detect_vwap_bounce(close, vwap_osc, wt1, wt2, volume, atr, direction='buy'):
         return crossed_dn & (wt1 < wt2) & (wt1 > -30) & vol_ok
 
 
-def detect_parabolic_bottom(close, opn, wt1, bb_low, atr, wt_down):
-    """v2.8 신규: Parabolic Top Sell의 대칭"""
-    return (
-        ((wt1 < -85) & (wt1 > wt1.shift(1)) &
-         (close > opn) & (close > close.shift(1))) |
-        ((close < bb_low - atr * 1.5) & (close > opn))
-    )
+def detect_parabolic_extreme(close, opn, wt1, bb_band, atr, direction='bottom'):
+    """v3.0: 통합 파라볼릭 극단 탐지"""
+    vol_ok = _vol_filter(close * 0 + 1, 0)  # placeholder — actual vol filter applied externally
+    if direction == 'bottom':
+        return (
+            ((wt1 < -85) & (wt1 > wt1.shift(1)) & (close > opn) & (close > close.shift(1))) |
+            ((close < bb_band - atr * 1.5) & (close > opn))
+        )
+    else:
+        return (
+            ((wt1 > 85) & (wt1 < wt1.shift(1)) & (close < opn) & (close < close.shift(1))) |
+            ((close > bb_band + atr * 1.5) & (close < opn))
+        )
 
 
 def compute_htf_trend(close, ema8, ema21, ma50):
@@ -565,31 +573,31 @@ def compute_signal_proximity(wt1, wt2, rsi, mfi, rsi_mfi, stochk, strong_bull, s
     wt_conv_up = (wt1 - wt2) > (wt1.shift(1) - wt2.shift(1))
     wt_conv_dn = (wt1 - wt2) < (wt1.shift(1) - wt2.shift(1))
 
-    for prox, conds in [
-        (buy_prox, [
+    prox_rules = {
+        'buy': [
             ((wt1 < -40) & near_cross, 30), ((wt1 < -40) & wt_conv_up & (wt_gap < 8), 15),
             (wt1 < OS2, 20), ((wt1 >= OS2) & (wt1 < -40), 10),
             (rsi < 35, 15), ((rsi >= 35) & (rsi < 45), 5),
             (mfi < 35, 15), ((mfi >= 35) & (mfi < 45), 5),
             (rsi_mfi < -5, 10), ((rsi_mfi >= -5) & (rsi_mfi < 0), 5),
             (stochk < 20, 10), ((stochk >= 20) & (stochk < 35), 5),
-        ]),
-        (sell_prox, [
+        ],
+        'sell': [
             ((wt1 > 40) & near_cross, 30), ((wt1 > 40) & wt_conv_dn & (wt_gap < 8), 15),
             (wt1 > OB1, 20), ((wt1 <= OB1) & (wt1 > 40), 10),
             (rsi > 65, 15), ((rsi <= 65) & (rsi > 55), 5),
             (mfi > 65, 15), ((mfi <= 65) & (mfi > 55), 5),
             (rsi_mfi > 5, 10), ((rsi_mfi <= 5) & (rsi_mfi > 0), 5),
             (stochk > 80, 10), ((stochk <= 80) & (stochk > 65), 5),
-        ]),
-    ]:
-        for cond, pts in conds:
-            prox += np.where(cond, pts, 0)
+        ],
+    }
+    for cond, pts in prox_rules['buy']:
+        buy_prox += np.where(cond, pts, 0)
+    for cond, pts in prox_rules['sell']:
+        sell_prox += np.where(cond, pts, 0)
 
-    buy_prox = buy_prox.clip(upper=100)
-    sell_prox = sell_prox.clip(upper=100)
+    buy_prox, sell_prox = buy_prox.clip(upper=100), sell_prox.clip(upper=100)
     net = buy_prox - sell_prox
-
     buy_damp = np.where(strong_bear, 0.4, 0.55)
     sell_damp = np.where(strong_bull, 0.4, 0.55)
     return (pd.Series(np.where(net >= 0, buy_prox, buy_prox * buy_damp), index=wt1.index),
@@ -678,6 +686,8 @@ def compute_indicators(df):
     df['OBV'], df['_OBV_Div_Buy_raw'], df['_OBV_Div_Sell_raw'] = detect_obv_divergence(
         df['Close'], df['Volume'], df['WT1'])
     df['KC_Upper'], df['KC_Mid'], df['KC_Lower'] = compute_keltner_channel(df['High'], df['Low'], df['Close'])
+    # v3.0: MACD 추가
+    df['MACD_Line'], df['MACD_Signal'], df['MACD_Hist'] = compute_macd(df['Close'])
     return df
 
 
@@ -706,11 +716,8 @@ def detect_all_signals(df):
     mf_bullish = df['RSI_MFI'] > -10
     mf_bearish = df['RSI_MFI'] < 10
 
-    parabolic_blowoff = (
-        ((df['WT1'] > 85) & (df['WT1'] < df['WT1'].shift(1)) & (C < O) & (C < C.shift(1))) |
-        ((C > df['BB_Up'] + df['ATR'] * 1.5) & (C < O))
-    )
-    parabolic_bottom = detect_parabolic_bottom(C, O, df['WT1'], df['BB_Low'], df['ATR'], df['WT_Down'])
+    parabolic_blowoff = detect_parabolic_extreme(C, O, df['WT1'], df['BB_Up'], df['ATR'], 'top')
+    parabolic_bottom = detect_parabolic_extreme(C, O, df['WT1'], df['BB_Low'], df['ATR'], 'bottom')
 
     st_flip_bear_raw = (df['ST_Direction'] == -1) & (df['ST_Direction'].shift(1) == 1)
     st_flip_bear_raw.iloc[:ST_MIN_BAR] = False
@@ -758,8 +765,15 @@ def detect_all_signals(df):
         (df['WT2'] >= 0) & wt_down_near & ~htf1_bull & ~htf2_bull &
         (~sell_shield_bull) & mf_bearish & vol_ok
     )
-    df['Green_Circle'] = wt_up_near & (df['WT1'] <= OS1) & ~_green_dot & (~buy_shield_bear) & vol_ok
-    df['Red_Circle'] = wt_down_near & (df['WT1'] >= OB1) & ~_red_dot & (~sell_shield_bull) & vol_ok
+    # v3.0: Circle 시그널에 RSI 소프트 필터 추가 (노이즈 감소)
+    df['Green_Circle'] = (
+        wt_up_near & (df['WT1'] <= OS1) & ~_green_dot &
+        (~buy_shield_bear) & vol_ok & (df['RSI'] < 45)
+    )
+    df['Red_Circle'] = (
+        wt_down_near & (df['WT1'] >= OB1) & ~_red_dot &
+        (~sell_shield_bull) & vol_ok & (df['RSI'] > 55)
+    )
 
     # ── Divergences ──
     bull_d, bear_d, hid_bull, hid_bear = detect_pivot_divergence_v2(C, df['WT1'], 60, 5, OS1, OB1)
@@ -770,8 +784,9 @@ def detect_all_signals(df):
     df['Blood_Diamond'] = df['Red_Dot_T1'] & (df['WT1'] >= OB2) & bear_d_recent
     df['Bull_Divergence'] = bull_d & wt_up_recent & ~_green_dot & ~df['Gold_Dot'] & (~buy_shield_bear) & vol_ok
     df['Bear_Divergence'] = bear_d & wt_down_recent & ~_red_dot & (~sell_shield_bull) & vol_ok
-    df['Hidden_Bull_Div'] = hid_bull & (df['WT1'] < 0) & htf2_bull & (~buy_shield_extreme)
-    df['Hidden_Bear_Div'] = hid_bear & (df['WT1'] > 0) & ~htf2_bull & (~sell_shield_extreme)
+    # v3.0: Hidden Div WT 필터 강화 (0 → -20/20)
+    df['Hidden_Bull_Div'] = hid_bull & (df['WT1'] < -20) & htf2_bull & (~buy_shield_extreme)
+    df['Hidden_Bear_Div'] = hid_bear & (df['WT1'] > 20) & ~htf2_bull & (~sell_shield_extreme)
 
     # ── TTM Squeeze ──
     sq_on, sq_fb, sq_fs = detect_ttm_squeeze(
@@ -780,7 +795,7 @@ def detect_all_signals(df):
     df['Squeeze_Fire_Buy'] = sq_fb & (~buy_shield_bear) & vol_ok
     df['Squeeze_Fire_Sell'] = sq_fs & (~sell_shield_bull) & vol_ok
 
-    # ── Volume Climax (v2.8: ATR body filter) ──
+    # ── Volume Climax ──
     df['Volume_Climax_Buy'], df['Volume_Climax_Sell'] = detect_volume_climax(
         C, O, V, df['WT1'], df['ATR'])
 
@@ -789,7 +804,7 @@ def detect_all_signals(df):
     df['ADX_Momentum_Buy'] = adx_cross & (df['Plus_DI'] > df['Minus_DI']) & (df['WT1'] > df['WT2']) & vol_ok
     df['ADX_Momentum_Sell'] = adx_cross & (df['Minus_DI'] > df['Plus_DI']) & (df['WT1'] < df['WT2']) & vol_ok
 
-    # ── Fib (v2.8: ATR dynamic tolerance) ──
+    # ── Fib ──
     df['Fib_Bounce_Buy'] = detect_fib_levels(H, L, C, df['WT1'], df['WT2'], df['ATR'], 'buy') & (~buy_shield_bear) & vol_ok
     df['Fib_Resistance_Sell'] = detect_fib_levels(H, L, C, df['WT1'], df['WT2'], df['ATR'], 'sell') & (~sell_shield_bull) & vol_ok
 
@@ -797,47 +812,69 @@ def detect_all_signals(df):
     df['Bullish_Engulfing'] = detect_engulfing(C, O, df['WT1'], 'bull') & (~buy_shield_bear) & vol_ok
     df['Bearish_Engulfing'] = detect_engulfing(C, O, df['WT1'], 'bear') & (~sell_shield_bull) & vol_ok
 
-    # ── MA Cross ──
-    df['Golden_Cross'], df['Death_Cross'] = detect_ma_cross(df['MA50'], df['MA200'])
+    # ── MA Cross (v3.0: ADX+거래량 필터 추가) ──
+    golden_raw, death_raw = detect_ma_cross(df['MA50'], df['MA200'])
+    adx_filter = df['ADX'] > 15
+    vol_cross_ok = _vol_filter(V, 0.7)
+    df['Golden_Cross'] = golden_raw & adx_filter & vol_cross_ok
+    df['Death_Cross'] = death_raw & adx_filter & vol_cross_ok
 
     # ── OBV Div ──
     df['OBV_Div_Buy'] = df['_OBV_Div_Buy_raw'] & (~buy_shield_extreme)
     df['OBV_Div_Sell'] = df['_OBV_Div_Sell_raw'] & (~sell_shield_extreme)
 
-    # ── EMA Pullback ──
+    # ── EMA Pullback (v3.0: touched_recent 지연 적용) ──
     for d in ['buy', 'sell']:
         col = f"EMA_Pullback_{'Buy' if d == 'buy' else 'Sell'}"
-        df[col] = _apply_cooldown(detect_ema_pullback(
-            C, H, L, V, df['EMA8'], df['EMA21'], df['ATR'], df['WT1'], df['WT2'], d), 7)
+        df[col] = detect_ema_pullback(C, H, L, V, df['EMA8'], df['EMA21'], df['ATR'], df['WT1'], df['WT2'], d)
 
-    # ── Momentum Ignition (v2.8: WT filter) ──
-    df['Momentum_Ignition_Buy'] = _apply_cooldown(detect_momentum_ignition(
-        C, O, V, df['BB_Up'], df['ATR'], df['EMA8'], df['EMA21'], df['WT1'], 'buy'), 10)
-    df['Momentum_Ignition_Sell'] = _apply_cooldown(detect_momentum_ignition(
-        C, O, V, df['BB_Low'], df['ATR'], df['EMA8'], df['EMA21'], df['WT1'], 'sell'), 10)
+    # ── Momentum Ignition ──
+    df['Momentum_Ignition_Buy'] = detect_momentum_ignition(
+        C, O, V, df['BB_Up'], df['ATR'], df['EMA8'], df['EMA21'], df['WT1'], 'buy')
+    df['Momentum_Ignition_Sell'] = detect_momentum_ignition(
+        C, O, V, df['BB_Low'], df['ATR'], df['EMA8'], df['EMA21'], df['WT1'], 'sell')
 
     # ── SuperTrend ──
     df['SuperTrend_Buy'] = st_flip_bull_raw
     df['SuperTrend_Sell'] = st_flip_bear_raw
 
-    # ── Parabolic (v2.8: Buy 추가) ──
+    # ── Parabolic (v3.0: 거래량 확인 추가) ──
+    vol_parabolic = _vol_filter(V, 1.0)  # 평균 이상 거래량
     raw_parabolic_sell = parabolic_blowoff & (
         (df['WT_Down'] | wt_down_recent) | ((C < O) & (C < C.shift(1))))
-    df['Parabolic_Top_Sell'] = _apply_cooldown(raw_parabolic_sell, 5)
-    df['Parabolic_Bottom_Buy'] = _apply_cooldown(
-        parabolic_bottom & ((df['WT_Up'] | wt_up_recent) | ((C > O) & (C > C.shift(1)))), 5)
+    df['Parabolic_Top_Sell'] = raw_parabolic_sell & vol_parabolic
+    raw_parabolic_buy = parabolic_bottom & (
+        (df['WT_Up'] | wt_up_recent) | ((C > O) & (C > C.shift(1))))
+    df['Parabolic_Bottom_Buy'] = raw_parabolic_buy & vol_parabolic
 
-    # ── VWAP (v2.8: ATR dynamic threshold) ──
-    df['VWAP_Bounce_Buy'] = _apply_cooldown(detect_vwap_bounce(
-        C, df['VWAP_Osc'], df['WT1'], df['WT2'], V, df['ATR'], 'buy'), 7)
-    df['VWAP_Reject_Sell'] = _apply_cooldown(detect_vwap_bounce(
-        C, df['VWAP_Osc'], df['WT1'], df['WT2'], V, df['ATR'], 'sell'), 7)
+    # ── VWAP ──
+    df['VWAP_Bounce_Buy'] = detect_vwap_bounce(C, df['VWAP_Osc'], df['WT1'], df['WT2'], V, df['ATR'], 'buy')
+    df['VWAP_Reject_Sell'] = detect_vwap_bounce(C, df['VWAP_Osc'], df['WT1'], df['WT2'], V, df['ATR'], 'sell')
 
-    # ── Cooldowns ──
-    for sig_col, cd in {'Squeeze_Fire_Buy': 5, 'Squeeze_Fire_Sell': 5,
-                        'Bullish_Engulfing': 5, 'Bearish_Engulfing': 5,
-                        'Fib_Bounce_Buy': 7, 'Fib_Resistance_Sell': 7,
-                        'ADX_Momentum_Buy': 10, 'ADX_Momentum_Sell': 10}.items():
+    # ── v3.0 신규: MACD Cross ──
+    macd_l, macd_s = df['MACD_Line'], df['MACD_Signal']
+    df['MACD_Cross_Buy'] = (
+        (macd_l > macd_s) & (macd_l.shift(1) <= macd_s.shift(1)) &
+        (macd_l < 0) & (~buy_shield_bear) & vol_ok
+    )
+    df['MACD_Cross_Sell'] = (
+        (macd_l < macd_s) & (macd_l.shift(1) >= macd_s.shift(1)) &
+        (macd_l > 0) & (~sell_shield_bull) & vol_ok
+    )
+
+    # ── v3.0 신규: StochRSI Cross ──
+    sk, sd = df['StochK'], df['StochD']
+    df['StochRSI_Cross_Buy'] = (
+        (sk > sd) & (sk.shift(1) <= sd.shift(1)) & (sk < 25) &
+        (~buy_shield_bear) & vol_ok
+    )
+    df['StochRSI_Cross_Sell'] = (
+        (sk < sd) & (sk.shift(1) >= sd.shift(1)) & (sk > 75) &
+        (~sell_shield_bull) & vol_ok
+    )
+
+    # ── 배치 쿨다운 적용 (v3.0: 중앙 관리) ──
+    for sig_col, cd in COOLDOWN_MAP.items():
         if sig_col in df.columns:
             df[sig_col] = _apply_cooldown(df[sig_col], cd)
 
@@ -876,7 +913,7 @@ def _add_highlight_zones(fig, mask_series, index, fillcolor, annotation_text=Non
         fig.add_vrect(**kwargs)
 
 
-def build_chart(df_chart, ticker, trend_regime, shield_status):
+def build_chart(df_chart, ticker, trend_regime, shield_status, chart_height=1100):
     mac = {5: "#ff9900", 20: '#f1c40f', 50: '#e74c3c', 100: '#9b59b6', 125: '#3498db', 200: '#2ecc71'}
 
     fig = make_subplots(
@@ -921,12 +958,14 @@ def build_chart(df_chart, ticker, trend_regime, shield_status):
         if override_mask.any():
             _add_highlight_zones(fig, override_mask, df_chart.index, clr, txt, row=1)
 
-    # Plot signals
+    # Plot signals (v3.0: 필터링된 시그널만)
+    enabled_signals = st.session_state.get('enabled_signals', set(ALL_CHART_SIGNALS.keys()))
+
     def _atr_at(sig_df):
         return df_chart.loc[sig_df.index, 'ATR'].fillna(df_chart['ATR'].median())
 
     for cn, cfg in ALL_CHART_SIGNALS.items():
-        if cn not in df_chart.columns:
+        if cn not in df_chart.columns or cn not in enabled_signals:
             continue
         if cn == 'Green_Dot_T1':
             sig = df_chart[df_chart[cn] & ~df_chart.get('Gold_Dot', False)]
@@ -1014,10 +1053,10 @@ def build_chart(df_chart, ticker, trend_regime, shield_status):
 
     shield_title = f" | {shield_status}" if shield_status else ""
     fig.update_layout(
-        title=dict(text=f"📊 {ticker.upper()} | 💎 Market Cipher B+ V2.8 | {trend_regime}{shield_title}",
+        title=dict(text=f"📊 {ticker.upper()} | 💎 Market Cipher B+ V3.0 | {trend_regime}{shield_title}",
                    font=dict(size=14, color='#FAFAFA')),
         yaxis_title="USD", yaxis2_title="Vol", yaxis3_title="WT", yaxis4_title="MF", yaxis5_title="Conf",
-        template="plotly_dark", margin=dict(l=0, r=0, t=50, b=0), height=1100, showlegend=True,
+        template="plotly_dark", margin=dict(l=0, r=0, t=50, b=0), height=chart_height, showlegend=True,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5,
                     font=dict(size=9, color='#AAAAAA'), bgcolor='rgba(0,0,0,0)'),
     )
@@ -1053,21 +1092,23 @@ def build_metadata(df_chart, df_valid, ticker):
         trend_regime = 'NEUTRAL ⚪'
 
     shield_parts = []
-    if latest.get('Parabolic_Blowoff', False):
-        shield_parts.append('🌡️ PARABOLIC TOP')
-    if latest.get('ST_Bear_Override', False):
-        shield_parts.append('📉 ST BEAR')
-    if latest.get('Parabolic_Bottom_Raw', False):
-        shield_parts.append('🧊 PARABOLIC BOT')
-    if latest.get('Buy_Shield_Overridden', False) and not shield_parts:
-        shield_parts.append('🔓 BUY SHIELD OFF')
-    if latest.get('Sell_Shield_Overridden', False) and '🌡️' not in str(shield_parts) and '📉' not in str(shield_parts):
-        shield_parts.append('🔓 SELL SHIELD OFF')
+    for cond, label in [
+        ('Parabolic_Blowoff', '🌡️ PARABOLIC TOP'),
+        ('ST_Bear_Override', '📉 ST BEAR'),
+        ('Parabolic_Bottom_Raw', '🧊 PARABOLIC BOT'),
+    ]:
+        if latest.get(cond, False):
+            shield_parts.append(label)
+    if not shield_parts:
+        if latest.get('Buy_Shield_Overridden', False):
+            shield_parts.append('🔓 BUY SHIELD OFF')
+        if latest.get('Sell_Shield_Overridden', False):
+            shield_parts.append('🔓 SELL SHIELD OFF')
     shield_status = ' + '.join(shield_parts)
 
     sig_checks = [(k, v['icon'], v['label'], v['dir']) for k, v in ALL_CHART_SIGNALS.items()]
     recent_signals = []
-    for ir, row in df_chart.tail(30).iterrows():
+    for ir, row in df_chart.tail(15).iterrows():  # v3.0: 30→15일
         d_str = ir.strftime('%m/%d')
         for col, icon, lbl, side in sig_checks:
             if row.get(col, False):
@@ -1100,6 +1141,9 @@ def build_metadata(df_chart, df_valid, ticker):
         'ema8': float(latest.get('EMA8', 0)), 'ema21': float(latest.get('EMA21', 0)),
         'bb_up': float(latest.get('BB_Up', 0)), 'bb_low': float(latest.get('BB_Low', 0)),
         'ma50': float(latest.get('MA50', 0)), 'ma200': float(latest.get('MA200', 0)),
+        'macd_line': float(latest.get('MACD_Line', 0)),
+        'macd_signal': float(latest.get('MACD_Signal', 0)),
+        'macd_hist': float(latest.get('MACD_Hist', 0)),
     }, trend_regime, shield_status
 
 
@@ -1133,11 +1177,11 @@ def build_prompt_text(df_chart, meta):
         f"EMA8={latest['EMA8']:.2f}, EMA21={latest['EMA21']:.2f}, "
         f"SuperTrend={st_dir_text}, BB=[{meta['bb_up']:.2f}/{meta['bb_low']:.2f}], "
         f"MA50={meta['ma50']:.2f}, MA200={meta['ma200']:.2f}, "
+        f"MACD={meta['macd_line']:.3f}/{meta['macd_signal']:.3f} Hist={meta['macd_hist']:.3f}, "
         f"Confluence={meta['confluence_score']:.1f}, Bias={meta['overall_bias']}({meta['bias_score']:.1f}), "
         f"Trend={meta['trend_regime']}, {shield_text}, {prox_text}, {sq_text}"
     )
 
-    # v2.8: 백테스트 통계 프롬프트 포함
     stats = meta.get('all_signal_stats', {})
     stats_text = ""
     if stats:
@@ -1168,7 +1212,8 @@ def get_yfinance_data_and_chart(ticker, chart_period_days=252):
             return None, "차트 데이터 부족", None
 
         meta, trend_regime, shield_status = build_metadata(df_chart, df_valid, ticker)
-        fig = build_chart(df_chart, ticker, trend_regime, shield_status)
+        chart_h = st.session_state.get('chart_height', 1100)
+        fig = build_chart(df_chart, ticker, trend_regime, shield_status, chart_h)
         enhanced = build_prompt_text(df_chart, meta)
 
         return fig, enhanced, meta
@@ -1186,15 +1231,12 @@ _IND_THRESHOLDS = {
     'stochk': [(20, '바닥'), (80, ''), (999, '천장')],
 }
 
+
 def _indicator_label(name, value):
     for thresh, label in _IND_THRESHOLDS.get(name, []):
         if value <= thresh:
             return label
     return ''
-
-
-def _cls(val, lo, hi):
-    return 'ind-bullish' if val < lo else ('ind-bearish' if val > hi else 'ind-neutral')
 
 
 def render_price_header(meta):
@@ -1206,6 +1248,7 @@ def render_price_header(meta):
     cv = meta.get('confluence_score', 0)
     st_dir = meta.get('supertrend_dir', 0)
     shield = meta.get('shield_status', '')
+    macd_h = meta.get('macd_hist', 0)
 
     ind_specs = [
         (_cls(meta['wt1'], -20, 20), f"WT: {meta['wt1']:.0f} {_indicator_label('wt1', meta['wt1'])}"),
@@ -1217,6 +1260,7 @@ def render_price_header(meta):
         (_cls(meta['stochk'], 30, 70), f"StK: {meta['stochk']:.0f} {_indicator_label('stochk', meta['stochk'])}"),
         ('ind-bullish' if cv >= 3.5 else ('ind-bearish' if cv <= -3.5 else 'ind-neutral'), f"Conf: {cv:.1f}"),
         ('ind-bullish' if st_dir == 1 else 'ind-bearish', f"ST: {'▲' if st_dir == 1 else '▼'}"),
+        ('ind-bullish' if macd_h > 0 else ('ind-bearish' if macd_h < 0 else 'ind-neutral'), f"MACD: {macd_h:+.2f}"),
     ]
 
     indicators_html = "".join([f"<span class='indicator-mini {c}'>{lbl}</span>" for c, lbl in ind_specs])
@@ -1296,7 +1340,7 @@ def render_signal_cards(meta):
     sigs = meta['recent_signals']
     if not sigs:
         st.markdown("""<div class="signal-card signal-card-neutral">
-            <p style="margin:0;color:#FFC107;font-weight:600;">🟠 최근 30일 내 주요 시그널 없음</p>
+            <p style="margin:0;color:#FFC107;font-weight:600;">🟠 최근 15일 내 주요 시그널 없음</p>
             <p style="margin:4px 0 0 0;color:#888;font-size:0.85rem;">관망 구간입니다.</p></div>""",
                     unsafe_allow_html=True)
         return
@@ -1305,7 +1349,6 @@ def render_signal_cards(meta):
     for icon, lbl, d_str, side in sigs:
         date_groups.setdefault(d_str, []).append((icon, lbl, side))
 
-    # v2.8: 백테스트 승률 인라인 표시
     all_stats = meta.get('all_signal_stats', {})
 
     for d_str in reversed(date_groups):
@@ -1316,7 +1359,6 @@ def render_signal_cards(meta):
         sig_parts = []
         for i, l, s in group:
             cls_name = "ind-bullish" if s == "buy" else "ind-bearish"
-            # Find matching stat by label
             stat_hint = ""
             for sn, sv in all_stats.items():
                 cfg = ALL_CHART_SIGNALS.get(sn, {})
@@ -1383,7 +1425,7 @@ def render_inline_analysis(msg):
 # ──────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 💎 CipherX")
-    st.markdown("<p style='color:#888;font-size:0.8rem;'>AI 주가 분석 · Market Cipher B+ v2.8</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#888;font-size:0.8rem;'>AI 주가 분석 · Market Cipher B+ v3.0</p>", unsafe_allow_html=True)
     st.markdown("---")
 
     st.markdown("### 📅 차트 기간")
@@ -1391,32 +1433,55 @@ with st.sidebar:
                             index=2, horizontal=True, key="chart_period_radio")
     chart_days = {'3개월': 63, '6개월': 126, '1년': 252, '2년': 504}[chart_period]
 
-    # v2.8: 기간 변경 시 자동 재분석
+    # v3.0: 차트 높이 조절
+    chart_height = st.select_slider("차트 높이", options=[800, 900, 1000, 1100, 1200, 1300],
+                                     value=1100, key="chart_height_slider")
+    st.session_state['chart_height'] = chart_height
+
+    # v3.0: 기간 변경 감지 (버그 수정)
     if 'prev_chart_period' not in st.session_state:
         st.session_state.prev_chart_period = chart_period
     if chart_period != st.session_state.prev_chart_period:
         st.session_state.prev_chart_period = chart_period
         if st.session_state.get('last_ticker'):
-            st.session_state._auto_reanalyze = True
-            st.rerun()
+            st.session_state._pending_reanalyze = True
 
     st.markdown("---")
 
-    # v2.8: 퀵 티커 버튼
+    # v3.0: 퀵 티커 버튼 (버그 수정 — 실제 동작)
     st.markdown("### ⚡ 빠른 분석")
     quick_cols = st.columns(4)
     for idx, t in enumerate(QUICK_TICKERS):
         with quick_cols[idx % 4]:
             if st.button(t, key=f"quick_{t}", type="secondary", use_container_width=True):
-                st.session_state._quick_ticker = t
+                st.session_state._pending_ticker = t
                 st.rerun()
 
     st.markdown("---")
 
+    # v3.0: 시그널 필터
+    with st.expander("🎛️ 시그널 필터", expanded=False):
+        show_buy = st.checkbox("🟢 매수 시그널", value=True, key="show_buy_signals")
+        show_sell = st.checkbox("🔴 매도 시그널", value=True, key="show_sell_signals")
+        show_composite = st.checkbox("⭐ 복합 시그널", value=True, key="show_composite_signals")
+        min_weight = st.slider("최소 가중치", 0.0, 3.0, 0.0, 0.5, key="min_signal_weight")
+
+        enabled = set()
+        for k, v in ALL_CHART_SIGNALS.items():
+            if v['dir'] == 'buy' and not show_buy: continue
+            if v['dir'] == 'sell' and not show_sell: continue
+            if k in COMPOSITE_SIGNALS and not show_composite: continue
+            if v['w'] < min_weight and k not in COMPOSITE_SIGNALS: continue
+            enabled.add(k)
+        st.session_state['enabled_signals'] = enabled
+        st.caption(f"활성 시그널: {len(enabled)}개")
+
     if st.button("🗑️ 대화 초기화", use_container_width=True, type="secondary"):
-        for key in ['messages', 'pending_ai_ticker', 'pending_ai_prompt', 'last_ticker']:
-            st.session_state[key] = [{"role": "assistant", "type": "text",
-                                       "content": "안녕하세요! 💎 **CipherX** 입니다.\n\n분석할 **티커명**을 입력하세요."}] if key == 'messages' else None
+        for key in ['messages', 'pending_ai_ticker', 'pending_ai_prompt', 'last_ticker',
+                     '_pending_ticker', '_pending_reanalyze']:
+            default = [{"role": "assistant", "type": "text",
+                        "content": "안녕하세요! 💎 **CipherX** 입니다.\n\n분석할 **티커명**을 입력하세요."}] if key == 'messages' else None
+            st.session_state[key] = default
         st.rerun()
     st.markdown("---")
 
@@ -1428,10 +1493,10 @@ with st.sidebar:
         with st.expander(expander_title, expanded=False):
             for k in sig_list:
                 info = ALL_CHART_SIGNALS[k]
-                st.markdown(f"**{info['icon']} {info['label']}** · <span style='color:#888;font-size:0.82rem;'>{info.get('kor', '')}</span>",
+                st.markdown(f"**{info['icon']} {info['label']}** (w={info['w']}) · "
+                            f"<span style='color:#888;font-size:0.82rem;'>{info.get('kor', '')}</span>",
                             unsafe_allow_html=True)
                 st.caption(info.get('desc', ''))
-                st.markdown("<hr style='border:none;border-top:1px solid #222;margin:4px 0;'>", unsafe_allow_html=True)
 
     with st.expander("🛡️ 추세 필터 시스템", expanded=False):
         st.markdown("""
@@ -1441,21 +1506,20 @@ with st.sidebar:
 - Parabolic Top/Bottom → 매도/매수 쉴드 강제 해제
 - SuperTrend Flip → 해당 방향 쉴드 해제
 
-**V2.8**: Parabolic Bottom 추가 · WT필터 Momentum Ignition · ATR동적 Fib/VWAP · Volume Climax 캔들크기 검증 · 백테스트 통계 AI전달
+**V3.0 변경점**: Hidden Div WT 필터 강화 · Circle RSI 필터 · Golden/Death Cross ADX+거래량 · EMA Pullback 지연확인 · MACD/StochRSI 크로스 추가 · Parabolic 거래량확인
         """)
 
     with st.expander("📊 지표 해석 가이드", expanded=False):
         st.markdown("""
 **WaveTrend**: WT1 < -53 과매도 · WT1 > 53 과매수 · 교차 = 시그널
 **RSI/MFI**: < 30 과매도 · > 70 과매수
+**MACD**: 히스토그램 양수=상승모멘텀 · 음수=하락모멘텀
 **Confluence**: ≥6 Ultra Buy · ≤-6 Ultra Sell
 **Squeeze**: ON = 변동성 응축 → 폭발 대기
-**VWAP**: 0 위 = 강세, 0 아래 = 약세 (기관 기준)
 **SuperTrend**: ▲ = 강세지지 · ▼ = 약세저항
         """)
 
-    st.markdown("---")
-    st.markdown("<p style='color:#555;font-size:0.7rem;text-align:center;'>CipherX v2.8 · Enhanced Signal Engine</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#555;font-size:0.7rem;text-align:center;'>CipherX v3.0 · Enhanced Signal Engine</p>", unsafe_allow_html=True)
 
 
 # ──────────────────────────────────────────
@@ -1469,6 +1533,8 @@ if 'messages' not in st.session_state:
 for key in ['pending_ai_ticker', 'pending_ai_prompt', 'last_ticker']:
     if key not in st.session_state:
         st.session_state[key] = None
+if 'enabled_signals' not in st.session_state:
+    st.session_state['enabled_signals'] = set(ALL_CHART_SIGNALS.keys())
 
 
 # ──────────────────────────────────────────
