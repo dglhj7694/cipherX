@@ -713,7 +713,7 @@ def build_chart(dc,ticker,regime,shield):
 
     stxt=f" | {shield}" if shield else ""
     fig.update_layout(
-        title=dict(text=f"📊 {ticker.upper()} | 💎 MCB+ V7.6 | {regime}{stxt}",font=dict(size=14,color='#FAFAFA')),
+        # title=dict(text=f"📊 {ticker.upper()} | 💎 MCB+ V7.6 | {regime}{stxt}",font=dict(size=14,color='#FAFAFA')),
         yaxis_title="Price",yaxis2_title="Vol",yaxis3_title="WT",yaxis4_title="MF",yaxis5_title="MACD",yaxis6_title="Conf",
         template="plotly_dark",margin=dict(l=0,r=0,t=50,b=0),height=1300,showlegend=True,
         hovermode="x unified", hoverlabel=dict(bgcolor="rgba(22,26,34,0.95)", font_size=12, font_family="Pretendard"),
@@ -842,7 +842,7 @@ def build_ai_prompt(ticker,phist,fundamentals):
 ━━━━━━━━━━━━━
 【 📄 Output Format (반드시 아래 양식을 그대로 출력할 것) 】
 ━━━━━━━━━━━━━
-# 💎 {ticker} 심층 퀀트 리포트
+# 🚦 {ticker} 심층 퀀트 리포트
 [🔵/🔴/🟠] [{ticker}] 분석: [핵심 한 줄]
 [날짜], 전일 대비 [변동률]% [상승/하락]. 거래량 [평균대비 배수]. [핵심 패턴]. 지지 [가격], 저항 [가격].
 
@@ -851,14 +851,14 @@ def build_ai_prompt(ticker,phist,fundamentals):
 [🔵/🔴/🟠] [현재 상황 및 방향성에 대한 3~4문장 요약]
 
 ---
-### 💎 마켓 사이퍼 B+ 시그널 분석
+### 🚦 마켓 사이퍼 B+ 시그널 분석
 * WaveTrend: [WT1/WT2 값, 과매수/과매도 등 상태]
 * Money Flow: [MF_Area 값, 자금 유입/유출 방향]
 * 🔥 Confluence Score: [점수, 판정 (예: Strong Buy), 감쇠 상태]
 * ⚠️ Signal Proximity: [매수/매도 임박 여부 퍼센트 및 코멘트]
 * 최근 시그널: [최근 발생한 주요 시그널 목록 요약]
 * 시그널 신뢰도: [높음/중간/낮음 + 제공된 백테스트 승률/평균수익 등 근거]
-> 💎 해석: [위 지표들이 뜻하는 바를 베테랑의 시선으로 1~2문장 해석]
+> 🚦 해석: [위 지표들이 뜻하는 바를 베테랑의 시선으로 1~2문장 해석]
 
 ---
 ### 주가 및 거래량 분석
@@ -968,7 +968,7 @@ def render_price_header(m):
     tr=m.get('trend_regime','NEUTRAL ⚪')
     st.markdown(f"""<div class="price-header">
         <div style="display:flex;justify-content:space-between;align-items:center">
-            <div><p class="price-label">💎 {m['ticker']} · {m['last_date']} · <b>{tr}</b></p>
+            <div><p class="price-label">🚦 {m['ticker']} · {m['last_date']} · <b>{tr}</b></p>
             <p class="price-big" style="color:#FAFAFA">${m['price']:.2f}
                 <span class="{cc}" style="font-size:1rem;margin-left:8px">
                     {ci} {abs(chg):.2f} ({abs(cp):.2f}%)</span></p></div>
@@ -1075,7 +1075,7 @@ def render_analysis(msg):
 # 사이드바
 # ──────────────────────────────────────────
 with st.sidebar:
-    st.markdown("## 💎 CipherX")
+    st.markdown("## 🚦 CipherX")
     st.markdown("<p style='color:#888;font-size:.8rem'>AI 퀀트 주가 분석 · MCB+ v7.6</p>",unsafe_allow_html=True)
     st.markdown("---")
     st.markdown("### 📅 차트 기간")
@@ -1099,7 +1099,7 @@ with st.sidebar:
     if st.button("🗑️ 대화 내역 지우기",use_container_width=True,type="secondary"):
         for key in ['messages','pending_ai_ticker','pending_ai_prompt','last_ticker']:
             st.session_state[key]=[{"role":"assistant","type":"text",
-                "content":"안녕하세요! 💎 **CipherX** 입니다.\n\n분석할 **티커명**을 입력하세요."}] if key=='messages' else None
+                "content":"안녕하세요! 🚦 **CipherX** 입니다.\n\n분석할 **티커명**을 입력하세요."}] if key=='messages' else None
         st.rerun()
 
 # ──────────────────────────────────────────
@@ -1107,7 +1107,7 @@ with st.sidebar:
 # ──────────────────────────────────────────
 if 'messages' not in st.session_state:
     st.session_state.messages=[{"role":"assistant","type":"text",
-        "content":"안녕하세요! 💎 **CipherX** 입니다.\n\n분석할 **티커명**을 입력하세요. 채팅처럼 이어서 여러 종목을 검색할 수 있습니다."}]
+        "content":"안녕하세요! 🚦 **CipherX** 입니다.\n\n분석할 **티커명**을 입력하세요. 채팅처럼 이어서 여러 종목을 검색할 수 있습니다."}]
 for key in ['pending_ai_ticker','pending_ai_prompt','last_ticker']:
     if key not in st.session_state: st.session_state[key]=None
 if 'enabled_signals' not in st.session_state:
@@ -1116,7 +1116,7 @@ if 'enabled_signals' not in st.session_state:
 # ──────────────────────────────────────────
 # 챗 인터페이스 & AI 실행
 # ──────────────────────────────────────────
-st.markdown("<h2 style='text-align:center;color:#fff;margin-bottom:20px'>💎 CipherX</h2>",unsafe_allow_html=True)
+st.markdown("<h2 style='text-align:center;color:#fff;margin-bottom:20px'>🚦 CipherX</h2>",unsafe_allow_html=True)
 
 for i,msg in enumerate(st.session_state.messages):
     av="✨" if msg["role"]=="assistant" else "🧑‍💻"
@@ -1179,7 +1179,7 @@ def process_ticker(tv,refresh=False):
         fundamentals = fetch_fundamentals(tv)
         pg.progress(40,text="📊 YFinance 기술적 데이터 및 지표 계산 중...")
         fig,phist,meta=analyze(tv,chart_days,refresh)
-        pg.progress(80,text="💎 마켓 사이퍼 시그널 엔진 교차 검증 중...")
+        pg.progress(80,text="🚦 마켓 사이퍼 시그널 엔진 교차 검증 중...")
         if fig:
             prompt=build_ai_prompt(tv,phist,fundamentals)
             st.session_state.messages.append({"role":"assistant","type":"analysis","ticker":tv,
