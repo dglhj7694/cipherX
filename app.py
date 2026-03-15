@@ -112,10 +112,10 @@ section[data-testid="stSidebar"] .stMarkdown p { color: #AAAAAA !important; }
 """, unsafe_allow_html=True)
 
 # ──────────────────────────────────────────
-# 시그널 레지스트리 (기존 + 추가분)
+# 시그널 레지스트리 (V2.4 — Micro_Breakdown 삭제)
 # ──────────────────────────────────────────
 SIGNAL_REGISTRY = {
-    # ═══ 기존 매수 시그널 (변경 없음) ═══
+    # ═══ 매수 시그널 ═══
     'Gold_Dot':          {'w': 3.0, 'dir': 'buy',  'icon': '🏆', 'label': 'GOLD DOT',       'sym': 'circle',         'sz': 18, 'clr': '#FFD700', 'base': 'Low',  'atr_m': -3.0},
     'Green_Dot_T1':      {'w': 2.5, 'dir': 'buy',  'icon': '🟢', 'label': 'BUY T1',         'sym': 'circle',         'sz': 16, 'clr': '#00E676', 'base': 'Low',  'atr_m': -2.5},
     'Green_Dot_T2':      {'w': 2.0, 'dir': 'buy',  'icon': '🟩', 'label': 'BUY T2',         'sym': 'circle',         'sz': 13, 'clr': '#69F0AE', 'base': 'Low',  'atr_m': -2.2},
@@ -130,13 +130,11 @@ SIGNAL_REGISTRY = {
     'Fib_Bounce_Buy':    {'w': 1.0, 'dir': 'buy',  'icon': '📐', 'label': 'Fib Bounce',     'sym': 'diamond-open',   'sz': 10, 'clr': '#FFAB00', 'base': 'Low',  'atr_m': -1.0},
     'Bullish_Engulfing':  {'w': 1.5, 'dir': 'buy',  'icon': '☀️', 'label': 'Bull Engulf',   'sym': 'square',         'sz': 10, 'clr': '#00E676', 'base': 'Low',  'atr_m': -1.3},
     'Golden_Cross':      {'w': 1.5, 'dir': 'buy',  'icon': '✨', 'label': 'Golden Cross',   'sym': 'cross',          'sz': 12, 'clr': '#FFD700', 'base': 'Low',  'atr_m': -0.8},
-
-    # ═══ ✅ NEW: 추세 추종 매수 시그널 3종 ═══
     'EMA_Pullback_Buy':       {'w': 2.0, 'dir': 'buy',  'icon': '🎯', 'label': 'EMA Pullback',    'sym': 'triangle-up',    'sz': 13, 'clr': '#00BFA5', 'base': 'Low',  'atr_m': -1.8},
     'Momentum_Ignition_Buy':  {'w': 2.5, 'dir': 'buy',  'icon': '🔥', 'label': 'Mom. Ignition',   'sym': 'star-diamond',   'sz': 15, 'clr': '#FF6D00', 'base': 'Low',  'atr_m': -2.5},
     'SuperTrend_Buy':         {'w': 1.5, 'dir': 'buy',  'icon': '📈', 'label': 'ST Flip Bull',    'sym': 'arrow-up',       'sz': 12, 'clr': '#00E5FF', 'base': 'Low',  'atr_m': -1.5},
 
-    # ═══ 기존 매도 시그널 (변경 없음) ═══
+    # ═══ 매도 시그널 ═══
     'Blood_Diamond':     {'w': 3.0, 'dir': 'sell', 'icon': '🩸', 'label': 'BLOOD DIA',      'sym': 'diamond',        'sz': 18, 'clr': '#DC143C', 'base': 'High', 'atr_m': 3.0},
     'Red_Dot_T1':        {'w': 2.5, 'dir': 'sell', 'icon': '🔴', 'label': 'SELL T1',        'sym': 'circle',         'sz': 16, 'clr': '#FF1744', 'base': 'High', 'atr_m': 2.5},
     'Red_Dot_T2':        {'w': 2.0, 'dir': 'sell', 'icon': '🟥', 'label': 'SELL T2',        'sym': 'circle',         'sz': 13, 'clr': '#FF5252', 'base': 'High', 'atr_m': 2.2},
@@ -152,10 +150,9 @@ SIGNAL_REGISTRY = {
     'Bearish_Engulfing':  {'w': 1.5, 'dir': 'sell','icon': '🌑', 'label': 'Bear Engulf',    'sym': 'x',             'sz': 10, 'clr': '#D50000', 'base': 'High', 'atr_m': 1.3},
     'Death_Cross':       {'w': 1.5, 'dir': 'sell', 'icon': '☠️', 'label': 'Death Cross',    'sym': 'cross',          'sz': 12, 'clr': '#FF1744', 'base': 'High', 'atr_m': 0.8},
 
-    # ═══ ✅ NEW: 상승장 쉴드 무력화 매도 시그널 3종 ═══
+    # ═══ V2.4: 상승장 쉴드 무력화 매도 시그널 2종 (Micro Breakdown 삭제) ═══
     'SuperTrend_Sell':         {'w': 2.0, 'dir': 'sell', 'icon': '📉', 'label': 'ST Flip Bear',     'sym': 'arrow-down',     'sz': 12, 'clr': '#FF1744', 'base': 'High', 'atr_m': 1.5},
     'Parabolic_Top_Sell':      {'w': 3.0, 'dir': 'sell', 'icon': '🌡️', 'label': 'Parabolic Top',   'sym': 'diamond',        'sz': 16, 'clr': '#FF0000', 'base': 'High', 'atr_m': 3.0},
-    'Micro_Breakdown_Sell':    {'w': 2.5, 'dir': 'sell', 'icon': '⚡', 'label': 'Micro Break',      'sym': 'triangle-down',  'sz': 14, 'clr': '#FF4444', 'base': 'High', 'atr_m': 2.0},
 }
 
 COMPOSITE_SIGNALS = {
@@ -170,7 +167,7 @@ SELL_SIGNALS = {k: v for k, v in SIGNAL_REGISTRY.items() if v['dir'] == 'sell'}
 ALL_CHART_SIGNALS = {**SIGNAL_REGISTRY, **COMPOSITE_SIGNALS}
 
 # ──────────────────────────────────────────
-# 신호 설명 사전 (사이드바용)
+# 신호 설명 사전 (V2.4 — Micro_Breakdown 삭제, Parabolic 설명 업데이트)
 # ──────────────────────────────────────────
 SIGNAL_DESCRIPTIONS = {
     'Ultra_Buy': {
@@ -253,6 +250,24 @@ SIGNAL_DESCRIPTIONS = {
         'kor': '골든 크로스',
         'desc': '50일 MA > 200일 MA 상향돌파. 중장기 강세 전환.',
     },
+    'EMA_Pullback_Buy': {
+        'chart_icon': '🎯', 'chart_label': 'EMA Pullback',
+        'kor': 'EMA 눌림목 매수',
+        'desc': '상승추세(EMA8>EMA21, Close>EMA21) 중 EMA8/21 부근 조정 후 '
+                'WT 반등 모멘텀 확인(WT1↑ & WT1>WT2) 시 발동. 쿨다운 7일.',
+    },
+    'Momentum_Ignition_Buy': {
+        'chart_icon': '🔥', 'chart_label': 'Mom. Ignition',
+        'kor': '모멘텀 점화 매수',
+        'desc': '캔들 몸통 > ATR×1.5 + 거래량 > 20일 평균×2.5 + 종가 > BB 상단. '
+                '스마트 머니의 강력한 개입을 포착. 쿨다운 10일.',
+    },
+    'SuperTrend_Buy': {
+        'chart_icon': '📈', 'chart_label': 'ST Flip Bull',
+        'kor': '슈퍼트렌드 강세 전환',
+        'desc': '가격이 SuperTrend 하단선 위로 돌파. ATR 기반 동적 지지선이 '
+                '강세로 전환되며 새 상승 추세 시작 신호.',
+    },
     'Ultra_Sell': {
         'chart_icon': '🚨', 'chart_label': 'ULTRA SELL',
         'kor': '울트라 매도',
@@ -333,44 +348,19 @@ SIGNAL_DESCRIPTIONS = {
         'kor': '데드 크로스',
         'desc': '50일 MA < 200일 MA 하향돌파. 중장기 약세 전환.',
     },
-# ═══ SIGNAL_DESCRIPTIONS에 추가할 항목들 ═══
-    'EMA_Pullback_Buy': {
-        'chart_icon': '🎯', 'chart_label': 'EMA Pullback',
-        'kor': 'EMA 눌림목 매수',
-        'desc': '상승추세(EMA8>EMA21, Close>EMA21) 중 가격이 EMA8/21 부근으로 '
-                '얕은 조정 후 반등. 오실레이터 과매수여도 추세가 살아있으면 유효.',
-    },
-    'Momentum_Ignition_Buy': {
-        'chart_icon': '🔥', 'chart_label': 'Mom. Ignition',
-        'kor': '모멘텀 점화 매수',
-        'desc': '캔들 몸통 > ATR×1.5 + 거래량 > 20일 평균×2.5 + 종가 > BB 상단. '
-                '스마트 머니의 강력한 개입을 포착. 오실레이터 무관.',
-    },
-    'SuperTrend_Buy': {
-        'chart_icon': '📈', 'chart_label': 'ST Flip Bull',
-        'kor': '슈퍼트렌드 강세 전환',
-        'desc': '가격이 SuperTrend 하단선 위로 돌파. ATR 기반 동적 지지선이 '
-                '강세로 전환되며 새 상승 추세 시작 신호.',
-    },
     'SuperTrend_Sell': {
         'chart_icon': '📉', 'chart_label': 'ST Flip Bear',
         'kor': '슈퍼트렌드 약세 전환',
         'desc': '가격이 SuperTrend 상단선 아래로 하향 돌파. 추세 필터 무시. '
-                '상승장이더라도 동적 지지선 붕괴는 즉각 매도 신호.',
+                '상승장이더라도 동적 지지선 붕괴는 즉각 매도 신호 + 쉴드 해제.',
     },
     'Parabolic_Top_Sell': {
         'chart_icon': '🌡️', 'chart_label': 'Parabolic Top',
         'kor': '포물선 천장 매도',
-        'desc': 'WT1>80 또는 Close>BB상단+ATR. 비정상적 폭등의 극단 과열. '
-                '추세 필터 완전 무시(Tier 0). 상승장 쉴드 강제 해제.',
+        'desc': 'WT1>85에서 꺾임(WT1 하락 시작) + 음봉 + 전일 대비 하락. '
+                '또는 Close>BB상단+ATR×1.5 극단이격 + 음봉. '
+                '추세 필터 완전 무시(Tier 0). 상승장 쉴드 강제 해제. 쿨다운 5일.',
     },
-    'Micro_Breakdown_Sell': {
-        'chart_icon': '⚡', 'chart_label': 'Micro Break',
-        'kor': '단기 지지 붕괴 매도',
-        'desc': '종가가 20일선(BB중단) 하향 이탈 + 거시적 상승장. '
-                '50일선까지 기다리면 늦으므로 단기 생명선 붕괴 시 쉴드 해제.',
-    },
-
 }
 
 # ──────────────────────────────────────────
@@ -436,6 +426,23 @@ def get_yf_history(ticker):
 def _recent_true(series, lookback=3):
     """series가 최근 lookback 바 이내에 True였으면 True (인과적, 미래 참조 없음)"""
     return series.rolling(window=lookback + 1, min_periods=1).max().fillna(0).astype(bool)
+
+
+def _apply_cooldown(signal_series, cooldown_bars=5):
+    """
+    V2.4 NEW: 시그널 쿨다운 — 동일 시그널 연속 발화 방지.
+    한 번 True 발화 후 cooldown_bars 동안 재발화 금지.
+    """
+    result = signal_series.copy().astype(bool)
+    vals = result.values.copy()
+    last_fire = -cooldown_bars - 1
+    for i in range(len(vals)):
+        if vals[i]:
+            if (i - last_fire) <= cooldown_bars:
+                vals[i] = False
+            else:
+                last_fire = i
+    return pd.Series(vals, index=signal_series.index)
 
 
 # ──────────────────────────────────────────
@@ -791,11 +798,12 @@ def compute_all_signal_stats(df_valid):
         if sig_result and sig_result['count'] > 0:
             results[sig] = {**sig_result, 'direction': direction}
     return results
+
+
 # ──────────────────────────────────────────
-# ✅ NEW: 슈퍼트렌드 (SuperTrend)
+# 슈퍼트렌드 (SuperTrend)
 # ──────────────────────────────────────────
 def compute_supertrend(high, low, close, period=10, multiplier=3.0):
-    """ATR 기반 동적 추세선. direction: 1=강세, -1=약세"""
     pc = close.shift(1)
     tr = pd.concat([high - low, (high - pc).abs(), (low - pc).abs()], axis=1).max(axis=1)
     atr = tr.rolling(period).mean()
@@ -813,8 +821,7 @@ def compute_supertrend(high, low, close, period=10, multiplier=3.0):
     st_vals = np.full(len(close), np.nan)
     dir_vals = np.zeros(len(close), dtype=int)
 
-    # 첫 유효 인덱스 찾기
-    first_valid = period  # ATR이 계산된 이후부터
+    first_valid = period
     if first_valid >= len(close):
         return supertrend, direction
 
@@ -822,22 +829,20 @@ def compute_supertrend(high, low, close, period=10, multiplier=3.0):
     st_vals[first_valid] = dn_vals[first_valid]
 
     for i in range(first_valid + 1, len(close)):
-        # 밴드 조정 (이전 방향에 따라 밴드를 올리기만 / 내리기만 함)
-        if dir_vals[i - 1] == 1:  # 이전이 강세
+        if dir_vals[i - 1] == 1:
             dn_vals[i] = max(dn_vals[i], dn_vals[i - 1]) if not np.isnan(dn_vals[i - 1]) else dn_vals[i]
-        else:  # 이전이 약세
+        else:
             up_vals[i] = min(up_vals[i], up_vals[i - 1]) if not np.isnan(up_vals[i - 1]) else up_vals[i]
 
-        # 방향 결정
-        if dir_vals[i - 1] == 1:  # 이전 강세
-            if cl[i] < dn_vals[i]:  # 하향 돌파 → 약세 전환
+        if dir_vals[i - 1] == 1:
+            if cl[i] < dn_vals[i]:
                 dir_vals[i] = -1
                 st_vals[i] = up_vals[i]
             else:
                 dir_vals[i] = 1
                 st_vals[i] = dn_vals[i]
-        else:  # 이전 약세
-            if cl[i] > up_vals[i]:  # 상향 돌파 → 강세 전환
+        else:
+            if cl[i] > up_vals[i]:
                 dir_vals[i] = 1
                 st_vals[i] = dn_vals[i]
             else:
@@ -850,49 +855,37 @@ def compute_supertrend(high, low, close, period=10, multiplier=3.0):
 
 
 # ──────────────────────────────────────────
-# ✅ NEW: EMA 풀백 매수 감지
+# V2.4: EMA 풀백 매수 감지 (WT 모멘텀 확인 + 존 축소)
 # ──────────────────────────────────────────
-def detect_ema_pullback_buy(close, high, low, ema8, ema21, atr, wt1):
+def detect_ema_pullback_buy(close, high, low, ema8, ema21, atr, wt1, wt2):
     """
-    조건:
-    1. 상승 추세: EMA8 > EMA21 (기울기도 상승)
-    2. 주가가 EMA21 위에 있음
-    3. 저가가 EMA8 또는 EMA21 근처까지 내려왔다 반등
-       (Low가 EMA21 × (1-ATR/Close*0.5) 이상, EMA8 × (1+ATR/Close*0.3) 이하)
-    4. 종가가 EMA8 위에서 마감 (반등 확인)
-    5. WT1이 극단적 과매수(>70)가 아닐 것 (이미 너무 과열이면 제외)
+    V2.4 개선:
+    1. 눌림 범위 축소 (0.3→0.15 / 0.5→0.25)
+    2. WT1 반등 모멘텀 필수 (WT1>WT1[1] AND WT1>WT2)
+    3. WT1 과매수 기준 강화 (70→60)
+    4. EMA21 기울기 5일 확인
     """
-    trend_up = (ema8 > ema21) & (ema21 > ema21.shift(3))  # EMA21도 우상향
+    trend_up = (ema8 > ema21) & (ema21 > ema21.shift(5))
     above_ema21 = close > ema21
 
-    # 눌림: 저가가 EMA8 근처까지 하락 (EMA8 ± ATR의 30%)
-    pullback_zone_upper = ema8 * (1 + atr / close * 0.3)
-    pullback_zone_lower = ema21 * (1 - atr / close * 0.5)
+    pullback_zone_upper = ema8 * (1 + atr / close * 0.15)
+    pullback_zone_lower = ema21 * (1 - atr / close * 0.25)
     touched_zone = (low <= pullback_zone_upper) & (low >= pullback_zone_lower)
 
-    # 반등 확인: 종가가 EMA8 위
     bounced = close >= ema8
+    not_extreme = wt1 < 60
 
-    # 과열 아님
-    not_extreme = wt1 < 70
+    # V2.4 핵심: WT 모멘텀 반등 확인
+    wt_turning_up = (wt1 > wt1.shift(1)) & (wt1 > wt2)
 
-    return trend_up & above_ema21 & touched_zone & bounced & not_extreme
+    return trend_up & above_ema21 & touched_zone & bounced & not_extreme & wt_turning_up
 
 
 # ──────────────────────────────────────────
-# ✅ NEW: 모멘텀 점화 감지
+# 모멘텀 점화 감지
 # ──────────────────────────────────────────
 def detect_momentum_ignition(close, opn, high, low, volume, bb_up, atr,
                               body_atr_mult=1.5, vol_mult=2.5):
-    """
-    조건 (3가지 동시 충족):
-    1. 캔들 몸통(|Close-Open|) > ATR × body_atr_mult (거대 양봉)
-    2. 거래량 > 20일 평균 거래량 × vol_mult
-    3. 종가 > 볼린저 밴드 상단 (상방 돌파)
-    4. 양봉 (Close > Open)
-
-    ※ 오실레이터와 무관 — 스마트 머니의 강력한 개입 자체를 포착
-    """
     body = (close - opn).abs()
     is_bullish = close > opn
     big_body = body > (atr * body_atr_mult)
@@ -902,8 +895,9 @@ def detect_momentum_ignition(close, opn, high, low, volume, bb_up, atr,
 
     return is_bullish & big_body & huge_volume & bb_breakout
 
+
 # ──────────────────────────────────────────
-# 차트 + 분석 데이터 엔진 (✅ v2.2 추세 필터 통합)
+# 차트 + 분석 데이터 엔진 (V2.4)
 # ──────────────────────────────────────────
 def get_yfinance_data_and_chart(ticker, chart_period_days=252):
     try:
@@ -915,7 +909,6 @@ def get_yfinance_data_and_chart(ticker, chart_period_days=252):
         for ma in mas:
             df[f'MA{ma}'] = df['Close'].rolling(ma).mean()
 
-        # ✅ NEW: EMA 8 & 21 추가
         df['EMA8'] = df['Close'].ewm(span=8, adjust=False).mean()
         df['EMA21'] = df['Close'].ewm(span=21, adjust=False).mean()
 
@@ -927,7 +920,6 @@ def get_yfinance_data_and_chart(ticker, chart_period_days=252):
         tr = pd.concat([df['High'] - df['Low'], (df['High'] - pc).abs(), (df['Low'] - pc).abs()], axis=1).max(axis=1)
         df['ATR'] = tr.rolling(14).mean()
 
-        # ✅ NEW: SuperTrend 계산
         df['SuperTrend'], df['ST_Direction'] = compute_supertrend(
             df['High'], df['Low'], df['Close'], period=10, multiplier=3.0
         )
@@ -954,7 +946,7 @@ def get_yfinance_data_and_chart(ticker, chart_period_days=252):
         wt_down_recent = _recent_true(wt_down, lookback=3)
 
         # ═══════════════════════════════════════════════════════
-        # 추세 레짐 감지 (기존과 동일)
+        # 추세 레짐 감지
         # ═══════════════════════════════════════════════════════
         above_ma50  = df['Close'] > df['MA50']
         above_ma200 = df['Close'] > df['MA200']
@@ -973,61 +965,67 @@ def get_yfinance_data_and_chart(ticker, chart_period_days=252):
         mf_bearish = df['RSI_MFI'] < 10
 
         # ═══════════════════════════════════════════════════════
-        # ✅ NEW: 매도 쉴드 오버라이드 조건 2가지
+        # V2.4: 매도 쉴드 오버라이드 조건 (완전 개편)
         # ═══════════════════════════════════════════════════════
 
-        # 1) Parabolic Blow-off Top: 비정상적 폭등 감지
-        #    WT1 > 80 (극단 과매수) 또는 종가 > BB상단 + ATR (비정상 이격)
-        parabolic_blowoff = (df['WT1'] > 80) | (df['Close'] > df['BB_Up'] + df['ATR'])
+        # 1) Parabolic Blow-off Top — 조건 대폭 강화
+        #    V2.3: WT1>80 OR Close>BB+ATR → 너무 느슨
+        #    V2.4: WT1>85 + 꺾임 + 음봉 + 하락 OR 극단이격(BB+ATR*1.5) + 음봉
+        parabolic_blowoff = (
+            (
+                (df['WT1'] > 85) &
+                (df['WT1'] < df['WT1'].shift(1)) &
+                (df['Close'] < df['Open']) &
+                (df['Close'] < df['Close'].shift(1))
+            ) | (
+                (df['Close'] > df['BB_Up'] + df['ATR'] * 1.5) &
+                (df['Close'] < df['Open'])
+            )
+        )
 
-        # 2) Micro-Trend Breakdown: 단기 지지선(20일선) 붕괴
-        #    종가가 BB_Mid(=MA20) 아래로 이탈 (하향 돌파 순간)
-        micro_breakdown = (df['Close'] < df['BB_Mid']) & (df['Close'].shift(1) >= df['BB_Mid'].shift(1))
-        #    최근 3일 내 Micro Breakdown이 있었으면 쉴드 해제 상태 유지
-        micro_breakdown_active = _recent_true(micro_breakdown, lookback=3)
+        # 2) Micro Breakdown — ❌ V2.4에서 완전 삭제
+
+        # 3) SuperTrend 약세 전환을 쉴드 오버라이드로 사용
+        st_flip_bear_raw = (df['ST_Direction'] == -1) & (df['ST_Direction'].shift(1) == 1)
+        st_bear_override = _recent_true(st_flip_bear_raw, lookback=3)
 
         # ═══════════════════════════════════════════════════════
-        # ✅ NEW: 오버라이드 적용된 '유효 쉴드' 계산
+        # V2.4: 오버라이드 적용된 '유효 쉴드' 계산
         # ═══════════════════════════════════════════════════════
-        # 상승장 쉴드: strong_bull이지만 parabolic/micro 조건이면 해제
-        sell_shield_bull   = strong_bull & (~parabolic_blowoff) & (~micro_breakdown_active)
-        sell_shield_extreme = extreme_bull & (~parabolic_blowoff) & (~micro_breakdown_active)
+        sell_shield_bull   = strong_bull & (~parabolic_blowoff) & (~st_bear_override)
+        sell_shield_extreme = extreme_bull & (~parabolic_blowoff) & (~st_bear_override)
 
-        # 하락장 쉴드: 기존과 동일 (하락장에서 매수를 억제)
         buy_shield_bear    = strong_bear
         buy_shield_extreme = extreme_bear
 
         # ═══════════════════════════════════════════════════════
-        # 기존 시그널 정의 (쉴드를 새 변수로 교체)
+        # 시그널 정의
         # ═══════════════════════════════════════════════════════
 
-        # ── TIER 1: 절대 억제 금지 (Gold_Dot, Blood_Diamond) ── (동일)
-
-        # ── Green/Red Dot (TIER 2) ──
+        # ── Green/Red Dot ──
         df['Green_Dot_T1'] = (
             wt_up & (df['WT1'] <= OS1) &
             (df['RSI'] < 30) & (df['MFI'] < 30) & (df['RSI_MFI'] < 0) &
-            (~buy_shield_extreme)  # 극단 하락장에서만 억제
+            (~buy_shield_extreme)
         )
         df['Green_Dot_T2'] = (
             wt_up & (df['WT1'] <= OS1) &
             ((df['RSI'] < 32) | (df['MFI'] < 32)) &
             ~df['Green_Dot_T1'] &
-            (~buy_shield_bear)  # 강한 하락장에서 억제
+            (~buy_shield_bear)
         )
         df['Green_Dot'] = df['Green_Dot_T1'] | df['Green_Dot_T2']
 
-        # ✅ 매도 시그널: 오버라이드 적용된 쉴드 사용
         df['Red_Dot_T1'] = (
             wt_down & (df['WT1'] >= OB1) &
             (df['RSI'] > 70) & (df['MFI'] > 70) & (df['RSI_MFI'] > 0) &
-            (~sell_shield_extreme)  # ✅ 오버라이드 적용
+            (~sell_shield_extreme)
         )
         df['Red_Dot_T2'] = (
             wt_down & (df['WT1'] >= OB1) &
             ((df['RSI'] > 68) | (df['MFI'] > 68)) &
             ~df['Red_Dot_T1'] &
-            (~sell_shield_bull)  # ✅ 오버라이드 적용
+            (~sell_shield_bull)
         )
         df['Red_Dot'] = df['Red_Dot_T1'] | df['Red_Dot_T2']
 
@@ -1038,7 +1036,7 @@ def get_yfinance_data_and_chart(ticker, chart_period_days=252):
         )
         df['Red_Diamond'] = (
             (df['WT2'] >= 0) & wt_down & ~htf1_bull & ~htf2_bull &
-            (~sell_shield_bull) & mf_bearish  # ✅ 오버라이드 적용
+            (~sell_shield_bull) & mf_bearish
         )
 
         df['Green_Circle'] = (
@@ -1047,7 +1045,7 @@ def get_yfinance_data_and_chart(ticker, chart_period_days=252):
         )
         df['Red_Circle'] = (
             wt_down & (df['WT1'] >= OB1) & ~df['Red_Dot'] &
-            (~sell_shield_bull)  # ✅ 오버라이드 적용
+            (~sell_shield_bull)
         )
 
         # ── 다이버전스 ──
@@ -1067,7 +1065,7 @@ def get_yfinance_data_and_chart(ticker, chart_period_days=252):
         df['Bear_Divergence'] = (
             bear_d & wt_down_recent &
             ~df['Red_Dot'] &
-            (~sell_shield_bull)  # ✅ 오버라이드 적용
+            (~sell_shield_bull)
         )
 
         df['Hidden_Bull_Div'] = hid_bull & (df['WT1'] < 0) & htf2_bull
@@ -1084,7 +1082,7 @@ def get_yfinance_data_and_chart(ticker, chart_period_days=252):
         )
         df['Squeeze_On'] = sq_on
         df['Squeeze_Fire_Buy']  = sq_fb & (~buy_shield_bear)
-        df['Squeeze_Fire_Sell'] = sq_fs & (~sell_shield_bull)  # ✅ 오버라이드 적용
+        df['Squeeze_Fire_Sell'] = sq_fs & (~sell_shield_bull)
 
         # ── Volume Climax ──
         vc_b, vc_s = detect_volume_climax(df['Close'], df['Open'], df['Volume'], df['WT1'])
@@ -1099,13 +1097,13 @@ def get_yfinance_data_and_chart(ticker, chart_period_days=252):
         raw_fib_buy = detect_fib_bounce_buy(df['High'], df['Low'], df['WT1'], df['WT2'])
         raw_fib_sell = detect_fib_resistance_sell(df['High'], df['Low'], df['Close'], df['WT1'], df['WT2'])
         df['Fib_Bounce_Buy']      = raw_fib_buy & (~buy_shield_bear)
-        df['Fib_Resistance_Sell'] = raw_fib_sell & (~sell_shield_bull)  # ✅ 오버라이드 적용
+        df['Fib_Resistance_Sell'] = raw_fib_sell & (~sell_shield_bull)
 
         # ── Engulfing ──
         raw_bull_eng = detect_bullish_engulfing(df['Close'], df['Open'], df['WT1'])
         raw_bear_eng = detect_bearish_engulfing(df['Close'], df['Open'], df['WT1'])
         df['Bullish_Engulfing'] = raw_bull_eng & (~buy_shield_bear)
-        df['Bearish_Engulfing'] = raw_bear_eng & (~sell_shield_bull)  # ✅ 오버라이드 적용
+        df['Bearish_Engulfing'] = raw_bear_eng & (~sell_shield_bull)
 
         # ── MA Cross ──
         gc, dc = detect_ma_cross(df['MA50'], df['MA200'], df['WT1'], df['WT2'])
@@ -1113,54 +1111,68 @@ def get_yfinance_data_and_chart(ticker, chart_period_days=252):
 
         # ── OBV Divergence ──
         df['OBV_Div_Buy']  = obv_db & (~buy_shield_extreme)
-        df['OBV_Div_Sell'] = obv_ds & (~sell_shield_extreme)  # ✅ 오버라이드 적용
+        df['OBV_Div_Sell'] = obv_ds & (~sell_shield_extreme)
 
         # ═══════════════════════════════════════════════════════
-        # ✅ NEW: 추세 추종 매수 시그널 3종
+        # V2.4: 추세 추종 매수 시그널 (개선)
         # ═══════════════════════════════════════════════════════
 
-        # 1) EMA Pullback Buy: 상승 추세 중 눌림목
-        df['EMA_Pullback_Buy'] = detect_ema_pullback_buy(
+        # 1) EMA Pullback Buy — WT 모멘텀 확인 + 쿨다운 7일
+        raw_ema_pullback = detect_ema_pullback_buy(
             df['Close'], df['High'], df['Low'],
-            df['EMA8'], df['EMA21'], df['ATR'], df['WT1']
+            df['EMA8'], df['EMA21'], df['ATR'],
+            df['WT1'], df['WT2']
         )
+        df['EMA_Pullback_Buy'] = _apply_cooldown(raw_ema_pullback, cooldown_bars=7)
 
-        # 2) Momentum Ignition Buy: 갭상승 / 장대양봉 돌파
-        df['Momentum_Ignition_Buy'] = detect_momentum_ignition(
+        # 2) Momentum Ignition Buy — 쿨다운 10일
+        raw_mom_ignition = detect_momentum_ignition(
             df['Close'], df['Open'], df['High'], df['Low'],
             df['Volume'], df['BB_Up'], df['ATR']
         )
+        df['Momentum_Ignition_Buy'] = _apply_cooldown(raw_mom_ignition, cooldown_bars=10)
 
         # 3) SuperTrend 전환 시그널
         st_flip_bull = (df['ST_Direction'] == 1) & (df['ST_Direction'].shift(1) == -1)
-        st_flip_bear = (df['ST_Direction'] == -1) & (df['ST_Direction'].shift(1) == 1)
         df['SuperTrend_Buy']  = st_flip_bull
-        df['SuperTrend_Sell'] = st_flip_bear  # ✅ 추세 필터 무시 (Tier 1)
+        df['SuperTrend_Sell'] = st_flip_bear_raw  # Tier 0: 추세 필터 무시
 
         # ═══════════════════════════════════════════════════════
-        # ✅ NEW: 상승장 쉴드 무력화 매도 시그널 2종 (Tier 0 — 절대 억제 금지)
+        # V2.4: Parabolic Top (Tier 0 — 조건 대폭 강화) + 쿨다운 5일
         # ═══════════════════════════════════════════════════════
-
-        # Parabolic Top: WT1>80 + 하락 교차, 또는 BB+ATR 초과 + 음봉
-        df['Parabolic_Top_Sell'] = (
+        raw_parabolic_top = (
             parabolic_blowoff &
             (
-                (wt_down | wt_down_recent) |                  # WT 하락교차
-                (df['Close'] < df['Open']) |                  # 음봉 (반전 시작)
-                (df['Close'] < df['Close'].shift(1))          # 전일 대비 하락
+                (wt_down | wt_down_recent) |
+                (
+                    (df['Close'] < df['Open']) &
+                    (df['Close'] < df['Close'].shift(1))
+                )
             )
         )
+        df['Parabolic_Top_Sell'] = _apply_cooldown(raw_parabolic_top, cooldown_bars=5)
 
-        # Micro Breakdown: 20일선 하향 이탈 + 이전에 상승장이었음
-        df['Micro_Breakdown_Sell'] = (
-            micro_breakdown &
-            (strong_bull.shift(1) | above_ma50.shift(1)) &   # 직전까지 상승장이었음
-            (df['Close'] < df['BB_Mid'])                       # 확인: 종가 < 20일선
-        )
+        # ❌ V2.4: Micro_Breakdown_Sell 완전 삭제
+        # df['Micro_Breakdown_Sell'] = ... (삭제됨)
 
         # ═══════════════════════════════════════════════════════
-        # 기존 Small Dots (동일)
+        # V2.4: 주요 시그널 쿨다운 일괄 적용 (연속 발화 방지)
         # ═══════════════════════════════════════════════════════
+        cooldown_targets = {
+            'Squeeze_Fire_Buy': 5,
+            'Squeeze_Fire_Sell': 5,
+            'Bullish_Engulfing': 5,
+            'Bearish_Engulfing': 5,
+            'Fib_Bounce_Buy': 7,
+            'Fib_Resistance_Sell': 7,
+            'ADX_Momentum_Buy': 10,
+            'ADX_Momentum_Sell': 10,
+        }
+        for sig_col, cd_bars in cooldown_targets.items():
+            if sig_col in df.columns:
+                df[sig_col] = _apply_cooldown(df[sig_col], cooldown_bars=cd_bars)
+
+        # ── Small Dots ──
         df['Small_Green_Dot'] = wt_up & ~df['Green_Circle'] & ~df['Green_Dot'] & ~df['Gold_Dot'] & ~df['Blue_Diamond'] & ~df['Bull_Divergence']
         df['Small_Red_Dot']   = wt_down & ~df['Red_Circle'] & ~df['Red_Dot'] & ~df['Red_Diamond'] & ~df['Bear_Divergence']
 
@@ -1174,10 +1186,10 @@ def get_yfinance_data_and_chart(ticker, chart_period_days=252):
         df['Strong_Bull'] = strong_bull
         df['Strong_Bear'] = strong_bear
 
-        # ✅ NEW: 오버라이드 상태도 저장
+        # V2.4: 오버라이드 상태 저장
         df['Parabolic_Blowoff'] = parabolic_blowoff
-        df['Micro_Breakdown_Active'] = micro_breakdown_active
-        df['Sell_Shield_Overridden'] = parabolic_blowoff | micro_breakdown_active
+        df['ST_Bear_Override'] = st_bear_override
+        df['Sell_Shield_Overridden'] = parabolic_blowoff | st_bear_override
 
         df_valid = df.dropna(subset=['WT1', 'WT2'])
         df_chart = df_valid.tail(chart_period_days).copy()
@@ -1213,12 +1225,12 @@ def get_yfinance_data_and_chart(ticker, chart_period_days=252):
         else:
             trend_regime = 'NEUTRAL ⚪'
 
-        # ✅ NEW: 쉴드 오버라이드 상태 문자열
+        # V2.4: 쉴드 상태 문자열
         shield_status = ''
         if latest.get('Parabolic_Blowoff', False):
             shield_status = '🌡️ PARABOLIC OVERRIDE'
-        elif latest.get('Micro_Breakdown_Active', False):
-            shield_status = '⚡ MICRO BREAKDOWN'
+        elif latest.get('ST_Bear_Override', False):
+            shield_status = '📉 ST BEAR OVERRIDE'
         elif latest.get('Sell_Shield_Overridden', False):
             shield_status = '🔓 SHIELD OVERRIDDEN'
 
@@ -1242,14 +1254,14 @@ def get_yfinance_data_and_chart(ticker, chart_period_days=252):
             'sell_proximity': float(latest['Sell_Proximity']),
             'squeeze_on': bool(latest.get('Squeeze_On', False)),
             'trend_regime': trend_regime,
-            'shield_status': shield_status,                     # ✅ NEW
-            'supertrend_dir': int(latest.get('ST_Direction', 0)),  # ✅ NEW
-            'ema8': float(latest.get('EMA8', 0)),               # ✅ NEW
-            'ema21': float(latest.get('EMA21', 0)),             # ✅ NEW
+            'shield_status': shield_status,
+            'supertrend_dir': int(latest.get('ST_Direction', 0)),
+            'ema8': float(latest.get('EMA8', 0)),
+            'ema21': float(latest.get('EMA21', 0)),
         }
 
         # ══════════════════════════════════════════════
-        # 차트 (5 패널) — SuperTrend + EMA 라인 추가
+        # 차트 (5 패널)
         # ══════════════════════════════════════════════
         fig = make_subplots(
             rows=5, cols=1, shared_xaxes=True, vertical_spacing=0.02,
@@ -1267,7 +1279,6 @@ def get_yfinance_data_and_chart(ticker, chart_period_days=252):
             fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart[f'MA{ma}'],
                                      line=dict(color=mac[ma], width=1.2), name=f'{ma}일선'), row=1, col=1)
 
-        # ✅ NEW: EMA 8 & 21 라인
         fig.add_trace(go.Scatter(
             x=df_chart.index, y=df_chart['EMA8'],
             line=dict(color='#00FFFF', width=1.5, dash='dot'), name='EMA 8',
@@ -1277,11 +1288,9 @@ def get_yfinance_data_and_chart(ticker, chart_period_days=252):
             line=dict(color='#FF69B4', width=1.5, dash='dot'), name='EMA 21',
         ), row=1, col=1)
 
-        # ✅ NEW: SuperTrend 라인 (강세=초록, 약세=빨강)
         st_bull_mask = df_chart['ST_Direction'] == 1
         st_bear_mask = df_chart['ST_Direction'] == -1
 
-        # SuperTrend 강세 구간
         st_bull_y = df_chart['SuperTrend'].where(st_bull_mask)
         fig.add_trace(go.Scatter(
             x=df_chart.index, y=st_bull_y,
@@ -1289,7 +1298,6 @@ def get_yfinance_data_and_chart(ticker, chart_period_days=252):
             connectgaps=False,
         ), row=1, col=1)
 
-        # SuperTrend 약세 구간
         st_bear_y = df_chart['SuperTrend'].where(st_bear_mask)
         fig.add_trace(go.Scatter(
             x=df_chart.index, y=st_bear_y,
@@ -1303,14 +1311,14 @@ def get_yfinance_data_and_chart(ticker, chart_period_days=252):
                                  line=dict(color='gray', width=1, dash='dot'), name='BB 하단',
                                  fill='tonexty', fillcolor='rgba(128,128,128,0.1)'), row=1, col=1)
 
-        # ✅ NEW: 쉴드 오버라이드 구간 표시 (반투명 빨간 배경)
+        # V2.4: 쉴드 오버라이드 구간 표시
         override_mask = df_chart.get('Sell_Shield_Overridden', pd.Series(False, index=df_chart.index))
         od = override_mask.astype(int).diff().fillna(0)
         os_list = df_chart.index[od == 1].tolist()
         oe_list = df_chart.index[od == -1].tolist()
-        if override_mask.iloc[0] if len(override_mask) > 0 else False:
+        if len(override_mask) > 0 and override_mask.iloc[0]:
             os_list.insert(0, df_chart.index[0])
-        if override_mask.iloc[-1] if len(override_mask) > 0 else False:
+        if len(override_mask) > 0 and override_mask.iloc[-1]:
             oe_list.append(df_chart.index[-1])
         for s0, e0 in zip(os_list, oe_list):
             fig.add_vrect(x0=s0, x1=e0, fillcolor="rgba(255,0,0,0.04)",
@@ -1344,7 +1352,7 @@ def get_yfinance_data_and_chart(ticker, chart_period_days=252):
                 name=nm,
             ), row=1, col=1)
 
-        # ── 이하 Volume, WT, MF, Confluence 패널은 기존과 동일 ──
+        # ── Volume 패널 ──
         br = df_chart['Close'] < df_chart['Open']
         fig.add_trace(go.Bar(x=df_chart.index, y=df_chart['Volume'],
                              marker_color=np.where(br, '#ef5350', '#26a69a').tolist(),
@@ -1356,6 +1364,7 @@ def get_yfinance_data_and_chart(ticker, chart_period_days=252):
             fig.add_trace(go.Bar(x=vcd.index, y=vcd['Volume'],
                                  marker_color='#FFD700', name="Vol Climax", opacity=0.9), row=2, col=1)
 
+        # ── WaveTrend 패널 ──
         fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['WT1'],
                                  line=dict(color='#00E676', width=2), name="WT1"), row=3, col=1)
         fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['WT2'],
@@ -1395,12 +1404,14 @@ def get_yfinance_data_and_chart(ticker, chart_period_days=252):
             for s0, e0 in zip(ss_list, se_list):
                 fig.add_vrect(x0=s0, x1=e0, fillcolor="rgba(255,255,0,0.05)", line_width=0, row=3, col=1)
 
+        # ── Money Flow 패널 ──
         rmfi = df_chart['RSI_MFI']
         fig.add_trace(go.Bar(x=df_chart.index, y=rmfi,
                              marker_color=np.where(rmfi >= 0, '#3ee145', '#ff3d2e').tolist(),
                              name="Money Flow", opacity=0.7), row=4, col=1)
         fig.add_hline(y=0, line_dash="solid", line_color="gray", line_width=1, row=4, col=1)
 
+        # ── Confluence 패널 ──
         conf = df_chart['Confluence_Score']
         fig.add_trace(go.Bar(x=df_chart.index, y=conf,
                              marker_color=np.where(conf >= 3.5, '#00E676',
@@ -1410,10 +1421,9 @@ def get_yfinance_data_and_chart(ticker, chart_period_days=252):
                           (3.5, '#00E676', 'dot'), (-3.5, '#FF1744', 'dot'), (0, 'gray', 'solid')]:
             fig.add_hline(y=lv, line_dash=d, line_color=c, line_width=1 if d == 'solid' else 0.8, row=5, col=1)
 
-        # ✅ 차트 타이틀에 쉴드 상태 표시
         shield_title = f" | {shield_status}" if shield_status else ""
         fig.update_layout(
-            title=dict(text=f"📊 {ticker.upper()} | 💎 Market Cipher B+ | {trend_regime}{shield_title}",
+            title=dict(text=f"📊 {ticker.upper()} | 💎 Market Cipher B+ V2.4 | {trend_regime}{shield_title}",
                        font=dict(size=14, color='#FAFAFA')),
             yaxis_title="USD", yaxis2_title="Vol", yaxis3_title="WT", yaxis4_title="MF", yaxis5_title="Conf",
             template="plotly_dark", margin=dict(l=0, r=0, t=50, b=0), height=1100, showlegend=True,
@@ -1444,7 +1454,6 @@ def get_yfinance_data_and_chart(ticker, chart_period_days=252):
             prox_text += " ⚠️ 매도 시그널 임박!"
         sq_text = "Squeeze ON (변동성 응축 중 → 폭발 임박)" if latest.get('Squeeze_On', False) else "Squeeze OFF"
 
-        # ✅ NEW: 추가 지표 정보
         st_dir_text = "BULL ▲" if latest.get('ST_Direction', 0) == 1 else "BEAR ▼"
         shield_text = f"Shield Override: {shield_status}" if shield_status else "Shield Override: NONE"
 
@@ -1511,7 +1520,6 @@ def render_price_header(meta):
     stk_lbl = _indicator_label('stochk', meta['stochk'])
     trend = meta.get('trend_regime', 'NEUTRAL ⚪')
 
-    # ✅ NEW: SuperTrend 방향 & 쉴드 상태
     st_dir = meta.get('supertrend_dir', 0)
     st_c = 'ind-bullish' if st_dir == 1 else 'ind-bearish'
     st_lbl = '▲' if st_dir == 1 else '▼'
@@ -1697,11 +1705,11 @@ def render_inline_analysis(msg):
 
 
 # ──────────────────────────────────────────
-# 사이드바
+# 사이드바 (V2.4)
 # ──────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 💎 CipherX")
-    st.markdown("<p style='color:#888;font-size:0.8rem;'>AI 주가 분석 · Market Cipher B+ v2.2</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#888;font-size:0.8rem;'>AI 주가 분석 · Market Cipher B+ v2.4</p>", unsafe_allow_html=True)
     st.markdown("---")
 
     st.markdown("### 📅 차트 기간")
@@ -1727,7 +1735,6 @@ with st.sidebar:
         'Blue_Diamond', 'Green_Circle', 'Bull_Divergence', 'Hidden_Bull_Div',
         'Squeeze_Fire_Buy', 'Volume_Climax_Buy', 'OBV_Div_Buy',
         'ADX_Momentum_Buy', 'Fib_Bounce_Buy', 'Bullish_Engulfing', 'Golden_Cross',
-        # ✅ NEW
         'EMA_Pullback_Buy', 'Momentum_Ignition_Buy', 'SuperTrend_Buy',
     ]
     SELL_GUIDE_ORDER = [
@@ -1735,8 +1742,7 @@ with st.sidebar:
         'Red_Diamond', 'Red_Circle', 'Bear_Divergence', 'Hidden_Bear_Div',
         'Squeeze_Fire_Sell', 'Volume_Climax_Sell', 'OBV_Div_Sell',
         'ADX_Momentum_Sell', 'Fib_Resistance_Sell', 'Bearish_Engulfing', 'Death_Cross',
-        # ✅ NEW
-        'Parabolic_Top_Sell', 'Micro_Breakdown_Sell', 'SuperTrend_Sell',
+        'Parabolic_Top_Sell', 'SuperTrend_Sell',
     ]
 
     with st.expander("🟢 매수 신호 (BUY)", expanded=False):
@@ -1771,20 +1777,25 @@ with st.sidebar:
 - `EXTREME`: Strong + MA200 확인 + MA50 기울기 확인
 
 **티어별 필터링**
-- **Tier 0** (Parabolic Top, Micro Breakdown, SuperTrend Sell): ❌ 절대 억제 안 함 + 쉴드 해제
+- **Tier 0** (Parabolic Top, SuperTrend Sell): ❌ 절대 억제 안 함 + 쉴드 해제
 - **Tier 1** (Gold Dot, Blood Diamond): ❌ 절대 억제 안 함
 - **Tier 2** (T1, Divergence): 극단 역추세에서만 억제
 - **Tier 3** (T2, Diamond, Circle, Squeeze, Engulfing): 강한 역추세에서 억제
 - **Tier 4** (Fib, OBV Div): 일반 역추세에서도 억제
 
-**🔓 쉴드 오버라이드 조건**
-- 🌡️ **Parabolic Top**: WT1>80 또는 Close>BB+ATR → 모든 매도 쉴드 해제
-- ⚡ **Micro Breakdown**: Close가 20일선 하향 돌파 → 매도 쉴드 해제
-- 📉 **SuperTrend Sell**: SuperTrend 약세 전환 → 추세 필터 무시
+**🔓 쉴드 오버라이드 조건 (V2.4)**
+- 🌡️ **Parabolic Top**: WT1>85 + 꺾임 + 음봉 + 하락, 또는 Close>BB+ATR×1.5 + 음봉
+- 📉 **SuperTrend Sell**: SuperTrend 약세 전환 → 3일간 매도 쉴드 해제
+- ❌ Micro Breakdown: V2.4에서 삭제 (20일선 이탈은 상승장에서 흔한 노이즈)
 
-**추세 추종 매수**
-- 🎯 **EMA Pullback**: 상승추세 중 EMA8/21 눌림목 반등
-- 🔥 **Momentum Ignition**: 장대양봉 + 거래량 폭증 + BB 돌파
+**시그널 쿨다운 (V2.4 NEW)**
+- 동일 시그널의 연속 발화를 5~10일간 억제하여 노이즈 제거
+- EMA Pullback: 7일 / Mom. Ignition: 10일 / Squeeze: 5일
+- Engulfing: 5일 / Fib: 7일 / ADX: 10일 / Parabolic Top: 5일
+
+**추세 추종 매수 (V2.4)**
+- 🎯 **EMA Pullback**: 상승추세 중 눌림목 + **WT 반등 모멘텀 확인** (쿨다운 7일)
+- 🔥 **Momentum Ignition**: 장대양봉 + 거래량 폭증 + BB 돌파 (쿨다운 10일)
 - 📈 **SuperTrend Buy**: SuperTrend 강세 전환
 
 **자금 흐름 필터**
@@ -1813,7 +1824,7 @@ with st.sidebar:
         """)
 
     st.markdown("---")
-    st.markdown("<p style='color:#555;font-size:0.7rem;text-align:center;'>CipherX v2.2 · Trend-Filtered Engine</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#555;font-size:0.7rem;text-align:center;'>CipherX v2.4 · Signal Diet Engine</p>", unsafe_allow_html=True)
 
 
 # ──────────────────────────────────────────
@@ -1847,12 +1858,14 @@ def build_analysis_prompt(ticker_value, phist, scraped):
 아래 데이터로 심층 주가 분석 보고서를 작성하세요.
 
 💎 시그널은 추세 필터가 적용되었습니다:
+- Tier 0 (Parabolic Top, SuperTrend Sell): 추세 무관 + 쉴드 해제
 - Tier 1 (Gold Dot, Blood Diamond): 추세 무관 항상 유효
 - Tier 2 (T1, Divergence): 극단 역추세에서만 억제됨
 - Tier 3 (T2, Diamond, Circle 등): 강한 역추세에서 억제됨
 
 🔥 Confluence Score (시간 감쇠 적용): ≥6 Ultra Buy | 3.5~6 Strong Buy | -3.5~3.5 Neutral | -6~-3.5 Strong Sell | ≤-6 Ultra Sell
 
+⚠️ V2.4 Signal Diet: 쿨다운 적용으로 노이즈 시그널 제거됨. 남은 시그널은 높은 신뢰도.
 ⚠️ Trend Regime: 현재 추세 상태를 반드시 고려하세요.
 ⚠️ Signal Proximity: 매수/매도 시그널 임박 여부를 반드시 언급하세요.
 
@@ -2027,7 +2040,7 @@ def process_ticker(ticker_value):
         scraped = get_stock_data(ticker_value)
         pg.progress(40, text="📊 Yahoo Finance 주가 로딩 중...")
         cfig, phist, meta = get_yfinance_data_and_chart(ticker_value, chart_period_days=chart_days)
-        pg.progress(70, text="💎 마켓 사이퍼 + 추세 필터 분석 중...")
+        pg.progress(70, text="💎 마켓 사이퍼 + 시그널 다이어트 분석 중...")
         time.sleep(0.3)
         pg.progress(90, text="📝 프롬프트 생성 중...")
         if scraped or cfig:
