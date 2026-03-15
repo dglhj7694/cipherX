@@ -1,6 +1,4 @@
 import streamlit as st
-import cloudscraper
-from bs4 import BeautifulSoup
 import google.generativeai as genai
 import time
 import random
@@ -14,7 +12,7 @@ import numpy as np
 from plotly.subplots import make_subplots
 from collections import OrderedDict
 
-st.set_page_config(page_title="CipherX V7.6", page_icon="📈", layout="centered")
+st.set_page_config(page_title="CipherX V8", page_icon="📈", layout="centered")
 
 # ──────────────────────────────────────────
 # 🎨 CSS (UX & 리포트 폰트 최적화)
@@ -432,24 +430,17 @@ def compute_bias(meta,htf1,htf2):
     elif sc>=-8: return 'SELL',sc
     else: return 'STRONG SELL',sc
 
-# ✅ V7.6 FIX: 백테스트 계산 시 한국어 라벨 출력을 위한 수정
 def compute_signal_stats(df, col, direction, fwd=(5, 10, 20), mn=5):
     if col not in df.columns: return None
     mask = df[col].fillna(False).values.astype(bool)
     if mask.sum() < mn: return None
-    
     st_res = {'count': int(mask.sum())}
     entry_price = df['Open'].shift(-1)
-    
     for n in fwd:
         exit_price = df['Close'].shift(-(n + 1))
         pct_change = (exit_price - entry_price) / entry_price * 100
-        
-        if direction == 'sell':
-            pct_change = -pct_change
-            
+        if direction == 'sell': pct_change = -pct_change
         valid_returns = pct_change[mask].dropna()
-        
         if len(valid_returns) >= mn:
             st_res[f'{n}d_avg'] = float(valid_returns.mean())
             st_res[f'{n}d_winrate'] = float((valid_returns > 0).sum() / len(valid_returns) * 100)
@@ -636,6 +627,7 @@ def build_chart(dc,ticker,regime,shield):
 
     enabled=st.session_state.get('enabled_signals',set(ALL_CHART_SIGNALS.keys()))
     
+    # ✅ V7.5 FIX: 시그널이 없는 날짜를 NaN으로 채워 x unified 프로젝션 버그 해결
     for cn, cfg in ALL_CHART_SIGNALS.items():
         if cn not in dc.columns or cn not in enabled: continue
         
@@ -646,8 +638,11 @@ def build_chart(dc,ticker,regime,shield):
         
         if not mask.any(): continue
         
+        # 전체 인덱스 길이에 맞춘 빈 시리즈 생성
         y_vals = pd.Series(np.nan, index=dc.index)
+        # 시그널이 있는 날만 계산된 y축 위치값 대입
         y_vals[mask] = dc.loc[mask, cfg['base']] + dc.loc[mask, 'ATR'].fillna(dc['ATR'].median()) * cfg['atr_m']
+        
         lw = 2 if cfg['sz'] >= 16 else (1.5 if cfg['sz'] >= 13 else 1)
         
         hover_html = [
@@ -713,7 +708,7 @@ def build_chart(dc,ticker,regime,shield):
 
     stxt=f" | {shield}" if shield else ""
     fig.update_layout(
-        # title=dict(text=f"📊 {ticker.upper()} | 💎 MCB+ V7.6 | {regime}{stxt}",font=dict(size=14,color='#FAFAFA')),
+        title=dict(text=f"📊 {ticker.upper()} | 💎 MCB+ V7.5 | {regime}{stxt}",font=dict(size=14,color='#FAFAFA')),
         yaxis_title="Price",yaxis2_title="Vol",yaxis3_title="WT",yaxis4_title="MF",yaxis5_title="MACD",yaxis6_title="Conf",
         template="plotly_dark",margin=dict(l=0,r=0,t=50,b=0),height=1300,showlegend=True,
         hovermode="x unified", hoverlabel=dict(bgcolor="rgba(22,26,34,0.95)", font_size=12, font_family="Pretendard"),
@@ -1048,13 +1043,11 @@ def render_stats(m):
             for sn,sv in sorted(data.items(),key=lambda x:x[1]['count'],reverse=True):
                 wr=sv.get('10d_winrate'); av=sv.get('10d_avg')
                 if wr is None: continue
-                # V7.6 FIX: 사용자 친화적인 한국어 라벨 출력
-                kor_label = ALL_CHART_SIGNALS.get(sn,{}).get('kor', sn)
                 c='#00E676' if wr>50 else ('#FFC107' if wr>40 else '#FF1744')
                 lb=f"승률 <span style='color:{c}'>**{wr:.0f}%**</span>"
                 av_c='#00E676' if av>0 else '#FF1744'
                 ic=ALL_CHART_SIGNALS.get(sn,{}).get('icon','')
-                st.markdown(f"<span style='font-size:.85rem'>{ic} **{kor_label}** ({sv['count']}회) · {lb} · 평균 <span style='color:{av_c}'>**{av:+.1f}%**</span></span>",unsafe_allow_html=True)
+                st.markdown(f"<span style='font-size:.85rem'>{ic} **{sn}** ({sv['count']}회) · {lb} · 평균수익 <span style='color:{av_c}'>**{av:+.1f}%**</span></span>",unsafe_allow_html=True)
         c1,c2=st.columns(2)
         with c1: _side("🟢 BUY 전략",{k:v for k,v in alls.items() if v['direction']=='buy'})
         with c2: _side("🔴 SELL (Short) 전략",{k:v for k,v in alls.items() if v['direction']=='sell'})
@@ -1143,7 +1136,7 @@ def _run_ai():
         pb=st.progress(0,text="퀀트 엔진 로딩 중...")
         try:
             pb.progress(10,text="Gemini 모델 초기화 중...")
-            model=genai.GenerativeModel('gemini-flash-latest') 
+            model=genai.GenerativeModel('gemini-1.5-flash-latest') 
             pb.progress(20,text="시장 데이터 및 시그널 취합 중...")
             resp=model.generate_content(pp,stream=True)
             pb.progress(40,text="🚀 AI 리포트 생성 중...")
