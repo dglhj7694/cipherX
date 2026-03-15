@@ -149,90 +149,41 @@ genai.configure(api_key=GEMINI_API_KEY)
 @st.cache_data(ttl=300, show_spinner=False)
 def get_stock_data(ticker):
     url = f"https://swingtradebot.com/equities/{ticker.upper()}"
-
     scraper = cloudscraper.create_scraper(
-        browser={
-            'browser': 'chrome',
-            'platform': 'windows',
-            'desktop': True,
-            'mobile': False,
-        },
-        delay=10,           # CF challenge 재시도 딜레이
-        interpreter='nodejs' # JS 엔진 (pip install js2py 대신 node 사용)
+        browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True}
     )
-
     headers = {
-        'User-Agent': random.choice([
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-        ]),
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Referer': 'https://www.google.com/search?q=swingtradebot',
-        'Sec-Ch-Ua': '"Google Chrome";v="125", "Chromium";v="125", "Not.A/Brand";v="24"',
-        'Sec-Ch-Ua-Mobile': '?0',
-        'Sec-Ch-Ua-Platform': '"Windows"',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'cross-site',
-        'Sec-Fetch-User': '?1',
-        'Upgrade-Insecure-Requests': '1',
-        'Cache-Control': 'max-age=0',
-        'Connection': 'keep-alive',
+        'User-Agent': (
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+            'AppleWebKit/537.36 (KHTML, like Gecko) '
+            'Chrome/120.0.0.0 Safari/537.36'
+        ),
+        'Referer': 'https://www.google.com/',
     }
+    try:
+        time.sleep(random.uniform(1.0, 2.0))
+        response = scraper.get(url, headers=headers, timeout=20)
+        if response.status_code != 200:
+            return None
+        soup = BeautifulSoup(response.text, 'html.parser')
+        extracted = []
+        for finder, label, sep in [
+            (lambda s: s.find('h2', {'itemprop': 'headline'}), 'HEADLINE', ' '),
+            (lambda s: s.find('div', class_='recap-body'), 'DAILY RECAP', ' '),
+            (lambda s: s.find(id='recap-tour'), 'RECAP TOUR', ' '),
+            (lambda s: s.find(id='indicators-tour'), 'INDICATORS TOUR', ' | '),
+        ]:
+            el = finder(soup)
+            if el:
+                extracted.append(f"#### [{label}]\n{el.get_text(separator=sep, strip=True)}")
+        for t_id, t_name in [('trend-table-tour', 'TREND ANALYSIS'), ('recent-signals-tour', 'RECENT SIGNALS')]:
+            table = soup.find('table', id=t_id)
+            if table:
+                extracted.append(f"#### [{t_name}]\n{table.get_text(separator=' | ', strip=True)}")
+        return "\n\n".join(extracted) if extracted else None
+    except Exception:
+        return None
 
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            time.sleep(random.uniform(2.0, 5.0))  # 더 긴 딜레이
-
-            # 먼저 메인 페이지 방문 (세션 쿠키 획득)
-            if attempt == 0:
-                scraper.get('https://swingtradebot.com/', headers=headers, timeout=20)
-                time.sleep(random.uniform(1.0, 2.0))
-
-            response = scraper.get(url, headers=headers, timeout=25)
-
-            if response.status_code == 200:
-                if 'Just a moment' in response.text or len(response.text) < 1000:
-                    print(f"CF Challenge 감지, 재시도 {attempt+1}/{max_retries}")
-                    time.sleep(random.uniform(5.0, 10.0))
-                    continue
-
-                soup = BeautifulSoup(response.text, 'html.parser')
-                # ... (기존 파싱 로직)
-                extracted = []
-                for finder, label, sep in [
-                    (lambda s: s.find('h2', {'itemprop': 'headline'}), 'HEADLINE', ' '),
-                    (lambda s: s.find('div', class_='recap-body'), 'DAILY RECAP', ' '),
-                    (lambda s: s.find(id='recap-tour'), 'RECAP TOUR', ' '),
-                    (lambda s: s.find(id='indicators-tour'), 'INDICATORS TOUR', ' | '),
-                ]:
-                    el = finder(soup)
-                    if el:
-                        extracted.append(f"#### [{label}]\n{el.get_text(separator=sep, strip=True)}")
-                for t_id, t_name in [('trend-table-tour', 'TREND ANALYSIS'),
-                                      ('recent-signals-tour', 'RECENT SIGNALS')]:
-                    table = soup.find('table', id=t_id)
-                    if table:
-                        extracted.append(f"#### [{t_name}]\n{table.get_text(separator=' | ', strip=True)}")
-                return "\n\n".join(extracted) if extracted else None
-
-            elif response.status_code == 403:
-                print(f"403 Forbidden, 재시도 {attempt+1}/{max_retries}")
-                time.sleep(random.uniform(8.0, 15.0))
-            else:
-                print(f"HTTP {response.status_code}")
-                return None
-
-        except Exception as e:
-            print(f"시도 {attempt+1} 실패: {e}")
-            time.sleep(random.uniform(3.0, 6.0))
-
-    return None
 
 @st.cache_data(ttl=300, show_spinner=False)
 def get_yf_history(ticker):
