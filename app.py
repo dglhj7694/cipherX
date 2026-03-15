@@ -259,9 +259,20 @@ def get_stock_data(ticker):
     try:
         time.sleep(random.uniform(1.0, 2.0))
         response = scraper.get(url, headers=headers, timeout=20)
+
+        # ★ 디버그: 응답 상태 확인
         if response.status_code != 200:
-            return None
+            return f"[CRAWL_DEBUG] HTTP {response.status_code} for {url}"
+
         soup = BeautifulSoup(response.text, 'html.parser')
+
+        # ★ 디버그: Cloudflare 챌린지 페이지 감지
+        title = soup.find('title')
+        if title:
+            title_text = title.get_text(strip=True).lower()
+            if 'just a moment' in title_text or 'cloudflare' in title_text:
+                return f"[CRAWL_DEBUG] Cloudflare challenge detected. Title: {title.get_text(strip=True)}"
+
         extracted = []
         headline = soup.find('h2', {'itemprop': 'headline'})
         if headline:
@@ -279,10 +290,18 @@ def get_stock_data(ticker):
             table = soup.find('table', id=t_id)
             if table:
                 extracted.append(f"#### [{t_name}]\n{table.get_text(separator=' | ', strip=True)}")
-        return "\n\n".join(extracted) if extracted else None
-    except Exception:
-        return None
 
+        if extracted:
+            return "\n\n".join(extracted)
+        else:
+            # ★ 디버그: HTML은 받았지만 파싱 요소 없음
+            body_preview = soup.get_text(strip=True)[:300]
+            return f"[CRAWL_DEBUG] Page loaded but no expected elements found.\nBody preview: {body_preview}"
+
+    except Exception as e:
+        # ★ 디버그: 예외 정보 반환
+        return f"[CRAWL_DEBUG] Exception: {type(e).__name__}: {str(e)[:200]}"
+    
 
 @st.cache_data(ttl=300, show_spinner=False)
 def get_yf_history(ticker):
