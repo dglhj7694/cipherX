@@ -1683,7 +1683,6 @@ if st.session_state.pending_ai_ticker and st.session_state.pending_ai_prompt:
         if st.button(f"🚀 {ticker_p.upper()} AI 심층 분석 시작", type="primary", use_container_width=True):
             run_ai_analysis(ticker_p, prompt_p)
 
-
 def process_ticker(ticker_value):
     ticker_value = ticker_value.strip().upper()
     if not ticker_value:
@@ -1700,16 +1699,23 @@ def process_ticker(ticker_value):
         time.sleep(0.3)
         pg.progress(90, text="📝 프롬프트 생성 중...")
 
-        if scraped or cfig:
+        # ★ FIX: cfig 기준으로 판단 (scraped는 이제 항상 문자열)
+        if cfig is not None:
             prompt = build_analysis_prompt(ticker_value, phist, scraped)
+
+            # ★ 크롤링 실패 시 사용자에게 알림
+            crawl_warning = ""
+            if scraped and "[크롤링 실패]" in scraped:
+                crawl_warning = f"\n\n⚠️ SwingTradeBot 크롤링 실패: 기술적 지표 데이터만으로 분석합니다.\n`{scraped[:100]}`"
+
             st.session_state.messages.append({
                 "role": "assistant", "type": "analysis", "ticker": ticker_value,
-                "content": f"✅ **{ticker_value}** 분석 완료! 아래에서 차트와 시그널을 확인하세요.",
+                "content": f"✅ **{ticker_value}** 분석 완료! 아래에서 차트와 시그널을 확인하세요.{crawl_warning}",
                 "fig": cfig, "meta": meta, "prompt": prompt,
             })
             st.session_state.pending_ai_ticker = ticker_value
             st.session_state.pending_ai_prompt = prompt
-            st.session_state.auto_run = auto_ai  # ★ 자동 실행 플래그
+            st.session_state.auto_run = auto_ai
             pg.progress(100, text="✅ 완료!"); time.sleep(0.3); pg.empty()
             st.rerun()
         else:
