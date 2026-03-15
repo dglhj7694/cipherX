@@ -19,220 +19,144 @@ st.set_page_config(page_title="CipherX", page_icon="📈", layout="centered")
 # ──────────────────────────────────────────
 # 🎨 CSS
 # ──────────────────────────────────────────
-def load_css():
-    st.markdown("""
-    <style>
-    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
-    html, body, [class*="css"] { font-family: 'Pretendard', 'Noto Sans KR', sans-serif !important; }
-    .stApp { background-color: #0E1117; }
-    p, div[data-testid="stMarkdownContainer"] p, div[data-testid="stChatMessageContent"] p,
-    h1, h2, h3, h4, h5, h6, li { color: #FAFAFA !important; }
-    div[data-testid="stCodeBlock"], pre, code { background-color: #1A1D24 !important; color: #FAFAFA !important; }
-    div[data-testid="stCodeBlock"] span { text-shadow: none !important; }
-    div[data-testid="stCodeBlock"] span[style*="color: rgb(0, 0, 0)"],
-    div[data-testid="stCodeBlock"] span[style*="color: black"],
-    div[data-testid="stCodeBlock"] code > span:not([class]) { color: #FAFAFA !important; }
-    div[data-testid="stChatMessage"]:nth-child(even) { background-color: #161A22; border-radius: 12px; padding: 5px 15px; }
-    header {visibility: hidden;}
-    .block-container { padding-top: 1rem !important; max-width: 900px; }
-    div.stButton > button[kind="primary"] {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-        color: white !important; border: none !important; border-radius: 12px !important;
-        padding: 0.6rem 1.5rem !important; font-weight: 600 !important;
-        font-size: 1rem !important; transition: all 0.3s ease !important; width: 100%;
-    }
-    div.stButton > button[kind="primary"]:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(118, 75, 162, 0.4) !important; }
-    div.stButton > button[kind="secondary"] {
-        background-color: #1E2127 !important; color: #E2E8F0 !important;
-        border: 1px solid #333842 !important; border-radius: 12px !important;
-        font-weight: 500 !important; transition: all 0.2s ease !important; width: 100%;
-    }
-    div.stButton > button[kind="secondary"]:hover { border-color: #667eea !important; color: #667eea !important; }
-    .streamlit-expanderHeader { background-color: #161A22 !important; border-radius: 10px !important; font-weight: 600 !important; }
-    .streamlit-expanderHeader p { color: #414df2 !important; }
-    div[data-testid="stExpander"] { border: 1px solid #2D333B !important; border-radius: 10px !important; background-color: #161A22; }
-    section[data-testid="stSidebar"] { background-color: #0A0D12; border-right: 1px solid #1E2127; }
-    section[data-testid="stSidebar"] .stMarkdown p { color: #AAAAAA !important; }
-    .signal-card { border-radius: 12px; padding: 16px 20px; margin: 6px 0; border: 1px solid #2D333B; }
-    .signal-card-buy { background: linear-gradient(135deg, rgba(0,230,118,0.08) 0%, rgba(0,191,255,0.05) 100%); border-left: 4px solid #00E676; }
-    .signal-card-sell { background: linear-gradient(135deg, rgba(255,23,68,0.08) 0%, rgba(255,82,82,0.05) 100%); border-left: 4px solid #FF1744; }
-    .signal-card-neutral { background: linear-gradient(135deg, rgba(255,193,7,0.08) 0%, rgba(255,152,0,0.05) 100%); border-left: 4px solid #FFC107; }
-    .price-header { background: linear-gradient(135deg, #161A22 0%, #1A1F2E 100%); border: 1px solid #2D333B; border-radius: 14px; padding: 18px 24px; margin-bottom: 16px; }
-    .price-big { font-size: 2rem; font-weight: 700; margin: 0; }
-    .price-change-up { color: #00E676 !important; }
-    .price-change-down { color: #FF1744 !important; }
-    .price-label { color: #666 !important; font-size: 0.8rem; margin: 0; }
-    .indicator-mini { display: inline-block; padding: 4px 10px; margin: 2px; border-radius: 6px; font-size: 0.78rem; font-weight: 500; }
-    .ind-bullish { background: rgba(0,230,118,0.15); color: #00E676; }
-    .ind-bearish { background: rgba(255,23,68,0.15); color: #FF1744; }
-    .ind-neutral { background: rgba(255,193,7,0.15); color: #FFC107; }
-    .bias-gauge-track { height: 8px; border-radius: 4px; margin: 8px 0; background: linear-gradient(90deg, #FF1744 0%, #FF1744 20%, #FFC107 35%, #888 50%, #FFC107 65%, #00E676 80%, #00E676 100%); position: relative; }
-    .bias-gauge-needle { width: 4px; height: 16px; background: white; border-radius: 2px; position: absolute; top: -4px; transform: translateX(-50%); box-shadow: 0 0 6px rgba(255,255,255,0.5); }
-    </style>
-    """, unsafe_allow_html=True)
-
-load_css()
+st.markdown("""<style>
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+html,body,[class*="css"]{font-family:'Pretendard','Noto Sans KR',sans-serif!important}
+.stApp{background-color:#0E1117}
+p,div[data-testid="stMarkdownContainer"] p,div[data-testid="stChatMessageContent"] p,
+h1,h2,h3,h4,h5,h6,li{color:#FAFAFA!important}
+div[data-testid="stCodeBlock"],pre,code{background-color:#1A1D24!important;color:#FAFAFA!important}
+div[data-testid="stCodeBlock"] span{text-shadow:none!important}
+div[data-testid="stCodeBlock"] span[style*="color: rgb(0, 0, 0)"],
+div[data-testid="stCodeBlock"] span[style*="color: black"],
+div[data-testid="stCodeBlock"] code>span:not([class]){color:#FAFAFA!important}
+div[data-testid="stChatMessage"]:nth-child(even){background-color:#161A22;border-radius:12px;padding:5px 15px}
+header{visibility:hidden}
+.block-container{padding-top:1rem!important;max-width:900px}
+div.stButton>button[kind="primary"]{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%)!important;
+color:white!important;border:none!important;border-radius:12px!important;padding:.6rem 1.5rem!important;
+font-weight:600!important;font-size:1rem!important;transition:all .3s ease!important;width:100%}
+div.stButton>button[kind="primary"]:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(118,75,162,.4)!important}
+div.stButton>button[kind="secondary"]{background-color:#1E2127!important;color:#E2E8F0!important;
+border:1px solid #333842!important;border-radius:12px!important;font-weight:500!important;
+transition:all .2s ease!important;width:100%}
+div.stButton>button[kind="secondary"]:hover{border-color:#667eea!important;color:#667eea!important}
+.streamlit-expanderHeader{background-color:#161A22!important;border-radius:10px!important;font-weight:600!important}
+.streamlit-expanderHeader p{color:#414df2!important}
+div[data-testid="stExpander"]{border:1px solid #2D333B!important;border-radius:10px!important;background-color:#161A22}
+section[data-testid="stSidebar"]{background-color:#0A0D12;border-right:1px solid #1E2127}
+section[data-testid="stSidebar"] .stMarkdown p{color:#AAA!important}
+.signal-card{border-radius:12px;padding:16px 20px;margin:6px 0;border:1px solid #2D333B}
+.signal-card-buy{background:linear-gradient(135deg,rgba(0,230,118,.08) 0%,rgba(0,191,255,.05) 100%);border-left:4px solid #00E676}
+.signal-card-sell{background:linear-gradient(135deg,rgba(255,23,68,.08) 0%,rgba(255,82,82,.05) 100%);border-left:4px solid #FF1744}
+.signal-card-neutral{background:linear-gradient(135deg,rgba(255,193,7,.08) 0%,rgba(255,152,0,.05) 100%);border-left:4px solid #FFC107}
+.price-header{background:linear-gradient(135deg,#161A22 0%,#1A1F2E 100%);border:1px solid #2D333B;
+border-radius:14px;padding:18px 24px;margin-bottom:16px}
+.price-big{font-size:2rem;font-weight:700;margin:0}
+.price-change-up{color:#00E676!important} .price-change-down{color:#FF1744!important}
+.price-label{color:#666!important;font-size:.8rem;margin:0}
+.indicator-mini{display:inline-block;padding:4px 10px;margin:2px;border-radius:6px;font-size:.78rem;font-weight:500}
+.ind-bullish{background:rgba(0,230,118,.15);color:#00E676}
+.ind-bearish{background:rgba(255,23,68,.15);color:#FF1744}
+.ind-neutral{background:rgba(255,193,7,.15);color:#FFC107}
+.bias-gauge-track{height:8px;border-radius:4px;margin:8px 0;
+background:linear-gradient(90deg,#FF1744 0%,#FF1744 20%,#FFC107 35%,#888 50%,#FFC107 65%,#00E676 80%,#00E676 100%);position:relative}
+.bias-gauge-needle{width:4px;height:16px;background:white;border-radius:2px;position:absolute;top:-4px;
+transform:translateX(-50%);box-shadow:0 0 6px rgba(255,255,255,.5)}
+</style>""", unsafe_allow_html=True)
 
 # ──────────────────────────────────────────
-# 🔧 통합 시그널 레지스트리 (V3.0)
+# 🔧 통합 시그널 레지스트리 (V4.0)
 # ──────────────────────────────────────────
 SIGNAL_REGISTRY = {
     # ── BUY ──
-    'Gold_Dot':         {'w': 3.0, 'dir': 'buy',  'icon': '🏆', 'label': 'GOLD DOT',       'sym': 'circle',       'sz': 18, 'clr': '#FFD700', 'base': 'Low',  'atr_m': -3.0, 'kor': '최강 매수', 'desc': '모든 매수 조건 극단 수렴. RSI<30+MFI<30+WT1<-60+상승 다이버전스.'},
-    'Green_Dot_T1':     {'w': 2.5, 'dir': 'buy',  'icon': '🟢', 'label': 'BUY T1',         'sym': 'circle',       'sz': 16, 'clr': '#00E676', 'base': 'Low',  'atr_m': -2.5, 'kor': '강한 매수', 'desc': 'WT과매도 교차+RSI<30+MFI<30+MF<0.'},
-    'Green_Dot_T2':     {'w': 2.0, 'dir': 'buy',  'icon': '🟩', 'label': 'BUY T2',         'sym': 'circle',       'sz': 13, 'clr': '#69F0AE', 'base': 'Low',  'atr_m': -2.2, 'kor': '매수', 'desc': 'T1 완화. WT과매도+RSI또는MFI<32.'},
-    'Blue_Diamond':     {'w': 2.0, 'dir': 'buy',  'icon': '🔹', 'label': 'BLUE DIA',       'sym': 'diamond',      'sz': 14, 'clr': '#00bfff', 'base': 'Low',  'atr_m': -1.8, 'kor': '추세 매수', 'desc': 'WT2≤0 상승교차+HTF강세+하락추세 아님.'},
-    'Green_Circle':     {'w': 1.2, 'dir': 'buy',  'icon': '✅', 'label': 'BUY Circle',     'sym': 'circle-open',  'sz': 11, 'clr': '#00E676', 'base': 'Low',  'atr_m': -1.2, 'kor': '과매도 반등', 'desc': 'WT과매도 교차+RSI<45. Green Dot 미달.'},
-    'Bull_Divergence':  {'w': 2.0, 'dir': 'buy',  'icon': '📈', 'label': 'Bull Div',       'sym': 'triangle-up',  'sz': 12, 'clr': '#AA00FF', 'base': 'Low',  'atr_m': -2.0, 'kor': '상승 다이버전스', 'desc': '가격 저점↓ vs WT 저점↑.'},
-    'Squeeze_Fire_Buy': {'w': 1.5, 'dir': 'buy',  'icon': '💥', 'label': 'Squeeze BUY',    'sym': 'star-diamond', 'sz': 14, 'clr': '#00FFFF', 'base': 'Low',  'atr_m': -1.5, 'kor': '스퀴즈 매수', 'desc': 'TTM Squeeze 해소+모멘텀 상방.'},
-    'Hidden_Bull_Div':  {'w': 1.5, 'dir': 'buy',  'icon': '🔀', 'label': 'Hidden Bull',    'sym': 'triangle-up',  'sz': 10, 'clr': '#E040FB', 'base': 'Low',  'atr_m': -1.6, 'kor': '히든 상승 다이버전스', 'desc': '가격 저점↑ vs 오실레이터 저점↓+WT<-20.'},
-    'Volume_Climax_Buy':{'w': 2.0, 'dir': 'buy',  'icon': '🌊', 'label': 'Vol Climax BUY', 'sym': 'hexagram',     'sz': 14, 'clr': '#00BCD4', 'base': 'Low',  'atr_m': -2.8, 'kor': '거래량 클라이맥스 매수', 'desc': '평균3배 거래량+하락장대봉+WT과매도→반등확인.'},
-    'OBV_Div_Buy':      {'w': 1.0, 'dir': 'buy',  'icon': '📊', 'label': 'OBV Div BUY',   'sym': 'triangle-up',  'sz': 10, 'clr': '#80DEEA', 'base': 'Low',  'atr_m': -1.4, 'kor': 'OBV 다이버전스 매수', 'desc': 'OBV-가격 상승 다이버전스+WT<-30.'},
-    'ADX_Momentum_Buy': {'w': 1.5, 'dir': 'buy',  'icon': '🚀', 'label': 'ADX Ignition',   'sym': 'arrow-up',     'sz': 11, 'clr': '#76FF03', 'base': 'Low',  'atr_m': -1.4, 'kor': 'ADX 점화', 'desc': 'ADX>20 돌파++DI>-DI.'},
-    'Fib_Bounce_Buy':   {'w': 0.8, 'dir': 'buy',  'icon': '📐', 'label': 'Fib Bounce',     'sym': 'diamond-open', 'sz': 10, 'clr': '#FFAB00', 'base': 'Low',  'atr_m': -1.0, 'kor': '피보나치 반등', 'desc': '0.618~0.786 되돌림 지지+WT 상승교차.'},
-    'Bullish_Engulfing': {'w': 1.5, 'dir': 'buy', 'icon': '☀️', 'label': 'Bull Engulf',    'sym': 'square',       'sz': 10, 'clr': '#00E676', 'base': 'Low',  'atr_m': -1.3, 'kor': '상승 장악형', 'desc': '전일 하락캔들 감싸는 상승캔들+WT약세구간.'},
-    'Golden_Cross':     {'w': 1.5, 'dir': 'buy',  'icon': '✨', 'label': 'Golden Cross',   'sym': 'cross',        'sz': 12, 'clr': '#FFD700', 'base': 'Low',  'atr_m': -0.8, 'kor': '골든 크로스', 'desc': '50MA>200MA 상향돌파+ADX>15+거래량확인.'},
-    'EMA_Pullback_Buy': {'w': 2.0, 'dir': 'buy',  'icon': '🎯', 'label': 'EMA Pullback',   'sym': 'triangle-up',  'sz': 13, 'clr': '#00BFA5', 'base': 'Low',  'atr_m': -1.8, 'kor': 'EMA 눌림목 매수', 'desc': '상승추세 EMA부근 조정 후 WT반등+거래량.'},
-    'Momentum_Ignition_Buy': {'w': 2.5, 'dir': 'buy', 'icon': '🔥', 'label': 'Mom. Ignition', 'sym': 'star-diamond', 'sz': 15, 'clr': '#FF6D00', 'base': 'Low', 'atr_m': -2.5, 'kor': '모멘텀 점화 매수', 'desc': '장대양봉>ATR×1.5+거래량>20MA×2.5+BB돌파.'},
-    'SuperTrend_Buy':   {'w': 1.5, 'dir': 'buy',  'icon': '📈', 'label': 'ST Flip Bull',   'sym': 'arrow-up',     'sz': 12, 'clr': '#00E5FF', 'base': 'Low',  'atr_m': -1.5, 'kor': '슈퍼트렌드 강세 전환', 'desc': 'SuperTrend 하단선 위로 돌파.'},
-    'VWAP_Bounce_Buy':  {'w': 1.5, 'dir': 'buy',  'icon': '🏦', 'label': 'VWAP Bounce',    'sym': 'triangle-up',  'sz': 11, 'clr': '#00E5FF', 'base': 'Low',  'atr_m': -1.3, 'kor': 'VWAP 반등 매수', 'desc': 'VWAP 하방이탈 후 복귀+WT교차+거래량.'},
-    'Parabolic_Bottom_Buy': {'w': 3.0, 'dir': 'buy', 'icon': '🧊', 'label': 'Parabolic Bot', 'sym': 'diamond', 'sz': 16, 'clr': '#00FFFF', 'base': 'Low', 'atr_m': -3.0, 'kor': '포물선 바닥 매수', 'desc': 'WT1<-85 꺾임+양봉 또는 BB-ATR×1.5 극단이격.'},
-    'MACD_Cross_Buy':   {'w': 1.0, 'dir': 'buy',  'icon': '〽️', 'label': 'MACD Cross',    'sym': 'triangle-up',  'sz': 9,  'clr': '#4CAF50', 'base': 'Low',  'atr_m': -1.0, 'kor': 'MACD 골든크로스', 'desc': 'MACD라인>시그널라인 상향교차(0선 하방에서).'},
-    'StochRSI_Cross_Buy':{'w': 0.8, 'dir': 'buy', 'icon': '🔄', 'label': 'StRSI Cross',   'sym': 'circle-open',  'sz': 8,  'clr': '#81C784', 'base': 'Low',  'atr_m': -0.8, 'kor': 'StochRSI 교차 매수', 'desc': 'StochK>StochD 상향교차(과매도 존).'},
+    'Gold_Dot':              {'w':3.0,'dir':'buy','icon':'🏆','label':'GOLD DOT','sym':'circle','sz':18,'clr':'#FFD700','base':'Low','atr_m':-3.0,'kor':'최강 매수','desc':'모든 매수 조건 극단 수렴. RSI<30+MFI<30+WT1<-60+상승 다이버전스.'},
+    'Green_Dot_T1':          {'w':2.5,'dir':'buy','icon':'🟢','label':'BUY T1','sym':'circle','sz':16,'clr':'#00E676','base':'Low','atr_m':-2.5,'kor':'강한 매수','desc':'WT과매도 교차+RSI<30+MFI<30+MF<0.'},
+    'Green_Dot_T2':          {'w':2.0,'dir':'buy','icon':'🟩','label':'BUY T2','sym':'circle','sz':13,'clr':'#69F0AE','base':'Low','atr_m':-2.2,'kor':'매수','desc':'T1 완화. WT과매도+RSI또는MFI<32.'},
+    'Blue_Diamond':          {'w':2.0,'dir':'buy','icon':'🔹','label':'BLUE DIA','sym':'diamond','sz':14,'clr':'#00bfff','base':'Low','atr_m':-1.8,'kor':'추세 매수','desc':'WT2≤0 상승교차+HTF강세+하락추세 아님.'},
+    'Green_Circle':          {'w':1.2,'dir':'buy','icon':'✅','label':'BUY Circle','sym':'circle-open','sz':11,'clr':'#00E676','base':'Low','atr_m':-1.2,'kor':'과매도 반등','desc':'WT과매도 교차+RSI<45. Green Dot 미달.'},
+    'Bull_Divergence':       {'w':2.0,'dir':'buy','icon':'📈','label':'Bull Div','sym':'triangle-up','sz':12,'clr':'#AA00FF','base':'Low','atr_m':-2.0,'kor':'상승 다이버전스','desc':'가격 저점↓ vs WT 저점↑.'},
+    'RSI_Bull_Divergence':   {'w':1.5,'dir':'buy','icon':'📊','label':'RSI Bull Div','sym':'triangle-up','sz':11,'clr':'#CE93D8','base':'Low','atr_m':-1.8,'kor':'RSI 상승 다이버전스','desc':'가격 저점↓ vs RSI 저점↑ (WT 무관).'},
+    'Squeeze_Fire_Buy':      {'w':1.5,'dir':'buy','icon':'💥','label':'Squeeze BUY','sym':'star-diamond','sz':14,'clr':'#00FFFF','base':'Low','atr_m':-1.5,'kor':'스퀴즈 매수','desc':'TTM Squeeze 해소+모멘텀 상방.'},
+    'Hidden_Bull_Div':       {'w':1.5,'dir':'buy','icon':'🔀','label':'Hidden Bull','sym':'triangle-up','sz':10,'clr':'#E040FB','base':'Low','atr_m':-1.6,'kor':'히든 상승 다이버전스','desc':'가격 저점↑ vs 오실레이터 저점↓+WT<-25.'},
+    'Volume_Climax_Buy':     {'w':2.0,'dir':'buy','icon':'🌊','label':'Vol Climax BUY','sym':'hexagram','sz':14,'clr':'#00BCD4','base':'Low','atr_m':-2.8,'kor':'거래량 클라이맥스 매수','desc':'평균3배 거래량+하락장대봉+WT과매도→반등확인.'},
+    'OBV_Div_Buy':           {'w':1.0,'dir':'buy','icon':'📊','label':'OBV Div BUY','sym':'triangle-up','sz':10,'clr':'#80DEEA','base':'Low','atr_m':-1.4,'kor':'OBV 다이버전스 매수','desc':'OBV-가격 상승 다이버전스+WT<-30.'},
+    'ADX_Momentum_Buy':      {'w':1.5,'dir':'buy','icon':'🚀','label':'ADX Ignition','sym':'arrow-up','sz':11,'clr':'#76FF03','base':'Low','atr_m':-1.4,'kor':'ADX 점화','desc':'ADX>20 돌파++DI>-DI.'},
+    'Bullish_Engulfing':     {'w':1.5,'dir':'buy','icon':'☀️','label':'Bull Engulf','sym':'square','sz':10,'clr':'#00E676','base':'Low','atr_m':-1.3,'kor':'상승 장악형','desc':'전일 하락캔들 감싸는 상승캔들+WT약세구간.'},
+    'Hammer_Buy':            {'w':1.5,'dir':'buy','icon':'🔨','label':'Hammer','sym':'triangle-up','sz':11,'clr':'#4CAF50','base':'Low','atr_m':-1.3,'kor':'해머 매수','desc':'하락추세 긴 아래꼬리+작은 몸통+WT<-20.'},
+    'Golden_Cross':          {'w':1.5,'dir':'buy','icon':'✨','label':'Golden Cross','sym':'cross','sz':12,'clr':'#FFD700','base':'Low','atr_m':-0.8,'kor':'골든 크로스','desc':'50MA>200MA 상향돌파+ADX>15+거래량확인.'},
+    'EMA_Pullback_Buy':      {'w':2.0,'dir':'buy','icon':'🎯','label':'EMA Pullback','sym':'triangle-up','sz':13,'clr':'#00BFA5','base':'Low','atr_m':-1.8,'kor':'EMA 눌림목 매수','desc':'상승추세 EMA부근 조정 후 WT반등+거래량.'},
+    'Momentum_Ignition_Buy': {'w':2.5,'dir':'buy','icon':'🔥','label':'Mom. Ignition','sym':'star-diamond','sz':15,'clr':'#FF6D00','base':'Low','atr_m':-2.5,'kor':'모멘텀 점화 매수','desc':'장대양봉>ATR×1.5+거래량>20MA×2.5+BB돌파.'},
+    'SuperTrend_Buy':        {'w':1.5,'dir':'buy','icon':'📈','label':'ST Flip Bull','sym':'arrow-up','sz':12,'clr':'#00E5FF','base':'Low','atr_m':-1.5,'kor':'슈퍼트렌드 강세 전환','desc':'SuperTrend 하단선 위로 돌파.'},
+    'VWAP_Bounce_Buy':       {'w':1.5,'dir':'buy','icon':'🏦','label':'VWAP Bounce','sym':'triangle-up','sz':11,'clr':'#00E5FF','base':'Low','atr_m':-1.3,'kor':'VWAP 반등 매수','desc':'VWAP 하방이탈 후 복귀+WT교차+거래량.'},
+    'Parabolic_Bottom_Buy':  {'w':3.0,'dir':'buy','icon':'🧊','label':'Parabolic Bot','sym':'diamond','sz':16,'clr':'#00FFFF','base':'Low','atr_m':-3.0,'kor':'포물선 바닥 매수','desc':'WT1<-85 꺾임+양봉 또는 BB-ATR×1.5 극단이격.'},
+    'MACD_Cross_Buy':        {'w':1.0,'dir':'buy','icon':'〽️','label':'MACD Cross','sym':'triangle-up','sz':9,'clr':'#4CAF50','base':'Low','atr_m':-1.0,'kor':'MACD 골든크로스','desc':'MACD라인>시그널라인 상향교차(0선 하방에서).'},
+    'StochRSI_Cross_Buy':    {'w':0.8,'dir':'buy','icon':'🔄','label':'StRSI Cross','sym':'circle-open','sz':8,'clr':'#81C784','base':'Low','atr_m':-0.8,'kor':'StochRSI 교차 매수','desc':'StochK>StochD 상향교차(과매도 존).'},
+    'Three_Candle_Strike_Buy':{'w':1.8,'dir':'buy','icon':'🎰','label':'3-Strike BUY','sym':'star','sz':12,'clr':'#00E676','base':'Low','atr_m':-1.6,'kor':'3연속 반전','desc':'3연속 하락캔들 후 전체를 감싸는 상승캔들.'},
     # ── SELL ──
-    'Blood_Diamond':    {'w': 3.0, 'dir': 'sell', 'icon': '🩸', 'label': 'BLOOD DIA',      'sym': 'diamond',       'sz': 18, 'clr': '#DC143C', 'base': 'High', 'atr_m': 3.0, 'kor': '최강 매도', 'desc': 'RSI>70+MFI>70+WT1>60+하락 다이버전스.'},
-    'Red_Dot_T1':       {'w': 2.5, 'dir': 'sell', 'icon': '🔴', 'label': 'SELL T1',        'sym': 'circle',        'sz': 16, 'clr': '#FF1744', 'base': 'High', 'atr_m': 2.5, 'kor': '강한 매도', 'desc': 'WT과매수 하락교차+RSI>70+MFI>70+MF>0.'},
-    'Red_Dot_T2':       {'w': 2.0, 'dir': 'sell', 'icon': '🟥', 'label': 'SELL T2',        'sym': 'circle',        'sz': 13, 'clr': '#FF5252', 'base': 'High', 'atr_m': 2.2, 'kor': '매도', 'desc': 'T1 완화. WT과매수+RSI또는MFI>68.'},
-    'Red_Diamond':      {'w': 2.0, 'dir': 'sell', 'icon': '🔸', 'label': 'RED DIA',        'sym': 'diamond',       'sz': 14, 'clr': '#ff3333', 'base': 'High', 'atr_m': 1.8, 'kor': '추세 매도', 'desc': 'WT2≥0 하락교차+HTF약세+상승추세 아님.'},
-    'Red_Circle':       {'w': 1.2, 'dir': 'sell', 'icon': '⛔', 'label': 'SELL Circle',    'sym': 'circle-open',   'sz': 11, 'clr': '#FF1744', 'base': 'High', 'atr_m': 1.2, 'kor': '과매수 하락', 'desc': 'WT과매수 하락교차+RSI>55. Red Dot 미달.'},
-    'Bear_Divergence':  {'w': 2.0, 'dir': 'sell', 'icon': '📉', 'label': 'Bear Div',       'sym': 'triangle-down', 'sz': 12, 'clr': '#AA00FF', 'base': 'High', 'atr_m': 2.0, 'kor': '하락 다이버전스', 'desc': '가격 고점↑ vs WT 고점↓.'},
-    'Squeeze_Fire_Sell':{'w': 1.5, 'dir': 'sell', 'icon': '🧨', 'label': 'Squeeze SELL',   'sym': 'star-diamond',  'sz': 14, 'clr': '#FF6600', 'base': 'High', 'atr_m': 1.5, 'kor': '스퀴즈 매도', 'desc': 'TTM Squeeze 해소+모멘텀 하방.'},
-    'Hidden_Bear_Div':  {'w': 1.5, 'dir': 'sell', 'icon': '🔁', 'label': 'Hidden Bear',    'sym': 'triangle-down', 'sz': 10, 'clr': '#E040FB', 'base': 'High', 'atr_m': 1.6, 'kor': '히든 하락 다이버전스', 'desc': '가격 고점↓ vs 오실레이터 고점↑+WT>20.'},
-    'Volume_Climax_Sell':{'w': 2.0, 'dir': 'sell','icon': '🌋', 'label': 'Vol Climax SELL', 'sym': 'hexagram',     'sz': 14, 'clr': '#FF5722', 'base': 'High', 'atr_m': 2.8, 'kor': '거래량 클라이맥스 매도', 'desc': '평균3배 거래량+상승장대봉+WT과매수→하락확인.'},
-    'OBV_Div_Sell':     {'w': 1.0, 'dir': 'sell', 'icon': '🔻', 'label': 'OBV Div SELL',   'sym': 'triangle-down', 'sz': 10, 'clr': '#FFAB91', 'base': 'High', 'atr_m': 1.4, 'kor': 'OBV 다이버전스 매도', 'desc': 'OBV-가격 하락 다이버전스+WT>30.'},
-    'ADX_Momentum_Sell':{'w': 1.5, 'dir': 'sell', 'icon': '💨', 'label': 'ADX Down',       'sym': 'arrow-down',    'sz': 11, 'clr': '#FF3D00', 'base': 'High', 'atr_m': 1.4, 'kor': 'ADX 하락 점화', 'desc': 'ADX>20 돌파+-DI>+DI.'},
-    'Fib_Resistance_Sell':{'w': 0.8, 'dir': 'sell','icon': '🚧', 'label': 'Fib Resist',    'sym': 'diamond-open',  'sz': 10, 'clr': '#FF8F00', 'base': 'High', 'atr_m': 1.0, 'kor': '피보나치 저항', 'desc': '0.618~0.786 되돌림 저항+WT 하락교차.'},
-    'Bearish_Engulfing': {'w': 1.5, 'dir': 'sell','icon': '🌑', 'label': 'Bear Engulf',    'sym': 'x',             'sz': 10, 'clr': '#D50000', 'base': 'High', 'atr_m': 1.3, 'kor': '하락 장악형', 'desc': '전일 상승캔들 감싸는 하락캔들+WT강세구간.'},
-    'Death_Cross':      {'w': 1.5, 'dir': 'sell', 'icon': '☠️', 'label': 'Death Cross',    'sym': 'cross',         'sz': 12, 'clr': '#FF1744', 'base': 'High', 'atr_m': 0.8, 'kor': '데드 크로스', 'desc': '50MA<200MA 하향돌파+ADX>15+거래량확인.'},
-    'SuperTrend_Sell':  {'w': 2.0, 'dir': 'sell', 'icon': '📉', 'label': 'ST Flip Bear',   'sym': 'arrow-down',    'sz': 12, 'clr': '#FF1744', 'base': 'High', 'atr_m': 1.5, 'kor': '슈퍼트렌드 약세 전환', 'desc': 'SuperTrend 상단선 아래로 돌파.'},
-    'Parabolic_Top_Sell':{'w': 3.0, 'dir': 'sell','icon': '🌡️', 'label': 'Parabolic Top',  'sym': 'diamond',       'sz': 16, 'clr': '#FF0000', 'base': 'High', 'atr_m': 3.0, 'kor': '포물선 천장 매도', 'desc': 'WT1>85 꺾임+음봉 또는 BB+ATR×1.5 극단이격.'},
-    'EMA_Pullback_Sell':{'w': 2.0, 'dir': 'sell', 'icon': '🎯', 'label': 'EMA PB Sell',    'sym': 'triangle-down', 'sz': 13, 'clr': '#FF6E40', 'base': 'High', 'atr_m': 1.8, 'kor': 'EMA 되돌림 매도', 'desc': '하락추세 EMA부근 반등 후 WT재하락+거래량.'},
-    'Momentum_Ignition_Sell':{'w': 2.5, 'dir': 'sell','icon': '💣', 'label': 'Mom. Ign Sell','sym': 'star-diamond', 'sz': 15, 'clr': '#D50000', 'base': 'High', 'atr_m': 2.5, 'kor': '모멘텀 점화 매도', 'desc': '장대음봉>ATR×1.5+거래량>20MA×2.5+BB하단돌파.'},
-    'VWAP_Reject_Sell': {'w': 1.5, 'dir': 'sell', 'icon': '🏛️', 'label': 'VWAP Reject',   'sym': 'triangle-down', 'sz': 11, 'clr': '#FF6E40', 'base': 'High', 'atr_m': 1.3, 'kor': 'VWAP 저항 매도', 'desc': 'VWAP 상방돌파 실패 후 하락+WT교차+거래량.'},
-    'MACD_Cross_Sell':  {'w': 1.0, 'dir': 'sell', 'icon': '〽️', 'label': 'MACD Dead',     'sym': 'triangle-down', 'sz': 9,  'clr': '#E57373', 'base': 'High', 'atr_m': 1.0, 'kor': 'MACD 데드크로스', 'desc': 'MACD라인<시그널라인 하향교차(0선 상방에서).'},
-    'StochRSI_Cross_Sell':{'w': 0.8, 'dir': 'sell','icon': '🔄', 'label': 'StRSI Dead',    'sym': 'circle-open',   'sz': 8,  'clr': '#EF9A9A', 'base': 'High', 'atr_m': 0.8, 'kor': 'StochRSI 교차 매도', 'desc': 'StochK<StochD 하향교차(과매수 존).'},
+    'Blood_Diamond':         {'w':3.0,'dir':'sell','icon':'🩸','label':'BLOOD DIA','sym':'diamond','sz':18,'clr':'#DC143C','base':'High','atr_m':3.0,'kor':'최강 매도','desc':'RSI>70+MFI>70+WT1>60+하락 다이버전스.'},
+    'Red_Dot_T1':            {'w':2.5,'dir':'sell','icon':'🔴','label':'SELL T1','sym':'circle','sz':16,'clr':'#FF1744','base':'High','atr_m':2.5,'kor':'강한 매도','desc':'WT과매수 하락교차+RSI>70+MFI>70+MF>0.'},
+    'Red_Dot_T2':            {'w':2.0,'dir':'sell','icon':'🟥','label':'SELL T2','sym':'circle','sz':13,'clr':'#FF5252','base':'High','atr_m':2.2,'kor':'매도','desc':'T1 완화. WT과매수+RSI또는MFI>68.'},
+    'Red_Diamond':           {'w':2.0,'dir':'sell','icon':'🔸','label':'RED DIA','sym':'diamond','sz':14,'clr':'#ff3333','base':'High','atr_m':1.8,'kor':'추세 매도','desc':'WT2≥0 하락교차+HTF약세+상승추세 아님.'},
+    'Red_Circle':            {'w':1.2,'dir':'sell','icon':'⛔','label':'SELL Circle','sym':'circle-open','sz':11,'clr':'#FF1744','base':'High','atr_m':1.2,'kor':'과매수 하락','desc':'WT과매수 하락교차+RSI>55. Red Dot 미달.'},
+    'Bear_Divergence':       {'w':2.0,'dir':'sell','icon':'📉','label':'Bear Div','sym':'triangle-down','sz':12,'clr':'#AA00FF','base':'High','atr_m':2.0,'kor':'하락 다이버전스','desc':'가격 고점↑ vs WT 고점↓.'},
+    'RSI_Bear_Divergence':   {'w':1.5,'dir':'sell','icon':'📉','label':'RSI Bear Div','sym':'triangle-down','sz':11,'clr':'#CE93D8','base':'High','atr_m':1.8,'kor':'RSI 하락 다이버전스','desc':'가격 고점↑ vs RSI 고점↓ (WT 무관).'},
+    'Squeeze_Fire_Sell':     {'w':1.5,'dir':'sell','icon':'🧨','label':'Squeeze SELL','sym':'star-diamond','sz':14,'clr':'#FF6600','base':'High','atr_m':1.5,'kor':'스퀴즈 매도','desc':'TTM Squeeze 해소+모멘텀 하방.'},
+    'Hidden_Bear_Div':       {'w':1.5,'dir':'sell','icon':'🔁','label':'Hidden Bear','sym':'triangle-down','sz':10,'clr':'#E040FB','base':'High','atr_m':1.6,'kor':'히든 하락 다이버전스','desc':'가격 고점↓ vs 오실레이터 고점↑+WT>25.'},
+    'Volume_Climax_Sell':    {'w':2.0,'dir':'sell','icon':'🌋','label':'Vol Climax SELL','sym':'hexagram','sz':14,'clr':'#FF5722','base':'High','atr_m':2.8,'kor':'거래량 클라이맥스 매도','desc':'평균3배 거래량+상승장대봉+WT과매수→하락확인.'},
+    'OBV_Div_Sell':          {'w':1.0,'dir':'sell','icon':'🔻','label':'OBV Div SELL','sym':'triangle-down','sz':10,'clr':'#FFAB91','base':'High','atr_m':1.4,'kor':'OBV 다이버전스 매도','desc':'OBV-가격 하락 다이버전스+WT>30.'},
+    'ADX_Momentum_Sell':     {'w':1.5,'dir':'sell','icon':'💨','label':'ADX Down','sym':'arrow-down','sz':11,'clr':'#FF3D00','base':'High','atr_m':1.4,'kor':'ADX 하락 점화','desc':'ADX>20 돌파+-DI>+DI.'},
+    'Bearish_Engulfing':     {'w':1.5,'dir':'sell','icon':'🌑','label':'Bear Engulf','sym':'x','sz':10,'clr':'#D50000','base':'High','atr_m':1.3,'kor':'하락 장악형','desc':'전일 상승캔들 감싸는 하락캔들+WT강세구간.'},
+    'ShootingStar_Sell':     {'w':1.5,'dir':'sell','icon':'⭐','label':'Shooting Star','sym':'triangle-down','sz':11,'clr':'#FF5252','base':'High','atr_m':1.3,'kor':'슈팅스타 매도','desc':'상승추세 긴 위꼬리+작은 몸통+WT>20.'},
+    'Death_Cross':           {'w':1.5,'dir':'sell','icon':'☠️','label':'Death Cross','sym':'cross','sz':12,'clr':'#FF1744','base':'High','atr_m':0.8,'kor':'데드 크로스','desc':'50MA<200MA 하향돌파+ADX>15+거래량확인.'},
+    'SuperTrend_Sell':       {'w':2.0,'dir':'sell','icon':'📉','label':'ST Flip Bear','sym':'arrow-down','sz':12,'clr':'#FF1744','base':'High','atr_m':1.5,'kor':'슈퍼트렌드 약세 전환','desc':'SuperTrend 상단선 아래로 돌파.'},
+    'Parabolic_Top_Sell':    {'w':3.0,'dir':'sell','icon':'🌡️','label':'Parabolic Top','sym':'diamond','sz':16,'clr':'#FF0000','base':'High','atr_m':3.0,'kor':'포물선 천장 매도','desc':'WT1>85 꺾임+음봉 또는 BB+ATR×1.5 극단이격.'},
+    'EMA_Pullback_Sell':     {'w':2.0,'dir':'sell','icon':'🎯','label':'EMA PB Sell','sym':'triangle-down','sz':13,'clr':'#FF6E40','base':'High','atr_m':1.8,'kor':'EMA 되돌림 매도','desc':'하락추세 EMA부근 반등 후 WT재하락+거래량.'},
+    'Momentum_Ignition_Sell':{'w':2.5,'dir':'sell','icon':'💣','label':'Mom. Ign Sell','sym':'star-diamond','sz':15,'clr':'#D50000','base':'High','atr_m':2.5,'kor':'모멘텀 점화 매도','desc':'장대음봉>ATR×1.5+거래량>20MA×2.5+BB하단돌파.'},
+    'VWAP_Reject_Sell':      {'w':1.5,'dir':'sell','icon':'🏛️','label':'VWAP Reject','sym':'triangle-down','sz':11,'clr':'#FF6E40','base':'High','atr_m':1.3,'kor':'VWAP 저항 매도','desc':'VWAP 상방돌파 실패 후 하락+WT교차+거래량.'},
+    'MACD_Cross_Sell':       {'w':1.0,'dir':'sell','icon':'〽️','label':'MACD Dead','sym':'triangle-down','sz':9,'clr':'#E57373','base':'High','atr_m':1.0,'kor':'MACD 데드크로스','desc':'MACD라인<시그널라인 하향교차(0선 상방에서).'},
+    'StochRSI_Cross_Sell':   {'w':0.8,'dir':'sell','icon':'🔄','label':'StRSI Dead','sym':'circle-open','sz':8,'clr':'#EF9A9A','base':'High','atr_m':0.8,'kor':'StochRSI 교차 매도','desc':'StochK<StochD 하향교차(과매수 존).'},
+    'Three_Candle_Strike_Sell':{'w':1.8,'dir':'sell','icon':'🎰','label':'3-Strike SELL','sym':'star','sz':12,'clr':'#FF1744','base':'High','atr_m':1.6,'kor':'3연속 반전','desc':'3연속 상승캔들 후 전체를 감싸는 하락캔들.'},
 }
 
 COMPOSITE_SIGNALS = {
-    'Ultra_Buy':  {'w': 0, 'dir': 'buy',  'icon': '⚡', 'label': 'ULTRA BUY',  'sym': 'star', 'sz': 20, 'clr': '#FFD700', 'base': 'Low',  'atr_m': -3.5, 'kor': '울트라 매수', 'desc': 'Confluence ≥6 또는 (≥5+동시 3개 이상).'},
-    'Strong_Buy': {'w': 0, 'dir': 'buy',  'icon': '🔱', 'label': 'STRONG BUY', 'sym': 'star', 'sz': 16, 'clr': '#00E676', 'base': 'Low',  'atr_m': -3.2, 'kor': '스트롱 매수', 'desc': 'Confluence 3.5~6.'},
-    'Ultra_Sell': {'w': 0, 'dir': 'sell', 'icon': '🚨', 'label': 'ULTRA SELL', 'sym': 'star', 'sz': 20, 'clr': '#FF0000', 'base': 'High', 'atr_m': 3.5, 'kor': '울트라 매도', 'desc': 'Confluence ≤-6 또는 (≤-5+동시 3개 이상).'},
-    'Strong_Sell':{'w': 0, 'dir': 'sell', 'icon': '⚠️', 'label': 'STRONG SELL','sym': 'star', 'sz': 16, 'clr': '#FF1744', 'base': 'High', 'atr_m': 3.2, 'kor': '스트롱 매도', 'desc': 'Confluence -6~-3.5.'},
+    'Ultra_Buy':  {'w':0,'dir':'buy','icon':'⚡','label':'ULTRA BUY','sym':'star','sz':20,'clr':'#FFD700','base':'Low','atr_m':-3.5,'kor':'울트라 매수','desc':'Confluence ≥6 또는 (≥5+동시 3개 이상).'},
+    'Strong_Buy': {'w':0,'dir':'buy','icon':'🔱','label':'STRONG BUY','sym':'star','sz':16,'clr':'#00E676','base':'Low','atr_m':-3.2,'kor':'스트롱 매수','desc':'Confluence 3.5~6.'},
+    'Ultra_Sell': {'w':0,'dir':'sell','icon':'🚨','label':'ULTRA SELL','sym':'star','sz':20,'clr':'#FF0000','base':'High','atr_m':3.5,'kor':'울트라 매도','desc':'Confluence ≤-6 또는 (≤-5+동시 3개 이상).'},
+    'Strong_Sell':{'w':0,'dir':'sell','icon':'⚠️','label':'STRONG SELL','sym':'star','sz':16,'clr':'#FF1744','base':'High','atr_m':3.2,'kor':'스트롱 매도','desc':'Confluence -6~-3.5.'},
 }
 
 ALL_CHART_SIGNALS = {**SIGNAL_REGISTRY, **COMPOSITE_SIGNALS}
 
 OB1, OB2, OS1, OS2 = 53, 60, -53, -60
 ST_MIN_BAR = 12
-QUICK_TICKERS = ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'AMZN', 'META', 'GOOG', 'AMD']
 _UA_LIST = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/125.0.0.0 Safari/537.36',
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 Version/17.4 Safari/605.1.15',
     'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0',
 ]
 
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=GEMINI_API_KEY)
 
-# 쿨다운 배치 정의 (v3.0: 중앙 관리)
 COOLDOWN_MAP = {
-    'Squeeze_Fire_Buy': 5, 'Squeeze_Fire_Sell': 5,
-    'Bullish_Engulfing': 5, 'Bearish_Engulfing': 5,
-    'Fib_Bounce_Buy': 7, 'Fib_Resistance_Sell': 7,
-    'ADX_Momentum_Buy': 10, 'ADX_Momentum_Sell': 10,
-    'EMA_Pullback_Buy': 7, 'EMA_Pullback_Sell': 7,
-    'Momentum_Ignition_Buy': 10, 'Momentum_Ignition_Sell': 10,
-    'Parabolic_Top_Sell': 5, 'Parabolic_Bottom_Buy': 5,
-    'VWAP_Bounce_Buy': 7, 'VWAP_Reject_Sell': 7,
-    'MACD_Cross_Buy': 10, 'MACD_Cross_Sell': 10,
-    'StochRSI_Cross_Buy': 5, 'StochRSI_Cross_Sell': 5,
+    'Squeeze_Fire_Buy':5,'Squeeze_Fire_Sell':5,'Bullish_Engulfing':5,'Bearish_Engulfing':5,
+    'Hammer_Buy':5,'ShootingStar_Sell':5,'Three_Candle_Strike_Buy':7,'Three_Candle_Strike_Sell':7,
+    'ADX_Momentum_Buy':10,'ADX_Momentum_Sell':10,
+    'EMA_Pullback_Buy':7,'EMA_Pullback_Sell':7,
+    'Momentum_Ignition_Buy':10,'Momentum_Ignition_Sell':10,
+    'Parabolic_Top_Sell':5,'Parabolic_Bottom_Buy':5,
+    'VWAP_Bounce_Buy':7,'VWAP_Reject_Sell':7,
+    'MACD_Cross_Buy':10,'MACD_Cross_Sell':10,
+    'StochRSI_Cross_Buy':5,'StochRSI_Cross_Sell':5,
+    'RSI_Bull_Divergence':10,'RSI_Bear_Divergence':10,
 }
-
-# ──────────────────────────────────────────
-# 캐싱 함수
-# ──────────────────────────────────────────
-@st.cache_data(ttl=300, show_spinner=False)
-def get_stock_data(ticker):
-    url = f"https://swingtradebot.com/equities/{ticker.upper()}"
-    for attempt in range(3):
-        headers = {
-            'User-Agent': random.choice(_UA_LIST),
-            'Referer': 'https://www.google.com/',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
-        }
-        try:
-            time.sleep(random.uniform(1.0, 2.0) * (attempt + 1))
-            response = requests.get(url, headers=headers, timeout=15)
-            if response.status_code != 200:
-                if attempt < 2: continue
-                return None
-            soup = BeautifulSoup(response.text, 'html.parser')
-            extracted = []
-            selectors = [
-                ('h2', {'itemprop': 'headline'}, 'HEADLINE', ' '),
-                ('div', {'class_': 'recap-body'}, 'DAILY RECAP', ' '),
-                (None, {'id': 'recap-tour'}, 'RECAP TOUR', ' '),
-                (None, {'id': 'indicators-tour'}, 'INDICATORS TOUR', ' | '),
-                ('table', {'id': 'trend-table-tour'}, 'TREND ANALYSIS', ' | '),
-                ('table', {'id': 'recent-signals-tour'}, 'RECENT SIGNALS', ' | '),
-            ]
-            for tag, attrs, label, sep in selectors:
-                elem = soup.find(id=attrs['id']) if 'id' in attrs and not tag else soup.find(tag, attrs) if tag else None
-                if elem:
-                    extracted.append(f"#### [{label}]\n{elem.get_text(separator=sep, strip=True)}")
-            sm_tables = soup.find_all('table', class_='table-sm')
-            for i, t in enumerate(sm_tables):
-                if t.get('id') not in ['trend-table-tour', 'recent-signals-tour']:
-                    extracted.append(f"#### [EXTRA {i}]\n{t.get_text(separator=' | ', strip=True)}")
-            return "\n\n".join(extracted) if extracted else None
-        except Exception:
-            if attempt < 2: continue
-            return None
-    return None
-
-
-@st.cache_data(ttl=300, show_spinner=False)
-def get_yf_history(ticker):
-    return yf.Ticker(ticker).history(period="2y")
-
-
-@st.cache_data(ttl=600, show_spinner=False)
-def validate_ticker(ticker):
-    try:
-        info = yf.Ticker(ticker).info
-        return info.get('regularMarketPrice') is not None or info.get('currentPrice') is not None
-    except Exception:
-        return False
-
-
-@st.cache_data(ttl=300, show_spinner=False)
-def compute_and_cache(ticker):
-    df = get_yf_history(ticker)
-    if df.empty:
-        return None
-    df = compute_indicators(df)
-    df = detect_all_signals(df)
-    return df
-
 
 # ──────────────────────────────────────────
 # 공통 유틸
 # ──────────────────────────────────────────
 def _recent_true(series, lookback=3):
-    return series.astype(float).rolling(window=lookback + 1, min_periods=1).max().fillna(0).astype(bool)
-
+    return series.astype(float).rolling(window=lookback+1, min_periods=1).max().fillna(0).astype(bool)
 
 def _apply_cooldown(signal_series, cooldown_bars=5):
     result = signal_series.copy().astype(bool)
@@ -246,18 +170,74 @@ def _apply_cooldown(signal_series, cooldown_bars=5):
                 last_fire = i
     return pd.Series(vals, index=signal_series.index)
 
-
 def _vol_filter(volume, min_ratio=0.5, period=20):
     return volume >= (volume.rolling(period, min_periods=5).mean() * min_ratio)
-
 
 def _is_valid_ticker_format(ticker):
     return bool(re.match(r'^[A-Za-z]{1,5}([.\-][A-Za-z]{1,2})?$', ticker))
 
-
 def _cls(val, lo, hi):
     return 'ind-bullish' if val < lo else ('ind-bearish' if val > hi else 'ind-neutral')
 
+# ──────────────────────────────────────────
+# 캐싱 함수
+# ──────────────────────────────────────────
+@st.cache_data(ttl=300, show_spinner=False)
+def get_stock_data(ticker):
+    url = f"https://swingtradebot.com/equities/{ticker.upper()}"
+    for attempt in range(3):
+        headers = {'User-Agent': random.choice(_UA_LIST), 'Referer': 'https://www.google.com/',
+                   'Accept': 'text/html,application/xhtml+xml', 'Accept-Language': 'en-US,en;q=0.9'}
+        try:
+            time.sleep(random.uniform(1.0, 2.0) * (attempt + 1))
+            response = requests.get(url, headers=headers, timeout=15)
+            if response.status_code != 200:
+                if attempt < 2: continue
+                return None
+            soup = BeautifulSoup(response.text, 'html.parser')
+            extracted = []
+            selectors = [
+                ('h2',{'itemprop':'headline'},'HEADLINE',' '),
+                ('div',{'class_':'recap-body'},'DAILY RECAP',' '),
+                (None,{'id':'recap-tour'},'RECAP TOUR',' '),
+                (None,{'id':'indicators-tour'},'INDICATORS TOUR',' | '),
+                ('table',{'id':'trend-table-tour'},'TREND ANALYSIS',' | '),
+                ('table',{'id':'recent-signals-tour'},'RECENT SIGNALS',' | '),
+            ]
+            for tag, attrs, label, sep in selectors:
+                elem = soup.find(id=attrs['id']) if 'id' in attrs and not tag else soup.find(tag, attrs) if tag else None
+                if elem:
+                    extracted.append(f"#### [{label}]\n{elem.get_text(separator=sep, strip=True)}")
+            sm_tables = soup.find_all('table', class_='table-sm')
+            for i, t in enumerate(sm_tables):
+                if t.get('id') not in ['trend-table-tour','recent-signals-tour']:
+                    extracted.append(f"#### [EXTRA {i}]\n{t.get_text(separator=' | ', strip=True)}")
+            return "\n\n".join(extracted) if extracted else None
+        except Exception:
+            if attempt < 2: continue
+            return None
+    return None
+
+@st.cache_data(ttl=300, show_spinner=False)
+def get_yf_history(ticker):
+    return yf.Ticker(ticker).history(period="2y")
+
+@st.cache_data(ttl=600, show_spinner=False)
+def validate_ticker(ticker):
+    try:
+        info = yf.Ticker(ticker).info
+        return info.get('regularMarketPrice') is not None or info.get('currentPrice') is not None
+    except Exception:
+        return False
+
+@st.cache_data(ttl=300, show_spinner=False)
+def compute_and_cache(ticker):
+    df = get_yf_history(ticker)
+    if df.empty:
+        return None
+    df = compute_indicators(df)
+    df = detect_all_signals(df)
+    return df
 
 # ──────────────────────────────────────────
 # 지표 계산 엔진
@@ -265,10 +245,9 @@ def _cls(val, lo, hi):
 def compute_rsi(series, period=14):
     delta = series.diff()
     gain, loss = delta.clip(lower=0), -delta.clip(upper=0)
-    avg_g = gain.ewm(alpha=1 / period, min_periods=period).mean()
-    avg_l = loss.ewm(alpha=1 / period, min_periods=period).mean()
-    return 100 - (100 / (1 + avg_g / (avg_l + 1e-10)))
-
+    ag = gain.ewm(alpha=1/period, min_periods=period).mean()
+    al = loss.ewm(alpha=1/period, min_periods=period).mean()
+    return 100 - (100 / (1 + ag / (al + 1e-10)))
 
 def compute_mfi(high, low, close, volume, period=14):
     tp = (high + low + close) / 3
@@ -278,22 +257,19 @@ def compute_mfi(high, low, close, volume, period=14):
     neg = raw_mf.where(d < 0, 0.0)
     return 100 - (100 / (1 + pos.rolling(period).sum() / (neg.rolling(period).sum() + 1e-10)))
 
-
 def compute_rsi_mfi(high, low, close, volume, period=60):
     rsi_f, mfi_f = compute_rsi(close, 20), compute_mfi(high, low, close, volume, 20)
     rsi_s, mfi_s = compute_rsi(close, period), compute_mfi(high, low, close, volume, period)
-    return (((rsi_f - 50) + (mfi_f - 50)) / 2) * 0.6 + (((rsi_s - 50) + (mfi_s - 50)) / 2) * 0.4
+    return (((rsi_f-50)+(mfi_f-50))/2)*0.6 + (((rsi_s-50)+(mfi_s-50))/2)*0.4
 
-
-def compute_wavetrend(high, low, close, channel_len=9, avg_len=12, ma_len=3):
+def compute_wavetrend(high, low, close, ch=9, avg=12, ma=3):
     ap = (high + low + close) / 3
-    esa = ap.ewm(span=channel_len, adjust=False).mean()
-    d = abs(ap - esa).ewm(span=channel_len, adjust=False).mean()
+    esa = ap.ewm(span=ch, adjust=False).mean()
+    d = abs(ap - esa).ewm(span=ch, adjust=False).mean()
     ci = (ap - esa) / (0.015 * d + 1e-10)
-    wt1 = ci.ewm(span=avg_len, adjust=False).mean()
-    wt2 = wt1.rolling(window=ma_len).mean()
-    return wt1, wt2, (wt1 > wt2) & (wt1.shift(1) <= wt2.shift(1)), (wt1 < wt2) & (wt1.shift(1) >= wt2.shift(1))
-
+    wt1 = ci.ewm(span=avg, adjust=False).mean()
+    wt2 = wt1.rolling(window=ma).mean()
+    return wt1, wt2, (wt1>wt2) & (wt1.shift(1)<=wt2.shift(1)), (wt1<wt2) & (wt1.shift(1)>=wt2.shift(1))
 
 def compute_stoch_rsi(close, rsi_len=14, stoch_len=14, k_smooth=3, d_smooth=3):
     rsi = compute_rsi(close, rsi_len)
@@ -302,322 +278,286 @@ def compute_stoch_rsi(close, rsi_len=14, stoch_len=14, k_smooth=3, d_smooth=3):
     k = stoch.rolling(k_smooth).mean()
     return k, k.rolling(d_smooth).mean()
 
-
 def compute_vwap_oscillator(close, volume, period=20):
     cv = volume.rolling(period).sum()
     vwap = (close * volume).rolling(period).sum() / (cv + 1e-10)
     return ((close - vwap) / (vwap + 1e-10)) * 100
 
-
 def compute_true_range(high, low, close):
     pc = close.shift(1)
     return pd.concat([high - low, (high - pc).abs(), (low - pc).abs()], axis=1).max(axis=1)
 
-
 def compute_adx(high, low, close, period=14):
     tr = compute_true_range(high, low, close)
     ph, pl = high.shift(1), low.shift(1)
-    plus_dm = pd.Series(np.where((high - ph) > (pl - low), np.maximum(high - ph, 0), 0), index=high.index, dtype=float)
-    minus_dm = pd.Series(np.where((pl - low) > (high - ph), np.maximum(pl - low, 0), 0), index=high.index, dtype=float)
-    atr = tr.ewm(alpha=1 / period, min_periods=period).mean()
-    pdi = 100 * plus_dm.ewm(alpha=1 / period, min_periods=period).mean() / (atr + 1e-10)
-    mdi = 100 * minus_dm.ewm(alpha=1 / period, min_periods=period).mean() / (atr + 1e-10)
+    plus_dm = pd.Series(np.where((high-ph)>(pl-low), np.maximum(high-ph,0), 0), index=high.index, dtype=float)
+    minus_dm = pd.Series(np.where((pl-low)>(high-ph), np.maximum(pl-low,0), 0), index=high.index, dtype=float)
+    atr = tr.ewm(alpha=1/period, min_periods=period).mean()
+    pdi = 100 * plus_dm.ewm(alpha=1/period, min_periods=period).mean() / (atr + 1e-10)
+    mdi = 100 * minus_dm.ewm(alpha=1/period, min_periods=period).mean() / (atr + 1e-10)
     dx = 100 * (pdi - mdi).abs() / (pdi + mdi + 1e-10)
-    return dx.ewm(alpha=1 / period, min_periods=period).mean(), pdi, mdi
-
+    return dx.ewm(alpha=1/period, min_periods=period).mean(), pdi, mdi
 
 def compute_obv(close, volume):
     return (volume * np.sign(close.diff()).fillna(0)).cumsum()
 
-
 def compute_macd(close, fast=12, slow=26, signal=9):
-    macd_line = close.ewm(span=fast, adjust=False).mean() - close.ewm(span=slow, adjust=False).mean()
-    signal_line = macd_line.ewm(span=signal, adjust=False).mean()
-    return macd_line, signal_line, macd_line - signal_line
+    ml = close.ewm(span=fast, adjust=False).mean() - close.ewm(span=slow, adjust=False).mean()
+    sl = ml.ewm(span=signal, adjust=False).mean()
+    return ml, sl, ml - sl
 
-
-def detect_pivot_divergence_v2(price, oscillator, lookback=60, pivot_window=5,
-                                osc_oversold=None, osc_overbought=None):
+def detect_pivot_divergence(price, oscillator, lookback=60, pivot_window=5,
+                             osc_oversold=None, osc_overbought=None):
     n = len(price)
     pv, ov = price.values, oscillator.values
     half = pivot_window
     min_gap = pivot_window * 2
     pivot_lows, pivot_highs = [], []
-    for i in range(2 * half, n):
-        candidate = i - half
-        window = pv[i - 2 * half: i + 1]
-        if pv[candidate] == window.min():
-            pivot_lows.append((i, candidate))
-        if pv[candidate] == window.max():
-            pivot_highs.append((i, candidate))
+    for i in range(2*half, n):
+        c = i - half
+        w = pv[i - 2*half: i + 1]
+        if pv[c] == w.min():
+            pivot_lows.append((i, c))
+        if pv[c] == w.max():
+            pivot_highs.append((i, c))
     bull_div = pd.Series(False, index=price.index)
     bear_div = pd.Series(False, index=price.index)
     hidden_bull = pd.Series(False, index=price.index)
     hidden_bear = pd.Series(False, index=price.index)
     for idx in range(1, len(pivot_lows)):
-        ci, pi = pivot_lows[idx]
-        cj, pj = pivot_lows[idx - 1]
-        if not (min_gap <= (pi - pj) <= lookback):
-            continue
-        if (osc_oversold is None or ov[pi] <= osc_oversold) and pv[pi] < pv[pj] and ov[pi] > ov[pj]:
+        ci, pi = pivot_lows[idx]; cj, pj = pivot_lows[idx-1]
+        if not (min_gap <= (pi-pj) <= lookback): continue
+        if (osc_oversold is None or ov[pi]<=osc_oversold) and pv[pi]<pv[pj] and ov[pi]>ov[pj]:
             bull_div.iloc[ci] = True
-        if pv[pi] > pv[pj] and ov[pi] < ov[pj]:
+        if pv[pi]>pv[pj] and ov[pi]<ov[pj]:
             hidden_bull.iloc[ci] = True
     for idx in range(1, len(pivot_highs)):
-        ci, pi = pivot_highs[idx]
-        cj, pj = pivot_highs[idx - 1]
-        if not (min_gap <= (pi - pj) <= lookback):
-            continue
-        if (osc_overbought is None or ov[pi] >= osc_overbought) and pv[pi] > pv[pj] and ov[pi] < ov[pj]:
+        ci, pi = pivot_highs[idx]; cj, pj = pivot_highs[idx-1]
+        if not (min_gap <= (pi-pj) <= lookback): continue
+        if (osc_overbought is None or ov[pi]>=osc_overbought) and pv[pi]>pv[pj] and ov[pi]<ov[pj]:
             bear_div.iloc[ci] = True
-        if pv[pi] < pv[pj] and ov[pi] > ov[pj]:
+        if pv[pi]<pv[pj] and ov[pi]>ov[pj]:
             hidden_bear.iloc[ci] = True
     return bull_div, bear_div, hidden_bull, hidden_bear
-
 
 def compute_keltner_channel(high, low, close, ema_len=20, atr_len=10, atr_mult=1.5):
     mid = close.ewm(span=ema_len, adjust=False).mean()
     atr = compute_true_range(high, low, close).rolling(atr_len).mean()
-    return mid + atr * atr_mult, mid, mid - atr * atr_mult
-
+    return mid + atr*atr_mult, mid, mid - atr*atr_mult
 
 def detect_ttm_squeeze(bb_up, bb_low, kc_up, kc_low, close, high, low, kc_mid):
     squeeze_on = (bb_up < kc_up) & (bb_low > kc_low)
     fire = (~squeeze_on) & squeeze_on.shift(1).fillna(False)
     donchian_mid = (high.rolling(20).max() + low.rolling(20).min()) / 2
-    momentum = close - (donchian_mid + kc_mid) / 2
-    return squeeze_on, fire & (momentum > 0), fire & (momentum < 0)
-
+    mom = close - (donchian_mid + kc_mid) / 2
+    return squeeze_on, fire & (mom > 0), fire & (mom < 0)
 
 def detect_volume_climax(close, opn, volume, wt1, atr, vol_mult=3.0, wt_buy=-40, wt_sell=40):
     avg = volume.rolling(20).mean()
     body = (close - opn).abs()
     big_body = body > atr * 0.5
-    prev_spike = (volume.shift(1) > avg.shift(1) * vol_mult) & big_body.shift(1)
-    return (prev_spike & (close.shift(1) < opn.shift(1)) & (wt1.shift(1) < wt_buy) & (close > opn),
-            prev_spike & (close.shift(1) > opn.shift(1)) & (wt1.shift(1) > wt_sell) & (close < opn))
-
+    prev_spike = (volume.shift(1) > avg.shift(1)*vol_mult) & big_body.shift(1)
+    return (prev_spike & (close.shift(1)<opn.shift(1)) & (wt1.shift(1)<wt_buy) & (close>opn),
+            prev_spike & (close.shift(1)>opn.shift(1)) & (wt1.shift(1)>wt_sell) & (close<opn))
 
 def detect_obv_divergence(close, volume, wt1, lookback=60, pivot_window=5):
     obv = compute_obv(close, volume)
-    bull_d, bear_d, _, _ = detect_pivot_divergence_v2(close, obv, lookback, pivot_window)
-    # v3.0: WT 필터 강화 -20 → -30, 20 → 30
+    bull_d, bear_d, _, _ = detect_pivot_divergence(close, obv, lookback, pivot_window)
     return obv, bull_d & (wt1 < -30), bear_d & (wt1 > 30)
-
 
 def detect_engulfing(close, opn, wt1, direction='bull', wt_thresh=20):
     body = (close - opn).abs()
     big_enough = body > body.rolling(20).mean() * 0.8
     if direction == 'bull':
         prev_bear = close.shift(1) < opn.shift(1)
-        eng = prev_bear & (close > opn) & (opn <= close.shift(1)) & (close >= opn.shift(1))
+        eng = prev_bear & (close>opn) & (opn<=close.shift(1)) & (close>=opn.shift(1))
         return eng & big_enough & (wt1 < -wt_thresh)
     else:
         prev_bull = close.shift(1) > opn.shift(1)
-        eng = prev_bull & (close < opn) & (opn >= close.shift(1)) & (close <= opn.shift(1))
+        eng = prev_bull & (close<opn) & (opn>=close.shift(1)) & (close<=opn.shift(1))
         return eng & big_enough & (wt1 > wt_thresh)
 
-
-def detect_fib_levels(high, low, close, wt1, wt2, atr, direction='buy', swing_lb=60, confirm=5):
-    sh = high.shift(confirm).rolling(swing_lb).max()
-    sl = low.shift(confirm).rolling(swing_lb).min()
-    fib_range = sh - sl
-    tol = (atr / (fib_range + 1e-10)).clip(upper=0.05)
-    if direction == 'buy':
-        f618, f786 = sh - fib_range * 0.618, sh - fib_range * 0.786
-        near = (low <= f618 * (1 + tol)) & (low >= f786 * (1 - tol))
-        return near & (wt1 < -30) & (wt1 > wt2)
+def detect_hammer_shooting_star(high, low, close, opn, atr, wt1, direction='hammer'):
+    body = (close - opn).abs()
+    total = high - low
+    upper_shadow = high - pd.concat([close, opn], axis=1).max(axis=1)
+    lower_shadow = pd.concat([close, opn], axis=1).min(axis=1) - low
+    small_body = body < total * 0.35
+    significant = total > atr * 0.5
+    if direction == 'hammer':
+        long_lower = lower_shadow > body * 2
+        short_upper = upper_shadow < body * 0.5
+        downtrend = close < close.shift(5)
+        return small_body & long_lower & short_upper & significant & downtrend & (wt1 < -20)
     else:
-        f618, f786 = sl + fib_range * 0.618, sl + fib_range * 0.786
-        near = (high >= f618 * (1 - tol)) & (high <= f786 * (1 + tol))
-        return near & (wt1 > 30) & (wt1 < wt2)
+        long_upper = upper_shadow > body * 2
+        short_lower = lower_shadow < body * 0.5
+        uptrend = close > close.shift(5)
+        return small_body & long_upper & short_lower & significant & uptrend & (wt1 > 20)
 
+def detect_three_candle_strike(close, opn, wt1, direction='buy'):
+    if direction == 'buy':
+        three_down = (close.shift(3)<opn.shift(3)) & (close.shift(2)<opn.shift(2)) & (close.shift(1)<opn.shift(1))
+        engulf = (close>opn) & (close>=opn.shift(3)) & (opn<=close.shift(1))
+        return three_down & engulf & (wt1 < 0)
+    else:
+        three_up = (close.shift(3)>opn.shift(3)) & (close.shift(2)>opn.shift(2)) & (close.shift(1)>opn.shift(1))
+        engulf = (close<opn) & (close<=opn.shift(3)) & (opn>=close.shift(1))
+        return three_up & engulf & (wt1 > 0)
 
 def detect_ma_cross(ma_fast, ma_slow):
-    return ((ma_fast > ma_slow) & (ma_fast.shift(1) <= ma_slow.shift(1)),
-            (ma_fast < ma_slow) & (ma_fast.shift(1) >= ma_slow.shift(1)))
-
+    return ((ma_fast>ma_slow) & (ma_fast.shift(1)<=ma_slow.shift(1)),
+            (ma_fast<ma_slow) & (ma_fast.shift(1)>=ma_slow.shift(1)))
 
 def compute_supertrend(high, low, close, period=10, multiplier=3.0):
     tr = compute_true_range(high, low, close)
     atr = tr.rolling(period).mean()
     hl2 = (high + low) / 2
-    up_vals = (hl2 + multiplier * atr).values.copy()
-    dn_vals = (hl2 - multiplier * atr).values.copy()
+    up_v = (hl2 + multiplier*atr).values.copy()
+    dn_v = (hl2 - multiplier*atr).values.copy()
     cl = close.values
-    st_vals = np.full(len(close), np.nan)
-    dir_vals = np.zeros(len(close), dtype=int)
-    first_valid = period
-    if first_valid >= len(close):
+    st_v = np.full(len(close), np.nan)
+    dir_v = np.zeros(len(close), dtype=int)
+    fv = period
+    if fv >= len(close):
         return pd.Series(np.nan, index=close.index), pd.Series(0, index=close.index, dtype=int)
-    dir_vals[first_valid] = 1
-    st_vals[first_valid] = dn_vals[first_valid]
-    for i in range(first_valid + 1, len(close)):
-        if dir_vals[i - 1] == 1:
-            dn_vals[i] = max(dn_vals[i], dn_vals[i - 1]) if not np.isnan(dn_vals[i - 1]) else dn_vals[i]
+    dir_v[fv] = 1; st_v[fv] = dn_v[fv]
+    for i in range(fv+1, len(close)):
+        if dir_v[i-1] == 1:
+            dn_v[i] = max(dn_v[i], dn_v[i-1]) if not np.isnan(dn_v[i-1]) else dn_v[i]
         else:
-            up_vals[i] = min(up_vals[i], up_vals[i - 1]) if not np.isnan(up_vals[i - 1]) else up_vals[i]
-        if dir_vals[i - 1] == 1:
-            dir_vals[i], st_vals[i] = (-1, up_vals[i]) if cl[i] < dn_vals[i] else (1, dn_vals[i])
+            up_v[i] = min(up_v[i], up_v[i-1]) if not np.isnan(up_v[i-1]) else up_v[i]
+        if dir_v[i-1] == 1:
+            dir_v[i], st_v[i] = (-1, up_v[i]) if cl[i]<dn_v[i] else (1, dn_v[i])
         else:
-            dir_vals[i], st_vals[i] = (1, dn_vals[i]) if cl[i] > up_vals[i] else (-1, up_vals[i])
-    return pd.Series(st_vals, index=close.index), pd.Series(dir_vals, index=close.index)
-
+            dir_v[i], st_v[i] = (1, dn_v[i]) if cl[i]>up_v[i] else (-1, up_v[i])
+    return pd.Series(st_v, index=close.index), pd.Series(dir_v, index=close.index)
 
 def detect_ema_pullback(close, high, low, volume, ema8, ema21, atr, wt1, wt2, direction='buy'):
-    slope_ok = ema21 > ema21.shift(5) if direction == 'buy' else ema21 < ema21.shift(5)
-    trend = ((ema8 > ema21) if direction == 'buy' else (ema8 < ema21)) & slope_ok
-    side_ok = (close > ema21) if direction == 'buy' else (close < ema21)
-    vol_ok = _vol_filter(volume, min_ratio=0.5)
+    slope_ok = ema21 > ema21.shift(5) if direction=='buy' else ema21 < ema21.shift(5)
+    trend = ((ema8>ema21) if direction=='buy' else (ema8<ema21)) & slope_ok
+    side_ok = (close>ema21) if direction=='buy' else (close<ema21)
+    vol_ok = _vol_filter(volume, 0.5)
     atr_r = atr / close
-
     if direction == 'buy':
-        # v3.0: touched_recent로 1~2봉 이전 터치 허용 → 동일봉 터치+바운스 방지
-        touched = (low <= ema8 * (1 + atr_r * 0.15)) & (low >= ema21 * (1 - atr_r * 0.25))
+        touched = (low <= ema8*(1+atr_r*0.15)) & (low >= ema21*(1-atr_r*0.25))
         touched_recent = _recent_true(touched, 2)
-        bounced = (close >= ema8) & (close > close.shift(1))
-        wt_ok = (wt1 > wt1.shift(1)) & (wt1 > wt2) & (wt1 < 60)
+        bounced = (close>=ema8) & (close>close.shift(1))
+        wt_ok = (wt1>wt1.shift(1)) & (wt1>wt2) & (wt1<60)
         return trend & side_ok & touched_recent & bounced & wt_ok & vol_ok
     else:
-        touched = (high >= ema8 * (1 - atr_r * 0.15)) & (high <= ema21 * (1 + atr_r * 0.25))
+        touched = (high >= ema8*(1-atr_r*0.15)) & (high <= ema21*(1+atr_r*0.25))
         touched_recent = _recent_true(touched, 2)
-        bounced = (close <= ema8) & (close < close.shift(1))
-        wt_ok = (wt1 < wt1.shift(1)) & (wt1 < wt2) & (wt1 > -60)
+        bounced = (close<=ema8) & (close<close.shift(1))
+        wt_ok = (wt1<wt1.shift(1)) & (wt1<wt2) & (wt1>-60)
         return trend & side_ok & touched_recent & bounced & wt_ok & vol_ok
-
 
 def detect_momentum_ignition(close, opn, volume, bb_band, atr, ema8, ema21, wt1,
                               direction='buy', body_atr_mult=1.5, vol_mult=2.5):
     body = (close - opn).abs()
-    big_body = body > (atr * body_atr_mult)
-    huge_vol = volume > (volume.rolling(20).mean() * vol_mult)
+    big_body = body > (atr*body_atr_mult)
+    huge_vol = volume > (volume.rolling(20).mean()*vol_mult)
     if direction == 'buy':
-        return (close > opn) & big_body & huge_vol & (close > bb_band) & (ema8 > ema21) & (wt1 < 50)
+        return (close>opn) & big_body & huge_vol & (close>bb_band) & (ema8>ema21) & (wt1<50)
     else:
-        return (close < opn) & big_body & huge_vol & (close < bb_band) & (ema8 < ema21) & (wt1 > -50)
-
+        return (close<opn) & big_body & huge_vol & (close<bb_band) & (ema8<ema21) & (wt1>-50)
 
 def detect_vwap_bounce(close, vwap_osc, wt1, wt2, volume, atr, direction='buy'):
-    vol_ok = _vol_filter(volume, min_ratio=0.7)
-    atr_pct = (atr / close * 100).clip(lower=0.3, upper=3.0)
-    dyn_thresh = (atr_pct * 0.3).clip(lower=0.3, upper=1.5)
+    vol_ok = _vol_filter(volume, 0.7)
+    atr_pct = (atr/close*100).clip(lower=0.3, upper=3.0)
+    dyn_thresh = (atr_pct*0.3).clip(lower=0.3, upper=1.5)
     if direction == 'buy':
-        crossed_up = (vwap_osc > 0) & (vwap_osc.shift(1) < -dyn_thresh)
-        return crossed_up & (wt1 > wt2) & (wt1 < 30) & vol_ok
+        crossed_up = (vwap_osc>0) & (vwap_osc.shift(1) < -dyn_thresh)
+        return crossed_up & (wt1>wt2) & (wt1<30) & vol_ok
     else:
-        crossed_dn = (vwap_osc < 0) & (vwap_osc.shift(1) > dyn_thresh)
-        return crossed_dn & (wt1 < wt2) & (wt1 > -30) & vol_ok
-
+        crossed_dn = (vwap_osc<0) & (vwap_osc.shift(1) > dyn_thresh)
+        return crossed_dn & (wt1<wt2) & (wt1>-30) & vol_ok
 
 def detect_parabolic_extreme(close, opn, wt1, bb_band, atr, direction='bottom'):
-    """v3.0: 통합 파라볼릭 극단 탐지"""
-    vol_ok = _vol_filter(close * 0 + 1, 0)  # placeholder — actual vol filter applied externally
     if direction == 'bottom':
-        return (
-            ((wt1 < -85) & (wt1 > wt1.shift(1)) & (close > opn) & (close > close.shift(1))) |
-            ((close < bb_band - atr * 1.5) & (close > opn))
-        )
+        return (((wt1<-85)&(wt1>wt1.shift(1))&(close>opn)&(close>close.shift(1))) |
+                ((close < bb_band - atr*1.5) & (close>opn)))
     else:
-        return (
-            ((wt1 > 85) & (wt1 < wt1.shift(1)) & (close < opn) & (close < close.shift(1))) |
-            ((close > bb_band + atr * 1.5) & (close < opn))
-        )
-
+        return (((wt1>85)&(wt1<wt1.shift(1))&(close<opn)&(close<close.shift(1))) |
+                ((close > bb_band + atr*1.5) & (close<opn)))
 
 def compute_htf_trend(close, ema8, ema21, ma50):
-    return ((ema8 > ema21) & (ema21 > ema21.shift(5)),
-            (close > ma50) & (ma50 > ma50.shift(10)))
-
+    return ((ema8>ema21) & (ema21>ema21.shift(5)),
+            (close>ma50) & (ma50>ma50.shift(10)))
 
 # ──────────────────────────────────────────
 # Scoring 함수들
 # ──────────────────────────────────────────
 def compute_confluence_score(df, decay_window=5, decay_factor=0.7):
-    buy_map = {k: v['w'] for k, v in SIGNAL_REGISTRY.items() if v['dir'] == 'buy'}
-    sell_map = {k: v['w'] for k, v in SIGNAL_REGISTRY.items() if v['dir'] == 'sell'}
-    decay_kernel = np.array([decay_factor ** i for i in range(decay_window + 1)])
+    buy_map = {k:v['w'] for k,v in SIGNAL_REGISTRY.items() if v['dir']=='buy'}
+    sell_map = {k:v['w'] for k,v in SIGNAL_REGISTRY.items() if v['dir']=='sell'}
+    decay_kernel = np.array([decay_factor**i for i in range(decay_window+1)])
     s = np.zeros(len(df))
     buy_count = np.zeros(len(df))
     sell_count = np.zeros(len(df))
-
     for col, w in buy_map.items():
         if col in df.columns:
             raw = df[col].fillna(False).astype(float).values * w
             s += np.convolve(raw, decay_kernel, mode='full')[:len(raw)]
             buy_count += np.convolve(df[col].fillna(False).astype(float).values,
-                                     np.ones(decay_window + 1), mode='full')[:len(raw)]
+                                     np.ones(decay_window+1), mode='full')[:len(raw)]
     for col, w in sell_map.items():
         if col in df.columns:
             raw = df[col].fillna(False).astype(float).values * w
             s -= np.convolve(raw, decay_kernel, mode='full')[:len(raw)]
             sell_count += np.convolve(df[col].fillna(False).astype(float).values,
-                                      np.ones(decay_window + 1), mode='full')[:len(raw)]
-
+                                      np.ones(decay_window+1), mode='full')[:len(raw)]
     wt1 = df['WT1'].values
-    s += np.where(wt1 < OS1, 1.0, 0.0) + np.where(wt1 < OS2, 0.5, 0.0)
-    s -= np.where(wt1 > OB1, 1.0, 0.0) + np.where(wt1 > OB2, 0.5, 0.0)
-
+    s += np.where(wt1<OS1, 1.0, 0) + np.where(wt1<OS2, 0.5, 0)
+    s -= np.where(wt1>OB1, 1.0, 0) + np.where(wt1>OB2, 0.5, 0)
     df['Confluence_Score'] = s
-    df['Ultra_Buy'] = (s >= 6.0) | ((s >= 5.0) & (buy_count >= 3))
-    df['Ultra_Sell'] = (s <= -6.0) | ((s <= -5.0) & (sell_count >= 3))
-    df['Strong_Buy'] = (s >= 3.5) & (~df['Ultra_Buy'])
-    df['Strong_Sell'] = (s <= -3.5) & (~df['Ultra_Sell'])
+    df['Ultra_Buy'] = (s>=6.0) | ((s>=5.0) & (buy_count>=3))
+    df['Ultra_Sell'] = (s<=-6.0) | ((s<=-5.0) & (sell_count>=3))
+    df['Strong_Buy'] = (s>=3.5) & (~df['Ultra_Buy'])
+    df['Strong_Sell'] = (s<=-3.5) & (~df['Ultra_Sell'])
     return s
-
 
 def compute_signal_proximity(wt1, wt2, rsi, mfi, rsi_mfi, stochk, strong_bull, strong_bear):
     buy_prox = pd.Series(0.0, index=wt1.index)
     sell_prox = pd.Series(0.0, index=wt1.index)
-    wt_gap = (wt1 - wt2).abs()
+    wt_gap = (wt1-wt2).abs()
     near_cross = wt_gap < 3.0
-    wt_conv_up = (wt1 - wt2) > (wt1.shift(1) - wt2.shift(1))
-    wt_conv_dn = (wt1 - wt2) < (wt1.shift(1) - wt2.shift(1))
-
+    wt_conv_up = (wt1-wt2) > (wt1.shift(1)-wt2.shift(1))
+    wt_conv_dn = (wt1-wt2) < (wt1.shift(1)-wt2.shift(1))
     prox_rules = {
-        'buy': [
-            ((wt1 < -40) & near_cross, 30), ((wt1 < -40) & wt_conv_up & (wt_gap < 8), 15),
-            (wt1 < OS2, 20), ((wt1 >= OS2) & (wt1 < -40), 10),
-            (rsi < 35, 15), ((rsi >= 35) & (rsi < 45), 5),
-            (mfi < 35, 15), ((mfi >= 35) & (mfi < 45), 5),
-            (rsi_mfi < -5, 10), ((rsi_mfi >= -5) & (rsi_mfi < 0), 5),
-            (stochk < 20, 10), ((stochk >= 20) & (stochk < 35), 5),
-        ],
-        'sell': [
-            ((wt1 > 40) & near_cross, 30), ((wt1 > 40) & wt_conv_dn & (wt_gap < 8), 15),
-            (wt1 > OB1, 20), ((wt1 <= OB1) & (wt1 > 40), 10),
-            (rsi > 65, 15), ((rsi <= 65) & (rsi > 55), 5),
-            (mfi > 65, 15), ((mfi <= 65) & (mfi > 55), 5),
-            (rsi_mfi > 5, 10), ((rsi_mfi <= 5) & (rsi_mfi > 0), 5),
-            (stochk > 80, 10), ((stochk <= 80) & (stochk > 65), 5),
-        ],
+        'buy': [((wt1<-40)&near_cross,30),((wt1<-40)&wt_conv_up&(wt_gap<8),15),
+                (wt1<OS2,20),((wt1>=OS2)&(wt1<-40),10),(rsi<35,15),((rsi>=35)&(rsi<45),5),
+                (mfi<35,15),((mfi>=35)&(mfi<45),5),(rsi_mfi<-5,10),((rsi_mfi>=-5)&(rsi_mfi<0),5),
+                (stochk<20,10),((stochk>=20)&(stochk<35),5)],
+        'sell': [((wt1>40)&near_cross,30),((wt1>40)&wt_conv_dn&(wt_gap<8),15),
+                 (wt1>OB1,20),((wt1<=OB1)&(wt1>40),10),(rsi>65,15),((rsi<=65)&(rsi>55),5),
+                 (mfi>65,15),((mfi<=65)&(mfi>55),5),(rsi_mfi>5,10),((rsi_mfi<=5)&(rsi_mfi>0),5),
+                 (stochk>80,10),((stochk<=80)&(stochk>65),5)],
     }
     for cond, pts in prox_rules['buy']:
         buy_prox += np.where(cond, pts, 0)
     for cond, pts in prox_rules['sell']:
         sell_prox += np.where(cond, pts, 0)
-
     buy_prox, sell_prox = buy_prox.clip(upper=100), sell_prox.clip(upper=100)
     net = buy_prox - sell_prox
     buy_damp = np.where(strong_bear, 0.4, 0.55)
     sell_damp = np.where(strong_bull, 0.4, 0.55)
-    return (pd.Series(np.where(net >= 0, buy_prox, buy_prox * buy_damp), index=wt1.index),
-            pd.Series(np.where(net <= 0, sell_prox, sell_prox * sell_damp), index=wt1.index))
-
+    return (pd.Series(np.where(net>=0, buy_prox, buy_prox*buy_damp), index=wt1.index),
+            pd.Series(np.where(net<=0, sell_prox, sell_prox*sell_damp), index=wt1.index))
 
 def compute_bias_score(meta, htf1_bull, htf2_bull):
     sc = 0.0
     for val, thresholds in [
-        (meta['wt1'], [(-60, 3), (-53, 2), (0, 1), (53, -1), (60, -2), (999, -3)]),
-        (meta['rsi'], [(-1, 0), (30, 2), (45, 1), (55, 0), (70, -1), (999, -2)]),
-        (meta['mfi'], [(-1, 0), (30, 2), (45, 1), (55, 0), (70, -1), (999, -2)]),
+        (meta['wt1'],[(-60,3),(-53,2),(0,1),(53,-1),(60,-2),(999,-3)]),
+        (meta['rsi'],[(-1,0),(30,2),(45,1),(55,0),(70,-1),(999,-2)]),
+        (meta['mfi'],[(-1,0),(30,2),(45,1),(55,0),(70,-1),(999,-2)]),
     ]:
         for thresh, points in thresholds:
-            if val <= thresh:
-                sc += points; break
+            if val <= thresh: sc += points; break
     mf = meta['mf_area']
-    sc += 2 if mf < -5 else (1 if mf < 0 else (-2 if mf > 5 else (-1 if mf > 0 else 0)))
+    sc += 2 if mf<-5 else (1 if mf<0 else (-2 if mf>5 else (-1 if mf>0 else 0)))
     stk = meta.get('stochk', 50)
-    sc += 1.5 if stk < 20 else (0.5 if stk < 35 else (-1.5 if stk > 80 else (-0.5 if stk > 65 else 0)))
+    sc += 1.5 if stk<20 else (0.5 if stk<35 else (-1.5 if stk>80 else (-0.5 if stk>65 else 0)))
     sc += 1 if htf1_bull else -1
     sc += 1.5 if htf2_bull else -1.5
     if sc >= 8:    return 'STRONG BUY', sc
@@ -626,53 +566,46 @@ def compute_bias_score(meta, htf1_bull, htf2_bull):
     elif sc >= -8: return 'SELL', sc
     else:          return 'STRONG SELL', sc
 
-
 def compute_signal_stats(df, signal_col, price_col='Close', forward_days=None, min_samples=5):
-    if forward_days is None:
-        forward_days = [5, 10, 20]
-    if signal_col not in df.columns:
-        return None
+    if forward_days is None: forward_days = [5, 10, 20]
+    if signal_col not in df.columns: return None
     mask = df[signal_col].fillna(False).values.astype(bool)
-    if mask.sum() < min_samples:
-        return None
+    if mask.sum() < min_samples: return None
     close = df[price_col].values
     stats = {'count': int(mask.sum())}
     for n in forward_days:
         if n >= len(close):
-            stats[f'{n}d_avg'] = stats[f'{n}d_winrate'] = stats[f'{n}d_median'] = None
-            continue
+            stats[f'{n}d_avg'] = stats[f'{n}d_winrate'] = stats[f'{n}d_median'] = None; continue
         fwd = np.full(len(close), np.nan)
-        fwd[:len(close) - n] = (close[n:] - close[:len(close) - n]) / close[:len(close) - n] * 100
+        fwd[:len(close)-n] = (close[n:]-close[:len(close)-n])/close[:len(close)-n]*100
         valid = fwd[mask]; valid = valid[~np.isnan(valid)]
         if len(valid) >= min_samples:
             stats[f'{n}d_avg'] = float(np.mean(valid))
-            stats[f'{n}d_winrate'] = float(np.sum(valid > 0) / len(valid) * 100)
+            stats[f'{n}d_winrate'] = float(np.sum(valid>0)/len(valid)*100)
             stats[f'{n}d_median'] = float(np.median(valid))
         else:
             stats[f'{n}d_avg'] = stats[f'{n}d_winrate'] = stats[f'{n}d_median'] = None
     return stats
 
-
 def compute_all_signal_stats(df_valid):
     targets = {k: v['dir'] for k, v in SIGNAL_REGISTRY.items()}
-    targets.update({'Ultra_Buy': 'buy', 'Strong_Buy': 'buy', 'Ultra_Sell': 'sell', 'Strong_Sell': 'sell'})
+    targets.update({'Ultra_Buy':'buy','Strong_Buy':'buy','Ultra_Sell':'sell','Strong_Sell':'sell'})
     return {sig: {**r, 'direction': d}
             for sig, d in targets.items()
             if (r := compute_signal_stats(df_valid, sig)) and r['count'] > 0}
-
 
 # ──────────────────────────────────────────
 # 지표 + 시그널 계산
 # ──────────────────────────────────────────
 def compute_indicators(df):
-    for ma in [5, 20, 50, 100, 125, 200]:
+    for ma in [5,20,50,100,125,200]:
         df[f'MA{ma}'] = df['Close'].rolling(ma).mean()
     df['EMA8'] = df['Close'].ewm(span=8, adjust=False).mean()
     df['EMA21'] = df['Close'].ewm(span=21, adjust=False).mean()
     df['BB_Mid'] = df['MA20']
     std20 = df['Close'].rolling(20).std()
-    df['BB_Up'] = df['BB_Mid'] + std20 * 2
-    df['BB_Low'] = df['BB_Mid'] - std20 * 2
+    df['BB_Up'] = df['BB_Mid'] + std20*2
+    df['BB_Low'] = df['BB_Mid'] - std20*2
     df['ATR'] = compute_true_range(df['High'], df['Low'], df['Close']).rolling(14).mean()
     df['SuperTrend'], df['ST_Direction'] = compute_supertrend(df['High'], df['Low'], df['Close'])
     wt1, wt2, wt_up, wt_down = compute_wavetrend(df['High'], df['Low'], df['Close'])
@@ -686,10 +619,8 @@ def compute_indicators(df):
     df['OBV'], df['_OBV_Div_Buy_raw'], df['_OBV_Div_Sell_raw'] = detect_obv_divergence(
         df['Close'], df['Volume'], df['WT1'])
     df['KC_Upper'], df['KC_Mid'], df['KC_Lower'] = compute_keltner_channel(df['High'], df['Low'], df['Close'])
-    # v3.0: MACD 추가
     df['MACD_Line'], df['MACD_Signal'], df['MACD_Hist'] = compute_macd(df['Close'])
     return df
-
 
 def detect_all_signals(df):
     H, L, C, O, V = df['High'], df['Low'], df['Close'], df['Open'], df['Volume']
@@ -708,8 +639,8 @@ def detect_all_signals(df):
     ma50_rising = df['MA50'] > df['MA50'].shift(5)
     ma50_falling = df['MA50'] < df['MA50'].shift(5)
 
-    strong_bull = (df['ADX'] > 25) & (df['Plus_DI'] > df['Minus_DI']) & above_ma50
-    strong_bear = (df['ADX'] > 25) & (df['Minus_DI'] > df['Plus_DI']) & below_ma50
+    strong_bull = (df['ADX']>25) & (df['Plus_DI']>df['Minus_DI']) & above_ma50
+    strong_bear = (df['ADX']>25) & (df['Minus_DI']>df['Plus_DI']) & below_ma50
     extreme_bull = strong_bull & above_ma200 & ma50_rising
     extreme_bear = strong_bear & below_ma200 & ma50_falling
 
@@ -719,11 +650,11 @@ def detect_all_signals(df):
     parabolic_blowoff = detect_parabolic_extreme(C, O, df['WT1'], df['BB_Up'], df['ATR'], 'top')
     parabolic_bottom = detect_parabolic_extreme(C, O, df['WT1'], df['BB_Low'], df['ATR'], 'bottom')
 
-    st_flip_bear_raw = (df['ST_Direction'] == -1) & (df['ST_Direction'].shift(1) == 1)
+    st_flip_bear_raw = (df['ST_Direction']==-1) & (df['ST_Direction'].shift(1)==1)
     st_flip_bear_raw.iloc[:ST_MIN_BAR] = False
     st_bear_override = _recent_true(st_flip_bear_raw, 3)
 
-    st_flip_bull_raw = (df['ST_Direction'] == 1) & (df['ST_Direction'].shift(1) == -1)
+    st_flip_bull_raw = (df['ST_Direction']==1) & (df['ST_Direction'].shift(1)==-1)
     st_flip_bull_raw.iloc[:ST_MIN_BAR] = False
     st_bull_override = _recent_true(st_flip_bull_raw, 3)
 
@@ -734,59 +665,47 @@ def detect_all_signals(df):
 
     # ── Core WT Signals ──
     df['Green_Dot_T1'] = (
-        wt_up_near & (df['WT1'] <= OS1) &
-        (df['RSI'] < 30) & (df['MFI'] < 30) & (df['RSI_MFI'] < 0) &
-        (~buy_shield_extreme) & vol_ok
-    )
+        wt_up_near & (df['WT1']<=OS1) & (df['RSI']<30) & (df['MFI']<30) & (df['RSI_MFI']<0) &
+        (~buy_shield_extreme) & vol_ok)
     df['Green_Dot_T2'] = (
-        wt_up_near & (df['WT1'] <= OS1) &
-        ((df['RSI'] < 32) | (df['MFI'] < 32)) &
-        ~df['Green_Dot_T1'] & (~buy_shield_bear) & vol_ok
-    )
+        wt_up_near & (df['WT1']<=OS1) & ((df['RSI']<32)|(df['MFI']<32)) &
+        ~df['Green_Dot_T1'] & (~buy_shield_bear) & vol_ok)
     _green_dot = df['Green_Dot_T1'] | df['Green_Dot_T2']
 
     df['Red_Dot_T1'] = (
-        wt_down_near & (df['WT1'] >= OB1) &
-        (df['RSI'] > 70) & (df['MFI'] > 70) & (df['RSI_MFI'] > 0) &
-        (~sell_shield_extreme) & vol_ok
-    )
+        wt_down_near & (df['WT1']>=OB1) & (df['RSI']>70) & (df['MFI']>70) & (df['RSI_MFI']>0) &
+        (~sell_shield_extreme) & vol_ok)
     df['Red_Dot_T2'] = (
-        wt_down_near & (df['WT1'] >= OB1) &
-        ((df['RSI'] > 68) | (df['MFI'] > 68)) &
-        ~df['Red_Dot_T1'] & (~sell_shield_bull) & vol_ok
-    )
+        wt_down_near & (df['WT1']>=OB1) & ((df['RSI']>68)|(df['MFI']>68)) &
+        ~df['Red_Dot_T1'] & (~sell_shield_bull) & vol_ok)
     _red_dot = df['Red_Dot_T1'] | df['Red_Dot_T2']
 
     df['Blue_Diamond'] = (
-        (df['WT2'] <= 0) & wt_up_near & htf1_bull & htf2_bull &
-        (~buy_shield_bear) & mf_bullish & vol_ok
-    )
+        (df['WT2']<=0) & wt_up_near & htf1_bull & htf2_bull &
+        (~buy_shield_bear) & mf_bullish & vol_ok)
     df['Red_Diamond'] = (
-        (df['WT2'] >= 0) & wt_down_near & ~htf1_bull & ~htf2_bull &
-        (~sell_shield_bull) & mf_bearish & vol_ok
-    )
-    # v3.0: Circle 시그널에 RSI 소프트 필터 추가 (노이즈 감소)
+        (df['WT2']>=0) & wt_down_near & ~htf1_bull & ~htf2_bull &
+        (~sell_shield_bull) & mf_bearish & vol_ok)
     df['Green_Circle'] = (
-        wt_up_near & (df['WT1'] <= OS1) & ~_green_dot &
-        (~buy_shield_bear) & vol_ok & (df['RSI'] < 45)
-    )
+        wt_up_near & (df['WT1']<=OS1) & ~_green_dot & (~buy_shield_bear) & vol_ok & (df['RSI']<45))
     df['Red_Circle'] = (
-        wt_down_near & (df['WT1'] >= OB1) & ~_red_dot &
-        (~sell_shield_bull) & vol_ok & (df['RSI'] > 55)
-    )
+        wt_down_near & (df['WT1']>=OB1) & ~_red_dot & (~sell_shield_bull) & vol_ok & (df['RSI']>55))
 
-    # ── Divergences ──
-    bull_d, bear_d, hid_bull, hid_bear = detect_pivot_divergence_v2(C, df['WT1'], 60, 5, OS1, OB1)
+    # ── Divergences (WT + RSI) ──
+    bull_d, bear_d, hid_bull, hid_bear = detect_pivot_divergence(C, df['WT1'], 60, 5, OS1, OB1)
     bull_d_recent = _recent_true(bull_d, 3)
     bear_d_recent = _recent_true(bear_d, 3)
 
-    df['Gold_Dot'] = df['Green_Dot_T1'] & (df['WT1'] <= OS2) & bull_d_recent
-    df['Blood_Diamond'] = df['Red_Dot_T1'] & (df['WT1'] >= OB2) & bear_d_recent
+    rsi_bull_d, rsi_bear_d, _, _ = detect_pivot_divergence(C, df['RSI'], 60, 5, 35, 65)
+
+    df['Gold_Dot'] = df['Green_Dot_T1'] & (df['WT1']<=OS2) & bull_d_recent
+    df['Blood_Diamond'] = df['Red_Dot_T1'] & (df['WT1']>=OB2) & bear_d_recent
     df['Bull_Divergence'] = bull_d & wt_up_recent & ~_green_dot & ~df['Gold_Dot'] & (~buy_shield_bear) & vol_ok
     df['Bear_Divergence'] = bear_d & wt_down_recent & ~_red_dot & (~sell_shield_bull) & vol_ok
-    # v3.0: Hidden Div WT 필터 강화 (0 → -20/20)
-    df['Hidden_Bull_Div'] = hid_bull & (df['WT1'] < -20) & htf2_bull & (~buy_shield_extreme)
-    df['Hidden_Bear_Div'] = hid_bear & (df['WT1'] > 20) & ~htf2_bull & (~sell_shield_extreme)
+    df['RSI_Bull_Divergence'] = rsi_bull_d & (df['WT1']<-20) & (~buy_shield_bear) & vol_ok & ~bull_d
+    df['RSI_Bear_Divergence'] = rsi_bear_d & (df['WT1']>20) & (~sell_shield_bull) & vol_ok & ~bear_d
+    df['Hidden_Bull_Div'] = hid_bull & (df['WT1']<-25) & htf2_bull & (~buy_shield_extreme)
+    df['Hidden_Bear_Div'] = hid_bear & (df['WT1']>25) & ~htf2_bull & (~sell_shield_extreme)
 
     # ── TTM Squeeze ──
     sq_on, sq_fb, sq_fs = detect_ttm_squeeze(
@@ -796,92 +715,74 @@ def detect_all_signals(df):
     df['Squeeze_Fire_Sell'] = sq_fs & (~sell_shield_bull) & vol_ok
 
     # ── Volume Climax ──
-    df['Volume_Climax_Buy'], df['Volume_Climax_Sell'] = detect_volume_climax(
-        C, O, V, df['WT1'], df['ATR'])
+    df['Volume_Climax_Buy'], df['Volume_Climax_Sell'] = detect_volume_climax(C, O, V, df['WT1'], df['ATR'])
 
     # ── ADX Momentum ──
-    adx_cross = (df['ADX'] > 20) & (df['ADX'].shift(1) <= 20)
-    df['ADX_Momentum_Buy'] = adx_cross & (df['Plus_DI'] > df['Minus_DI']) & (df['WT1'] > df['WT2']) & vol_ok
-    df['ADX_Momentum_Sell'] = adx_cross & (df['Minus_DI'] > df['Plus_DI']) & (df['WT1'] < df['WT2']) & vol_ok
+    adx_cross = (df['ADX']>20) & (df['ADX'].shift(1)<=20)
+    df['ADX_Momentum_Buy'] = adx_cross & (df['Plus_DI']>df['Minus_DI']) & (df['WT1']>df['WT2']) & vol_ok
+    df['ADX_Momentum_Sell'] = adx_cross & (df['Minus_DI']>df['Plus_DI']) & (df['WT1']<df['WT2']) & vol_ok
 
-    # ── Fib ──
-    df['Fib_Bounce_Buy'] = detect_fib_levels(H, L, C, df['WT1'], df['WT2'], df['ATR'], 'buy') & (~buy_shield_bear) & vol_ok
-    df['Fib_Resistance_Sell'] = detect_fib_levels(H, L, C, df['WT1'], df['WT2'], df['ATR'], 'sell') & (~sell_shield_bull) & vol_ok
-
-    # ── Engulfing ──
+    # ── Engulfing + Hammer/ShootingStar + Three Candle Strike ──
     df['Bullish_Engulfing'] = detect_engulfing(C, O, df['WT1'], 'bull') & (~buy_shield_bear) & vol_ok
     df['Bearish_Engulfing'] = detect_engulfing(C, O, df['WT1'], 'bear') & (~sell_shield_bull) & vol_ok
+    df['Hammer_Buy'] = detect_hammer_shooting_star(H, L, C, O, df['ATR'], df['WT1'], 'hammer') & (~buy_shield_bear) & vol_ok
+    df['ShootingStar_Sell'] = detect_hammer_shooting_star(H, L, C, O, df['ATR'], df['WT1'], 'shooting_star') & (~sell_shield_bull) & vol_ok
+    df['Three_Candle_Strike_Buy'] = detect_three_candle_strike(C, O, df['WT1'], 'buy') & (~buy_shield_bear) & vol_ok
+    df['Three_Candle_Strike_Sell'] = detect_three_candle_strike(C, O, df['WT1'], 'sell') & (~sell_shield_bull) & vol_ok
 
-    # ── MA Cross (v3.0: ADX+거래량 필터 추가) ──
+    # ── MA Cross ──
     golden_raw, death_raw = detect_ma_cross(df['MA50'], df['MA200'])
-    adx_filter = df['ADX'] > 15
-    vol_cross_ok = _vol_filter(V, 0.7)
-    df['Golden_Cross'] = golden_raw & adx_filter & vol_cross_ok
-    df['Death_Cross'] = death_raw & adx_filter & vol_cross_ok
+    adx_f = df['ADX'] > 15
+    vol_cross = _vol_filter(V, 0.7)
+    df['Golden_Cross'] = golden_raw & adx_f & vol_cross
+    df['Death_Cross'] = death_raw & adx_f & vol_cross
 
     # ── OBV Div ──
     df['OBV_Div_Buy'] = df['_OBV_Div_Buy_raw'] & (~buy_shield_extreme)
     df['OBV_Div_Sell'] = df['_OBV_Div_Sell_raw'] & (~sell_shield_extreme)
 
-    # ── EMA Pullback (v3.0: touched_recent 지연 적용) ──
-    for d in ['buy', 'sell']:
-        col = f"EMA_Pullback_{'Buy' if d == 'buy' else 'Sell'}"
+    # ── EMA Pullback ──
+    for d in ['buy','sell']:
+        col = f"EMA_Pullback_{'Buy' if d=='buy' else 'Sell'}"
         df[col] = detect_ema_pullback(C, H, L, V, df['EMA8'], df['EMA21'], df['ATR'], df['WT1'], df['WT2'], d)
 
     # ── Momentum Ignition ──
-    df['Momentum_Ignition_Buy'] = detect_momentum_ignition(
-        C, O, V, df['BB_Up'], df['ATR'], df['EMA8'], df['EMA21'], df['WT1'], 'buy')
-    df['Momentum_Ignition_Sell'] = detect_momentum_ignition(
-        C, O, V, df['BB_Low'], df['ATR'], df['EMA8'], df['EMA21'], df['WT1'], 'sell')
+    df['Momentum_Ignition_Buy'] = detect_momentum_ignition(C, O, V, df['BB_Up'], df['ATR'], df['EMA8'], df['EMA21'], df['WT1'], 'buy')
+    df['Momentum_Ignition_Sell'] = detect_momentum_ignition(C, O, V, df['BB_Low'], df['ATR'], df['EMA8'], df['EMA21'], df['WT1'], 'sell')
 
     # ── SuperTrend ──
     df['SuperTrend_Buy'] = st_flip_bull_raw
     df['SuperTrend_Sell'] = st_flip_bear_raw
 
-    # ── Parabolic (v3.0: 거래량 확인 추가) ──
-    vol_parabolic = _vol_filter(V, 1.0)  # 평균 이상 거래량
-    raw_parabolic_sell = parabolic_blowoff & (
-        (df['WT_Down'] | wt_down_recent) | ((C < O) & (C < C.shift(1))))
-    df['Parabolic_Top_Sell'] = raw_parabolic_sell & vol_parabolic
-    raw_parabolic_buy = parabolic_bottom & (
-        (df['WT_Up'] | wt_up_recent) | ((C > O) & (C > C.shift(1))))
-    df['Parabolic_Bottom_Buy'] = raw_parabolic_buy & vol_parabolic
+    # ── Parabolic ──
+    vol_parabolic = _vol_filter(V, 1.0)
+    df['Parabolic_Top_Sell'] = parabolic_blowoff & (
+        (df['WT_Down']|wt_down_recent)|((C<O)&(C<C.shift(1)))) & vol_parabolic
+    df['Parabolic_Bottom_Buy'] = parabolic_bottom & (
+        (df['WT_Up']|wt_up_recent)|((C>O)&(C>C.shift(1)))) & vol_parabolic
 
     # ── VWAP ──
     df['VWAP_Bounce_Buy'] = detect_vwap_bounce(C, df['VWAP_Osc'], df['WT1'], df['WT2'], V, df['ATR'], 'buy')
     df['VWAP_Reject_Sell'] = detect_vwap_bounce(C, df['VWAP_Osc'], df['WT1'], df['WT2'], V, df['ATR'], 'sell')
 
-    # ── v3.0 신규: MACD Cross ──
-    macd_l, macd_s = df['MACD_Line'], df['MACD_Signal']
-    df['MACD_Cross_Buy'] = (
-        (macd_l > macd_s) & (macd_l.shift(1) <= macd_s.shift(1)) &
-        (macd_l < 0) & (~buy_shield_bear) & vol_ok
-    )
-    df['MACD_Cross_Sell'] = (
-        (macd_l < macd_s) & (macd_l.shift(1) >= macd_s.shift(1)) &
-        (macd_l > 0) & (~sell_shield_bull) & vol_ok
-    )
+    # ── MACD Cross ──
+    ml, ms = df['MACD_Line'], df['MACD_Signal']
+    df['MACD_Cross_Buy'] = (ml>ms) & (ml.shift(1)<=ms.shift(1)) & (ml<0) & (~buy_shield_bear) & vol_ok
+    df['MACD_Cross_Sell'] = (ml<ms) & (ml.shift(1)>=ms.shift(1)) & (ml>0) & (~sell_shield_bull) & vol_ok
 
-    # ── v3.0 신규: StochRSI Cross ──
+    # ── StochRSI Cross ──
     sk, sd = df['StochK'], df['StochD']
-    df['StochRSI_Cross_Buy'] = (
-        (sk > sd) & (sk.shift(1) <= sd.shift(1)) & (sk < 25) &
-        (~buy_shield_bear) & vol_ok
-    )
-    df['StochRSI_Cross_Sell'] = (
-        (sk < sd) & (sk.shift(1) >= sd.shift(1)) & (sk > 75) &
-        (~sell_shield_bull) & vol_ok
-    )
+    df['StochRSI_Cross_Buy'] = (sk>sd) & (sk.shift(1)<=sd.shift(1)) & (sk<25) & (~buy_shield_bear) & vol_ok
+    df['StochRSI_Cross_Sell'] = (sk<sd) & (sk.shift(1)>=sd.shift(1)) & (sk>75) & (~sell_shield_bull) & vol_ok
 
-    # ── 배치 쿨다운 적용 (v3.0: 중앙 관리) ──
+    # ── 배치 쿨다운 ──
     for sig_col, cd in COOLDOWN_MAP.items():
         if sig_col in df.columns:
             df[sig_col] = _apply_cooldown(df[sig_col], cd)
 
     compute_confluence_score(df)
     df['Buy_Proximity'], df['Sell_Proximity'] = compute_signal_proximity(
-        df['WT1'], df['WT2'], df['RSI'], df['MFI'], df['RSI_MFI'], df['StochK'],
-        strong_bull, strong_bear)
+        df['WT1'], df['WT2'], df['RSI'], df['MFI'], df['RSI_MFI'], df['StochK'], strong_bull, strong_bear)
 
     df['Strong_Bull'], df['Strong_Bear'] = strong_bull, strong_bear
     df['Parabolic_Blowoff'] = parabolic_blowoff
@@ -890,83 +791,69 @@ def detect_all_signals(df):
     df['Sell_Shield_Overridden'] = parabolic_blowoff | st_bear_override
     df['Buy_Shield_Overridden'] = parabolic_bottom | st_bull_override
     df['_HTF1_Bull'], df['_HTF2_Bull'] = htf1_bull, htf2_bull
-
     return df
-
 
 # ──────────────────────────────────────────
 # 차트 생성
 # ──────────────────────────────────────────
 def _add_highlight_zones(fig, mask_series, index, fillcolor, annotation_text=None, row=1):
     d = mask_series.astype(int).diff().fillna(0)
-    starts = index[d == 1].tolist()
-    ends = index[d == -1].tolist()
-    if len(mask_series) > 0 and mask_series.iloc[0]:
-        starts.insert(0, index[0])
-    if len(mask_series) > 0 and mask_series.iloc[-1]:
-        ends.append(index[-1])
+    starts = index[d==1].tolist()
+    ends = index[d==-1].tolist()
+    if len(mask_series)>0 and mask_series.iloc[0]: starts.insert(0, index[0])
+    if len(mask_series)>0 and mask_series.iloc[-1]: ends.append(index[-1])
     for s0, e0 in zip(starts, ends):
-        kwargs = dict(x0=s0, x1=e0, fillcolor=fillcolor, line_width=0, row=row, col=1)
+        kw = dict(x0=s0, x1=e0, fillcolor=fillcolor, line_width=0, row=row, col=1)
         if annotation_text:
-            kwargs.update(annotation_text=annotation_text, annotation_position="top left",
-                          annotation_font_size=8, annotation_font_color="#FF4444")
-        fig.add_vrect(**kwargs)
+            kw.update(annotation_text=annotation_text, annotation_position="top left",
+                      annotation_font_size=8, annotation_font_color="#FF4444")
+        fig.add_vrect(**kw)
 
-
-def build_chart(df_chart, ticker, trend_regime, shield_status, chart_height=1100):
-    mac = {5: "#ff9900", 20: '#f1c40f', 50: '#e74c3c', 100: '#9b59b6', 125: '#3498db', 200: '#2ecc71'}
-
-    fig = make_subplots(
-        rows=5, cols=1, shared_xaxes=True, vertical_spacing=0.02,
-        row_heights=[0.40, 0.10, 0.22, 0.14, 0.14],
-        subplot_titles=("", "", "WaveTrend Oscillator", "Money Flow", "Confluence Score"),
-    )
+def build_chart(df_chart, ticker, trend_regime, shield_status):
+    mac = {5:"#ff9900",20:'#f1c40f',50:'#e74c3c',100:'#9b59b6',125:'#3498db',200:'#2ecc71'}
+    fig = make_subplots(rows=5, cols=1, shared_xaxes=True, vertical_spacing=0.02,
+        row_heights=[0.40,0.10,0.22,0.14,0.14],
+        subplot_titles=("","","WaveTrend Oscillator","Money Flow","Confluence Score"))
 
     fig.add_trace(go.Candlestick(
         x=df_chart.index, open=df_chart['Open'], high=df_chart['High'],
         low=df_chart['Low'], close=df_chart['Close'], name="가격",
-        increasing_line_color='#26a69a', decreasing_line_color='#ef5350',
-    ), row=1, col=1)
+        increasing_line_color='#26a69a', decreasing_line_color='#ef5350'), row=1, col=1)
 
-    for ma in [5, 20, 50, 100, 125, 200]:
+    for ma in [5,20,50,100,125,200]:
         fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart[f'MA{ma}'],
-                                 line=dict(color=mac[ma], width=1.2), name=f'{ma}일선'), row=1, col=1)
+            line=dict(color=mac[ma], width=1.2), name=f'{ma}일선'), row=1, col=1)
     fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['EMA8'],
-                             line=dict(color='#00FFFF', width=1.5, dash='dot'), name='EMA 8'), row=1, col=1)
+        line=dict(color='#00FFFF', width=1.5, dash='dot'), name='EMA 8'), row=1, col=1)
     fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['EMA21'],
-                             line=dict(color='#FF69B4', width=1.5, dash='dot'), name='EMA 21'), row=1, col=1)
+        line=dict(color='#FF69B4', width=1.5, dash='dot'), name='EMA 21'), row=1, col=1)
 
     for mask_cond, color, name in [
-        (df_chart['ST_Direction'] == 1, '#00E676', 'SuperTrend ▲'),
-        (df_chart['ST_Direction'] == -1, '#FF1744', 'SuperTrend ▼'),
-    ]:
+        (df_chart['ST_Direction']==1, '#00E676', 'SuperTrend ▲'),
+        (df_chart['ST_Direction']==-1, '#FF1744', 'SuperTrend ▼')]:
         fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['SuperTrend'].where(mask_cond),
-                                 line=dict(color=color, width=2), name=name, connectgaps=False), row=1, col=1)
+            line=dict(color=color, width=2), name=name, connectgaps=False), row=1, col=1)
 
     fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['BB_Up'],
-                             line=dict(color='gray', width=1, dash='dot'), name='BB 상단'), row=1, col=1)
+        line=dict(color='gray', width=1, dash='dot'), name='BB 상단'), row=1, col=1)
     fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['BB_Low'],
-                             line=dict(color='gray', width=1, dash='dot'), name='BB 하단',
-                             fill='tonexty', fillcolor='rgba(128,128,128,0.1)'), row=1, col=1)
+        line=dict(color='gray', width=1, dash='dot'), name='BB 하단',
+        fill='tonexty', fillcolor='rgba(128,128,128,0.1)'), row=1, col=1)
 
-    # Shield override zones
     for col, clr, txt in [
-        ('Sell_Shield_Overridden', 'rgba(255,0,0,0.04)', '🔓Sell Shield OFF'),
-        ('Buy_Shield_Overridden', 'rgba(0,255,0,0.04)', '🔓Buy Shield OFF'),
-    ]:
+        ('Sell_Shield_Overridden','rgba(255,0,0,0.04)','🔓Sell Shield OFF'),
+        ('Buy_Shield_Overridden','rgba(0,255,0,0.04)','🔓Buy Shield OFF')]:
         override_mask = df_chart.get(col, pd.Series(False, index=df_chart.index))
         if override_mask.any():
             _add_highlight_zones(fig, override_mask, df_chart.index, clr, txt, row=1)
 
-    # Plot signals (v3.0: 필터링된 시그널만)
     enabled_signals = st.session_state.get('enabled_signals', set(ALL_CHART_SIGNALS.keys()))
 
     def _atr_at(sig_df):
         return df_chart.loc[sig_df.index, 'ATR'].fillna(df_chart['ATR'].median())
 
     for cn, cfg in ALL_CHART_SIGNALS.items():
-        if cn not in df_chart.columns or cn not in enabled_signals:
-            continue
+        if cn not in df_chart.columns or cn not in enabled_signals: continue
         if cn == 'Green_Dot_T1':
             sig = df_chart[df_chart[cn] & ~df_chart.get('Gold_Dot', False)]
         elif cn == 'Ultra_Buy':
@@ -975,144 +862,115 @@ def build_chart(df_chart, ticker, trend_regime, shield_status, chart_height=1100
             sig = df_chart[df_chart[cn] & ~df_chart.get('Blood_Diamond', False)]
         else:
             sig = df_chart[df_chart[cn]]
-        if sig.empty:
-            continue
+        if sig.empty: continue
         yv = sig[cfg['base']] + _atr_at(sig) * cfg['atr_m']
-        lw = 2 if cfg['sz'] >= 16 else (1.5 if cfg['sz'] >= 13 else 1)
+        lw = 2 if cfg['sz']>=16 else (1.5 if cfg['sz']>=13 else 1)
         fig.add_trace(go.Scatter(
             x=sig.index, y=yv, mode='markers',
             marker=dict(symbol=cfg['sym'], size=cfg['sz'], color=cfg['clr'],
-                        line=dict(width=lw, color='white' if 'open' not in cfg['sym'] else cfg['clr'])),
-            name=f"{cfg['icon']} {cfg['label']}",
-        ), row=1, col=1)
+                line=dict(width=lw, color='white' if 'open' not in cfg['sym'] else cfg['clr'])),
+            name=f"{cfg['icon']} {cfg['label']}"), row=1, col=1)
 
-    # Volume
     br = df_chart['Close'] < df_chart['Open']
     fig.add_trace(go.Bar(x=df_chart.index, y=df_chart['Volume'],
-                         marker_color=np.where(br, '#ef5350', '#26a69a').tolist(),
-                         name="거래량", opacity=0.7), row=2, col=1)
+        marker_color=np.where(br,'#ef5350','#26a69a').tolist(), name="거래량", opacity=0.7), row=2, col=1)
     vcm = df_chart.get('Volume_Climax_Buy', pd.Series(False)) | df_chart.get('Volume_Climax_Sell', pd.Series(False))
     vcd = df_chart[vcm]
     if not vcd.empty:
         fig.add_trace(go.Bar(x=vcd.index, y=vcd['Volume'],
-                             marker_color='#FFD700', name="Vol Climax", opacity=0.9), row=2, col=1)
+            marker_color='#FFD700', name="Vol Climax", opacity=0.9), row=2, col=1)
 
-    # WaveTrend
     fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['WT1'],
-                             line=dict(color='#00E676', width=2), name="WT1"), row=3, col=1)
+        line=dict(color='#00E676', width=2), name="WT1"), row=3, col=1)
     fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['WT2'],
-                             line=dict(color='#FF1744', width=1.5, dash='dot'), name="WT2"), row=3, col=1)
+        line=dict(color='#FF1744', width=1.5, dash='dot'), name="WT2"), row=3, col=1)
     wd = df_chart['WT1'] - df_chart['WT2']
     fig.add_trace(go.Bar(x=df_chart.index, y=wd,
-                         marker_color=np.where(wd >= 0, '#00E676', '#FF1744').tolist(),
-                         name="WT Hist", opacity=0.3), row=3, col=1)
+        marker_color=np.where(wd>=0,'#00E676','#FF1744').tolist(), name="WT Hist", opacity=0.3), row=3, col=1)
 
-    # WT signal dots
     for mask_col_list, clr in [
-        (['Green_Circle', 'Green_Dot_T1', 'Green_Dot_T2', 'Gold_Dot'], '#00E676'),
-        (['Red_Circle', 'Red_Dot_T1', 'Red_Dot_T2', 'Blood_Diamond'], '#FF1744'),
-    ]:
+        (['Green_Circle','Green_Dot_T1','Green_Dot_T2','Gold_Dot'], '#00E676'),
+        (['Red_Circle','Red_Dot_T1','Red_Dot_T2','Blood_Diamond'], '#FF1744')]:
         combined = pd.Series(False, index=df_chart.index)
         for mc in mask_col_list:
             combined |= df_chart.get(mc, pd.Series(False, index=df_chart.index))
         pts = df_chart[combined]
         if not pts.empty:
             fig.add_trace(go.Scatter(x=pts.index, y=pts['WT1'], mode='markers',
-                                     marker=dict(symbol='circle', size=10, color=clr,
-                                                 line=dict(width=1, color='white')),
-                                     showlegend=False), row=3, col=1)
+                marker=dict(symbol='circle', size=10, color=clr, line=dict(width=1, color='white')),
+                showlegend=False), row=3, col=1)
 
-    for lv, c, d in [(OB2, '#ff3333', 'dash'), (OB1, '#ff3333', 'solid'),
-                      (0, 'gray', 'dot'), (OS1, '#00bfff', 'solid'), (OS2, '#00bfff', 'dash')]:
+    for lv, c, d in [(OB2,'#ff3333','dash'),(OB1,'#ff3333','solid'),(0,'gray','dot'),
+                      (OS1,'#00bfff','solid'),(OS2,'#00bfff','dash')]:
         fig.add_hline(y=lv, line_dash=d, line_color=c, line_width=1, row=3, col=1)
-
-    wmx = max(float(df_chart['WT1'].max()), 100) + 10
-    wmn = min(float(df_chart['WT1'].min()), -100) - 10
+    wmx = max(float(df_chart['WT1'].max()), 100)+10
+    wmn = min(float(df_chart['WT1'].min()), -100)-10
     fig.add_hrect(y0=OB1, y1=wmx, fillcolor="rgba(255,23,68,0.08)", line_width=0, row=3, col=1)
     fig.add_hrect(y0=wmn, y1=OS1, fillcolor="rgba(0,191,255,0.08)", line_width=0, row=3, col=1)
-
     if 'Squeeze_On' in df_chart.columns:
         _add_highlight_zones(fig, df_chart['Squeeze_On'], df_chart.index, "rgba(255,255,0,0.05)", None, row=3)
 
-    # Money Flow
     rmfi = df_chart['RSI_MFI']
     fig.add_trace(go.Bar(x=df_chart.index, y=rmfi,
-                         marker_color=np.where(rmfi >= 0, '#3ee145', '#ff3d2e').tolist(),
-                         name="Money Flow", opacity=0.7), row=4, col=1)
+        marker_color=np.where(rmfi>=0,'#3ee145','#ff3d2e').tolist(), name="Money Flow", opacity=0.7), row=4, col=1)
     fig.add_hline(y=0, line_dash="solid", line_color="gray", line_width=1, row=4, col=1)
 
-    # Confluence
     conf = df_chart['Confluence_Score']
     fig.add_trace(go.Bar(x=df_chart.index, y=conf,
-                         marker_color=np.where(conf >= 3.5, '#00E676',
-                                      np.where(conf <= -3.5, '#FF1744', '#FFC107')).tolist(),
-                         name="Confluence", opacity=0.8), row=5, col=1)
-    for lv, c, d in [(6, '#00E676', 'dash'), (-6, '#FF1744', 'dash'),
-                      (3.5, '#00E676', 'dot'), (-3.5, '#FF1744', 'dot'), (0, 'gray', 'solid')]:
-        fig.add_hline(y=lv, line_dash=d, line_color=c, line_width=1 if d == 'solid' else 0.8, row=5, col=1)
+        marker_color=np.where(conf>=3.5,'#00E676',np.where(conf<=-3.5,'#FF1744','#FFC107')).tolist(),
+        name="Confluence", opacity=0.8), row=5, col=1)
+    for lv, c, d in [(6,'#00E676','dash'),(-6,'#FF1744','dash'),(3.5,'#00E676','dot'),
+                      (-3.5,'#FF1744','dot'),(0,'gray','solid')]:
+        fig.add_hline(y=lv, line_dash=d, line_color=c, line_width=1 if d=='solid' else 0.8, row=5, col=1)
 
     shield_title = f" | {shield_status}" if shield_status else ""
     fig.update_layout(
-        title=dict(text=f"📊 {ticker.upper()} | 💎 Market Cipher B+ V3.0 | {trend_regime}{shield_title}",
+        title=dict(text=f"📊 {ticker.upper()} | 💎 Market Cipher B+ V4.0 | {trend_regime}{shield_title}",
                    font=dict(size=14, color='#FAFAFA')),
-        yaxis_title="USD", yaxis2_title="Vol", yaxis3_title="WT", yaxis4_title="MF", yaxis5_title="Conf",
-        template="plotly_dark", margin=dict(l=0, r=0, t=50, b=0), height=chart_height, showlegend=True,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5,
-                    font=dict(size=9, color='#AAAAAA'), bgcolor='rgba(0,0,0,0)'),
-    )
+        yaxis_title="USD",yaxis2_title="Vol",yaxis3_title="WT",yaxis4_title="MF",yaxis5_title="Conf",
+        template="plotly_dark", margin=dict(l=0,r=0,t=50,b=0), height=1100, showlegend=True,
+        legend=dict(orientation="h",yanchor="bottom",y=1.02,xanchor="center",x=0.5,
+                    font=dict(size=9,color='#AAAAAA'),bgcolor='rgba(0,0,0,0)'))
     fig.update(layout_xaxis_rangeslider_visible=False)
     for ann in fig['layout']['annotations']:
         ann['font'] = dict(size=11, color='#888888')
-
     return fig
 
-
 # ──────────────────────────────────────────
-# 메타데이터 + 프롬프트 텍스트 생성
+# 메타데이터 + 프롬프트 텍스트
 # ──────────────────────────────────────────
 def build_metadata(df_chart, df_valid, ticker):
     latest = df_chart.iloc[-1]
-    prev = df_chart.iloc[-2] if len(df_chart) >= 2 else latest
+    prev = df_chart.iloc[-2] if len(df_chart)>=2 else latest
     p_chg = latest['Close'] - prev['Close']
     p_chg_pct = (p_chg / prev['Close']) * 100
 
     m4b = {k: float(latest[col]) for k, col in [
-        ('wt1', 'WT1'), ('rsi', 'RSI'), ('mfi', 'MFI'),
-        ('mf_area', 'RSI_MFI'), ('stochk', 'StochK')]}
+        ('wt1','WT1'),('rsi','RSI'),('mfi','MFI'),('mf_area','RSI_MFI'),('stochk','StochK')]}
     htf1_b = bool(latest.get('_HTF1_Bull', False))
     htf2_b = bool(latest.get('_HTF2_Bull', False))
     bias, bscore = compute_bias_score(m4b, htf1_b, htf2_b)
     conf_now = float(df_chart['Confluence_Score'].iloc[-1])
 
-    if latest.get('Strong_Bull', False):
-        trend_regime = 'STRONG BULL 🟢'
-    elif latest.get('Strong_Bear', False):
-        trend_regime = 'STRONG BEAR 🔴'
-    else:
-        trend_regime = 'NEUTRAL ⚪'
+    if latest.get('Strong_Bull', False): trend_regime = 'STRONG BULL 🟢'
+    elif latest.get('Strong_Bear', False): trend_regime = 'STRONG BEAR 🔴'
+    else: trend_regime = 'NEUTRAL ⚪'
 
     shield_parts = []
-    for cond, label in [
-        ('Parabolic_Blowoff', '🌡️ PARABOLIC TOP'),
-        ('ST_Bear_Override', '📉 ST BEAR'),
-        ('Parabolic_Bottom_Raw', '🧊 PARABOLIC BOT'),
-    ]:
-        if latest.get(cond, False):
-            shield_parts.append(label)
+    for cond, label in [('Parabolic_Blowoff','🌡️ PARABOLIC TOP'),
+                         ('ST_Bear_Override','📉 ST BEAR'),('Parabolic_Bottom_Raw','🧊 PARABOLIC BOT')]:
+        if latest.get(cond, False): shield_parts.append(label)
     if not shield_parts:
-        if latest.get('Buy_Shield_Overridden', False):
-            shield_parts.append('🔓 BUY SHIELD OFF')
-        if latest.get('Sell_Shield_Overridden', False):
-            shield_parts.append('🔓 SELL SHIELD OFF')
+        if latest.get('Buy_Shield_Overridden', False): shield_parts.append('🔓 BUY SHIELD OFF')
+        if latest.get('Sell_Shield_Overridden', False): shield_parts.append('🔓 SELL SHIELD OFF')
     shield_status = ' + '.join(shield_parts)
 
     sig_checks = [(k, v['icon'], v['label'], v['dir']) for k, v in ALL_CHART_SIGNALS.items()]
     recent_signals = []
-    for ir, row in df_chart.tail(15).iterrows():  # v3.0: 30→15일
+    for ir, row in df_chart.tail(15).iterrows():
         d_str = ir.strftime('%m/%d')
         for col, icon, lbl, side in sig_checks:
-            if row.get(col, False):
-                recent_signals.append((icon, lbl, d_str, side))
+            if row.get(col, False): recent_signals.append((icon, lbl, d_str, side))
 
     all_stats = compute_all_signal_stats(df_valid)
 
@@ -1121,31 +979,29 @@ def build_metadata(df_chart, df_valid, ticker):
         'price_change': p_chg, 'price_change_pct': p_chg_pct,
         'volume': latest['Volume'],
         'avg_volume': df_chart['Volume'].rolling(20).mean().iloc[-1],
-        'wt1': float(latest['WT1']), 'wt2': float(latest['WT2']),
-        'rsi': float(latest['RSI']), 'mfi': float(latest['MFI']),
-        'stochk': float(latest['StochK']), 'stochd': float(latest['StochD']),
-        'vwap_osc': float(latest['VWAP_Osc']), 'mf_area': float(latest['RSI_MFI']),
-        'atr': float(latest['ATR']),
-        'atr_pct': float(latest['ATR']) / float(latest['Close']) * 100,
-        'adx': float(latest['ADX']),
-        'plus_di': float(latest['Plus_DI']), 'minus_di': float(latest['Minus_DI']),
-        'overall_bias': bias, 'bias_score': bscore, 'confluence_score': conf_now,
-        'recent_signals': recent_signals, 'all_signal_stats': all_stats,
-        'last_date': df_chart.index[-1].strftime('%Y-%m-%d'),
-        'buy_proximity': float(latest['Buy_Proximity']),
-        'sell_proximity': float(latest['Sell_Proximity']),
-        'squeeze_on': bool(latest.get('Squeeze_On', False)),
-        'trend_regime': trend_regime, 'shield_status': shield_status,
-        'supertrend_dir': int(latest.get('ST_Direction', 0)),
-        'supertrend_val': float(latest.get('SuperTrend', 0)),
-        'ema8': float(latest.get('EMA8', 0)), 'ema21': float(latest.get('EMA21', 0)),
-        'bb_up': float(latest.get('BB_Up', 0)), 'bb_low': float(latest.get('BB_Low', 0)),
-        'ma50': float(latest.get('MA50', 0)), 'ma200': float(latest.get('MA200', 0)),
-        'macd_line': float(latest.get('MACD_Line', 0)),
-        'macd_signal': float(latest.get('MACD_Signal', 0)),
-        'macd_hist': float(latest.get('MACD_Hist', 0)),
+        'wt1':float(latest['WT1']),'wt2':float(latest['WT2']),
+        'rsi':float(latest['RSI']),'mfi':float(latest['MFI']),
+        'stochk':float(latest['StochK']),'stochd':float(latest['StochD']),
+        'vwap_osc':float(latest['VWAP_Osc']),'mf_area':float(latest['RSI_MFI']),
+        'atr':float(latest['ATR']),'atr_pct':float(latest['ATR'])/float(latest['Close'])*100,
+        'adx':float(latest['ADX']),
+        'plus_di':float(latest['Plus_DI']),'minus_di':float(latest['Minus_DI']),
+        'overall_bias':bias,'bias_score':bscore,'confluence_score':conf_now,
+        'recent_signals':recent_signals,'all_signal_stats':all_stats,
+        'last_date':df_chart.index[-1].strftime('%Y-%m-%d'),
+        'buy_proximity':float(latest['Buy_Proximity']),
+        'sell_proximity':float(latest['Sell_Proximity']),
+        'squeeze_on':bool(latest.get('Squeeze_On', False)),
+        'trend_regime':trend_regime,'shield_status':shield_status,
+        'supertrend_dir':int(latest.get('ST_Direction',0)),
+        'supertrend_val':float(latest.get('SuperTrend',0)),
+        'ema8':float(latest.get('EMA8',0)),'ema21':float(latest.get('EMA21',0)),
+        'bb_up':float(latest.get('BB_Up',0)),'bb_low':float(latest.get('BB_Low',0)),
+        'ma50':float(latest.get('MA50',0)),'ma200':float(latest.get('MA200',0)),
+        'macd_line':float(latest.get('MACD_Line',0)),
+        'macd_signal':float(latest.get('MACD_Signal',0)),
+        'macd_hist':float(latest.get('MACD_Hist',0)),
     }, trend_regime, shield_status
-
 
 def build_prompt_text(df_chart, meta):
     latest = df_chart.iloc[-1]
@@ -1157,8 +1013,7 @@ def build_prompt_text(df_chart, meta):
     for ir, row in df_chart.tail(30).iterrows():
         dd = ir.strftime('%Y-%m-%d')
         for c, l in sig_checks:
-            if row.get(c, False):
-                sl.append(f"{l} {dd}")
+            if row.get(c, False): sl.append(f"{l} {dd}")
     st_text = "\n".join(sl) if sl else "최근 30일 내 주요 시그널 없음"
 
     bp, sp = meta['buy_proximity'], meta['sell_proximity']
@@ -1166,7 +1021,7 @@ def build_prompt_text(df_chart, meta):
     if bp >= 60: prox_text += " ⚠️ 매수 시그널 임박!"
     if sp >= 60: prox_text += " ⚠️ 매도 시그널 임박!"
     sq_text = "Squeeze ON (변동성 응축→폭발 임박)" if meta['squeeze_on'] else "Squeeze OFF"
-    st_dir_text = f"BULL ▲ ({meta['supertrend_val']:.2f})" if meta['supertrend_dir'] == 1 else f"BEAR ▼ ({meta['supertrend_val']:.2f})"
+    st_dir_text = f"BULL ▲ ({meta['supertrend_val']:.2f})" if meta['supertrend_dir']==1 else f"BEAR ▼ ({meta['supertrend_val']:.2f})"
     shield_text = f"Shield Override: {meta['shield_status']}" if meta['shield_status'] else "Shield Override: NONE"
 
     inds = (
@@ -1179,16 +1034,14 @@ def build_prompt_text(df_chart, meta):
         f"MA50={meta['ma50']:.2f}, MA200={meta['ma200']:.2f}, "
         f"MACD={meta['macd_line']:.3f}/{meta['macd_signal']:.3f} Hist={meta['macd_hist']:.3f}, "
         f"Confluence={meta['confluence_score']:.1f}, Bias={meta['overall_bias']}({meta['bias_score']:.1f}), "
-        f"Trend={meta['trend_regime']}, {shield_text}, {prox_text}, {sq_text}"
-    )
+        f"Trend={meta['trend_regime']}, {shield_text}, {prox_text}, {sq_text}")
 
     stats = meta.get('all_signal_stats', {})
     stats_text = ""
     if stats:
         lines = []
         for sn, sv in sorted(stats.items(), key=lambda x: x[1]['count'], reverse=True)[:10]:
-            wr = sv.get('10d_winrate')
-            avg = sv.get('10d_avg')
+            wr = sv.get('10d_winrate'); avg = sv.get('10d_avg')
             if wr is not None:
                 lines.append(f"  {sn}: {sv['count']}회, 10일 승률 {wr:.0f}%, 평균 {avg:+.1f}%")
         if lines:
@@ -1196,145 +1049,116 @@ def build_prompt_text(df_chart, meta):
 
     return f"{ps}\n\n📌 [지표]\n{inds}\n\n📌 [시그널]\n{st_text}{stats_text}"
 
-
 # ──────────────────────────────────────────
-# 통합 분석 함수
+# 통합 분석
 # ──────────────────────────────────────────
 def get_yfinance_data_and_chart(ticker, chart_period_days=252):
     try:
         df = compute_and_cache(ticker)
         if df is None or df.empty:
             return None, "최근 주가 데이터 없음", None
-
-        df_valid = df.dropna(subset=['WT1', 'WT2'])
+        df_valid = df.dropna(subset=['WT1','WT2'])
         df_chart = df_valid.tail(chart_period_days).copy()
         if df_chart.empty:
             return None, "차트 데이터 부족", None
-
         meta, trend_regime, shield_status = build_metadata(df_chart, df_valid, ticker)
-        chart_h = st.session_state.get('chart_height', 1100)
-        fig = build_chart(df_chart, ticker, trend_regime, shield_status, chart_h)
+        fig = build_chart(df_chart, ticker, trend_regime, shield_status)
         enhanced = build_prompt_text(df_chart, meta)
-
         return fig, enhanced, meta
     except Exception as e:
         return None, f"주가 데이터 로딩 실패: {e}", None
-
 
 # ──────────────────────────────────────────
 # UI 렌더 헬퍼
 # ──────────────────────────────────────────
 _IND_THRESHOLDS = {
-    'wt1': [(-53, '극과매도'), (-20, '과매도'), (20, '중립'), (53, '과매수'), (999, '극과매수')],
-    'rsi': [(30, '과매도'), (45, '약세'), (55, '중립'), (70, '강세'), (999, '과매수')],
-    'mfi': [(30, '과매도'), (45, '약세'), (55, '중립'), (70, '강세'), (999, '과매수')],
-    'stochk': [(20, '바닥'), (80, ''), (999, '천장')],
+    'wt1': [(-53,'극과매도'),(-20,'과매도'),(20,'중립'),(53,'과매수'),(999,'극과매수')],
+    'rsi': [(30,'과매도'),(45,'약세'),(55,'중립'),(70,'강세'),(999,'과매수')],
+    'mfi': [(30,'과매도'),(45,'약세'),(55,'중립'),(70,'강세'),(999,'과매수')],
+    'stochk': [(20,'바닥'),(80,''),(999,'천장')],
 }
-
 
 def _indicator_label(name, value):
     for thresh, label in _IND_THRESHOLDS.get(name, []):
-        if value <= thresh:
-            return label
+        if value <= thresh: return label
     return ''
 
-
 def render_price_header(meta):
-    chg = meta['price_change']
-    chg_pct = meta['price_change_pct']
-    chg_cls = 'price-change-up' if chg >= 0 else 'price-change-down'
-    chg_ico = '▲' if chg >= 0 else '▼'
-    vr = meta['volume'] / meta['avg_volume'] if meta['avg_volume'] else 0
-    cv = meta.get('confluence_score', 0)
-    st_dir = meta.get('supertrend_dir', 0)
-    shield = meta.get('shield_status', '')
-    macd_h = meta.get('macd_hist', 0)
+    chg = meta['price_change']; chg_pct = meta['price_change_pct']
+    chg_cls = 'price-change-up' if chg>=0 else 'price-change-down'
+    chg_ico = '▲' if chg>=0 else '▼'
+    vr = meta['volume']/meta['avg_volume'] if meta['avg_volume'] else 0
+    cv = meta.get('confluence_score',0)
+    st_dir = meta.get('supertrend_dir',0)
+    shield = meta.get('shield_status','')
+    macd_h = meta.get('macd_hist',0)
 
     ind_specs = [
-        (_cls(meta['wt1'], -20, 20), f"WT: {meta['wt1']:.0f} {_indicator_label('wt1', meta['wt1'])}"),
-        (_cls(meta['rsi'], 40, 60), f"RSI: {meta['rsi']:.0f} {_indicator_label('rsi', meta['rsi'])}"),
-        (_cls(meta['mfi'], 40, 60), f"MFI: {meta['mfi']:.0f} {_indicator_label('mfi', meta['mfi'])}"),
-        ('ind-bullish' if meta['mf_area'] < 0 else ('ind-bearish' if meta['mf_area'] > 0 else 'ind-neutral'), f"MF: {meta['mf_area']:.1f}"),
-        ('ind-bullish' if vr > 1.5 else 'ind-neutral', f"Vol: {vr:.1f}x"),
-        ('ind-bullish' if meta['adx'] > 25 else 'ind-neutral', f"ADX: {meta['adx']:.0f}"),
-        (_cls(meta['stochk'], 30, 70), f"StK: {meta['stochk']:.0f} {_indicator_label('stochk', meta['stochk'])}"),
-        ('ind-bullish' if cv >= 3.5 else ('ind-bearish' if cv <= -3.5 else 'ind-neutral'), f"Conf: {cv:.1f}"),
-        ('ind-bullish' if st_dir == 1 else 'ind-bearish', f"ST: {'▲' if st_dir == 1 else '▼'}"),
-        ('ind-bullish' if macd_h > 0 else ('ind-bearish' if macd_h < 0 else 'ind-neutral'), f"MACD: {macd_h:+.2f}"),
+        (_cls(meta['wt1'],-20,20), f"WT: {meta['wt1']:.0f} {_indicator_label('wt1',meta['wt1'])}"),
+        (_cls(meta['rsi'],40,60), f"RSI: {meta['rsi']:.0f} {_indicator_label('rsi',meta['rsi'])}"),
+        (_cls(meta['mfi'],40,60), f"MFI: {meta['mfi']:.0f} {_indicator_label('mfi',meta['mfi'])}"),
+        ('ind-bullish' if meta['mf_area']<0 else ('ind-bearish' if meta['mf_area']>0 else 'ind-neutral'), f"MF: {meta['mf_area']:.1f}"),
+        ('ind-bullish' if vr>1.5 else 'ind-neutral', f"Vol: {vr:.1f}x"),
+        ('ind-bullish' if meta['adx']>25 else 'ind-neutral', f"ADX: {meta['adx']:.0f}"),
+        (_cls(meta['stochk'],30,70), f"StK: {meta['stochk']:.0f} {_indicator_label('stochk',meta['stochk'])}"),
+        ('ind-bullish' if cv>=3.5 else ('ind-bearish' if cv<=-3.5 else 'ind-neutral'), f"Conf: {cv:.1f}"),
+        ('ind-bullish' if st_dir==1 else 'ind-bearish', f"ST: {'▲' if st_dir==1 else '▼'}"),
+        ('ind-bullish' if macd_h>0 else ('ind-bearish' if macd_h<0 else 'ind-neutral'), f"MACD: {macd_h:+.2f}"),
     ]
-
     indicators_html = "".join([f"<span class='indicator-mini {c}'>{lbl}</span>" for c, lbl in ind_specs])
     if shield:
         indicators_html += f"<span class='indicator-mini ind-bearish' style='font-weight:700;'>🔓 {shield}</span>"
-
-    trend = meta.get('trend_regime', 'NEUTRAL ⚪')
-    st.markdown(f"""
-    <div class="price-header">
+    trend = meta.get('trend_regime','NEUTRAL ⚪')
+    st.markdown(f"""<div class="price-header">
         <div style="display:flex;justify-content:space-between;align-items:center;">
-            <div>
-                <p class="price-label">💎 {meta['ticker']} · {meta['last_date']} · <b>{trend}</b></p>
-                <p class="price-big" style="color:#FAFAFA;">${meta['price']:.2f}
-                    <span class="{chg_cls}" style="font-size:1rem;margin-left:8px;">
-                        {chg_ico} {abs(chg):.2f} ({abs(chg_pct):.2f}%)</span></p>
-            </div>
-            <div style="text-align:right;">
-                <p class="price-label">ATR (변동성)</p>
-                <p style="color:#FFC107;font-size:1.1rem;font-weight:600;margin:0;">
-                    ${meta['atr']:.2f} ({meta['atr_pct']:.1f}%)</p>
-            </div>
-        </div>
-        <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">{indicators_html}</div>
-    </div>""", unsafe_allow_html=True)
-
+            <div><p class="price-label">💎 {meta['ticker']} · {meta['last_date']} · <b>{trend}</b></p>
+            <p class="price-big" style="color:#FAFAFA;">${meta['price']:.2f}
+                <span class="{chg_cls}" style="font-size:1rem;margin-left:8px;">
+                    {chg_ico} {abs(chg):.2f} ({abs(chg_pct):.2f}%)</span></p></div>
+            <div style="text-align:right;"><p class="price-label">ATR (변동성)</p>
+            <p style="color:#FFC107;font-size:1.1rem;font-weight:600;margin:0;">
+                ${meta['atr']:.2f} ({meta['atr_pct']:.1f}%)</p></div></div>
+        <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">{indicators_html}</div></div>""",
+        unsafe_allow_html=True)
 
 def render_bias_badge(meta):
-    bias = meta['overall_bias']; sc = meta.get('bias_score', 0); cv = meta.get('confluence_score', 0)
-    bias_styles = {
-        'STRONG BUY': ('rgba(0,230,118,0.2)', '#00E676', '🟢🟢'),
-        'BUY': ('rgba(0,230,118,0.12)', '#00E676', '🟢'),
-        'STRONG SELL': ('rgba(255,23,68,0.2)', '#FF1744', '🔴🔴'),
-        'SELL': ('rgba(255,23,68,0.12)', '#FF1744', '🔴'),
-    }
-    bg, clr, ico = bias_styles.get(bias, ('rgba(255,193,7,0.12)', '#FFC107', '🟠'))
-    cc = '#00E676' if cv >= 3.5 else ('#FF1744' if cv <= -3.5 else '#FFC107')
-    gauge_pct = max(0, min(100, ((sc + 13.0) / 26.0) * 100))
-
+    bias = meta['overall_bias']; sc = meta.get('bias_score',0); cv = meta.get('confluence_score',0)
+    bias_styles = {'STRONG BUY':('rgba(0,230,118,0.2)','#00E676','🟢🟢'),
+        'BUY':('rgba(0,230,118,0.12)','#00E676','🟢'),
+        'STRONG SELL':('rgba(255,23,68,0.2)','#FF1744','🔴🔴'),
+        'SELL':('rgba(255,23,68,0.12)','#FF1744','🔴')}
+    bg, clr, ico = bias_styles.get(bias, ('rgba(255,193,7,0.12)','#FFC107','🟠'))
+    cc = '#00E676' if cv>=3.5 else ('#FF1744' if cv<=-3.5 else '#FFC107')
+    gauge_pct = max(0, min(100, ((sc+13.0)/26.0)*100))
     st.markdown(f"""<div style="background:{bg};border-radius:10px;padding:12px 16px;text-align:center;margin:8px 0;">
         <span style="font-size:1.2rem;font-weight:700;color:{clr};">{ico} 종합 판정: {bias} ({sc:.1f})</span><br>
         <span style="font-size:0.9rem;color:{cc};font-weight:600;">📊 Confluence: {cv:.1f}</span>
         <div class="bias-gauge-track" style="margin:10px auto;max-width:300px;">
-            <div class="bias-gauge-needle" style="left:{gauge_pct}%;"></div>
-        </div>
+            <div class="bias-gauge-needle" style="left:{gauge_pct}%;"></div></div>
         <div style="display:flex;justify-content:space-between;max-width:300px;margin:0 auto;">
             <span style="color:#FF1744;font-size:0.65rem;">STRONG SELL</span>
             <span style="color:#888;font-size:0.65rem;">NEUTRAL</span>
-            <span style="color:#00E676;font-size:0.65rem;">STRONG BUY</span>
-        </div>
-    </div>""", unsafe_allow_html=True)
-
+            <span style="color:#00E676;font-size:0.65rem;">STRONG BUY</span></div></div>""",
+        unsafe_allow_html=True)
 
 def render_proximity_alert(meta):
     alerts = []
-    bp, sp = meta.get('buy_proximity', 0), meta.get('sell_proximity', 0)
-    if bp >= 70: alerts.append(('🟢⚡ 매수 시그널 매우 임박!', '#00E676', bp))
-    elif bp >= 50: alerts.append(('🟢 매수 시그널 접근 중', '#69F0AE', bp))
-    if sp >= 70: alerts.append(('🔴⚡ 매도 시그널 매우 임박!', '#FF1744', sp))
-    elif sp >= 50: alerts.append(('🔴 매도 시그널 접근 중', '#FF5252', sp))
+    bp, sp = meta.get('buy_proximity',0), meta.get('sell_proximity',0)
+    if bp>=70: alerts.append(('🟢⚡ 매수 시그널 매우 임박!','#00E676',bp))
+    elif bp>=50: alerts.append(('🟢 매수 시그널 접근 중','#69F0AE',bp))
+    if sp>=70: alerts.append(('🔴⚡ 매도 시그널 매우 임박!','#FF1744',sp))
+    elif sp>=50: alerts.append(('🔴 매도 시그널 접근 중','#FF5252',sp))
     if meta.get('squeeze_on', False):
-        alerts.append(('💥 Squeeze ON — 변동성 폭발 임박', '#FFFF00', 80))
+        alerts.append(('💥 Squeeze ON — 변동성 폭발 임박','#FFFF00',80))
     for txt, clr, pct in alerts:
         w = min(pct, 100)
-        st.markdown(f"""
-        <div style="background:rgba(255,255,255,0.03);border:1px solid #2D333B;border-radius:8px;padding:8px 14px;margin:4px 0;">
+        st.markdown(f"""<div style="background:rgba(255,255,255,0.03);border:1px solid #2D333B;border-radius:8px;padding:8px 14px;margin:4px 0;">
             <div style="display:flex;justify-content:space-between;align-items:center;">
                 <span style="color:{clr};font-weight:600;font-size:0.9rem;">{txt}</span>
-                <span style="color:{clr};font-weight:700;font-size:0.85rem;">{pct:.0f}%</span>
-            </div>
+                <span style="color:{clr};font-weight:700;font-size:0.85rem;">{pct:.0f}%</span></div>
             <div style="background:#1A1D24;border-radius:3px;height:6px;margin-top:6px;">
-                <div style="background:{clr};width:{w}%;height:6px;border-radius:3px;"></div>
-            </div>
-        </div>""", unsafe_allow_html=True)
-
+                <div style="background:{clr};width:{w}%;height:6px;border-radius:3px;"></div></div></div>""",
+            unsafe_allow_html=True)
 
 def render_signal_cards(meta):
     sigs = meta['recent_signals']
@@ -1342,70 +1166,58 @@ def render_signal_cards(meta):
         st.markdown("""<div class="signal-card signal-card-neutral">
             <p style="margin:0;color:#FFC107;font-weight:600;">🟠 최근 15일 내 주요 시그널 없음</p>
             <p style="margin:4px 0 0 0;color:#888;font-size:0.85rem;">관망 구간입니다.</p></div>""",
-                    unsafe_allow_html=True)
+            unsafe_allow_html=True)
         return
-
     date_groups = OrderedDict()
     for icon, lbl, d_str, side in sigs:
         date_groups.setdefault(d_str, []).append((icon, lbl, side))
-
     all_stats = meta.get('all_signal_stats', {})
-
     for d_str in reversed(date_groups):
         group = date_groups[d_str]
-        buy_c = sum(1 for _, _, s in group if s == 'buy')
-        sell_c = sum(1 for _, _, s in group if s == 'sell')
-        ct = 'signal-card-buy' if buy_c > sell_c else ('signal-card-sell' if sell_c > buy_c else 'signal-card-neutral')
+        buy_c = sum(1 for _,_,s in group if s=='buy')
+        sell_c = sum(1 for _,_,s in group if s=='sell')
+        ct = 'signal-card-buy' if buy_c>sell_c else ('signal-card-sell' if sell_c>buy_c else 'signal-card-neutral')
         sig_parts = []
         for i, l, s in group:
-            cls_name = "ind-bullish" if s == "buy" else "ind-bearish"
+            cls_name = "ind-bullish" if s=="buy" else "ind-bearish"
             stat_hint = ""
             for sn, sv in all_stats.items():
                 cfg = ALL_CHART_SIGNALS.get(sn, {})
-                if cfg.get('label') == l:
+                if cfg.get('label')==l:
                     wr = sv.get('10d_winrate')
-                    if wr is not None:
-                        stat_hint = f" ({wr:.0f}%)"
+                    if wr is not None: stat_hint = f" ({wr:.0f}%)"
                     break
             sig_parts.append(f'<span class="indicator-mini {cls_name}">{i} {l}{stat_hint}</span>')
         sig_html = " ".join(sig_parts)
         st.markdown(f"""<div class="signal-card {ct}">
             <div style="display:flex;justify-content:space-between;align-items:center;">
                 <span style="font-weight:700;font-size:0.9rem;color:#FAFAFA;">📅 {d_str}</span>
-                <span style="color:#888;font-size:0.75rem;">{len(group)}개 신호</span>
-            </div>
-            <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;">{sig_html}</div>
-        </div>""", unsafe_allow_html=True)
-
+                <span style="color:#888;font-size:0.75rem;">{len(group)}개 신호</span></div>
+            <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;">{sig_html}</div></div>""",
+            unsafe_allow_html=True)
 
 def render_signal_stats(meta):
     with st.expander("📊 시그널 백테스트 통계 (과거 2년, 최소 5회 이상)", expanded=True):
         alls = meta.get('all_signal_stats', {})
         if not alls:
             st.caption("통계 데이터 없음 (최소 발생 횟수 미달)"); return
-
         def _render_side(title, data, is_sell=False):
             st.markdown(f"##### {title}")
             for sn, sv in sorted(data.items(), key=lambda x: x[1]['count'], reverse=True):
                 wr = sv.get('10d_winrate'); av = sv.get('10d_avg')
                 if wr is None: continue
                 if is_sell:
-                    rate = 100 - wr
-                    clr = '#FF1744' if rate > 55 else ('#FFC107' if rate > 45 else '#00E676')
+                    rate = 100-wr; clr = '#FF1744' if rate>55 else ('#FFC107' if rate>45 else '#00E676')
                     label = f"10일 후 하락 확률 <span style='color:{clr}'>{rate:.0f}%</span>"
                 else:
-                    clr = '#00E676' if wr > 55 else ('#FFC107' if wr > 45 else '#FF1744')
+                    clr = '#00E676' if wr>55 else ('#FFC107' if wr>45 else '#FF1744')
                     label = f"10일 상승 <span style='color:{clr}'>{wr:.0f}%</span>"
-                icon = ALL_CHART_SIGNALS.get(sn, {}).get('icon', '')
+                icon = ALL_CHART_SIGNALS.get(sn,{}).get('icon','')
                 st.markdown(f"<span style='font-size:0.82rem;'>{icon} **{sn}** ({sv['count']}회) · "
                             f"{label} · 평균 {av:+.1f}%</span>", unsafe_allow_html=True)
-
         c1, c2 = st.columns(2)
-        with c1:
-            _render_side("🟢 BUY 시그널", {k: v for k, v in alls.items() if v['direction'] == 'buy'})
-        with c2:
-            _render_side("🔴 SELL 시그널", {k: v for k, v in alls.items() if v['direction'] == 'sell'}, True)
-
+        with c1: _render_side("🟢 BUY", {k:v for k,v in alls.items() if v['direction']=='buy'})
+        with c2: _render_side("🔴 SELL", {k:v for k,v in alls.items() if v['direction']=='sell'}, True)
 
 def render_inline_analysis(msg):
     meta, fig = msg.get('meta'), msg.get('fig')
@@ -1419,84 +1231,55 @@ def render_inline_analysis(msg):
     if meta:
         render_signal_stats(meta)
 
-
 # ──────────────────────────────────────────
 # 사이드바
 # ──────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 💎 CipherX")
-    st.markdown("<p style='color:#888;font-size:0.8rem;'>AI 주가 분석 · Market Cipher B+ v3.0</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#888;font-size:0.8rem;'>AI 주가 분석 · Market Cipher B+ v4.0</p>", unsafe_allow_html=True)
     st.markdown("---")
 
     st.markdown("### 📅 차트 기간")
-    chart_period = st.radio("표시 기간", ['3개월', '6개월', '1년', '2년'],
-                            index=2, horizontal=True, key="chart_period_radio")
-    chart_days = {'3개월': 63, '6개월': 126, '1년': 252, '2년': 504}[chart_period]
-
-    # v3.0: 차트 높이 조절
-    chart_height = st.select_slider("차트 높이", options=[800, 900, 1000, 1100, 1200, 1300],
-                                     value=1100, key="chart_height_slider")
-    st.session_state['chart_height'] = chart_height
-
-    # v3.0: 기간 변경 감지 (버그 수정)
-    if 'prev_chart_period' not in st.session_state:
-        st.session_state.prev_chart_period = chart_period
-    if chart_period != st.session_state.prev_chart_period:
-        st.session_state.prev_chart_period = chart_period
-        if st.session_state.get('last_ticker'):
-            st.session_state._pending_reanalyze = True
+    chart_period = st.radio("표시 기간", ['3개월','6개월','1년','2년'], index=2, horizontal=True, key="chart_period_radio")
+    chart_days = {'3개월':63,'6개월':126,'1년':252,'2년':504}[chart_period]
+    st.session_state['chart_days'] = chart_days
 
     st.markdown("---")
 
-    # v3.0: 퀵 티커 버튼 (버그 수정 — 실제 동작)
-    st.markdown("### ⚡ 빠른 분석")
-    quick_cols = st.columns(4)
-    for idx, t in enumerate(QUICK_TICKERS):
-        with quick_cols[idx % 4]:
-            if st.button(t, key=f"quick_{t}", type="secondary", use_container_width=True):
-                st.session_state._pending_ticker = t
-                st.rerun()
-
-    st.markdown("---")
-
-    # v3.0: 시그널 필터
     with st.expander("🎛️ 시그널 필터", expanded=False):
         show_buy = st.checkbox("🟢 매수 시그널", value=True, key="show_buy_signals")
         show_sell = st.checkbox("🔴 매도 시그널", value=True, key="show_sell_signals")
         show_composite = st.checkbox("⭐ 복합 시그널", value=True, key="show_composite_signals")
         min_weight = st.slider("최소 가중치", 0.0, 3.0, 0.0, 0.5, key="min_signal_weight")
-
         enabled = set()
         for k, v in ALL_CHART_SIGNALS.items():
-            if v['dir'] == 'buy' and not show_buy: continue
-            if v['dir'] == 'sell' and not show_sell: continue
+            if v['dir']=='buy' and not show_buy: continue
+            if v['dir']=='sell' and not show_sell: continue
             if k in COMPOSITE_SIGNALS and not show_composite: continue
-            if v['w'] < min_weight and k not in COMPOSITE_SIGNALS: continue
+            if v['w']<min_weight and k not in COMPOSITE_SIGNALS: continue
             enabled.add(k)
         st.session_state['enabled_signals'] = enabled
         st.caption(f"활성 시그널: {len(enabled)}개")
 
     if st.button("🗑️ 대화 초기화", use_container_width=True, type="secondary"):
-        for key in ['messages', 'pending_ai_ticker', 'pending_ai_prompt', 'last_ticker',
-                     '_pending_ticker', '_pending_reanalyze']:
-            default = [{"role": "assistant", "type": "text",
-                        "content": "안녕하세요! 💎 **CipherX** 입니다.\n\n분석할 **티커명**을 입력하세요."}] if key == 'messages' else None
+        for key in ['messages','pending_ai_ticker','pending_ai_prompt','last_ticker']:
+            default = [{"role":"assistant","type":"text",
+                "content":"안녕하세요! 💎 **CipherX** 입니다.\n\n분석할 **티커명**을 입력하세요."}] if key=='messages' else None
             st.session_state[key] = default
         st.rerun()
-    st.markdown("---")
 
+    st.markdown("---")
     st.markdown("### 📖 신호 가이드")
     for expander_title, sig_list in [
-        ("🟢 매수 신호 (BUY)", [k for k, v in ALL_CHART_SIGNALS.items() if v['dir'] == 'buy']),
-        ("🔴 매도 신호 (SELL)", [k for k, v in ALL_CHART_SIGNALS.items() if v['dir'] == 'sell']),
-    ]:
+        ("🟢 매수 신호 (BUY)", [k for k,v in ALL_CHART_SIGNALS.items() if v['dir']=='buy']),
+        ("🔴 매도 신호 (SELL)", [k for k,v in ALL_CHART_SIGNALS.items() if v['dir']=='sell'])]:
         with st.expander(expander_title, expanded=False):
             for k in sig_list:
                 info = ALL_CHART_SIGNALS[k]
                 st.markdown(f"**{info['icon']} {info['label']}** (w={info['w']}) · "
-                            f"<span style='color:#888;font-size:0.82rem;'>{info.get('kor', '')}</span>",
-                            unsafe_allow_html=True)
-                st.caption(info.get('desc', ''))
+                    f"<span style='color:#888;font-size:0.82rem;'>{info.get('kor','')}</span>",
+                    unsafe_allow_html=True)
+                st.caption(info.get('desc',''))
 
     with st.expander("🛡️ 추세 필터 시스템", expanded=False):
         st.markdown("""
@@ -1506,36 +1289,35 @@ with st.sidebar:
 - Parabolic Top/Bottom → 매도/매수 쉴드 강제 해제
 - SuperTrend Flip → 해당 방향 쉴드 해제
 
-**V3.0 변경점**: Hidden Div WT 필터 강화 · Circle RSI 필터 · Golden/Death Cross ADX+거래량 · EMA Pullback 지연확인 · MACD/StochRSI 크로스 추가 · Parabolic 거래량확인
+**V4.0 변경점**: RSI Divergence 추가 · Hammer/ShootingStar 추가 · Three Candle Strike 추가 · Fib 시그널 제거 · Hidden Div WT 필터 강화(-25/25)
         """)
 
     with st.expander("📊 지표 해석 가이드", expanded=False):
         st.markdown("""
-**WaveTrend**: WT1 < -53 과매도 · WT1 > 53 과매수 · 교차 = 시그널
-**RSI/MFI**: < 30 과매도 · > 70 과매수
-**MACD**: 히스토그램 양수=상승모멘텀 · 음수=하락모멘텀
+**WaveTrend**: WT1<-53 과매도 · WT1>53 과매수 · 교차=시그널
+**RSI/MFI**: <30 과매도 · >70 과매수
+**MACD**: 히스토그램 양수=상승모멘텀
 **Confluence**: ≥6 Ultra Buy · ≤-6 Ultra Sell
-**Squeeze**: ON = 변동성 응축 → 폭발 대기
-**SuperTrend**: ▲ = 강세지지 · ▼ = 약세저항
+**Squeeze**: ON=변동성 응축→폭발 대기
+**SuperTrend**: ▲=강세지지 · ▼=약세저항
         """)
 
-    st.markdown("<p style='color:#555;font-size:0.7rem;text-align:center;'>CipherX v3.0 · Enhanced Signal Engine</p>", unsafe_allow_html=True)
-
+    st.markdown("<p style='color:#555;font-size:0.7rem;text-align:center;'>CipherX v4.0</p>", unsafe_allow_html=True)
 
 # ──────────────────────────────────────────
 # 세션 초기화
 # ──────────────────────────────────────────
 if 'messages' not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "type": "text",
-         "content": "안녕하세요! 💎 **CipherX** 입니다.\n\n분석할 **티커명**을 입력하세요. 채팅처럼 자유롭게 여러 종목을 이어서 분석할 수 있습니다."}
-    ]
-for key in ['pending_ai_ticker', 'pending_ai_prompt', 'last_ticker']:
+        {"role":"assistant","type":"text",
+         "content":"안녕하세요! 💎 **CipherX** 입니다.\n\n분석할 **티커명**을 입력하세요. 채팅처럼 자유롭게 여러 종목을 이어서 분석할 수 있습니다."}]
+for key in ['pending_ai_ticker','pending_ai_prompt','last_ticker']:
     if key not in st.session_state:
         st.session_state[key] = None
 if 'enabled_signals' not in st.session_state:
     st.session_state['enabled_signals'] = set(ALL_CHART_SIGNALS.keys())
-
+if 'chart_days' not in st.session_state:
+    st.session_state['chart_days'] = 252
 
 # ──────────────────────────────────────────
 # 프롬프트
@@ -1569,13 +1351,13 @@ def build_analysis_prompt(ticker_value, phist, scraped):
 - ≥70%: 시그널 발동 매우 임박 | 50~70%: 접근 중 | <50%: 아직 거리 있음
 
 🛡️ **Shield Override** 해석:
-- NONE: 추세 필터가 정상 작동 중
-- PARABOLIC TOP: 극단적 과열 감지 → 매도 쉴드 해제 (강한 경고)
+- NONE: 추세 필터 정상 작동 중
+- PARABOLIC TOP: 극단적 과열 → 매도 쉴드 해제 (강한 경고)
 - PARABOLIC BOT: 극단적 과매도 → 매수 쉴드 해제 (반등 가능성)
 - ST BEAR/BULL: 슈퍼트렌드 전환 → 해당 방향 쉴드 해제
 
-📊 **백테스트 통계**: 과거 2년간 각 시그널의 실제 10일 후 승률/평균수익률이 포함되어 있습니다.
-→ 승률 60% 이상 시그널은 높은 신뢰도, 50% 미만은 주의 필요로 해석하세요.
+📊 **백테스트 통계**: 과거 2년간 각 시그널의 실제 10일 후 승률/평균수익률 포함.
+→ 승률 60% 이상 시그널은 높은 신뢰도, 50% 미만은 주의 필요.
 
 ---
 ━━━━━━━━━━━━━
@@ -1597,7 +1379,7 @@ def build_analysis_prompt(ticker_value, phist, scraped):
 ② 확신형 어조, 이모티콘(🔵긍정 🔴부정 🟠중간)
 ③ Trend Regime + 시그널 Tier + 백테스트 통계를 연계 분석
 ④ 시나리오별 신뢰도(높음/중간/낮음) + 근거 (추측 확률% 금지)
-⑤ 지지/저항 수준은 MA, BB, SuperTrend, Fib 레벨에서 도출
+⑤ 지지/저항 수준은 MA, BB, SuperTrend, 가격 레벨에서 도출
 ⑥ Proximity Alert와 Squeeze 상태를 시나리오에 반영
 ⑦ Shield Override 상태의 의미를 분석에 반영
 
@@ -1658,30 +1440,30 @@ def build_analysis_prompt(ticker_value, phist, scraped):
 st.markdown("<h2 style='text-align:center;color:#fff;margin-bottom:20px;'>💎 CipherX</h2>", unsafe_allow_html=True)
 
 for i, msg in enumerate(st.session_state.messages):
-    av = "✨" if msg["role"] == "assistant" else "🧑‍💻"
+    av = "✨" if msg["role"]=="assistant" else "🧑‍💻"
     with st.chat_message(msg["role"], avatar=av):
         if msg.get("type") == "analysis":
-            st.markdown(msg.get("content", ""))
+            st.markdown(msg.get("content",""))
             render_inline_analysis(msg)
             if msg.get("prompt"):
                 with st.expander("📝 생성된 프롬프트 확인", expanded=False):
                     st.code(msg["prompt"], language="markdown")
                     st_copy_to_clipboard(msg["prompt"], before_copy_label="📋 복사", after_copy_label="✅ 복사됨!")
         elif msg.get("type") == "report":
-            with st.expander(f"📊 {msg.get('ticker', '')} AI 심층 분석 리포트", expanded=True):
+            with st.expander(f"📊 {msg.get('ticker','')} AI 심층 분석 리포트", expanded=True):
                 st.markdown(msg["content"])
             ns = datetime.now().strftime("%Y%m%d_%H%M")
-            tn = msg.get("ticker", "report").upper()
+            tn = msg.get("ticker","report").upper()
             st.download_button("📥 다운로드 (.md)", key=f"dl_{i}",
-                               data=msg["content"].encode('utf-8'),
-                               file_name=f"{tn}_Report_{ns}.md", mime="text/markdown",
-                               use_container_width=True)
+                data=msg["content"].encode('utf-8'),
+                file_name=f"{tn}_Report_{ns}.md", mime="text/markdown",
+                use_container_width=True)
         else:
-            st.markdown(msg.get("content", ""))
+            st.markdown(msg.get("content",""))
 
 
 # ──────────────────────────────────────────
-# 재분석 바 + AI 분석 버튼
+# AI 분석 + 처리 함수
 # ──────────────────────────────────────────
 def _run_ai_analysis():
     ticker_pending = st.session_state.pending_ai_ticker
@@ -1697,13 +1479,12 @@ def _run_ai_analysis():
             rpt = ""; rph = st.empty(); cc = 0
             for chunk in resp:
                 rpt += chunk.text; rph.markdown(rpt + " ▌"); cc += 1
-                pb.progress(min(40 + cc * 2, 95), text="AI 리포트 작성 중...")
+                pb.progress(min(40+cc*2, 95), text="AI 리포트 작성 중...")
             pb.progress(100, text="✅ 분석 완료!"); time.sleep(0.5); pb.empty()
             rph.empty()
             st.session_state.messages.append({
-                "role": "assistant", "type": "report",
-                "ticker": ticker_pending.upper(), "content": rpt,
-            })
+                "role":"assistant","type":"report",
+                "ticker":ticker_pending.upper(),"content":rpt})
             st.session_state.pending_ai_ticker = None
             st.session_state.pending_ai_prompt = None
             st.rerun()
@@ -1712,30 +1493,32 @@ def _run_ai_analysis():
             st.error(f"AI 분석 중 오류 발생: {e}")
 
 
-def process_ticker(ticker_value):
+def process_ticker(ticker_value, force_refresh=False):
     ticker_value = ticker_value.strip().upper()
 
+    # 기존 pending 상태 초기화 (같은 티커 재분석/다른 티커 전환 시 충돌 방지)
+    st.session_state.pending_ai_ticker = None
+    st.session_state.pending_ai_prompt = None
+
     if not _is_valid_ticker_format(ticker_value):
-        st.session_state.messages.append({"role": "user", "type": "text", "content": ticker_value})
+        st.session_state.messages.append({"role":"user","type":"text","content":ticker_value})
         st.session_state.messages.append({
-            "role": "assistant", "type": "text",
-            "content": f"⚠️ **{ticker_value}** — 올바른 티커 형식이 아닙니다.\n\n"
-                       f"영문 1~5자를 입력하세요 (예: AAPL, TSLA, BRK.B)"
-        })
-        st.rerun()
-        return
+            "role":"assistant","type":"text",
+            "content":f"⚠️ **{ticker_value}** — 올바른 티커 형식이 아닙니다.\n\n영문 1~5자를 입력하세요 (예: AAPL, TSLA, BRK.B)"})
+        st.rerun(); return
 
     if not validate_ticker(ticker_value):
-        st.session_state.messages.append({"role": "user", "type": "text", "content": ticker_value})
+        st.session_state.messages.append({"role":"user","type":"text","content":ticker_value})
         st.session_state.messages.append({
-            "role": "assistant", "type": "text",
-            "content": f"⚠️ **{ticker_value}** — 유효하지 않은 티커입니다.\n\n"
-                       f"Yahoo Finance에서 해당 종목을 찾을 수 없습니다. 티커명을 확인해주세요."
-        })
-        st.rerun()
-        return
+            "role":"assistant","type":"text",
+            "content":f"⚠️ **{ticker_value}** — 유효하지 않은 티커입니다.\n\nYahoo Finance에서 해당 종목을 찾을 수 없습니다."})
+        st.rerun(); return
 
-    st.session_state.messages.append({"role": "user", "type": "text", "content": ticker_value})
+    # 캐시 갱신 (재분석 시)
+    if force_refresh:
+        st.cache_data.clear()
+
+    st.session_state.messages.append({"role":"user","type":"text","content":ticker_value})
     st.session_state.last_ticker = ticker_value
 
     with st.chat_message("assistant", avatar="✨"):
@@ -1743,15 +1526,16 @@ def process_ticker(ticker_value):
         pg.progress(15, text="📡 SwingTradeBot 크롤링 중...")
         scraped = get_stock_data(ticker_value)
         pg.progress(40, text="📊 Yahoo Finance 주가 로딩 중...")
-        cfig, phist, meta = get_yfinance_data_and_chart(ticker_value, chart_period_days=chart_days)
+        cd = st.session_state.get('chart_days', 252)
+        cfig, phist, meta = get_yfinance_data_and_chart(ticker_value, chart_period_days=cd)
         pg.progress(70, text="💎 마켓 사이퍼 + 시그널 분석 중...")
         time.sleep(0.3)
         pg.progress(90, text="📝 프롬프트 생성 중...")
         if scraped or cfig:
             prompt = build_analysis_prompt(ticker_value, phist, scraped)
             analysis_msg = {
-                "role": "assistant", "type": "analysis", "ticker": ticker_value,
-                "content": f"✅ **{ticker_value}** 분석 완료! 아래에서 차트와 시그널을 확인하세요.",
+                "role":"assistant","type":"analysis","ticker":ticker_value,
+                "content":f"✅ **{ticker_value}** 분석 완료! 아래에서 차트와 시그널을 확인하세요.",
                 "fig": cfig, "meta": meta, "prompt": prompt,
             }
             st.session_state.messages.append(analysis_msg)
