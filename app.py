@@ -14,10 +14,10 @@ import numpy as np
 from plotly.subplots import make_subplots
 from collections import OrderedDict
 
-st.set_page_config(page_title="CipherX V6", page_icon="📈", layout="centered")
+st.set_page_config(page_title="CipherX V6.2", page_icon="📈", layout="centered")
 
 # ──────────────────────────────────────────
-# 🎨 CSS
+# 🎨 CSS (UX 최적화)
 # ──────────────────────────────────────────
 st.markdown("""<style>
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -32,7 +32,7 @@ div[data-testid="stCodeBlock"] span[style*="color: black"],
 div[data-testid="stCodeBlock"] code>span:not([class]){color:#FAFAFA!important}
 div[data-testid="stChatMessage"]:nth-child(even){background-color:#161A22;border-radius:12px;padding:5px 15px}
 header{visibility:hidden}
-.block-container{padding-top:1rem!important;max-width:900px}
+.block-container{padding-top:1rem!important;max-width:950px}
 div.stButton>button[kind="primary"]{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%)!important;
 color:white!important;border:none!important;border-radius:12px!important;padding:.6rem 1.5rem!important;
 font-weight:600!important;font-size:1rem!important;transition:all .3s ease!important;width:100%}
@@ -67,7 +67,7 @@ div[data-testid="stTabs"] button[aria-selected="true"]{color:#667eea!important;b
 </style>""", unsafe_allow_html=True)
 
 # ──────────────────────────────────────────
-# 🔧 시그널 레지스트리 (V6.0 노이즈 캔들 패턴 제거)
+# 🔧 시그널 레지스트리 (유지)
 # ──────────────────────────────────────────
 _B, _S = 'buy', 'sell'
 def _sig(w,d,icon,label,sym,sz,clr,base,atr_m,kor,desc):
@@ -132,10 +132,6 @@ ALL_CHART_SIGNALS = {**SIGNAL_REGISTRY, **COMPOSITE_SIGNALS}
 
 OB1, OB2, OS1, OS2 = 53, 60, -53, -60
 ST_MIN_BAR = 12
-_UA = ['Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/125.0.0.0 Safari/537.36',
-       'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 Version/17.4 Safari/605.1.15',
-       'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36']
-
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=GEMINI_API_KEY)
 
@@ -155,8 +151,7 @@ COOLDOWN_MAP = {
 # ──────────────────────────────────────────
 # 공통 유틸
 # ──────────────────────────────────────────
-def _recent(s, lb=3):
-    return s.astype(float).rolling(lb+1, min_periods=1).max().fillna(0).astype(bool)
+def _recent(s, lb=3): return s.astype(float).rolling(lb+1, min_periods=1).max().fillna(0).astype(bool)
 
 def _cooldown(sig, bars=5):
     v = sig.astype(bool).values.copy(); last = -bars-1
@@ -169,14 +164,13 @@ def _cooldown(sig, bars=5):
 def _volf(vol, ratio=0.5, period=20):
     return vol >= (vol.rolling(period, min_periods=5).mean() * ratio)
 
-def _valid_fmt(t):
-    return bool(re.match(r'^[A-Za-z]{1,5}([.\-][A-Za-z]{1,2})?$', t))
+def _valid_fmt(t): return bool(re.match(r'^[A-Za-z]{1,5}([.\-][A-Za-z]{1,2})?$', t))
 
 def _cls(val, lo, hi):
     return 'ind-bullish' if val<lo else ('ind-bearish' if val>hi else 'ind-neutral')
 
 # ──────────────────────────────────────────
-# 캐싱
+# 데이터 수집 및 연산 (로직 동일 유지)
 # ──────────────────────────────────────────
 @st.cache_data(ttl=300, show_spinner=False)
 def get_stock_data(ticker):
@@ -185,7 +179,6 @@ def get_stock_data(ticker):
     for att in range(3):
         try:
             time.sleep(random.uniform(1.0, 2.0) * (att + 1))
-            # V6.0 FIX: requests 대신 scraper.get 사용 (스크래핑 성공률 극대화)
             r = scraper.get(url, headers={'Referer': 'https://www.google.com/'}, timeout=15)
             if r.status_code != 200:
                 if att < 2: continue
@@ -221,9 +214,6 @@ def compute_and_cache(ticker, _ts=None):
     if df.empty: return None
     return detect_all_signals(compute_indicators(df))
 
-# ──────────────────────────────────────────
-# 지표 계산 엔진
-# ──────────────────────────────────────────
 def compute_rsi(s, p=14):
     d=s.diff(); g,l=d.clip(lower=0),-d.clip(upper=0)
     return 100-(100/(1+g.ewm(alpha=1/p,min_periods=p).mean()/(l.ewm(alpha=1/p,min_periods=p).mean()+1e-10)))
@@ -296,8 +286,8 @@ def compute_keltner(h,l,c,el=20,al=10,m=1.5):
 
 def detect_ttm_squeeze(bbu,bbl,kcu,kcl,c,h,l,kcm):
     sq=(bbu<kcu)&(bbl>kcl); fire=(~sq)&sq.shift(1).fillna(False)
-    dm=(h.rolling(20).max()+l.rolling(20).min())/2; mom=c-(dm+kcm)/2
-    return sq, fire&(mom>0), fire&(mom<0)
+    momentum = c - ((h.rolling(20).max() + l.rolling(20).min()) / 2 + kcm) / 2
+    return sq, fire&(momentum>0), fire&(momentum<0)
 
 def detect_volume_climax(c,o,v,wt1,atr,vm=3.0):
     avg=v.rolling(20).mean(); big=(c-o).abs()>atr*0.5
@@ -362,9 +352,6 @@ def _detect_parabolic_pair(c,o,wt1,bbu,bbl,atr):
     top=((wt1>85)&(wt1<wt1.shift(1))&(c<o)&(c<c.shift(1)))|((c>bbu+atr*1.5)&(c<o))
     return bot,top
 
-# ──────────────────────────────────────────
-# Scoring
-# ──────────────────────────────────────────
 def compute_confluence(df, dw=5, df_=0.7):
     bm={k:v['w'] for k,v in SIGNAL_REGISTRY.items() if v['dir']=='buy'}
     sm={k:v['w'] for k,v in SIGNAL_REGISTRY.items() if v['dir']=='sell'}
@@ -452,9 +439,6 @@ def compute_all_stats(dv):
     tgt.update({'Ultra_Buy':'buy','Strong_Buy':'buy','Ultra_Sell':'sell','Strong_Sell':'sell'})
     return {s:{**r,'direction':d} for s,d in tgt.items() if (r:=compute_signal_stats(dv,s)) and r['count']>0}
 
-# ──────────────────────────────────────────
-# 지표 + 시그널 파이프라인
-# ──────────────────────────────────────────
 def compute_indicators(df):
     c,h,l,v=df['Close'],df['High'],df['Low'],df['Volume']
     for ma in [5,20,50,100,125,200]: df[f'MA{ma}']=c.rolling(ma).mean()
@@ -503,7 +487,6 @@ def detect_all_signals(df):
     ssb=sb&(~para_top)&(~st_bo); ssx=xb&(~para_top)&(~st_bo)
     bsb=sbe&(~para_bot)&(~st_bu); bsx=xbe&(~para_bot)&(~st_bu)
 
-    # ── Core WT ──
     df['Green_Dot_T1']=wun&(wt1<=OS1)&(df['RSI']<30)&(df['MFI']<30)&(df['RSI_MFI']<0)&(~bsx)&vok
     df['Green_Dot_T2']=wun&(wt1<=OS1)&((df['RSI']<32)|(df['MFI']<32))&~df['Green_Dot_T1']&(~bsb)&vok
     _gd=df['Green_Dot_T1']|df['Green_Dot_T2']
@@ -516,7 +499,6 @@ def detect_all_signals(df):
     df['Green_Circle']=wun&(wt1<=OS1)&~_gd&(~bsb)&vok&(df['RSI']<45)
     df['Red_Circle']=wdn&(wt1>=OB1)&~_rd&(~ssb)&vok&(df['RSI']>55)
 
-    # ── Divergences ──
     bd,brd,hb,hbr=detect_pivot_div(C,wt1,60,5,OS1,OB1)
     bdr=_recent(bd,3); brdr=_recent(brd,3)
     rbd,rbrd,_,_=detect_pivot_div(C,df['RSI'],60,5,35,65)
@@ -534,57 +516,41 @@ def detect_all_signals(df):
     df['OBV_Div_Buy']=obd&(wt1<-30)&(~bsx)
     df['OBV_Div_Sell']=obrd&(wt1>30)&(~ssx)
 
-    # ── TTM Squeeze ──
     sqo,sqb,sqs=detect_ttm_squeeze(df['BB_Up'],df['BB_Low'],df['KC_Upper'],df['KC_Lower'],C,H,L,df['KC_Mid'])
     df['Squeeze_On']=sqo
     df['Squeeze_Fire_Buy']=sqb&(~bsb)&vok
     df['Squeeze_Fire_Sell']=sqs&(~ssb)&vok
 
-    # ── Volume Climax ──
     df['Volume_Climax_Buy'],df['Volume_Climax_Sell']=detect_volume_climax(C,O,V,wt1,atr)
 
-    # ── ADX ──
     ax=(df['ADX']>20)&(df['ADX'].shift(1)<=20)
     df['ADX_Momentum_Buy']=ax&(df['Plus_DI']>df['Minus_DI'])&(wt1>wt2)&vok
     df['ADX_Momentum_Sell']=ax&(df['Minus_DI']>df['Plus_DI'])&(wt1<wt2)&vok
 
-    # ── Candle Patterns ──
     df['Bullish_Engulfing'],df['Bearish_Engulfing']=_detect_engulfing_pair(C,O,wt1)
     df['Bullish_Engulfing']&=(~bsb)&vok; df['Bearish_Engulfing']&=(~ssb)&vok
 
-    # ── MA Cross ──
     gc=(m50>m200)&(m50.shift(1)<=m200.shift(1)); dc=(m50<m200)&(m50.shift(1)>=m200.shift(1))
     af=df['ADX']>15; vc=_volf(V,0.7)
     df['Golden_Cross']=gc&af&vc; df['Death_Cross']=dc&af&vc
 
-    # ── EMA Pullback ──
     df['EMA_Pullback_Buy'],df['EMA_Pullback_Sell']=_detect_ema_pullback_pair(C,H,L,V,e8,e21,atr,wt1,wt2)
-
-    # ── Momentum Ignition ──
     df['Momentum_Ignition_Buy'],df['Momentum_Ignition_Sell']=_detect_mom_ignition_pair(C,O,V,df['BB_Up'],df['BB_Low'],atr,e8,e21,wt1)
 
-    # ── SuperTrend ──
     df['SuperTrend_Buy']=st_fb2; df['SuperTrend_Sell']=st_fb
 
-    # ── Parabolic ──
     vp=_volf(V,1.0)
     df['Parabolic_Top_Sell']=para_top&((df['WT_Down']|wdr)|((C<O)&(C<C.shift(1))))&vp
     df['Parabolic_Bottom_Buy']=para_bot&((df['WT_Up']|wur)|((C>O)&(C>C.shift(1))))&vp
 
-    # ── VWAP ──
     df['VWAP_Bounce_Buy'],df['VWAP_Reject_Sell']=_detect_vwap_pair(C,df['VWAP_Osc'],wt1,wt2,V,atr)
 
-    # ── MACD Cross ──
     ml,ms=df['MACD_Line'],df['MACD_Signal']
     df['MACD_Cross_Buy']=(ml>ms)&(ml.shift(1)<=ms.shift(1))&(ml<0)&(~bsb)&vok
     df['MACD_Cross_Sell']=(ml<ms)&(ml.shift(1)>=ms.shift(1))&(ml>0)&(~ssb)&vok
+    df['StochRSI_Cross_Buy']=(df['StochK']>df['StochD'])&(df['StochK'].shift(1)<=df['StochD'].shift(1))&(df['StochK']<25)&(~bsb)&vok
+    df['StochRSI_Cross_Sell']=(df['StochK']<df['StochD'])&(df['StochK'].shift(1)>=df['StochD'].shift(1))&(df['StochK']>75)&(~ssb)&vok
 
-    # ── StochRSI Cross ──
-    sk,sd=df['StochK'],df['StochD']
-    df['StochRSI_Cross_Buy']=(sk>sd)&(sk.shift(1)<=sd.shift(1))&(sk<25)&(~bsb)&vok
-    df['StochRSI_Cross_Sell']=(sk<sd)&(sk.shift(1)>=sd.shift(1))&(sk>75)&(~ssb)&vok
-
-    # ── Cooldown ──
     for s,cd in COOLDOWN_MAP.items():
         if s in df.columns: df[s]=_cooldown(df[s],cd)
 
@@ -600,7 +566,7 @@ def detect_all_signals(df):
     return df
 
 # ──────────────────────────────────────────
-# 차트 생성
+# 📊 정밀 차트 렌더링 (V6.2 UX 극대화)
 # ──────────────────────────────────────────
 def _hl(fig,mask,idx,fill,txt=None,row=1):
     d=mask.astype(int).diff().fillna(0)
@@ -610,26 +576,29 @@ def _hl(fig,mask,idx,fill,txt=None,row=1):
     for s,e in zip(starts,ends):
         kw=dict(x0=s,x1=e,fillcolor=fill,line_width=0,row=row,col=1)
         if txt: kw.update(annotation_text=txt,annotation_position="top left",
-                          annotation_font_size=8,annotation_font_color="#FF4444")
+                          annotation_font_size=10,annotation_font_color="#FF5252")
         fig.add_vrect(**kw)
 
 def build_chart(dc,ticker,regime,shield):
     mac={5:"#ff9900",20:'#f1c40f',50:'#e74c3c',100:'#9b59b6',125:'#3498db',200:'#2ecc71'}
-    fig=make_subplots(rows=5,cols=1,shared_xaxes=True,vertical_spacing=0.02,
-        row_heights=[.40,.10,.22,.14,.14],
-        subplot_titles=("","","WaveTrend Oscillator","Money Flow","Confluence Score"))
+    
+    # ✅ V6.2 UX: MACD 패널 추가 및 높이 확장
+    fig=make_subplots(rows=6,cols=1,shared_xaxes=True,vertical_spacing=0.03,
+        row_heights=[.35,.08,.15,.12,.15,.15],
+        subplot_titles=("","","WaveTrend Oscillator","Money Flow","MACD (12, 26, 9)","Confluence Score"))
 
     fig.add_trace(go.Candlestick(x=dc.index,open=dc['Open'],high=dc['High'],low=dc['Low'],
-        close=dc['Close'],name="가격",increasing_line_color='#26a69a',decreasing_line_color='#ef5350'),row=1,col=1)
+        close=dc['Close'],name="Price",increasing_line_color='#26a69a',decreasing_line_color='#ef5350'),row=1,col=1)
+    
     for ma in [5,20,50,100,125,200]:
-        fig.add_trace(go.Scatter(x=dc.index,y=dc[f'MA{ma}'],line=dict(color=mac[ma],width=1.2),name=f'{ma}일선'),row=1,col=1)
-    for nm,col,clr,dash in [('EMA8','EMA8','#00FFFF','dot'),('EMA21','EMA21','#FF69B4','dot')]:
-        fig.add_trace(go.Scatter(x=dc.index,y=dc[col],line=dict(color=clr,width=1.5,dash=dash),name=nm),row=1,col=1)
+        fig.add_trace(go.Scatter(x=dc.index,y=dc[f'MA{ma}'],line=dict(color=mac[ma],width=1.2),name=f'{ma} MA',hoverinfo='skip'),row=1,col=1)
+    for nm,col,clr,dash in [('EMA 8','EMA8','#00FFFF','dot'),('EMA 21','EMA21','#FF69B4','dot')]:
+        fig.add_trace(go.Scatter(x=dc.index,y=dc[col],line=dict(color=clr,width=1.5,dash=dash),name=nm,hoverinfo='skip'),row=1,col=1)
     for mc,clr,nm in [(dc['ST_Direction']==1,'#00E676','ST▲'),(dc['ST_Direction']==-1,'#FF1744','ST▼')]:
-        fig.add_trace(go.Scatter(x=dc.index,y=dc['SuperTrend'].where(mc),line=dict(color=clr,width=2),name=nm,connectgaps=False),row=1,col=1)
-    fig.add_trace(go.Scatter(x=dc.index,y=dc['BB_Up'],line=dict(color='gray',width=1,dash='dot'),name='BB↑'),row=1,col=1)
+        fig.add_trace(go.Scatter(x=dc.index,y=dc['SuperTrend'].where(mc),line=dict(color=clr,width=2),name=nm,connectgaps=False,hoverinfo='skip'),row=1,col=1)
+    fig.add_trace(go.Scatter(x=dc.index,y=dc['BB_Up'],line=dict(color='gray',width=1,dash='dot'),name='BB↑',hoverinfo='skip'),row=1,col=1)
     fig.add_trace(go.Scatter(x=dc.index,y=dc['BB_Low'],line=dict(color='gray',width=1,dash='dot'),name='BB↓',
-        fill='tonexty',fillcolor='rgba(128,128,128,0.1)'),row=1,col=1)
+        fill='tonexty',fillcolor='rgba(128,128,128,0.1)',hoverinfo='skip'),row=1,col=1)
 
     for col,clr,txt in [('Sell_Shield_Overridden','rgba(255,0,0,0.04)','🔓Sell OFF'),
                          ('Buy_Shield_Overridden','rgba(0,255,0,0.04)','🔓Buy OFF')]:
@@ -639,6 +608,7 @@ def build_chart(dc,ticker,regime,shield):
     enabled=st.session_state.get('enabled_signals',set(ALL_CHART_SIGNALS.keys()))
     def _at(s): return dc.loc[s.index,'ATR'].fillna(dc['ATR'].median())
 
+    # ✅ V6.2 UX: 팝업 툴팁 (Hover Text) 고도화
     for cn,cfg in ALL_CHART_SIGNALS.items():
         if cn not in dc.columns or cn not in enabled: continue
         if cn=='Green_Dot_T1': sig=dc[dc[cn]&~dc.get('Gold_Dot',False)]
@@ -646,23 +616,34 @@ def build_chart(dc,ticker,regime,shield):
         elif cn=='Ultra_Sell': sig=dc[dc[cn]&~dc.get('Blood_Diamond',False)]
         else: sig=dc[dc[cn]]
         if sig.empty: continue
+        
         yv=sig[cfg['base']]+_at(sig)*cfg['atr_m']
         lw=2 if cfg['sz']>=16 else (1.5 if cfg['sz']>=13 else 1)
+        
+        hover_html = [
+            f"<span style='font-size:14px;color:{cfg['clr']}'><b>{cfg['icon']} {cfg['label']}</b></span><br>"
+            f"<span style='font-size:12px;color:#E2E8F0'>{cfg.get('kor','')}</span><br>"
+            f"<span style='font-size:11px;color:#888888'>{cfg.get('desc','')}</span>"
+            for _ in range(len(sig))
+        ]
+
         fig.add_trace(go.Scatter(x=sig.index,y=yv,mode='markers',
             marker=dict(symbol=cfg['sym'],size=cfg['sz'],color=cfg['clr'],
                 line=dict(width=lw,color='white' if 'open' not in cfg['sym'] else cfg['clr'])),
-            name=f"{cfg['icon']} {cfg['label']}"),row=1,col=1)
+            name=f"{cfg['icon']} {cfg['label']}",
+            hovertext=hover_html,
+            hovertemplate="%{x|%Y-%m-%d}<br>%{hovertext}<extra></extra>"),row=1,col=1)
 
     br=dc['Close']<dc['Open']
     fig.add_trace(go.Bar(x=dc.index,y=dc['Volume'],marker_color=np.where(br,'#ef5350','#26a69a').tolist(),
-        name="거래량",opacity=0.7),row=2,col=1)
+        name="Volume",opacity=0.7),row=2,col=1)
     vcm=dc.get('Volume_Climax_Buy',pd.Series(False))|dc.get('Volume_Climax_Sell',pd.Series(False))
     vcd=dc[vcm]
     if not vcd.empty:
         fig.add_trace(go.Bar(x=vcd.index,y=vcd['Volume'],marker_color='#FFD700',name="Vol Climax",opacity=0.9),row=2,col=1)
 
-    fig.add_trace(go.Scatter(x=dc.index,y=dc['WT1'],line=dict(color='#00E676',width=2),name="WT1"),row=3,col=1)
-    fig.add_trace(go.Scatter(x=dc.index,y=dc['WT2'],line=dict(color='#FF1744',width=1.5,dash='dot'),name="WT2"),row=3,col=1)
+    fig.add_trace(go.Scatter(x=dc.index,y=dc['WT1'],line=dict(color='#00E676',width=2),name="WT1",hoverinfo='skip'),row=3,col=1)
+    fig.add_trace(go.Scatter(x=dc.index,y=dc['WT2'],line=dict(color='#FF1744',width=1.5,dash='dot'),name="WT2",hoverinfo='skip'),row=3,col=1)
     wd=dc['WT1']-dc['WT2']
     fig.add_trace(go.Bar(x=dc.index,y=wd,marker_color=np.where(wd>=0,'#00E676','#FF1744').tolist(),name="WT Hist",opacity=0.3),row=3,col=1)
 
@@ -674,7 +655,7 @@ def build_chart(dc,ticker,regime,shield):
         if not pts.empty:
             fig.add_trace(go.Scatter(x=pts.index,y=pts['WT1'],mode='markers',
                 marker=dict(symbol='circle',size=10,color=clr,line=dict(width=1,color='white')),
-                showlegend=False),row=3,col=1)
+                hoverinfo='skip',showlegend=False),row=3,col=1)
 
     for lv,c,d in [(OB2,'#ff3333','dash'),(OB1,'#ff3333','solid'),(0,'gray','dot'),(OS1,'#00bfff','solid'),(OS2,'#00bfff','dash')]:
         fig.add_hline(y=lv,line_dash=d,line_color=c,line_width=1,row=3,col=1)
@@ -688,26 +669,48 @@ def build_chart(dc,ticker,regime,shield):
         name="Money Flow",opacity=0.7),row=4,col=1)
     fig.add_hline(y=0,line_dash="solid",line_color="gray",line_width=1,row=4,col=1)
 
+    # ✅ V6.2 UX: MACD 패널 완벽 추가
+    fig.add_trace(go.Scatter(x=dc.index,y=dc['MACD_Line'],line=dict(color='#29B6F6',width=1.5),name="MACD",hoverinfo='skip'),row=5,col=1)
+    fig.add_trace(go.Scatter(x=dc.index,y=dc['MACD_Signal'],line=dict(color='#FFA726',width=1.5),name="Signal",hoverinfo='skip'),row=5,col=1)
+    mh=dc['MACD_Hist']
+    fig.add_trace(go.Bar(x=dc.index,y=mh,marker_color=np.where(mh>=0,'#26A69A','#EF5350').tolist(),name="Hist",opacity=0.7),row=5,col=1)
+    fig.add_hline(y=0,line_color="#444444",line_width=1,row=5,col=1) # MACD 0선
+
     conf=dc['Confluence_Score']
     fig.add_trace(go.Bar(x=dc.index,y=conf,
         marker_color=np.where(conf>=3.5,'#00E676',np.where(conf<=-3.5,'#FF1744','#FFC107')).tolist(),
-        name="Confluence",opacity=0.8),row=5,col=1)
+        name="Conf Score",opacity=0.8),row=6,col=1)
     for lv,c,d in [(6,'#00E676','dash'),(-6,'#FF1744','dash'),(3.5,'#00E676','dot'),(-3.5,'#FF1744','dot'),(0,'gray','solid')]:
-        fig.add_hline(y=lv,line_dash=d,line_color=c,line_width=1 if d=='solid' else .8,row=5,col=1)
+        fig.add_hline(y=lv,line_dash=d,line_color=c,line_width=1 if d=='solid' else .8,row=6,col=1)
 
     stxt=f" | {shield}" if shield else ""
     fig.update_layout(
-        title=dict(text=f"📊 {ticker.upper()} | 💎 MCB+ V6.0 | {regime}{stxt}",font=dict(size=14,color='#FAFAFA')),
-        yaxis_title="USD",yaxis2_title="Vol",yaxis3_title="WT",yaxis4_title="MF",yaxis5_title="Conf",
-        template="plotly_dark",margin=dict(l=0,r=0,t=50,b=0),height=1100,showlegend=True,
+        title=dict(text=f"📊 {ticker.upper()} | 💎 MCB+ V6.2 | {regime}{stxt}",font=dict(size=14,color='#FAFAFA')),
+        yaxis_title="Price",yaxis2_title="Vol",yaxis3_title="WT",yaxis4_title="MF",yaxis5_title="MACD",yaxis6_title="Conf",
+        template="plotly_dark",margin=dict(l=0,r=0,t=50,b=0),height=1200,showlegend=True,
+        hovermode="closest", # 깔끔한 툴팁 표시
+        hoverlabel=dict(bgcolor="rgba(22,26,34,0.9)", font_size=12, font_family="Pretendard"),
         legend=dict(orientation="h",yanchor="bottom",y=1.02,xanchor="center",x=0.5,
                     font=dict(size=9,color='#AAA'),bgcolor='rgba(0,0,0,0)'))
-    fig.update(layout_xaxis_rangeslider_visible=False)
+    
+    # ✅ V6.2 UX 버그 해결: rangeslider 비활성화 방법 교체 (차트 찌그러짐 방지)
+    fig.update_xaxes(rangeslider_visible=False)
+    
+    # ✅ V6.2 UX: 십자선(Crosshair) 활성화 및 주말 빈 캔들 제거 (TradingView 스타일)
+    has_weekends = dc.index.dayofweek.isin([5, 6]).any() # 암호화폐 여부 판별
+    rangebreaks_config = [dict(bounds=["sat", "mon"])] if not has_weekends else []
+
+    fig.update_xaxes(
+        showspikes=True, spikecolor="#555555", spikemode="across", spikethickness=1, spikedash="dash",
+        rangebreaks=rangebreaks_config
+    )
+    fig.update_yaxes(showspikes=True, spikecolor="#555555", spikemode="across", spikethickness=1, spikedash="dash")
+    
     for ann in fig['layout']['annotations']: ann['font']=dict(size=11,color='#888')
     return fig
 
 # ──────────────────────────────────────────
-# 메타데이터 + 프롬프트 생성 (V6.0 퀀트 전용 프롬프트)
+# 메타데이터 + 프롬프트
 # ──────────────────────────────────────────
 def build_metadata(dc,dv,ticker):
     lat,prev=dc.iloc[-1],dc.iloc[-2] if len(dc)>=2 else dc.iloc[-1]
@@ -999,9 +1002,9 @@ def render_analysis(msg):
     m,fig=msg.get('meta'),msg.get('fig')
     if m: render_price_header(m); render_bias(m); render_alerts(m)
     if m or fig:
-        t1,t2,t3=st.tabs(["📊 차트","🔔 시그널","📈 통계"])
+        t1,t2,t3=st.tabs(["📊 정밀 차트","🔔 발생 시그널","📈 백테스트"])
         with t1:
-            if fig: st.plotly_chart(fig,use_container_width=True,theme=None)
+            if fig: st.plotly_chart(fig,use_container_width=True,theme=None, config={'displayModeBar': False})
         with t2:
             if m: render_signals(m)
         with t3:
@@ -1012,17 +1015,17 @@ def render_analysis(msg):
 # ──────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 💎 CipherX")
-    st.markdown("<p style='color:#888;font-size:.8rem'>AI 퀀트 주가 분석 · MCB+ v6.0</p>",unsafe_allow_html=True)
+    st.markdown("<p style='color:#888;font-size:.8rem'>AI 퀀트 주가 분석 · MCB+ v6.2</p>",unsafe_allow_html=True)
     st.markdown("---")
-    st.markdown("### 📅 기간")
+    st.markdown("### 📅 차트 기간")
     chart_period=st.radio("표시 기간",['3개월','6개월','1년','2년'],index=2,horizontal=True,key="period")
     chart_days={'3개월':63,'6개월':126,'1년':252,'2년':504}[chart_period]
     st.markdown("---")
-    with st.expander("🎛️ 시그널 필터",expanded=False):
-        _sb=st.checkbox("🟢 매수",value=True,key="sb")
-        _ss=st.checkbox("🔴 매도",value=True,key="ss")
-        _sc=st.checkbox("⭐ 복합",value=True,key="sc")
-        _mw=st.slider("최소 가중치",0.0,3.0,0.0,0.5,key="mw")
+    with st.expander("🎛️ 시그널 활성화 필터",expanded=False):
+        _sb=st.checkbox("🟢 매수 시그널",value=True,key="sb")
+        _ss=st.checkbox("🔴 매도 시그널",value=True,key="ss")
+        _sc=st.checkbox("⭐ 복합 시그널",value=True,key="sc")
+        _mw=st.slider("최소 가중치 필터",0.0,3.0,0.0,0.5,key="mw")
         enabled=set()
         for k,v in ALL_CHART_SIGNALS.items():
             if v['dir']=='buy' and not _sb: continue
@@ -1031,36 +1034,19 @@ with st.sidebar:
             if v['w']<_mw and k not in COMPOSITE_SIGNALS: continue
             enabled.add(k)
         st.session_state['enabled_signals']=enabled
-        st.caption(f"활성: {len(enabled)}개")
-    if st.button("🗑️ 대화 초기화",use_container_width=True,type="secondary"):
+        st.caption(f"현재 차트 표시: {len(enabled)}개")
+    if st.button("🗑️ 대화 내역 지우기",use_container_width=True,type="secondary"):
         for key in ['messages','pending_ai_ticker','pending_ai_prompt','last_ticker']:
             st.session_state[key]=[{"role":"assistant","type":"text",
                 "content":"안녕하세요! 💎 **CipherX** 입니다.\n\n분석할 **티커명**을 입력하세요."}] if key=='messages' else None
         st.rerun()
-    st.markdown("---")
-    st.markdown("### 📖 가이드")
-    for et,sl in [("🟢 매수",[k for k,v in ALL_CHART_SIGNALS.items() if v['dir']=='buy']),
-                    ("🔴 매도",[k for k,v in ALL_CHART_SIGNALS.items() if v['dir']=='sell'])]:
-        with st.expander(et,expanded=False):
-            for k in sl:
-                info=ALL_CHART_SIGNALS[k]
-                st.markdown(f"**{info['icon']} {info['label']}** (w={info['w']}) · "
-                    f"<span style='color:#888;font-size:.82rem'>{info.get('kor','')}</span>",unsafe_allow_html=True)
-                st.caption(info.get('desc',''))
-    with st.expander("🛡️ V6.0 업데이트",expanded=False):
-        st.markdown("""
-- **노이즈 캔들 패턴 삭제:** 해머, 슈팅스타 등 단기 캔들 삭제로 휩쏘 방지
-- **AI 퀀트 모델 도입:** ATR 기반 정밀한 매수/매도 타점 테이블 지원
-- **스크래핑 강화:** 봇 방어 우회 기능 상향 및 로딩 안정성 확보
-        """)
-    st.markdown("<p style='color:#555;font-size:.7rem;text-align:center'>CipherX v6.0</p>",unsafe_allow_html=True)
 
 # ──────────────────────────────────────────
 # 세션
 # ──────────────────────────────────────────
 if 'messages' not in st.session_state:
     st.session_state.messages=[{"role":"assistant","type":"text",
-        "content":"안녕하세요! 💎 **CipherX** 입니다.\n\n분석할 **티커명**을 입력하세요."}]
+        "content":"안녕하세요! 💎 **CipherX** 입니다.\n\n분석할 **티커명**을 입력하세요. 채팅처럼 이어서 여러 종목을 검색할 수 있습니다."}]
 for key in ['pending_ai_ticker','pending_ai_prompt','last_ticker']:
     if key not in st.session_state: st.session_state[key]=None
 if 'enabled_signals' not in st.session_state:
@@ -1078,13 +1064,13 @@ for i,msg in enumerate(st.session_state.messages):
             st.markdown(msg.get("content",""))
             render_analysis(msg)
             if msg.get("prompt"):
-                with st.expander("📝 퀀트 프롬프트 확인",expanded=False):
+                with st.expander("📝 퀀트 프롬프트 원문 확인",expanded=False):
                     st.code(msg["prompt"],language="markdown")
                     st_copy_to_clipboard(msg["prompt"],before_copy_label="📋 복사",after_copy_label="✅ 복사됨!")
         elif msg.get("type")=="report":
             with st.expander(f"📊 {msg.get('ticker','')} AI 퀀트 리포트",expanded=True):
                 st.markdown(msg["content"])
-            st.download_button("📥 다운로드",key=f"dl_{i}_{msg.get('ticker','RPT')}",
+            st.download_button("📥 마크다운 파일 다운로드",key=f"dl_{i}_{msg.get('ticker','RPT')}",
                 data=msg["content"].encode('utf-8'),
                 file_name=f"{msg.get('ticker','RPT').upper()}_Quant_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.md",
                 mime="text/markdown",use_container_width=True)
@@ -1121,7 +1107,7 @@ def process_ticker(tv,refresh=False):
     if not validate_ticker(tv):
         st.session_state.messages.append({"role":"user","type":"text","content":tv})
         st.session_state.messages.append({"role":"assistant","type":"text",
-            "content":f"⚠️ **{tv}** — Yahoo Finance에서 찾을 수 없습니다."})
+            "content":f"⚠️ **{tv}** — Yahoo Finance에서 데이터를 찾을 수 없습니다."})
         st.rerun(); return
     
     st.session_state.messages.append({"role":"user","type":"text","content":tv})
@@ -1143,27 +1129,27 @@ def process_ticker(tv,refresh=False):
         else:
             pg.empty()
             st.session_state.messages.append({"role":"assistant","type":"text",
-                "content":f"⚠️ **{tv}** 로딩 실패."})
+                "content":f"⚠️ **{tv}** 로딩에 실패했습니다."})
             st.rerun()
 
 # ──────────────────────────────────────────
-# 액션 버튼 (챗 인터페이스 하단 고정)
+# 액션 버튼 (챗 하단)
 # ──────────────────────────────────────────
 if st.session_state.last_ticker:
     lt=st.session_state.last_ticker
     c1,c2=st.columns([3,1])
     with c1:
         if st.session_state.pending_ai_ticker and st.session_state.pending_ai_prompt:
-            if st.button(f"🚀 {st.session_state.pending_ai_ticker.upper()} AI 심층 퀀트 분석",
+            if st.button(f"🚀 {st.session_state.pending_ai_ticker.upper()} AI 심층 퀀트 분석 시작",
                          type="primary",use_container_width=True):
                 _run_ai()
     with c2:
         if st.button(f"🔄 {lt} 새로고침",type="secondary",use_container_width=True,key="re"):
             process_ticker(lt,refresh=True)
 elif st.session_state.pending_ai_ticker and st.session_state.pending_ai_prompt:
-    if st.button(f"🚀 {st.session_state.pending_ai_ticker.upper()} AI 심층 퀀트 분석",
+    if st.button(f"🚀 {st.session_state.pending_ai_ticker.upper()} AI 심층 퀀트 분석 시작",
                  type="primary",use_container_width=True):
         _run_ai()
 
-if ticker_input:=st.chat_input("분석할 미국 주식 티커를 입력하세요 (예: IREN, TSLA, AAPL)"):
+if ticker_input:=st.chat_input("미국 주식 티커를 입력하세요 (예: TSLA, AAPL, QQQ)"):
     process_ticker(ticker_input)
