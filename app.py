@@ -14,7 +14,7 @@ import numpy as np
 from plotly.subplots import make_subplots
 from collections import OrderedDict
 
-st.set_page_config(page_title="CipherX V6.4", page_icon="📈", layout="centered")
+st.set_page_config(page_title="CipherX V6.5", page_icon="📈", layout="centered")
 
 # ──────────────────────────────────────────
 # 🎨 CSS
@@ -455,19 +455,26 @@ def compute_bias(meta,htf1,htf2):
     elif sc>=-8: return 'SELL',sc
     else: return 'STRONG SELL',sc
 
-def compute_signal_stats(df,col,fwd=(5,10,20),mn=5):
+# ✅ V6.5 FIX: 정확한 백테스트 (미래 참조 방지 및 진입 타점 정밀화)
+def compute_signal_stats(df, col, fwd=(5, 10, 20), mn=5):
     if col not in df.columns: return None
-    mask=df[col].fillna(False).values.astype(bool)
-    if mask.sum()<mn: return None
-    c=df['Close'].values; st={'count':int(mask.sum())}
+    mask = df[col].fillna(False).values.astype(bool)
+    if mask.sum() < mn: return None
+    
+    st = {'count': int(mask.sum())}
+    entry_price = df['Open'].shift(-1)
+    
     for n in fwd:
-        if n>=len(c): st[f'{n}d_avg']=st[f'{n}d_winrate']=st[f'{n}d_median']=None; continue
-        f=np.full(len(c),np.nan); f[:len(c)-n]=(c[n:]-c[:len(c)-n])/c[:len(c)-n]*100
-        v=f[mask]; v=v[~np.isnan(v)]
-        if len(v)>=mn:
-            st[f'{n}d_avg']=float(np.mean(v)); st[f'{n}d_winrate']=float(np.sum(v>0)/len(v)*100)
-            st[f'{n}d_median']=float(np.median(v))
-        else: st[f'{n}d_avg']=st[f'{n}d_winrate']=st[f'{n}d_median']=None
+        exit_price = df['Close'].shift(-(n + 1))
+        pct_change = (exit_price - entry_price) / entry_price * 100
+        valid_returns = pct_change[mask].dropna()
+        
+        if len(valid_returns) >= mn:
+            st[f'{n}d_avg'] = float(valid_returns.mean())
+            st[f'{n}d_winrate'] = float((valid_returns > 0).sum() / len(valid_returns) * 100)
+            st[f'{n}d_median'] = float(valid_returns.median())
+        else:
+            st[f'{n}d_avg'] = st[f'{n}d_winrate'] = st[f'{n}d_median'] = None
     return st
 
 def compute_all_stats(dv):
@@ -724,7 +731,7 @@ def build_chart(dc,ticker,regime,shield):
 
     stxt=f" | {shield}" if shield else ""
     fig.update_layout(
-        title=dict(text=f"📊 {ticker.upper()} | 💎 MCB+ V6.4 | {regime}{stxt}",font=dict(size=14,color='#FAFAFA')),
+        title=dict(text=f"📊 {ticker.upper()} | 💎 MCB+ V6.5 | {regime}{stxt}",font=dict(size=14,color='#FAFAFA')),
         yaxis_title="Price",yaxis2_title="Vol",yaxis3_title="WT",yaxis4_title="MF",yaxis5_title="MACD",yaxis6_title="Conf",
         template="plotly_dark",margin=dict(l=0,r=0,t=50,b=0),height=1300,showlegend=True,
         hovermode="closest", hoverlabel=dict(bgcolor="rgba(22,26,34,0.9)", font_size=12, font_family="Pretendard"),
@@ -740,7 +747,7 @@ def build_chart(dc,ticker,regime,shield):
     return fig
 
 # ──────────────────────────────────────────
-# 메타데이터 + 프롬프트 생성 (V6.4 융합 프롬프트)
+# 메타데이터 + 프롬프트 텍스트 빌더
 # ──────────────────────────────────────────
 def build_metadata(dc,dv,ticker):
     lat,prev=dc.iloc[-1],dc.iloc[-2] if len(dc)>=2 else dc.iloc[-1]
@@ -1082,7 +1089,7 @@ def render_analysis(msg):
 # ──────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 💎 CipherX")
-    st.markdown("<p style='color:#888;font-size:.8rem'>AI 퀀트 주가 분석 · MCB+ v6.4</p>",unsafe_allow_html=True)
+    st.markdown("<p style='color:#888;font-size:.8rem'>AI 퀀트 주가 분석 · MCB+ v6.5</p>",unsafe_allow_html=True)
     st.markdown("---")
     st.markdown("### 📅 차트 기간")
     chart_period=st.radio("표시 기간",['3개월','6개월','1년','2년'],index=2,horizontal=True,key="period")
@@ -1149,7 +1156,7 @@ def _run_ai():
         pb=st.progress(0,text="퀀트 엔진 로딩 중...")
         try:
             pb.progress(10,text="Gemini 모델 초기화 중...")
-            model=genai.GenerativeModel('gemini-flash-latest')
+            model=genai.GenerativeModel('gemini-2.0-flash')
             pb.progress(20,text="시장 데이터 및 시그널 취합 중...")
             resp=model.generate_content(pp,stream=True)
             pb.progress(40,text="🚀 AI 리포트 생성 중...")
