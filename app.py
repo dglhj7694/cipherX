@@ -14,7 +14,7 @@ import numpy as np
 from plotly.subplots import make_subplots
 from collections import OrderedDict
 
-st.set_page_config(page_title="CipherX V7.3", page_icon="📈", layout="centered")
+st.set_page_config(page_title="CipherX V7.4", page_icon="📈", layout="centered")
 
 # ──────────────────────────────────────────
 # 🎨 CSS (UX & 리포트 폰트 최적화)
@@ -82,6 +82,7 @@ def _sig(w,d,icon,label,sym,sz,clr,base,atr_m,kor,desc):
             'base':base,'atr_m':atr_m,'kor':kor,'desc':desc}
 
 SIGNAL_REGISTRY = {
+    # ── BUY ──
     'Gold_Dot':              _sig(3.0,_B,'🏆','GOLD DOT','circle',18,'#FFD700','Low',-3.0,'최강 매수','RSI<30+MFI<30+WT1<-60+상승 다이버전스'),
     'Green_Dot_T1':          _sig(2.5,_B,'🟢','BUY T1','circle',16,'#00E676','Low',-2.5,'강한 매수','WT과매도교차+RSI<30+MFI<30+MF<0'),
     'Green_Dot_T2':          _sig(2.0,_B,'🟩','BUY T2','circle',13,'#69F0AE','Low',-2.2,'매수','WT과매도+RSI또는MFI<32'),
@@ -104,6 +105,7 @@ SIGNAL_REGISTRY = {
     'MACD_Cross_Buy':        _sig(1.0,_B,'〽️','MACD Cross','triangle-up',9,'#4CAF50','Low',-1.0,'MACD 골든크로스','MACD>시그널(0선 하방)'),
     'StochRSI_Cross_Buy':    _sig(0.8,_B,'🔄','StRSI Cross','circle-open',8,'#81C784','Low',-0.8,'StochRSI 매수교차','StochK>StochD(과매도)'),
 
+    # ── SELL ──
     'Blood_Diamond':         _sig(3.0,_S,'🩸','BLOOD DIA','diamond',18,'#DC143C','High',3.0,'최강 매도','RSI>70+MFI>70+WT1>60+하락 다이버전스'),
     'Red_Dot_T1':            _sig(2.5,_S,'🔴','SELL T1','circle',16,'#FF1744','High',2.5,'강한 매도','WT과매수하락교차+RSI>70+MFI>70'),
     'Red_Dot_T2':            _sig(2.0,_S,'🟥','SELL T2','circle',13,'#FF5252','High',2.2,'매도','WT과매수+RSI또는MFI>68'),
@@ -171,7 +173,7 @@ def _cls(val, lo, hi):
     return 'ind-bullish' if val<lo else ('ind-bearish' if val>hi else 'ind-neutral')
 
 # ──────────────────────────────────────────
-# 캐싱 및 데이터 처리 (YFinance)
+# 캐싱 및 데이터 처리 (YFinance 펀더멘탈 통합)
 # ──────────────────────────────────────────
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_fundamentals(ticker):
@@ -587,7 +589,7 @@ def detect_all_signals(df):
     return df
 
 # ──────────────────────────────────────────
-# 📊 정밀 차트 렌더링 (V7.3 UX 개선 - 통합 툴팁)
+# 📊 정밀 차트 렌더링 (V7.4 UX 완벽 개선 - x unified 통합 툴팁)
 # ──────────────────────────────────────────
 def _hl(fig,mask,idx,fill,txt=None,row=1):
     d=mask.astype(int).diff().fillna(0)
@@ -628,43 +630,24 @@ def build_chart(dc,ticker,regime,shield):
     enabled=st.session_state.get('enabled_signals',set(ALL_CHART_SIGNALS.keys()))
     def _at(s): return dc.loc[s.index,'ATR'].fillna(dc['ATR'].median())
 
-    # ✅ V7.3 UX: 통합 툴팁 (Aggregated Hover Text) 로직
-    daily_sigs = {}
-    signal_traces = {}
-    
-    # 1. 날짜별 포착된 모든 시그널의 설명 박스를 미리 조립
-    for cn, cfg in ALL_CHART_SIGNALS.items():
+    # ✅ V7.4 UX: x unified를 위한 개별 trace 등록 (마커 호버 시 한국어 명칭만 심플하게 표시)
+    for cn,cfg in ALL_CHART_SIGNALS.items():
         if cn not in dc.columns or cn not in enabled: continue
         if cn=='Green_Dot_T1': sig=dc[dc[cn]&~dc.get('Gold_Dot',False)]
         elif cn=='Ultra_Buy': sig=dc[dc[cn]&~dc.get('Gold_Dot',False)]
         elif cn=='Ultra_Sell': sig=dc[dc[cn]&~dc.get('Blood_Diamond',False)]
         else: sig=dc[dc[cn]]
-        
         if sig.empty: continue
         
-        yv = sig[cfg['base']] + _at(sig)*cfg['atr_m']
-        signal_traces[cn] = (sig.index, yv, cfg)
-        
-        for date in sig.index:
-            if date not in daily_sigs: daily_sigs[date] = []
-            daily_sigs[date].append(
-                f"<span style='font-size:13px;color:{cfg['clr']}'><b>{cfg['icon']} {cfg['label']}</b></span> "
-                f"<span style='font-size:11px;color:#E2E8F0'>({cfg.get('kor','')})</span><br>"
-                f"<span style='font-size:11px;color:#888888'>{cfg.get('desc','')}</span>"
-            )
+        yv=sig[cfg['base']]+_at(sig)*cfg['atr_m']
+        lw=2 if cfg['sz']>=16 else (1.5 if cfg['sz']>=13 else 1)
 
-    # 2. 각 시그널 마커를 그릴 때, 해당 일자의 '모든 시그널 설명'을 합쳐서 툴팁으로 배정
-    for cn, (idx, yv, cfg) in signal_traces.items():
-        lw = 2 if cfg['sz']>=16 else (1.5 if cfg['sz']>=13 else 1)
-        # 해당 마커들의 날짜를 기반으로 일별 통합 툴팁 할당
-        hover_html = ["<br><br>".join(daily_sigs[d]) for d in idx]
-
-        fig.add_trace(go.Scatter(x=idx, y=yv, mode='markers',
-            marker=dict(symbol=cfg['sym'], size=cfg['sz'], color=cfg['clr'],
-                line=dict(width=lw, color='white' if 'open' not in cfg['sym'] else cfg['clr'])),
+        fig.add_trace(go.Scatter(x=sig.index,y=yv,mode='markers',
+            marker=dict(symbol=cfg['sym'],size=cfg['sz'],color=cfg['clr'],
+                line=dict(width=lw,color='white' if 'open' not in cfg['sym'] else cfg['clr'])),
             name=f"{cfg['icon']} {cfg['label']}",
-            hovertext=hover_html,
-            hovertemplate="<b>%{x|%Y-%m-%d} 포착 시그널</b><br><br>%{hovertext}<extra></extra>"), row=1, col=1)
+            text=[f"{cfg.get('kor','')}"] * len(sig),
+            hovertemplate="<b>%{text}</b><extra></extra>"),row=1,col=1)
 
     br=dc['Close']<dc['Open']
     fig.add_trace(go.Bar(x=dc.index,y=dc['Volume'],marker_color=np.where(br,'#ef5350','#26a69a').tolist(),
@@ -674,10 +657,10 @@ def build_chart(dc,ticker,regime,shield):
     if not vcd.empty:
         fig.add_trace(go.Bar(x=vcd.index,y=vcd['Volume'],marker_color='#FFD700',name="Vol Climax",opacity=0.9),row=2,col=1)
 
-    fig.add_trace(go.Scatter(x=dc.index,y=dc['WT1'],line=dict(color='#00E676',width=2),name="WT1",hoverinfo='skip'),row=3,col=1)
-    fig.add_trace(go.Scatter(x=dc.index,y=dc['WT2'],line=dict(color='#FF1744',width=1.5,dash='dot'),name="WT2",hoverinfo='skip'),row=3,col=1)
+    fig.add_trace(go.Scatter(x=dc.index,y=dc['WT1'],line=dict(color='#00E676',width=2),name="WT1",hovertemplate="%{y:.1f}"),row=3,col=1)
+    fig.add_trace(go.Scatter(x=dc.index,y=dc['WT2'],line=dict(color='#FF1744',width=1.5,dash='dot'),name="WT2",hovertemplate="%{y:.1f}"),row=3,col=1)
     wd=dc['WT1']-dc['WT2']
-    fig.add_trace(go.Bar(x=dc.index,y=wd,marker_color=np.where(wd>=0,'#00E676','#FF1744').tolist(),name="WT Hist",opacity=0.3),row=3,col=1)
+    fig.add_trace(go.Bar(x=dc.index,y=wd,marker_color=np.where(wd>=0,'#00E676','#FF1744').tolist(),name="WT Hist",opacity=0.3,hoverinfo='skip'),row=3,col=1)
 
     for ml,clr in [(['Green_Circle','Green_Dot_T1','Green_Dot_T2','Gold_Dot'],'#00E676'),
                      (['Red_Circle','Red_Dot_T1','Red_Dot_T2','Blood_Diamond'],'#FF1744')]:
@@ -701,10 +684,10 @@ def build_chart(dc,ticker,regime,shield):
         name="Money Flow",opacity=0.7),row=4,col=1)
     fig.add_hline(y=0,line_dash="solid",line_color="gray",line_width=1,row=4,col=1)
 
-    fig.add_trace(go.Scatter(x=dc.index,y=dc['MACD_Line'],line=dict(color='#29B6F6',width=1.5),name="MACD",hoverinfo='skip'),row=5,col=1)
-    fig.add_trace(go.Scatter(x=dc.index,y=dc['MACD_Signal'],line=dict(color='#FFA726',width=1.5),name="Signal",hoverinfo='skip'),row=5,col=1)
+    fig.add_trace(go.Scatter(x=dc.index,y=dc['MACD_Line'],line=dict(color='#29B6F6',width=1.5),name="MACD",hovertemplate="%{y:.3f}"),row=5,col=1)
+    fig.add_trace(go.Scatter(x=dc.index,y=dc['MACD_Signal'],line=dict(color='#FFA726',width=1.5),name="Signal",hovertemplate="%{y:.3f}"),row=5,col=1)
     mh=dc['MACD_Hist']
-    fig.add_trace(go.Bar(x=dc.index,y=mh,marker_color=np.where(mh>=0,'#26A69A','#EF5350').tolist(),name="Hist",opacity=0.7),row=5,col=1)
+    fig.add_trace(go.Bar(x=dc.index,y=mh,marker_color=np.where(mh>=0,'#26A69A','#EF5350').tolist(),name="Hist",opacity=0.7,hoverinfo='skip'),row=5,col=1)
     fig.add_hline(y=0,line_color="#444444",line_width=1,row=5,col=1)
 
     conf=dc['Confluence_Score']
@@ -716,10 +699,11 @@ def build_chart(dc,ticker,regime,shield):
 
     stxt=f" | {shield}" if shield else ""
     fig.update_layout(
-        title=dict(text=f"📊 {ticker.upper()} | 💎 MCB+ V7.3 | {regime}{stxt}",font=dict(size=14,color='#FAFAFA')),
+        title=dict(text=f"📊 {ticker.upper()} | 💎 MCB+ V7.4 | {regime}{stxt}",font=dict(size=14,color='#FAFAFA')),
         yaxis_title="Price",yaxis2_title="Vol",yaxis3_title="WT",yaxis4_title="MF",yaxis5_title="MACD",yaxis6_title="Conf",
         template="plotly_dark",margin=dict(l=0,r=0,t=50,b=0),height=1300,showlegend=True,
-        hovermode="closest", hoverlabel=dict(bgcolor="rgba(22,26,34,0.9)", font_size=12, font_family="Pretendard"),
+        hovermode="x unified", # ✅ V7.4 UX: 일자별 모든 시그널 통합 툴팁 (TradingView 방식)
+        hoverlabel=dict(bgcolor="rgba(22,26,34,0.95)", font_size=13, font_family="Pretendard"),
         legend=dict(orientation="h",yanchor="bottom",y=1.02,xanchor="center",x=0.5, font=dict(size=9,color='#AAA'),bgcolor='rgba(0,0,0,0)'))
     
     fig.update_xaxes(rangeslider_visible=False)
@@ -732,7 +716,7 @@ def build_chart(dc,ticker,regime,shield):
     return fig
 
 # ──────────────────────────────────────────
-# 메타데이터 + AI 프롬프트 생성 (V7.3 사용자 요청 융합 양식)
+# 메타데이터 + 프롬프트 텍스트 빌더
 # ──────────────────────────────────────────
 def build_metadata(dc,dv,ticker):
     lat,prev=dc.iloc[-1],dc.iloc[-2] if len(dc)>=2 else dc.iloc[-1]
@@ -811,7 +795,7 @@ def build_prompt_text(dc,meta):
         if lines: st_txt="\n📌 [백테스트(2년,상위10)]\n"+"\n".join(lines)
     return f"{ps}\n\n📌 [지표 요약]\n{inds}\n\n📌 [최근 시그널]\n{st_text}{st_txt}"
 
-# ✅ V7.3 융합 프롬프트: 사용자 양식 + 팩트체크 규칙 + ATR 타점 계산 적용
+# ✅ V7.4 융합 프롬프트
 def build_ai_prompt(ticker,phist,fundamentals):
     return f"""━━━━━━━━━━━━━
 【 🎯 Role & Persona 】
@@ -839,7 +823,7 @@ def build_ai_prompt(ticker,phist,fundamentals):
 ━━━━━━━━━━━━━
 [티커: {ticker}]
 
-📌 [주가 + 기술적 지표 + 최근 시그널 + 백테스트 통계]
+📌 [주가 + 기술적 지표 + 최근 시그널 요약]
 {phist}
 
 📌 [YFinance 펀더멘탈 및 숏(공매도) 데이터] (반드시 이 데이터만 사용할 것)
@@ -861,61 +845,41 @@ def build_ai_prompt(ticker,phist,fundamentals):
 【 📄 Output Format (반드시 아래 마크다운 양식을 따를 것) 】
 ━━━━━━━━━━━━━
 # 💎 {ticker} 심층 퀀트 리포트
-**[🔵/🔴/🟠] {ticker} 분석:** [가장 중요한 모멘텀 및 현재 상태를 한 줄로 요약]
-[현재 날짜], 전일 대비 [변동률]% [방향]. 거래량 [평균대비 배수]. [핵심 패턴]. 지지 [가격], 저항 [가격].
+**[🔵강세 / 🔴약세 / 🟠중립] {ticker} 분석:** [가장 중요한 모멘텀 및 현재 상태를 한 줄로 요약]
 
 ---
 ### 1. 내용 요약
 [🔵/🔴/🟠] [현재 추세, 주요 시그널, 향후 방향성을 포함해 3~4문장으로 요약]
 
 ---
-### 2. 💎 마켓 사이퍼 B+ 시그널 분석
-* **WaveTrend:** [WT1/WT2 값, 과매수/과매도 등 상태]
-* **Money Flow:** [MF_Area 값, 자금 유입/유출 방향]
-* 🔥 **Confluence Score:** [점수, 판정 (예: Strong Buy)]
-* ⚠️ **Signal Proximity:** [매수/매도 임박 여부 퍼센트 및 코멘트]
-* **최근 시그널:** [최근 발생한 주요 시그널 목록 요약]
-* **시그널 신뢰도:** [높음/중간/낮음 + 제공된 백테스트 승률/평균수익 등 근거]
-> 💎 **해석:** [위 지표들이 뜻하는 바를 베테랑의 시선으로 1~2문장 해석]
+### 2. 🛡️ 시장 추세 & 마켓 사이퍼 B+ 시그널 분석
+* **현재 추세 (Trend Regime):** [STRONG BULL/BEAR/NEUTRAL] - [이유 1문장]
+* **마켓 사이퍼 시그널 (Confluence):** Score [점수] → **[Ultra Buy / Strong Buy / Neutral / Strong Sell / Ultra Sell]**
+* **시그널 신뢰도 평가:** [최근 발동된 시그널들의 백테스트 결과 및 신뢰도 평가. 휩쏘 가능성 체크]
+* **Signal Proximity:** [매수/매도 시그널 임박 여부 및 대기 전략]
+> 💎 **종합 해석:** [위 지표들이 뜻하는 바를 베테랑의 시선으로 1~2문장 해석]
 
 ---
-### 3. 📊 주가 및 거래량 분석
-* **거래량:** 평균 대비 [배수] 수준. 거래량 지표(VWAP Oscillator): [값]
-* **현재 상태:** [과매수/과매도 여부, ADX 기반 추세 강도 분석]
-> **해석:** [거래량이 갖는 시장 심리 해석]  [긍정:🔵/부정 :🔴/중간:🟠]
-* **거래량 해석:** [스마트 머니 유입/이탈 징후 판단]  [긍정:🔵/부정 :🔴/중간:🟠]
-> **종합 해석:** [🔵/🔴/🟠] [종합 판단]
+### 3. 📊 주가, 거래량 및 수급 동향 (스마트 머니)
+* **거래량 & 모멘텀:** [볼륨 클라이맥스나 MACD, Squeeze 방향성을 통한 스마트머니 매집/이탈 판별]
+* **가치평가 및 공매도 현황:** [제공된 P/E, 숏 비율(Short % of Float) 등을 활용한 펀더멘탈/수급 심리 분석]
+> [긍정:🔵 / 부정:🔴 / 중간:🟠] **해석:** [수급상 주가를 끌어올릴 '에너지'나 숏스퀴즈 가능성이 얼마나 축적되었는가?]
 
 ---
 ### 4. 📈 장중 기술적 지표 및 S/R
-**[식별된 기술적 패턴 이름 (예: Momentum Ignition, EMA Pullback 등)]**
-* **상태:** [패턴에 대한 설명. ATR 기반 예상 변동 ±__%]
-* **해석:** [패턴이 향후 주가에 미칠 영향]  [긍정:🔵/부정 :🔴/중간:🟠]
-* **역사적 유사패턴:** [백테스트 데이터 기반: 동일 시그널 10일 승률 __%, 평균 수익률 __%]  [긍정:🔵/부정 :🔴/중간:🟠]
-* **지표 요약:** ATR [값] (±__%), ADX [값], TTM Squeeze [ON/OFF], MACD [상태]
-
-**[지지선 및 저항선]**
-* **지지선:** [가격1] (설명), [가격2], [가격3]
-* **저항선:** [가격1] (설명), [가격2], [가격3]
-[이동평균선, 볼린저 밴드 등을 기준으로 현재 주가 위치 설명]
+* **주요 식별 패턴:** [식별된 기술적 패턴 이름 및 설명]
+* **지지선 (Support):** [가격 1], [가격 2] (근거: MA50, SuperTrend 등)
+* **저항선 (Resistance):** [가격 1], [가격 2] (근거: BB 상단, 이전 고점 등)
+* **기타 지표 상태:** ATR (변동폭), ADX (추세강도), MACD 등 종합 상태
 
 ---
-### 5. 🏦 펀더멘탈 및 파생 심리 현황
-* **옵션/파생 심리 추정:** [수급 기반 투자자들의 베팅 심리 분석]
-* **감마 스퀴즈 위험도:** High/Medium/Low
-> [긍정:🔵/부정 :🔴/중간:🟠] **해석:** 수급상 주가를 움직일 에너지가 얼마나 축적되었는가?
-
-* **공매도 현황:** [제공된 Short % of Float, Short Ratio 기반 숏스퀴즈 가능성 등 분석]
-* **주가 변동 이유 (이벤트):** [현재 펀더멘탈 모멘텀 평가]
-
----
-### 6. 🔮 종합해석 및 전망
+### 5. 🔮 종합 해석 및 시나리오
 * 🔵 **긍정적 시나리오 (Bullish):** [조건] 충족 시 [목표가]까지 상승 예상. 확률: __% (근거: )
-* 🟠 **베이스 시나리오 (Base):** [가장 확률 높은 시나리오]. 확률: __%
-* 🔴 **리스크 시나리오 (Bearish):** [조건] 이탈 시 [목표가]까지 하락 예상. 확률: __% (근거: )
+* 🟠 **베이스 시나리오 (Base):** [가장 확률 높은 횡보/조정 시나리오]. 확률: __%
+* 🔴 **리스크 시나리오 (Bearish):** [조건] 이탈 시 [하락 목표가]까지 하락 예상. 확률: __% (근거: )
 
 ---
-### 7. 🎯 실전 트레이딩 타점 및 전략 (ATR 기반)
+### 6. 🎯 실전 트레이딩 타점 및 전략 (ATR 기반)
 [반드시 마크다운 표 형식으로 작성할 것]
 | 포지션 | 가격대 | 산출 근거 (ATR 및 지지/저항) |
 |---|---|---|
@@ -927,20 +891,12 @@ def build_ai_prompt(ticker,phist,fundamentals):
 
 **세부 전략 가이드:**
 * **리스크/리워드 비율:** 목표가 대비 손절가 간 비율 (예: 1:2) 확인
-* **공격적 매수 구간:** [가격대] (ATR __% 이내 진입)
-* **보수적 진입 시점:** [확인 매매 가격대]
-* **손절(Stop-loss) 라인:** [필수 준수 가격] - 이 가격 붕괴 시 예측 시나리오 폐기, 즉시 대응
-* **분할 매도 전략:** 1차 목표 [가격] 도달 시 __% 익절, 2차 목표 [가격] 도달 시 __% 추가 매도
-* **트레일링 스탑:** [Chandelier Exit 값 활용 이익 보존 가이드]
+* **트레일링 스탑:** [Chandelier Exit 값 등을 활용하여 이익 보존 전략 제시]
 
 ---
-### 8. ⚖️ 결론
-[🔵/🔴/🟠] [2~3문장 명확한 결론]
-
-### 주가 예측 (다음 거래일)
-[🔵/🔴/🟠] **예상:** [방향] · **근거:** [...]
-**[리스크/리워드 최적 진입]:** [가격] 지지 확인 후 [가격] 공략, [비율] 리스크/리워드 최적 진입
-**[GRADE/Score]:** [최종 등급 및 이유]
+### 7. ⚖️ 결론 및 다음 거래일 예측
+* **다음 거래일 전망:** [🔵상승 / 🔴하락 / 🟠횡보] 예상
+* **액션 플랜:** [지금 당장 매수해야 하는가? 기다려야 하는가? 보유자는 팔아야 하는가? 명확하고 단호한 행동 가이드 제시]
 """
 
 # ──────────────────────────────────────────
@@ -1100,7 +1056,7 @@ def render_analysis(msg):
 # ──────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 💎 CipherX")
-    st.markdown("<p style='color:#888;font-size:.8rem'>AI 퀀트 주가 분석 · MCB+ v7.3</p>",unsafe_allow_html=True)
+    st.markdown("<p style='color:#888;font-size:.8rem'>AI 퀀트 주가 분석 · MCB+ v7.4</p>",unsafe_allow_html=True)
     st.markdown("---")
     st.markdown("### 📅 차트 기간")
     chart_period=st.radio("표시 기간",['3개월','6개월','1년','2년'],index=2,horizontal=True,key="period")
@@ -1167,7 +1123,7 @@ def _run_ai():
         pb=st.progress(0,text="퀀트 엔진 로딩 중...")
         try:
             pb.progress(10,text="Gemini 모델 초기화 중...")
-            model=genai.GenerativeModel('gemini-flash-latest') # ✅ V7.3: 플래시 최신 버전 사용
+            model=genai.GenerativeModel('gemini-flash-latest') # ✅ V7.4: 플래시 최신 버전 사용
             pb.progress(20,text="시장 데이터 및 시그널 취합 중...")
             resp=model.generate_content(pp,stream=True)
             pb.progress(40,text="🚀 AI 리포트 생성 중...")
