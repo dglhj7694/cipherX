@@ -1,9 +1,6 @@
 import streamlit as st
-import cloudscraper
-from bs4 import BeautifulSoup
 import google.generativeai as genai
 import time
-import random
 import re
 from datetime import datetime
 from st_copy_to_clipboard import st_copy_to_clipboard
@@ -14,10 +11,10 @@ import numpy as np
 from plotly.subplots import make_subplots
 from collections import OrderedDict
 
-st.set_page_config(page_title="CipherX V6.2", page_icon="📈", layout="centered")
+st.set_page_config(page_title="CipherX V6.3", page_icon="📈", layout="centered")
 
 # ──────────────────────────────────────────
-# 🎨 CSS (UX 최적화)
+# 🎨 CSS
 # ──────────────────────────────────────────
 st.markdown("""<style>
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -132,6 +129,7 @@ ALL_CHART_SIGNALS = {**SIGNAL_REGISTRY, **COMPOSITE_SIGNALS}
 
 OB1, OB2, OS1, OS2 = 53, 60, -53, -60
 ST_MIN_BAR = 12
+
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=GEMINI_API_KEY)
 
@@ -170,32 +168,41 @@ def _cls(val, lo, hi):
     return 'ind-bullish' if val<lo else ('ind-bearish' if val>hi else 'ind-neutral')
 
 # ──────────────────────────────────────────
-# 데이터 수집 및 연산 (로직 동일 유지)
+# 캐싱 및 데이터 처리 (V6.3: YFinance 펀더멘탈 통합)
 # ──────────────────────────────────────────
-@st.cache_data(ttl=300, show_spinner=False)
-def get_stock_data(ticker):
-    url = f"https://swingtradebot.com/equities/{ticker.upper()}"
-    scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True})
-    for att in range(3):
-        try:
-            time.sleep(random.uniform(1.0, 2.0) * (att + 1))
-            r = scraper.get(url, headers={'Referer': 'https://www.google.com/'}, timeout=15)
-            if r.status_code != 200:
-                if att < 2: continue
-                return None
-            soup = BeautifulSoup(r.text, 'html.parser'); parts = []
-            for tag, attrs, label, sep in [('h2', {'itemprop': 'headline'}, 'HEADLINE', ' '),
-                                           ('div', {'class_': 'recap-body'}, 'DAILY RECAP', ' '), (None, {'id': 'recap-tour'}, 'RECAP TOUR', ' '),
-                                           (None, {'id': 'indicators-tour'}, 'INDICATORS', ' | '),
-                                           ('table', {'id': 'trend-table-tour'}, 'TREND ANALYSIS', ' | '),
-                                           ('table', {'id': 'recent-signals-tour'}, 'RECENT SIGNALS', ' | ')]:
-                el = soup.find(id=attrs['id']) if 'id' in attrs and not tag else soup.find(tag, attrs) if tag else None
-                if el: parts.append(f"#### [{label}]\n{el.get_text(separator=sep, strip=True)}")
-            return "\n\n".join(parts) if parts else None
-        except Exception:
-            if att < 2: continue
-            return None
-    return None
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_fundamentals(ticker):
+    try:
+        info = yf.Ticker(ticker).info
+        def _get(key, fmt=None):
+            val = info.get(key)
+            if val is None: return "N/A"
+            if fmt == 'currency': return f"${val:,.2f}"
+            if fmt == 'large': return f"{val:,.0f}"
+            if fmt == 'percent': return f"{val*100:.2f}%"
+            if fmt == 'float': return f"{val:.2f}"
+            return str(val)
+
+        funds = [
+            "#### [Fundamentals & Short Interest]",
+            f"Market Cap: {_get('marketCap', 'large')}",
+            f"Shares Outstanding: {_get('sharesOutstanding', 'large')}",
+            f"Float: {_get('floatShares', 'large')}",
+            f"Short % of Float: {_get('shortPercentOfFloat', 'percent')}",
+            f"Days to Cover (Short Ratio): {_get('shortRatio', 'float')}",
+            f"Trailing EPS: {_get('trailingEps', 'currency')}",
+            f"P/E Ratio: {_get('trailingPE', 'float')}",
+            f"Price-to-Sales (P/S): {_get('priceToSalesTrailing12Months', 'float')}",
+            f"Price-to-Book (P/B): {_get('priceToBook', 'float')}",
+            f"PEG Ratio: {_get('pegRatio', 'float')}",
+            "#### [52-Week Stats]",
+            f"52 Week High: {_get('fiftyTwoWeekHigh', 'currency')}",
+            f"52 Week Low: {_get('fiftyTwoWeekLow', 'currency')}",
+            f"Average Volume: {_get('averageVolume', 'large')}"
+        ]
+        return "\n".join(funds)
+    except Exception:
+        return "펀더멘탈 데이터를 불러올 수 없습니다."
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_history(ticker, _ts=None):
@@ -214,6 +221,9 @@ def compute_and_cache(ticker, _ts=None):
     if df.empty: return None
     return detect_all_signals(compute_indicators(df))
 
+# ──────────────────────────────────────────
+# 지표 계산 엔진 (V6.3: 사용자 요청 지표 추가)
+# ──────────────────────────────────────────
 def compute_rsi(s, p=14):
     d=s.diff(); g,l=d.clip(lower=0),-d.clip(upper=0)
     return 100-(100/(1+g.ewm(alpha=1/p,min_periods=p).mean()/(l.ewm(alpha=1/p,min_periods=p).mean()+1e-10)))
@@ -441,13 +451,21 @@ def compute_all_stats(dv):
 
 def compute_indicators(df):
     c,h,l,v=df['Close'],df['High'],df['Low'],df['Volume']
-    for ma in [5,20,50,100,125,200]: df[f'MA{ma}']=c.rolling(ma).mean()
+    
+    # V6.3: MA10 추가
+    for ma in [5,10,20,50,100,125,200]: df[f'MA{ma}']=c.rolling(ma).mean()
     df['EMA8']=c.ewm(span=8,adjust=False).mean()
     df['EMA21']=c.ewm(span=21,adjust=False).mean()
     df['BB_Mid']=df['MA20']; s20=c.rolling(20).std()
     df['BB_Up'],df['BB_Low']=df['BB_Mid']+s20*2,df['BB_Mid']-s20*2
-    df['BB_Width']=(df['BB_Up']-df['BB_Low'])/df['BB_Mid'] 
+    df['BB_Width']=(df['BB_Up']-df['BB_Low'])/df['BB_Mid']
+    df['Percent_B']=(c-df['BB_Low'])/(df['BB_Up']-df['BB_Low']+1e-10) # V6.3 NEW
+    
     df['ATR']=compute_tr(h,l,c).rolling(14).mean()
+    atr22 = compute_tr(h,l,c).rolling(22).mean()
+    df['Chandelier_Long'] = h.rolling(22).max() - atr22 * 3.0 # V6.3 NEW
+    df['Chandelier_Short'] = l.rolling(22).min() + atr22 * 3.0 # V6.3 NEW
+
     df['SuperTrend'],df['ST_Direction']=compute_supertrend(h,l,c)
     wt1,wt2,wu,wd=compute_wavetrend(h,l,c)
     df['WT1'],df['WT2'],df['WT_Up'],df['WT_Down']=wt1,wt2,wu,wd
@@ -566,7 +584,7 @@ def detect_all_signals(df):
     return df
 
 # ──────────────────────────────────────────
-# 📊 정밀 차트 렌더링 (V6.2 UX 극대화)
+# 📊 정밀 차트 렌더링
 # ──────────────────────────────────────────
 def _hl(fig,mask,idx,fill,txt=None,row=1):
     d=mask.astype(int).diff().fillna(0)
@@ -580,9 +598,8 @@ def _hl(fig,mask,idx,fill,txt=None,row=1):
         fig.add_vrect(**kw)
 
 def build_chart(dc,ticker,regime,shield):
-    mac={5:"#ff9900",20:'#f1c40f',50:'#e74c3c',100:'#9b59b6',125:'#3498db',200:'#2ecc71'}
+    mac={5:"#ff9900",10:"#ffb74d",20:'#f1c40f',50:'#e74c3c',100:'#9b59b6',125:'#3498db',200:'#2ecc71'}
     
-    # ✅ V6.2 UX: MACD 패널 추가 및 높이 확장
     fig=make_subplots(rows=6,cols=1,shared_xaxes=True,vertical_spacing=0.03,
         row_heights=[.35,.08,.15,.12,.15,.15],
         subplot_titles=("","","WaveTrend Oscillator","Money Flow","MACD (12, 26, 9)","Confluence Score"))
@@ -590,7 +607,7 @@ def build_chart(dc,ticker,regime,shield):
     fig.add_trace(go.Candlestick(x=dc.index,open=dc['Open'],high=dc['High'],low=dc['Low'],
         close=dc['Close'],name="Price",increasing_line_color='#26a69a',decreasing_line_color='#ef5350'),row=1,col=1)
     
-    for ma in [5,20,50,100,125,200]:
+    for ma in [5,10,20,50,100,125,200]:
         fig.add_trace(go.Scatter(x=dc.index,y=dc[f'MA{ma}'],line=dict(color=mac[ma],width=1.2),name=f'{ma} MA',hoverinfo='skip'),row=1,col=1)
     for nm,col,clr,dash in [('EMA 8','EMA8','#00FFFF','dot'),('EMA 21','EMA21','#FF69B4','dot')]:
         fig.add_trace(go.Scatter(x=dc.index,y=dc[col],line=dict(color=clr,width=1.5,dash=dash),name=nm,hoverinfo='skip'),row=1,col=1)
@@ -608,7 +625,6 @@ def build_chart(dc,ticker,regime,shield):
     enabled=st.session_state.get('enabled_signals',set(ALL_CHART_SIGNALS.keys()))
     def _at(s): return dc.loc[s.index,'ATR'].fillna(dc['ATR'].median())
 
-    # ✅ V6.2 UX: 팝업 툴팁 (Hover Text) 고도화
     for cn,cfg in ALL_CHART_SIGNALS.items():
         if cn not in dc.columns or cn not in enabled: continue
         if cn=='Green_Dot_T1': sig=dc[dc[cn]&~dc.get('Gold_Dot',False)]
@@ -669,12 +685,11 @@ def build_chart(dc,ticker,regime,shield):
         name="Money Flow",opacity=0.7),row=4,col=1)
     fig.add_hline(y=0,line_dash="solid",line_color="gray",line_width=1,row=4,col=1)
 
-    # ✅ V6.2 UX: MACD 패널 완벽 추가
     fig.add_trace(go.Scatter(x=dc.index,y=dc['MACD_Line'],line=dict(color='#29B6F6',width=1.5),name="MACD",hoverinfo='skip'),row=5,col=1)
     fig.add_trace(go.Scatter(x=dc.index,y=dc['MACD_Signal'],line=dict(color='#FFA726',width=1.5),name="Signal",hoverinfo='skip'),row=5,col=1)
     mh=dc['MACD_Hist']
     fig.add_trace(go.Bar(x=dc.index,y=mh,marker_color=np.where(mh>=0,'#26A69A','#EF5350').tolist(),name="Hist",opacity=0.7),row=5,col=1)
-    fig.add_hline(y=0,line_color="#444444",line_width=1,row=5,col=1) # MACD 0선
+    fig.add_hline(y=0,line_color="#444444",line_width=1,row=5,col=1)
 
     conf=dc['Confluence_Score']
     fig.add_trace(go.Bar(x=dc.index,y=conf,
@@ -685,32 +700,23 @@ def build_chart(dc,ticker,regime,shield):
 
     stxt=f" | {shield}" if shield else ""
     fig.update_layout(
-        title=dict(text=f"📊 {ticker.upper()} | 💎 MCB+ V6.2 | {regime}{stxt}",font=dict(size=14,color='#FAFAFA')),
+        title=dict(text=f"📊 {ticker.upper()} | 💎 MCB+ V6.3 | {regime}{stxt}",font=dict(size=14,color='#FAFAFA')),
         yaxis_title="Price",yaxis2_title="Vol",yaxis3_title="WT",yaxis4_title="MF",yaxis5_title="MACD",yaxis6_title="Conf",
-        template="plotly_dark",margin=dict(l=0,r=0,t=50,b=0),height=1200,showlegend=True,
-        hovermode="closest", # 깔끔한 툴팁 표시
-        hoverlabel=dict(bgcolor="rgba(22,26,34,0.9)", font_size=12, font_family="Pretendard"),
-        legend=dict(orientation="h",yanchor="bottom",y=1.02,xanchor="center",x=0.5,
-                    font=dict(size=9,color='#AAA'),bgcolor='rgba(0,0,0,0)'))
+        template="plotly_dark",margin=dict(l=0,r=0,t=50,b=0),height=1300,showlegend=True,
+        hovermode="closest", hoverlabel=dict(bgcolor="rgba(22,26,34,0.9)", font_size=12, font_family="Pretendard"),
+        legend=dict(orientation="h",yanchor="bottom",y=1.02,xanchor="center",x=0.5, font=dict(size=9,color='#AAA'),bgcolor='rgba(0,0,0,0)'))
     
-    # ✅ V6.2 UX 버그 해결: rangeslider 비활성화 방법 교체 (차트 찌그러짐 방지)
     fig.update_xaxes(rangeslider_visible=False)
-    
-    # ✅ V6.2 UX: 십자선(Crosshair) 활성화 및 주말 빈 캔들 제거 (TradingView 스타일)
-    has_weekends = dc.index.dayofweek.isin([5, 6]).any() # 암호화폐 여부 판별
+    has_weekends = dc.index.dayofweek.isin([5, 6]).any()
     rangebreaks_config = [dict(bounds=["sat", "mon"])] if not has_weekends else []
-
-    fig.update_xaxes(
-        showspikes=True, spikecolor="#555555", spikemode="across", spikethickness=1, spikedash="dash",
-        rangebreaks=rangebreaks_config
-    )
+    fig.update_xaxes(showspikes=True, spikecolor="#555555", spikemode="across", spikethickness=1, spikedash="dash", rangebreaks=rangebreaks_config)
     fig.update_yaxes(showspikes=True, spikecolor="#555555", spikemode="across", spikethickness=1, spikedash="dash")
     
     for ann in fig['layout']['annotations']: ann['font']=dict(size=11,color='#888')
     return fig
 
 # ──────────────────────────────────────────
-# 메타데이터 + 프롬프트
+# 메타데이터 + 프롬프트 텍스트 빌더
 # ──────────────────────────────────────────
 def build_metadata(dc,dv,ticker):
     lat,prev=dc.iloc[-1],dc.iloc[-2] if len(dc)>=2 else dc.iloc[-1]
@@ -774,7 +780,8 @@ def build_prompt_text(dc,meta):
         f"StK={lat['StochK']:.1f},StD={lat['StochD']:.1f},VWAP={lat['VWAP_Osc']:.2f},"
         f"MF={lat['RSI_MFI']:.1f},ADX={lat['ADX']:.1f},+DI={lat['Plus_DI']:.1f},-DI={lat['Minus_DI']:.1f},"
         f"E8={lat['EMA8']:.2f},E21={lat['EMA21']:.2f},ST={std},"
-        f"BB=[{meta['bb_up']:.2f}/{meta['bb_low']:.2f}],M50={meta['ma50']:.2f},M200={meta['ma200']:.2f},"
+        f"BB=[{meta['bb_up']:.2f}/{meta['bb_low']:.2f}],%B={lat.get('Percent_B',0):.2f},M50={meta['ma50']:.2f},M200={meta['ma200']:.2f},"
+        f"Chandelier=[L:{lat.get('Chandelier_Long',0):.2f}/S:{lat.get('Chandelier_Short',0):.2f}],"
         f"MACD={meta['macd_line']:.3f}/{meta['macd_signal']:.3f} H={meta['macd_hist']:.3f},"
         f"Conf={meta['confluence_score']:.1f},Bias={meta['overall_bias']}({meta['bias_score']:.1f}),"
         f"Trend={meta['trend_regime']},{shd},{prox},{sq}")
@@ -786,14 +793,14 @@ def build_prompt_text(dc,meta):
             wr=sv.get('10d_winrate'); avg=sv.get('10d_avg')
             if wr is not None: lines.append(f"  {sn}:{sv['count']}회,10일승률{wr:.0f}%,평균{avg:+.1f}%")
         if lines: st_txt="\n📌 [백테스트(2년,상위10)]\n"+"\n".join(lines)
-    return f"{ps}\n\n📌 [지표]\n{inds}\n\n📌 [시그널]\n{st_text}{st_txt}"
+    return f"{ps}\n\n📌 [지표 요약]\n{inds}\n\n📌 [최근 시그널]\n{st_text}{st_txt}"
 
-def build_ai_prompt(ticker,phist,scraped):
+def build_ai_prompt(ticker,phist,fundamentals):
     return f"""━━━━━━━━━━━━━
 【 🎯 Role & Persona 】
 ━━━━━━━━━━━━━
 당신은 월스트리트 탑티어 헤지펀드의 수석 퀀트 애널리스트입니다.
-Market Cipher B+ 지표, 볼륨 프로파일, ATR 변동성 기반의 철저한 리스크 관리에 입각하여 데이터 중심의 객관적이고 냉철한 분석을 제공합니다.
+Market Cipher B+ 지표, 볼륨 프로파일, ATR 변동성 및 YFinance 펀더멘탈 기반의 철저한 리스크 관리에 입각하여 객관적이고 냉철한 분석을 제공합니다.
 
 ---
 ━━━━━━━━━━━━━
@@ -801,10 +808,10 @@ Market Cipher B+ 지표, 볼륨 프로파일, ATR 변동성 기반의 철저한 
 ━━━━━━━━━━━━━
 제공된 데이터를 바탕으로 투자자를 위한 심층 전략 리포트를 작성하세요.
 
-1. 🚫 환각(Hallucination) 엄금: 팩트 체크가 불가능한 콜/풋 옵션, 공매도 비율 데이터는 지어내지 말고, 현재 주어진 차트의 거래량과 보조지표를 토대로 수급 상태를 추정하세요.
+1. 🚫 환각(Hallucination) 엄금: 외부 검색 없이 오직 아래 제공된 [YFinance 펀더멘탈 데이터]와 [주가+지표]만을 바탕으로 분석하세요. 모르는 것은 추측하지 마세요.
 2. 🧮 기계적 리스크 관리 (ATR 활용): 손절가와 목표가는 임의로 정하지 말고 제공된 데이터의 **ATR**을 활용하여 계산하세요.
    - 롱 포지션 손절가 = 현재가 - (ATR * 1.5) / 목표가 = 현재가 + (ATR * 2.0)
-   - 스윙 박스권 매매 시 = 지지선/저항선 인근에서 진입 타점 설정
+   - 트레일링 스탑 적용 시 Chandelier Long/Short 값 활용 가능
 3. 🌊 추세 맞춤형 전략 (Trend Regime):
    - [STRONG BULL]: 돌파 매수 또는 얕은 눌림목(EMA Pullback) 매수 전략 제시
    - [STRONG BEAR]: 기술적 반등 시 숏(매도) 전략 또는 관망(Wait & See) 제시
@@ -816,29 +823,29 @@ Market Cipher B+ 지표, 볼륨 프로파일, ATR 변동성 기반의 철저한 
 ━━━━━━━━━━━━━
 [티커: {ticker}]
 
-📌 [주가 + 지표 + 최근 시그널]
-{phist}
+📌 [YFinance 펀더멘탈 및 숏(공매도) 데이터]
+{fundamentals}
 
-📌 [SwingTradeBot 뉴스 및 수급 요약]
-{scraped if scraped else '데이터 미제공'}
+📌 [주가 + 기술적 지표 + 최근 시그널 요약]
+{phist}
 
 ---
 ━━━━━━━━━━━━━
 【 📄 Output Format (마크다운 적용) 】
 ━━━━━━━━━━━━━
 # 💎 {ticker} 심층 퀀트 리포트
-**[🔵강세 / 🔴약세 / 🟠중립] 핵심 요약:** [가장 중요한 모멘텀 및 현재 상태를 한 줄로 요약]
+**[🔵강세 / 🔴약세 / 🟠중립] 핵심 요약:** [모멘텀 및 펀더멘탈 요약 한 줄]
 
 ---
 ### 1. 🛡️ 시장 추세 & 시스템 시그널 분석
 * **현재 추세 (Trend Regime):** [STRONG BULL / STRONG BEAR / NEUTRAL 중 택1] - [이유 1문장]
 * **마켓 사이퍼 시그널 종합:** Score [점수] → **[Ultra Buy / Strong Buy / Neutral / Strong Sell / Ultra Sell]**
-* **시그널 퀄리티 평가:** [최근 발동된 시그널들의 신뢰도 평가. 휩쏘 가능성 체크]
+* **시그널 퀄리티 평가:** [최근 발동된 시그널 신뢰도 평가. 휩쏘 가능성 체크]
 * **Signal Proximity:** [매수/매도 시그널 임박 여부 및 대기 전략]
 
-### 2. 📊 수급 및 모멘텀 (스마트머니 동향)
-* **거래량 & 모멘텀:** [볼륨 클라이맥스나 MACD/Squeeze 등의 방향성을 통한 스마트머니 매집/이탈 판별]
-* **주요 촉매제 (Catalyst):** [가장 최근의 뉴스나 상승/하락을 견인한 핵심 이벤트 - 봇 데이터 참고]
+### 2. 📊 펀더멘탈 및 수급 (스마트머니 동향)
+* **공매도 및 가치평가:** [제공된 숏 커버링, P/E Ratio 등 펀더멘탈 기반 분석]
+* **거래량 & 모멘텀:** [볼륨 클라이맥스나 MACD 방향성을 통한 매집/이탈 판별]
 
 ### 3. 🎯 실전 트레이딩 시나리오 및 타점 (ATR 기반)
 [마크다운 표 형식으로 작성]
@@ -1015,7 +1022,7 @@ def render_analysis(msg):
 # ──────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 💎 CipherX")
-    st.markdown("<p style='color:#888;font-size:.8rem'>AI 퀀트 주가 분석 · MCB+ v6.2</p>",unsafe_allow_html=True)
+    st.markdown("<p style='color:#888;font-size:.8rem'>AI 퀀트 주가 분석 · MCB+ v6.3</p>",unsafe_allow_html=True)
     st.markdown("---")
     st.markdown("### 📅 차트 기간")
     chart_period=st.radio("표시 기간",['3개월','6개월','1년','2년'],index=2,horizontal=True,key="period")
@@ -1042,7 +1049,7 @@ with st.sidebar:
         st.rerun()
 
 # ──────────────────────────────────────────
-# 세션
+# 세션 관리
 # ──────────────────────────────────────────
 if 'messages' not in st.session_state:
     st.session_state.messages=[{"role":"assistant","type":"text",
@@ -1053,7 +1060,7 @@ if 'enabled_signals' not in st.session_state:
     st.session_state['enabled_signals']=set(ALL_CHART_SIGNALS.keys())
 
 # ──────────────────────────────────────────
-# 메인 렌더링
+# 챗 인터페이스 & AI 실행
 # ──────────────────────────────────────────
 st.markdown("<h2 style='text-align:center;color:#fff;margin-bottom:20px'>💎 CipherX</h2>",unsafe_allow_html=True)
 
@@ -1114,13 +1121,14 @@ def process_ticker(tv,refresh=False):
     st.session_state.last_ticker=tv
     with st.chat_message("assistant",avatar="✨"):
         pg=st.progress(0,text=f"🌐 {tv} 데이터 파이프라인 가동...")
-        pg.progress(15,text="📡 SwingTradeBot 뉴스/팩트 크롤링 중...")
-        scraped=get_stock_data(tv)
-        pg.progress(40,text="📊 YFinance 주가 데이터 로딩 중...")
+        pg.progress(15,text="📡 YFinance 펀더멘탈 및 숏(공매도) 데이터 조회 중...")
+        # V6.3: 크롤링 대체
+        fundamentals = fetch_fundamentals(tv)
+        pg.progress(40,text="📊 YFinance 기술적 데이터 및 지표 계산 중...")
         fig,phist,meta=analyze(tv,chart_days,refresh)
         pg.progress(80,text="💎 마켓 사이퍼 시그널 엔진 교차 검증 중...")
-        if scraped or fig:
-            prompt=build_ai_prompt(tv,phist,scraped)
+        if fig:
+            prompt=build_ai_prompt(tv,phist,fundamentals)
             st.session_state.messages.append({"role":"assistant","type":"analysis","ticker":tv,
                 "content":f"✅ **{tv}** 분석 완료! 아래에서 정밀 차트를 확인하세요.","fig":fig,"meta":meta,"prompt":prompt})
             st.session_state.pending_ai_ticker=tv; st.session_state.pending_ai_prompt=prompt
@@ -1129,11 +1137,11 @@ def process_ticker(tv,refresh=False):
         else:
             pg.empty()
             st.session_state.messages.append({"role":"assistant","type":"text",
-                "content":f"⚠️ **{tv}** 로딩에 실패했습니다."})
+                "content":f"⚠️ **{tv}** 차트 렌더링에 실패했습니다."})
             st.rerun()
 
 # ──────────────────────────────────────────
-# 액션 버튼 (챗 하단)
+# 액션 버튼 (챗 하단 고정)
 # ──────────────────────────────────────────
 if st.session_state.last_ticker:
     lt=st.session_state.last_ticker
