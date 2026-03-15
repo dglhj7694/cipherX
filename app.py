@@ -240,7 +240,7 @@ GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=GEMINI_API_KEY)
 
 # ──────────────────────────────────────────
-# 캐싱
+# 캐싱 크롤링
 # ──────────────────────────────────────────
 @st.cache_data(ttl=300, show_spinner=False)
 def get_stock_data(ticker):
@@ -249,32 +249,37 @@ def get_stock_data(ticker):
         browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True}
     )
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+        'User-Agent': (
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+            'AppleWebKit/537.36 (KHTML, like Gecko) '
+            'Chrome/120.0.0.0 Safari/537.36'
+        ),
         'Referer': 'https://www.google.com/',
     }
     try:
         time.sleep(random.uniform(1.0, 2.0))
-        resp = scraper.get(url, headers=headers, timeout=20)
-        if resp.status_code != 200:
+        response = scraper.get(url, headers=headers, timeout=20)
+        if response.status_code != 200:
             return None
-        soup = BeautifulSoup(resp.text, 'html.parser')
-        parts = []
-        for sel, tag, name in [
-            (('h2', {'itemprop': 'headline'}), None, 'HEADLINE'),
-            (('div', {'class': 'recap-body'}), None, 'DAILY RECAP'),
-        ]:
-            el = soup.find(*sel)
-            if el:
-                parts.append(f"#### [{name}]\n{el.get_text(separator=' ', strip=True)}")
-        for eid, ename in [('recap-tour', 'RECAP TOUR'), ('indicators-tour', 'INDICATORS TOUR')]:
-            el = soup.find(id=eid)
-            if el:
-                parts.append(f"#### [{ename}]\n{el.get_text(separator=' | ', strip=True)}")
-        for tid, tname in [('trend-table-tour', 'TREND ANALYSIS'), ('recent-signals-tour', 'RECENT SIGNALS')]:
-            el = soup.find('table', id=tid)
-            if el:
-                parts.append(f"#### [{tname}]\n{el.get_text(separator=' | ', strip=True)}")
-        return "\n\n".join(parts) if parts else None
+        soup = BeautifulSoup(response.text, 'html.parser')
+        extracted = []
+        headline = soup.find('h2', {'itemprop': 'headline'})
+        if headline:
+            extracted.append(f"#### [HEADLINE]\n{headline.get_text(strip=True)}")
+        recap = soup.find('div', class_='recap-body')
+        if recap:
+            extracted.append(f"#### [DAILY RECAP]\n{recap.get_text(separator=' ', strip=True)}")
+        recap_tour = soup.find(id='recap-tour')
+        if recap_tour:
+            extracted.append(f"#### [RECAP TOUR]\n{recap_tour.get_text(separator=' ', strip=True)}")
+        indicators_tour = soup.find(id='indicators-tour')
+        if indicators_tour:
+            extracted.append(f"#### [INDICATORS TOUR]\n{indicators_tour.get_text(separator=' | ', strip=True)}")
+        for t_id, t_name in [('trend-table-tour', 'TREND ANALYSIS'), ('recent-signals-tour', 'RECENT SIGNALS')]:
+            table = soup.find('table', id=t_id)
+            if table:
+                extracted.append(f"#### [{t_name}]\n{table.get_text(separator=' | ', strip=True)}")
+        return "\n\n".join(extracted) if extracted else None
     except Exception:
         return None
 
@@ -1469,73 +1474,145 @@ for key, default in [
     if key not in st.session_state:
         st.session_state[key] = default
 
-
 # ──────────────────────────────────────────
-# 프롬프트 (V3.1 — 간결화 + 현실적 지시)
+# 프롬프트 생성 함수 (V3.1 — 원본 복원 + 개선 반영)
 # ──────────────────────────────────────────
-def build_analysis_prompt(ticker_val, phist, scraped):
+def build_analysis_prompt(ticker_value, phist, scraped):
     return f"""━━━━━━━━━━━━━
 【 🎯 Role 】
-당신은 월스트리트 20년+ 경력 베테랑 주식 애널리스트입니다.
-기술적 분석과 Market Cipher B+ 지표 해석에 정통합니다.
+━━━━━━━━━━━━━
+당신은 월스트리트 20년+ 경력 베테랑 주식 애널리스트이자 펀드 매니저입니다.
+기술적 분석과 시장 심리 파악에 탁월하며, Market Cipher B 지표 해석에 정통합니다.
 
+---
 ━━━━━━━━━━━━━
 【 🛠️ Task 】
+━━━━━━━━━━━━━
 아래 데이터로 심층 주가 분석 보고서를 작성하세요.
 
-💎 시그널은 추세 필터 + 쿨다운 + Tier 적용 완료:
-- Tier 0 (Parabolic Top, ST Sell): 항상 유효 + 매도 쉴드 해제
-- Tier 1 (Gold/Blood): 추세 무관
-- Tier 2-3: 역추세에서 억제됨 → 남은 시그널 = 높은 신뢰도
-- 🔥 Confluence: ≥6 Ultra | 3.5~6 Strong | ≤-3.5 Strong Sell
+💎 시그널은 추세 필터 + 쿨다운이 적용되었습니다 (V3.1):
+- Tier 0 (Parabolic Top, SuperTrend Sell): 추세 무관 + 매도 쉴드 해제
+- Tier 1 (Gold Dot, Blood Diamond): 추세 무관 항상 유효
+- Tier 2 (T1, Divergence): 극단 역추세에서만 억제됨
+- Tier 3 (T2, Diamond, Circle 등): 강한 역추세에서 억제됨
+- 쿨다운 적용 완료 → 남은 시그널은 높은 신뢰도
+
+🔥 Confluence Score (시간 감쇠 적용): ≥6 Ultra Buy | 3.5~6 Strong Buy | -3.5~3.5 Neutral | -6~-3.5 Strong Sell | ≤-6 Ultra Sell
 
 ⚠️ 반드시 확인:
-1. Trend Regime vs 시그널 방향 일치 여부
-2. Signal Proximity — 임박 여부
-3. 제공된 S/R 레벨 활용
-4. 백테스트 통계 — 적중률 근거
-5. MACD 모멘텀 + RSI 다이버전스
+1. Trend Regime — 현재 추세와 시그널 방향 일치 여부
+2. Signal Proximity — 매수/매도 시그널 임박 여부
+3. 지지/저항 레벨 — 제공된 S/R 데이터 활용
+4. 백테스트 통계 — 과거 해당 종목에서의 시그널 적중률
+5. MACD — 모멘텀 방향 확인
+6. RSI 다이버전스 — WT 다이버전스와 독립 교차 검증
 
-※ 옵션/공매도 데이터는 제공되지 않습니다. 알고 있는 정보 한정으로 분석하세요.
+주가변동이유/이벤트, 공매도, 콜/풋옵션 → DEEP SEARCH.
 
+---
 ━━━━━━━━━━━━━
-【 📥 Data: {ticker_val} 】
+【 📥 Input Data 】
+━━━━━━━━━━━━━
+[티커: {ticker_value}]
 
+📌 [주가 + 지표]
 {phist}
 
 📌 [SwingTradeBot]
 {scraped if scraped else "크롤링 데이터 없음"}
 
+---
 ━━━━━━━━━━━━━
 【 ✍️ Guidelines 】
-한국어, 확신형 어조, 이모티콘(🔵긍정 🔴부정 🟠중간), 시나리오별 확률(%)
+━━━━━━━━━━━━━
+① 한국어, 전문적이면서 이해하기 쉽게
+② 확신형 어조
+③ 불릿/강조/이모티콘(🔵긍정 🔴부정 🟠중간)
+④ Trend Regime과 시그널의 신뢰도를 연계하여 분석
+⑤ 시나리오별 확률(%) + 근거
+⑥ 기술적 vs 심리지표 충돌 판단
+⑦ 섹터/지수 동조성, 베타
+⑧ 지지/저항 (제공된 S/R 데이터 참조)
+⑨ 백테스트 통계를 근거로 신뢰도 판단
 
 ━━━━━━━━━━━━━
-【 📄 Format 】
+【 📄 Output Format 】
+━━━━━━━━━━━━━
 
-[🔵/🔴/🟠] [{ticker_val}] 핵심 한 줄
-날짜, 변동률, 거래량 배수, 지지/저항
+[🔵/🔴/🟠] [{ticker_value}] 분석: [핵심 한 줄]
+[날짜], 전일 대비 [변동률]% [방향]. 거래량 [배수]. 지지 [가격], 저항 [가격].
 
 ---
-### 내용 요약 (3~4문장)
-### 🛡️ 추세 & 시그널 신뢰도
+### 내용 요약
+[🔵/🔴/🟠] [3~4문장]
+
+---
+### 🛡️ 추세 상태 & 시그널 신뢰도
+* 현재 추세 레짐: [STRONG BULL/BEAR/NEUTRAL]
+* 시그널 필터 상태: [어떤 시그널이 억제/통과되었는지]
+* 백테스트 기반 신뢰도: [높음/중간/낮음 + 적중률 근거]
+
+---
 ### 💎 마켓 사이퍼 B+ 시그널 분석
-  - WaveTrend, MACD, MF, Confluence, Proximity
-  - RSI 다이버전스 확인
-  - 최근 시그널 목록
-  > 💎 해석:
+* WaveTrend: [WT1/WT2, 상태]
+* MACD: [방향, 히스토그램 추세]
+* Money Flow: [방향]
+* 🔥 Confluence Score: [점수, 판정]
+* ⚠️ Signal Proximity: [매수/매도 임박 여부]
+* RSI 다이버전스: [감지 여부 + WT 다이버전스와 교차 검증]
+* 최근 시그널: [목록]
+> 💎 해석:
+
+---
 ### 주가 및 거래량 분석
-### 장중 기술적 지표 (ATR, ADX, Squeeze, MA Cross, SuperTrend)
-### 지지선 및 저항선 (제공된 S/R 활용)
+* 거래량: 평균 대비 [배수]
+* 거래량 해석: [스마트머니 유입/이탈]
+> 해석: [🔵/🔴/🟠]
+
+---
+### 장중 기술적 지표
+* 패턴: [식별된 패턴]
+* ATR ±__%, ADX, TTM Squeeze, MA Cross, SuperTrend
+> 해석: [🔵/🔴/🟠]
+
+---
+### 지지선 및 저항선
+* 지지선: [제공된 S/R 데이터 기반]
+* 저항선: [제공된 S/R 데이터 기반]
+* 핵심 레벨 해석
+
+---
+### 콜/풋옵션 현황
+* 시사점: [심리 분석]
+> [🔵/🔴/🟠]
+
+---
+### 공매도현황
+* 시사점: [숏스퀴즈 가능성]
+
+---
+### 주가변동이유 및 이벤트
+- [🔵/🔴/🟠] [이유] — 단발성/추세형
+
+---
 ### 종합해석 및 전망
-  * 🔵 Bullish: 조건 → 목표가. 확률 __%
-  * 🟠 Base: 시나리오. 확률 __%
-  * 🔴 Bearish: 조건 → 목표가. 확률 __%
-  전략: 공격적/보수적 진입가, 손절, 분할매도
-### 결론 (2~3문장)
+* 🔵 Bullish: [조건] → [목표가]. 확률: __%
+* 🟠 Base: [시나리오]. 확률: __%
+* 🔴 Bearish: [조건] → [목표가]. 확률: __%
+
+전략:
+공격적 매수: [가격대]
+보수적 진입: [가격대]
+손절: [가격]
+분할매도: 1차 [가격] __%, 2차 [가격] __%
+
+---
+### 결론
+[🔵/🔴/🟠] [2~3문장]
+
 ### 주가 예측 (다음 거래일)
-  [🔵/🔴/🟠] 예상 방향 · 근거
-  [GRADE/Score]: 이유"""
+[🔵/🔴/🟠] 예상: [방향] · 근거: [...]
+[GRADE/Score]: [이유]"""
 
 
 # ──────────────────────────────────────────
