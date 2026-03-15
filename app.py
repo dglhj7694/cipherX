@@ -1179,7 +1179,7 @@ def _run_ai():
         with st.status("🧠 AI 퀀트 엔진 가동 중...", expanded=True) as status:
             try:
                 st.write("Gemini 모델 연동 중...")
-                model=genai.GenerativeModel('gemini-1.5-flash-latest') 
+                model=genai.GenerativeModel('gemini-flash-latest') 
                 st.write("시장 데이터 및 시그널 취합 중...")
                 resp=model.generate_content(pp,stream=True)
                 
