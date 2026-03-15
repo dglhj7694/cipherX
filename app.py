@@ -902,8 +902,8 @@ def analyze_ticker(ticker, chart_period_days=252):
         # ★ 추가 필터: 히스토그램 연속 3봉 방향 전환 확인
         hist_rising = (df['MACD_Hist'] > df['MACD_Hist'].shift(1)) & (df['MACD_Hist'].shift(1) > df['MACD_Hist'].shift(2))
         hist_falling = (df['MACD_Hist'] < df['MACD_Hist'].shift(1)) & (df['MACD_Hist'].shift(1) < df['MACD_Hist'].shift(2))
-        df['MACD_Cross_Buy'] = _cooldown(macd_buy & _recent(hist_rising, lb=2) & ~strong_bear & vol, bars=7)
-        df['MACD_Cross_Sell'] = _cooldown(macd_sell & _recent(hist_falling, lb=2) & ~sell_shield & vol, bars=7)
+        df['MACD_Cross_Buy'] = _cooldown(macd_buy_raw & _recent(hist_rising, lb=2) & ~strong_bear & vol, bars=7)
+        df['MACD_Cross_Sell'] = _cooldown(macd_sell_raw & _recent(hist_falling, lb=2) & ~sell_shield & vol, bars=7)
 
         # EMA Pullback (통합)
         df['EMA_Pullback_Buy'] = _cooldown(detect_ema_pullback(df['Close'], df['High'], df['Low'], df['Volume'],
