@@ -589,8 +589,9 @@ def compute_confluence_score(df, decay_window=5, decay_factor=0.7):
             cnt_arr += np.convolve(raw, ones, mode='full')[:len(raw)]
 
     wt1 = df['WT1'].values
-    s += np.where(wt1 < -53, 1.0, 0) + np.where(wt1 < -60, 0.5, 0)
-    s -= np.where(wt1 > 53, 1.0, 0) - np.where(wt1 > 60, -0.5, 0)
+    # ★ FIX: 매수/매도 대칭 코딩
+    s += np.where(wt1 < -53, 1.0, 0) + np.where(wt1 < -60, 0.5, 0)   # 과매도 보너스
+    s -= np.where(wt1 > 53, 1.0, 0) + np.where(wt1 > 60, 0.5, 0)     # 과매수 페널티
 
     df['Confluence_Score'] = s
     df['Ultra_Buy']  = (s >= 6.0) | ((s >= 5.0) & (bc >= 3))
@@ -888,9 +889,16 @@ def analyze_ticker(ticker, chart_period_days=252):
         dc = (df['MA50'] < df['MA200']) & (df['MA50'].shift(1) >= df['MA200'].shift(1))
         df['Golden_Cross'], df['Death_Cross'] = gc, dc
 
-        # MACD Cross (★ FIX: 히스토그램 방향 확인 추가)
-        macd_buy = (df['MACD'] > df['MACD_Signal']) & (df['MACD'].shift(1) <= df['MACD_Signal'].shift(1)) & (df['MACD'] < 0)
-        macd_sell = (df['MACD'] < df['MACD_Signal']) & (df['MACD'].shift(1) >= df['MACD_Signal'].shift(1)) & (df['MACD'] > 0)
+        # MACD Cross (★ FIX: 필터 완화 — 히스토그램 방향 1봉만 확인)
+        macd_buy_raw = (df['MACD'] > df['MACD_Signal']) & (df['MACD'].shift(1) <= df['MACD_Signal'].shift(1)) & (df['MACD'] < 0)
+        macd_sell_raw = (df['MACD'] < df['MACD_Signal']) & (df['MACD'].shift(1) >= df['MACD_Signal'].shift(1)) & (df['MACD'] > 0)
+        # 히스토그램이 교차 방향과 일치하는지만 확인 (3봉 연속 → 1봉 방향 전환으로 완화)
+        hist_turning_up = df['MACD_Hist'] > df['MACD_Hist'].shift(1)
+        hist_turning_dn = df['MACD_Hist'] < df['MACD_Hist'].shift(1)
+        df['MACD_Cross_Buy'] = _cooldown(macd_buy_raw & hist_turning_up & ~strong_bear & vol, bars=7)
+        df['MACD_Cross_Sell'] = _cooldown(macd_sell_raw & hist_turning_dn & ~sell_shield & vol, bars=7)
+
+
         # ★ 추가 필터: 히스토그램 연속 3봉 방향 전환 확인
         hist_rising = (df['MACD_Hist'] > df['MACD_Hist'].shift(1)) & (df['MACD_Hist'].shift(1) > df['MACD_Hist'].shift(2))
         hist_falling = (df['MACD_Hist'] < df['MACD_Hist'].shift(1)) & (df['MACD_Hist'].shift(1) < df['MACD_Hist'].shift(2))
@@ -915,11 +923,8 @@ def analyze_ticker(ticker, chart_period_days=252):
         df['SuperTrend_Buy'] = st_flip_bull
         df['SuperTrend_Sell'] = st_flip_bear
 
-        # Parabolic Top (★ FIX: 중복 계산 제거 — parabolic 변수 재사용)
-        df['Parabolic_Top_Sell'] = _cooldown(
-            parabolic & ((wt_dn | wt_dn3) | ((df['Close'] < df['Open']) & (df['Close'] < df['Close'].shift(1)))),
-            bars=5
-        )
+        # Parabolic Top (★ FIX: parabolic 자체가 이미 음봉 조건 포함 → 추가 음봉 체크 불필요)
+        df['Parabolic_Top_Sell'] = _cooldown(parabolic, bars=5)
 
         # ── 쿨다운 일괄 ──
         for sig, cd in [('Squeeze_Fire_Buy', 5), ('Squeeze_Fire_Sell', 5),
@@ -1160,12 +1165,14 @@ def analyze_ticker(ticker, chart_period_days=252):
         for ann in fig['layout']['annotations']:
             ann['font'] = dict(size=11, color='#888888')
 
-        # ═══ 프롬프트 텍스트 (V3.1) ═══
+        # ═══ 프롬프트 텍스트 (V3.1 FIX) ═══
         rd10 = dc.tail(10)
         ohlcv = "\n".join([f"{d.strftime('%Y-%m-%d')}: O={r['Open']:.2f} H={r['High']:.2f} L={r['Low']:.2f} C={r['Close']:.2f} V={r['Volume']:.0f}"
                            for d, r in rd10.iterrows()])
-        rd60 = dc.tail(60)
-        prices60 = ", ".join([f"'{d.strftime('%Y-%m-%d')}:{r['Close']:.2f}'" for d, r in rd60.iterrows()])
+
+        # ★ FIX: 60일 종가 목록 → 20일로 축소 (토큰 절약, AI 분석에 충분)
+        rd20 = dc.tail(20)
+        prices20 = ", ".join([f"{d.strftime('%m/%d')}:{r['Close']:.2f}" for d, r in rd20.iterrows()])
 
         all_sig_cols = [(k, f"{v['icon']} {v['label']}") for k, v in ALL_CHART_SIGNALS.items()]
         sl = []
@@ -1206,14 +1213,14 @@ def analyze_ticker(ticker, chart_period_days=252):
         )
         enhanced = (
             f"📌 [최근 10일 OHLCV]\n{ohlcv}\n\n"
-            f"📌 [60일 종가]\n{prices60}\n\n"
+            f"📌 [최근 20일 종가]\n{prices20}\n\n"
             f"📌 [지표]\n{inds}\n\n"
             f"📌 [지지/저항]\n{sr_text}\n\n"
             f"📌 [시그널]\n{sig_text}\n\n"
             f"📌 [백테스트 통계 (2년)]\n{stats_summary}"
         )
         return fig, enhanced, meta
-
+    
     except Exception as e:
         return None, f"주가 데이터 로딩 실패: {e}", None
 
@@ -1375,7 +1382,17 @@ def render_signal_cards(meta):
     date_groups = OrderedDict()
     for icon, lbl, d_str, side in sigs:
         date_groups.setdefault(d_str, []).append((icon, lbl, side))
+
+    # ★ FIX: 최근 10일치만 표시 (너무 많으면 스크롤 과다)
+    shown = 0
+    max_cards = 10
     for d_str in reversed(date_groups):
+        if shown >= max_cards:
+            remaining = len(date_groups) - shown
+            if remaining > 0:
+                st.markdown(f"<p style='color:#666;font-size:0.8rem;text-align:center;'>... 외 {remaining}일 추가 시그널</p>",
+                            unsafe_allow_html=True)
+            break
         grp = date_groups[d_str]
         bc = sum(1 for _, _, s in grp if s == 'buy')
         sc = sum(1 for _, _, s in grp if s == 'sell')
@@ -1389,6 +1406,7 @@ def render_signal_cards(meta):
             </div>
             <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;">{badges}</div>
         </div>""", unsafe_allow_html=True)
+        shown += 1
 
 
 def render_signal_stats(meta):
@@ -1493,10 +1511,15 @@ for key, default in [
     if key not in st.session_state:
         st.session_state[key] = default
 
-# ──────────────────────────────────────────
-# 프롬프트 생성 함수 (V3.1 — 원본 복원 + 개선 반영)
-# ──────────────────────────────────────────
 def build_analysis_prompt(ticker_value, phist, scraped):
+    # ★ FIX: 크롤링 디버그 메시지를 AI-friendly하게 변환
+    if scraped and "[CRAWL_DEBUG]" in str(scraped):
+        scraped_text = "SwingTradeBot 크롤링에 실패했습니다. 아래 기술적 지표 데이터만으로 분석하세요."
+    elif scraped:
+        scraped_text = scraped
+    else:
+        scraped_text = "크롤링 데이터 없음. 아래 기술적 지표 데이터만으로 분석하세요."
+
     return f"""━━━━━━━━━━━━━
 【 🎯 Role 】
 ━━━━━━━━━━━━━
@@ -1526,8 +1549,6 @@ def build_analysis_prompt(ticker_value, phist, scraped):
 5. MACD — 모멘텀 방향 확인
 6. RSI 다이버전스 — WT 다이버전스와 독립 교차 검증
 
-주가변동이유/이벤트, 공매도, 콜/풋옵션 → DEEP SEARCH.
-
 ---
 ━━━━━━━━━━━━━
 【 📥 Input Data 】
@@ -1538,7 +1559,7 @@ def build_analysis_prompt(ticker_value, phist, scraped):
 {phist}
 
 📌 [SwingTradeBot]
-{scraped if scraped else "크롤링 데이터 없음"}
+{scraped_text}
 
 ---
 ━━━━━━━━━━━━━
@@ -1553,6 +1574,7 @@ def build_analysis_prompt(ticker_value, phist, scraped):
 ⑦ 섹터/지수 동조성, 베타
 ⑧ 지지/저항 (제공된 S/R 데이터 참조)
 ⑨ 백테스트 통계를 근거로 신뢰도 판단
+⑩ 콜/풋옵션, 공매도 데이터는 제공되지 않습니다 — 알고 있는 일반 정보만 언급하세요
 
 ━━━━━━━━━━━━━
 【 📄 Output Format 】
@@ -1601,15 +1623,6 @@ def build_analysis_prompt(ticker_value, phist, scraped):
 * 핵심 레벨 해석
 
 ---
-### 콜/풋옵션 현황
-* 시사점: [심리 분석]
-> [🔵/🔴/🟠]
-
----
-### 공매도현황
-* 시사점: [숏스퀴즈 가능성]
-
----
 ### 주가변동이유 및 이벤트
 - [🔵/🔴/🟠] [이유] — 단발성/추세형
 
@@ -1632,7 +1645,6 @@ def build_analysis_prompt(ticker_value, phist, scraped):
 ### 주가 예측 (다음 거래일)
 [🔵/🔴/🟠] 예상: [방향] · 근거: [...]
 [GRADE/Score]: [이유]"""
-
 
 # ──────────────────────────────────────────
 # 메인 영역
