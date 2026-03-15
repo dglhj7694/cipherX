@@ -1,9 +1,6 @@
 import streamlit as st
-import cloudscraper
-from bs4 import BeautifulSoup
 import google.generativeai as genai
 import time
-import random
 import re
 from datetime import datetime
 from st_copy_to_clipboard import st_copy_to_clipboard
@@ -14,10 +11,10 @@ import numpy as np
 from plotly.subplots import make_subplots
 from collections import OrderedDict
 
-st.set_page_config(page_title="CipherX V6.5", page_icon="📈", layout="centered")
+st.set_page_config(page_title="CipherX V7", page_icon="📈", layout="centered")
 
 # ──────────────────────────────────────────
-# 🎨 CSS
+# 🎨 CSS (UX 최적화)
 # ──────────────────────────────────────────
 st.markdown("""<style>
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -67,7 +64,7 @@ div[data-testid="stTabs"] button[aria-selected="true"]{color:#667eea!important;b
 </style>""", unsafe_allow_html=True)
 
 # ──────────────────────────────────────────
-# 🔧 시그널 레지스트리
+# 🔧 시그널 레지스트리 (알고리즘 유지)
 # ──────────────────────────────────────────
 _B, _S = 'buy', 'sell'
 def _sig(w,d,icon,label,sym,sz,clr,base,atr_m,kor,desc):
@@ -75,7 +72,6 @@ def _sig(w,d,icon,label,sym,sz,clr,base,atr_m,kor,desc):
             'base':base,'atr_m':atr_m,'kor':kor,'desc':desc}
 
 SIGNAL_REGISTRY = {
-    # ── BUY ──
     'Gold_Dot':              _sig(3.0,_B,'🏆','GOLD DOT','circle',18,'#FFD700','Low',-3.0,'최강 매수','RSI<30+MFI<30+WT1<-60+상승 다이버전스'),
     'Green_Dot_T1':          _sig(2.5,_B,'🟢','BUY T1','circle',16,'#00E676','Low',-2.5,'강한 매수','WT과매도교차+RSI<30+MFI<30+MF<0'),
     'Green_Dot_T2':          _sig(2.0,_B,'🟩','BUY T2','circle',13,'#69F0AE','Low',-2.2,'매수','WT과매도+RSI또는MFI<32'),
@@ -98,7 +94,6 @@ SIGNAL_REGISTRY = {
     'MACD_Cross_Buy':        _sig(1.0,_B,'〽️','MACD Cross','triangle-up',9,'#4CAF50','Low',-1.0,'MACD 골든크로스','MACD>시그널(0선 하방)'),
     'StochRSI_Cross_Buy':    _sig(0.8,_B,'🔄','StRSI Cross','circle-open',8,'#81C784','Low',-0.8,'StochRSI 매수교차','StochK>StochD(과매도)'),
 
-    # ── SELL ──
     'Blood_Diamond':         _sig(3.0,_S,'🩸','BLOOD DIA','diamond',18,'#DC143C','High',3.0,'최강 매도','RSI>70+MFI>70+WT1>60+하락 다이버전스'),
     'Red_Dot_T1':            _sig(2.5,_S,'🔴','SELL T1','circle',16,'#FF1744','High',2.5,'강한 매도','WT과매수하락교차+RSI>70+MFI>70'),
     'Red_Dot_T2':            _sig(2.0,_S,'🟥','SELL T2','circle',13,'#FF5252','High',2.2,'매도','WT과매수+RSI또는MFI>68'),
@@ -113,7 +108,7 @@ SIGNAL_REGISTRY = {
     'ADX_Momentum_Sell':     _sig(1.5,_S,'💨','ADX Down','arrow-down',11,'#FF3D00','High',1.4,'ADX 하락 점화','ADX>20돌파+-DI>+DI'),
     'Bearish_Engulfing':     _sig(1.5,_S,'🌑','Bear Engulf','x',10,'#D50000','High',1.3,'하락 장악형','상승캔들 감싸는 하락캔들+WT>20'),
     'Death_Cross':           _sig(1.5,_S,'☠️','Death Cross','cross',12,'#FF1744','High',0.8,'데드 크로스','50MA<200MA+ADX>15'),
-    'SuperTrend_Sell':       _sig(2.0,_S,'📉','ST Flip Bear','arrow-down',12,'#FF1744','High',1.5,'슈퍼트렌드 약세','SuperTrend 아래로 돌파'),
+    'SuperTrend_Sell':       _sig(2.0,_S,'📉','ST Flip Bear','arrow-down',12,'#FF1744','High',1.5,'슈퍼트렌드 약세','SuperTrend 상단선 아래로 하향 돌파'),
     'Parabolic_Top_Sell':    _sig(3.0,_S,'🌡️','Parabolic Top','diamond',16,'#FF0000','High',3.0,'포물선 천장','WT1>85 꺾임+음봉'),
     'EMA_Pullback_Sell':     _sig(2.0,_S,'🎯','EMA PB Sell','triangle-down',13,'#FF6E40','High',1.8,'EMA 되돌림 매도','하락추세 EMA반등후 WT재하락'),
     'Momentum_Ignition_Sell':_sig(2.5,_S,'💣','Mom. Ign Sell','star-diamond',15,'#D50000','High',2.5,'모멘텀 점화 매도','장대음봉>ATR×1.5+거래량>2.5배'),
@@ -137,16 +132,11 @@ GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=GEMINI_API_KEY)
 
 COOLDOWN_MAP = {
-    'Squeeze_Fire_Buy':5,'Squeeze_Fire_Sell':5,
-    'Bullish_Engulfing':5,'Bearish_Engulfing':5,
-    'ADX_Momentum_Buy':10,'ADX_Momentum_Sell':10,
-    'EMA_Pullback_Buy':7,'EMA_Pullback_Sell':7,
-    'Momentum_Ignition_Buy':10,'Momentum_Ignition_Sell':10,
-    'Parabolic_Top_Sell':5,'Parabolic_Bottom_Buy':5,
-    'VWAP_Bounce_Buy':7,'VWAP_Reject_Sell':7,
-    'MACD_Cross_Buy':12,'MACD_Cross_Sell':12,
-    'StochRSI_Cross_Buy':7,'StochRSI_Cross_Sell':7,
-    'RSI_Bull_Divergence':10,'RSI_Bear_Divergence':10,
+    'Squeeze_Fire_Buy':5,'Squeeze_Fire_Sell':5, 'Bullish_Engulfing':5,'Bearish_Engulfing':5,
+    'ADX_Momentum_Buy':10,'ADX_Momentum_Sell':10, 'EMA_Pullback_Buy':7,'EMA_Pullback_Sell':7,
+    'Momentum_Ignition_Buy':10,'Momentum_Ignition_Sell':10, 'Parabolic_Top_Sell':5,'Parabolic_Bottom_Buy':5,
+    'VWAP_Bounce_Buy':7,'VWAP_Reject_Sell':7, 'MACD_Cross_Buy':12,'MACD_Cross_Sell':12,
+    'StochRSI_Cross_Buy':7,'StochRSI_Cross_Sell':7, 'RSI_Bull_Divergence':10,'RSI_Bear_Divergence':10,
 }
 
 # ──────────────────────────────────────────
@@ -171,7 +161,7 @@ def _cls(val, lo, hi):
     return 'ind-bullish' if val<lo else ('ind-bearish' if val>hi else 'ind-neutral')
 
 # ──────────────────────────────────────────
-# 캐싱 및 데이터 처리 (YFinance 펀더멘탈 통합)
+# ✅ YFinance 데이터 연동 (크롤링 완전 제거)
 # ──────────────────────────────────────────
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_fundamentals(ticker):
@@ -204,31 +194,6 @@ def fetch_fundamentals(ticker):
         return "\n".join(funds)
     except Exception:
         return "펀더멘탈 데이터를 불러올 수 없습니다."
-
-@st.cache_data(ttl=300, show_spinner=False)
-def get_stock_data(ticker):
-    url = f"https://swingtradebot.com/equities/{ticker.upper()}"
-    scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True})
-    for att in range(3):
-        try:
-            time.sleep(random.uniform(1.0, 2.0) * (att + 1))
-            r = scraper.get(url, headers={'Referer': 'https://www.google.com/'}, timeout=15)
-            if r.status_code != 200:
-                if att < 2: continue
-                return None
-            soup = BeautifulSoup(r.text, 'html.parser'); parts = []
-            for tag, attrs, label, sep in [('h2', {'itemprop': 'headline'}, 'HEADLINE', ' '),
-                                           ('div', {'class_': 'recap-body'}, 'DAILY RECAP', ' '), (None, {'id': 'recap-tour'}, 'RECAP TOUR', ' '),
-                                           (None, {'id': 'indicators-tour'}, 'INDICATORS', ' | '),
-                                           ('table', {'id': 'trend-table-tour'}, 'TREND ANALYSIS', ' | '),
-                                           ('table', {'id': 'recent-signals-tour'}, 'RECENT SIGNALS', ' | ')]:
-                el = soup.find(id=attrs['id']) if 'id' in attrs and not tag else soup.find(tag, attrs) if tag else None
-                if el: parts.append(f"#### [{label}]\n{el.get_text(separator=sep, strip=True)}")
-            return "\n\n".join(parts) if parts else None
-        except Exception:
-            if att < 2: continue
-            return None
-    return None
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_history(ticker, _ts=None):
@@ -455,32 +420,42 @@ def compute_bias(meta,htf1,htf2):
     elif sc>=-8: return 'SELL',sc
     else: return 'STRONG SELL',sc
 
-# ✅ V6.5 FIX: 정확한 백테스트 (미래 참조 방지 및 진입 타점 정밀화)
-def compute_signal_stats(df, col, fwd=(5, 10, 20), mn=5):
+# ✅ V7.0 백테스트 로직: 당일 종가 -> 다음날 시가 진입으로 오차 제거. 숏 포지션 수익률 정방향 처리.
+def compute_signal_stats(df, col, direction, fwd=(5, 10, 20), mn=5):
     if col not in df.columns: return None
     mask = df[col].fillna(False).values.astype(bool)
     if mask.sum() < mn: return None
     
-    st = {'count': int(mask.sum())}
+    st_res = {'count': int(mask.sum())}
+    # 진입가: 시그널 뜬 날짜의 '다음 날' 시가 (안전하고 현실적인 백테스트)
     entry_price = df['Open'].shift(-1)
     
     for n in fwd:
+        # 청산가: 진입 후 n일째 종가
         exit_price = df['Close'].shift(-(n + 1))
+        
+        # 수익률 계산 (기본 롱 포지션 기준)
         pct_change = (exit_price - entry_price) / entry_price * 100
+        
+        # 매도(SELL) 시그널인 경우 숏 포지션 수익률로 반전시킴
+        if direction == 'sell':
+            pct_change = -pct_change
+            
         valid_returns = pct_change[mask].dropna()
         
         if len(valid_returns) >= mn:
-            st[f'{n}d_avg'] = float(valid_returns.mean())
-            st[f'{n}d_winrate'] = float((valid_returns > 0).sum() / len(valid_returns) * 100)
-            st[f'{n}d_median'] = float(valid_returns.median())
+            st_res[f'{n}d_avg'] = float(valid_returns.mean())
+            st_res[f'{n}d_winrate'] = float((valid_returns > 0).sum() / len(valid_returns) * 100)
+            st_res[f'{n}d_median'] = float(valid_returns.median())
         else:
-            st[f'{n}d_avg'] = st[f'{n}d_winrate'] = st[f'{n}d_median'] = None
-    return st
+            st_res[f'{n}d_avg'] = st_res[f'{n}d_winrate'] = st_res[f'{n}d_median'] = None
+    return st_res
 
 def compute_all_stats(dv):
     tgt={k:v['dir'] for k,v in SIGNAL_REGISTRY.items()}
     tgt.update({'Ultra_Buy':'buy','Strong_Buy':'buy','Ultra_Sell':'sell','Strong_Sell':'sell'})
-    return {s:{**r,'direction':d} for s,d in tgt.items() if (r:=compute_signal_stats(dv,s)) and r['count']>0}
+    # compute_signal_stats 에 방향(direction) 파라미터 추가 전달
+    return {s:{**r,'direction':d} for s,d in tgt.items() if (r:=compute_signal_stats(dv, s, d)) and r['count']>0}
 
 def compute_indicators(df):
     c,h,l,v=df['Close'],df['High'],df['Low'],df['Volume']
@@ -731,10 +706,10 @@ def build_chart(dc,ticker,regime,shield):
 
     stxt=f" | {shield}" if shield else ""
     fig.update_layout(
-        title=dict(text=f"📊 {ticker.upper()} | 💎 MCB+ V6.5 | {regime}{stxt}",font=dict(size=14,color='#FAFAFA')),
+        title=dict(text=f"📊 {ticker.upper()} | 💎 MCB+ V7.0 | {regime}{stxt}",font=dict(size=14,color='#FAFAFA')),
         yaxis_title="Price",yaxis2_title="Vol",yaxis3_title="WT",yaxis4_title="MF",yaxis5_title="MACD",yaxis6_title="Conf",
         template="plotly_dark",margin=dict(l=0,r=0,t=50,b=0),height=1300,showlegend=True,
-        hovermode="closest", hoverlabel=dict(bgcolor="rgba(22,26,34,0.9)", font_size=12, font_family="Pretendard"),
+        hovermode="x unified", hoverlabel=dict(bgcolor="rgba(22,26,34,0.9)", font_size=12, font_family="Pretendard"),
         legend=dict(orientation="h",yanchor="bottom",y=1.02,xanchor="center",x=0.5, font=dict(size=9,color='#AAA'),bgcolor='rgba(0,0,0,0)'))
     
     fig.update_xaxes(rangeslider_visible=False)
@@ -1052,31 +1027,29 @@ def render_signals(m):
             <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">{" ".join(parts)}</div></div>""",unsafe_allow_html=True)
 
 def render_stats(m):
-    with st.expander("📊 백테스트 (2년, ≥5회)",expanded=True):
+    with st.expander("📊 백테스트 (2년, 진입:다음날시가, 청산:종가)",expanded=True):
         alls=m.get('all_signal_stats',{})
         if not alls: st.caption("통계 없음"); return
-        def _side(title,data,is_sell=False):
+        def _side(title,data):
             st.markdown(f"##### {title}")
             for sn,sv in sorted(data.items(),key=lambda x:x[1]['count'],reverse=True):
                 wr=sv.get('10d_winrate'); av=sv.get('10d_avg')
                 if wr is None: continue
-                if is_sell:
-                    r=100-wr; c='#FF1744' if r>55 else ('#FFC107' if r>45 else '#00E676')
-                    lb=f"10일↓ <span style='color:{c}'>{r:.0f}%</span>"
-                else:
-                    c='#00E676' if wr>55 else ('#FFC107' if wr>45 else '#FF1744')
-                    lb=f"10일↑ <span style='color:{c}'>{wr:.0f}%</span>"
+                # V7.0 FIX: wr과 av가 모두 전략 수익률 기준으로 맞춰짐
+                c='#00E676' if wr>50 else ('#FFC107' if wr>40 else '#FF1744')
+                lb=f"승률 <span style='color:{c}'>**{wr:.0f}%**</span>"
+                av_c='#00E676' if av>0 else '#FF1744'
                 ic=ALL_CHART_SIGNALS.get(sn,{}).get('icon','')
-                st.markdown(f"<span style='font-size:.82rem'>{ic} **{sn}** ({sv['count']}회) · {lb} · avg{av:+.1f}%</span>",unsafe_allow_html=True)
+                st.markdown(f"<span style='font-size:.85rem'>{ic} **{sn}** ({sv['count']}회) · {lb} · 평균수익 <span style='color:{av_c}'>**{av:+.1f}%**</span></span>",unsafe_allow_html=True)
         c1,c2=st.columns(2)
-        with c1: _side("🟢 BUY",{k:v for k,v in alls.items() if v['direction']=='buy'})
-        with c2: _side("🔴 SELL",{k:v for k,v in alls.items() if v['direction']=='sell'},True)
+        with c1: _side("🟢 BUY 전략",{k:v for k,v in alls.items() if v['direction']=='buy'})
+        with c2: _side("🔴 SELL (Short) 전략",{k:v for k,v in alls.items() if v['direction']=='sell'})
 
 def render_analysis(msg):
     m,fig=msg.get('meta'),msg.get('fig')
     if m: render_price_header(m); render_bias(m); render_alerts(m)
     if m or fig:
-        t1,t2,t3=st.tabs(["📊 정밀 차트","🔔 발생 시그널","📈 백테스트"])
+        t1,t2,t3=st.tabs(["📊 정밀 차트","🔔 발생 시그널","📈 백테스트 통계"])
         with t1:
             if fig: st.plotly_chart(fig,use_container_width=True,theme=None, config={'displayModeBar': False})
         with t2:
@@ -1089,7 +1062,7 @@ def render_analysis(msg):
 # ──────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 💎 CipherX")
-    st.markdown("<p style='color:#888;font-size:.8rem'>AI 퀀트 주가 분석 · MCB+ v6.5</p>",unsafe_allow_html=True)
+    st.markdown("<p style='color:#888;font-size:.8rem'>AI 퀀트 주가 분석 · MCB+ v7.0</p>",unsafe_allow_html=True)
     st.markdown("---")
     st.markdown("### 📅 차트 기간")
     chart_period=st.radio("표시 기간",['3개월','6개월','1년','2년'],index=2,horizontal=True,key="period")
