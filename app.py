@@ -12,7 +12,7 @@ import numpy as np
 from plotly.subplots import make_subplots
 from collections import OrderedDict
 
-st.set_page_config(page_title="CipherX V8", page_icon="📈", layout="centered")
+st.set_page_config(page_title="CipherX V8.0", page_icon="📈", layout="centered")
 
 # ──────────────────────────────────────────
 # 🎨 CSS (UX & 리포트 폰트 최적화)
@@ -80,7 +80,6 @@ def _sig(w,d,icon,label,sym,sz,clr,base,atr_m,kor,desc):
             'base':base,'atr_m':atr_m,'kor':kor,'desc':desc}
 
 SIGNAL_REGISTRY = {
-    # ── BUY ──
     'Gold_Dot':              _sig(3.0,_B,'🏆','GOLD DOT','circle',18,'#FFD700','Low',-3.0,'최강 매수','RSI<30+MFI<30+WT1<-60+상승 다이버전스'),
     'Green_Dot_T1':          _sig(2.5,_B,'🟢','BUY T1','circle',16,'#00E676','Low',-2.5,'강한 매수','WT과매도교차+RSI<30+MFI<30+MF<0'),
     'Green_Dot_T2':          _sig(2.0,_B,'🟩','BUY T2','circle',13,'#69F0AE','Low',-2.2,'매수','WT과매도+RSI또는MFI<32'),
@@ -103,7 +102,6 @@ SIGNAL_REGISTRY = {
     'MACD_Cross_Buy':        _sig(1.0,_B,'〽️','MACD Cross','triangle-up',9,'#4CAF50','Low',-1.0,'MACD 골든크로스','MACD>시그널(0선 하방)'),
     'StochRSI_Cross_Buy':    _sig(0.8,_B,'🔄','StRSI Cross','circle-open',8,'#81C784','Low',-0.8,'StochRSI 매수교차','StochK>StochD(과매도)'),
 
-    # ── SELL ──
     'Blood_Diamond':         _sig(3.0,_S,'🩸','BLOOD DIA','diamond',18,'#DC143C','High',3.0,'최강 매도','RSI>70+MFI>70+WT1>60+하락 다이버전스'),
     'Red_Dot_T1':            _sig(2.5,_S,'🔴','SELL T1','circle',16,'#FF1744','High',2.5,'강한 매도','WT과매수하락교차+RSI>70+MFI>70'),
     'Red_Dot_T2':            _sig(2.0,_S,'🟥','SELL T2','circle',13,'#FF5252','High',2.2,'매도','WT과매수+RSI또는MFI>68'),
@@ -149,11 +147,7 @@ COOLDOWN_MAP = {
     'StochRSI_Cross_Buy':7,'StochRSI_Cross_Sell':7, 'RSI_Bull_Divergence':10,'RSI_Bear_Divergence':10,
 }
 
-# ──────────────────────────────────────────
-# 공통 유틸
-# ──────────────────────────────────────────
 def _recent(s, lb=3): return s.astype(float).rolling(lb+1, min_periods=1).max().fillna(0).astype(bool)
-
 def _cooldown(sig, bars=5):
     v = sig.astype(bool).values.copy(); last = -bars-1
     for i in range(len(v)):
@@ -161,14 +155,9 @@ def _cooldown(sig, bars=5):
             if (i-last)<=bars: v[i]=False
             else: last=i
     return pd.Series(v, index=sig.index)
-
-def _volf(vol, ratio=0.5, period=20):
-    return vol >= (vol.rolling(period, min_periods=5).mean() * ratio)
-
+def _volf(vol, ratio=0.5, period=20): return vol >= (vol.rolling(period, min_periods=5).mean() * ratio)
 def _valid_fmt(t): return bool(re.match(r'^[A-Za-z]{1,5}([.\-][A-Za-z]{1,2})?$', t))
-
-def _cls(val, lo, hi):
-    return 'ind-bullish' if val<lo else ('ind-bearish' if val>hi else 'ind-neutral')
+def _cls(val, lo, hi): return 'ind-bullish' if val<lo else ('ind-bearish' if val>hi else 'ind-neutral')
 
 # ──────────────────────────────────────────
 # 캐싱 및 데이터 처리 (YFinance)
@@ -434,13 +423,19 @@ def compute_signal_stats(df, col, direction, fwd=(5, 10, 20), mn=5):
     if col not in df.columns: return None
     mask = df[col].fillna(False).values.astype(bool)
     if mask.sum() < mn: return None
+    
     st_res = {'count': int(mask.sum())}
     entry_price = df['Open'].shift(-1)
+    
     for n in fwd:
         exit_price = df['Close'].shift(-(n + 1))
         pct_change = (exit_price - entry_price) / entry_price * 100
-        if direction == 'sell': pct_change = -pct_change
+        
+        if direction == 'sell':
+            pct_change = -pct_change
+            
         valid_returns = pct_change[mask].dropna()
+        
         if len(valid_returns) >= mn:
             st_res[f'{n}d_avg'] = float(valid_returns.mean())
             st_res[f'{n}d_winrate'] = float((valid_returns > 0).sum() / len(valid_returns) * 100)
@@ -587,7 +582,7 @@ def detect_all_signals(df):
     return df
 
 # ──────────────────────────────────────────
-# 📊 정밀 차트 렌더링
+# 📊 정밀 차트 렌더링 (V8.0 완벽한 Unified Tooltip)
 # ──────────────────────────────────────────
 def _hl(fig,mask,idx,fill,txt=None,row=1):
     d=mask.astype(int).diff().fillna(0)
@@ -607,8 +602,35 @@ def build_chart(dc,ticker,regime,shield):
         row_heights=[.35,.08,.15,.12,.15,.15],
         subplot_titles=("","","WaveTrend Oscillator","Money Flow","MACD (12, 26, 9)","Confluence Score"))
 
+    # ✅ V8.0 핵심: 해당 일자에 발생한 '모든 시그널'을 모아서 Candlestick의 Tooltip으로 주입
+    enabled = st.session_state.get('enabled_signals', set(ALL_CHART_SIGNALS.keys()))
+    
+    active_masks = {}
+    for cn, cfg in ALL_CHART_SIGNALS.items():
+        if cn not in dc.columns or cn not in enabled: continue
+        mask = dc[cn].copy()
+        if cn == 'Green_Dot_T1': mask &= ~dc.get('Gold_Dot', pd.Series(False, index=dc.index))
+        elif cn == 'Ultra_Buy': mask &= ~dc.get('Gold_Dot', pd.Series(False, index=dc.index))
+        elif cn == 'Ultra_Sell': mask &= ~dc.get('Blood_Diamond', pd.Series(False, index=dc.index))
+        active_masks[cn] = mask
+        
+    daily_sig_texts = []
+    for i in range(len(dc)):
+        day_sigs = []
+        for cn, mask in active_masks.items():
+            if mask.iloc[i]:
+                cfg = ALL_CHART_SIGNALS[cn]
+                day_sigs.append(f"<span style='color:{cfg['clr']}'><b>{cfg['icon']} {cfg['label']}</b></span> <span style='font-size:11px;color:#AAA'>({cfg.get('kor','')})</span>")
+        if day_sigs:
+            daily_sig_texts.append("<br><br><b>🎯 포착 시그널:</b><br>" + "<br>".join(day_sigs))
+        else:
+            daily_sig_texts.append("")
+
     fig.add_trace(go.Candlestick(x=dc.index,open=dc['Open'],high=dc['High'],low=dc['Low'],
-        close=dc['Close'],name="Price",increasing_line_color='#26a69a',decreasing_line_color='#ef5350'),row=1,col=1)
+        close=dc['Close'],name="Price",increasing_line_color='#26a69a',decreasing_line_color='#ef5350',
+        customdata=daily_sig_texts,
+        hovertemplate="O: %{open:.2f}<br>H: %{high:.2f}<br>L: %{low:.2f}<br>C: %{close:.2f}%{customdata}<extra></extra>"
+    ),row=1,col=1)
     
     for ma in [5,10,20,50,100,125,200]:
         fig.add_trace(go.Scatter(x=dc.index,y=dc[f'MA{ma}'],line=dict(color=mac[ma],width=1.2),name=f'{ma} MA',hovertemplate="%{y:.2f}"),row=1,col=1)
@@ -625,38 +647,22 @@ def build_chart(dc,ticker,regime,shield):
         om=dc.get(col,pd.Series(False,index=dc.index))
         if om.any(): _hl(fig,om,dc.index,clr,txt,1)
 
-    enabled=st.session_state.get('enabled_signals',set(ALL_CHART_SIGNALS.keys()))
-    
-    # ✅ V7.5 FIX: 시그널이 없는 날짜를 NaN으로 채워 x unified 프로젝션 버그 해결
-    for cn, cfg in ALL_CHART_SIGNALS.items():
-        if cn not in dc.columns or cn not in enabled: continue
-        
-        mask = dc[cn].copy()
-        if cn == 'Green_Dot_T1': mask &= ~dc.get('Gold_Dot', pd.Series(False, index=dc.index))
-        elif cn == 'Ultra_Buy': mask &= ~dc.get('Gold_Dot', pd.Series(False, index=dc.index))
-        elif cn == 'Ultra_Sell': mask &= ~dc.get('Blood_Diamond', pd.Series(False, index=dc.index))
-        
-        if not mask.any(): continue
-        
-        # 전체 인덱스 길이에 맞춘 빈 시리즈 생성
-        y_vals = pd.Series(np.nan, index=dc.index)
-        # 시그널이 있는 날만 계산된 y축 위치값 대입
-        y_vals[mask] = dc.loc[mask, cfg['base']] + dc.loc[mask, 'ATR'].fillna(dc['ATR'].median()) * cfg['atr_m']
-        
-        lw = 2 if cfg['sz'] >= 16 else (1.5 if cfg['sz'] >= 13 else 1)
-        
-        hover_html = [
-            f"<span style='font-size:14px;color:{cfg['clr']}'><b>{cfg['icon']} {cfg['label']}</b></span><br>"
-            f"<span style='font-size:12px;color:#E2E8F0'>{cfg.get('kor','')}</span><br>"
-            f"<span style='font-size:11px;color:#888888'>{cfg.get('desc','')}</span>"
-        ] * len(dc)
+    def _at(s): return dc.loc[s.index,'ATR'].fillna(dc['ATR'].median())
 
-        fig.add_trace(go.Scatter(x=dc.index, y=y_vals, mode='markers',
+    # ✅ V8.0 핵심: 시그널 마커는 화면에 그리되, 마우스에는 반응하지 않게 (hoverinfo='skip') 변경
+    for cn, cfg in ALL_CHART_SIGNALS.items():
+        if cn not in active_masks: continue
+        sig = dc[active_masks[cn]]
+        if sig.empty: continue
+        
+        yv = sig[cfg['base']] + _at(sig) * cfg['atr_m']
+        lw = 2 if cfg['sz'] >= 16 else (1.5 if cfg['sz'] >= 13 else 1)
+
+        fig.add_trace(go.Scatter(x=sig.index, y=yv, mode='markers',
             marker=dict(symbol=cfg['sym'], size=cfg['sz'], color=cfg['clr'],
                 line=dict(width=lw, color='white' if 'open' not in cfg['sym'] else cfg['clr'])),
             name=f"{cfg['icon']} {cfg['label']}",
-            text=hover_html,
-            hovertemplate="%{text}<extra></extra>"), row=1, col=1)
+            hoverinfo='skip'), row=1, col=1) # Tooltip 충돌 원천 차단
 
     br=dc['Close']<dc['Open']
     fig.add_trace(go.Bar(x=dc.index,y=dc['Volume'],marker_color=np.where(br,'#ef5350','#26a69a').tolist(),
@@ -708,6 +714,7 @@ def build_chart(dc,ticker,regime,shield):
 
     stxt=f" | {shield}" if shield else ""
     fig.update_layout(
+        title=dict(text=f"📊 {ticker.upper()} | 💎 MCB+ V8.0 | {regime}{stxt}",font=dict(size=14,color='#FAFAFA')),
         yaxis_title="Price",yaxis2_title="Vol",yaxis3_title="WT",yaxis4_title="MF",yaxis5_title="MACD",yaxis6_title="Conf",
         template="plotly_dark",margin=dict(l=0,r=0,t=50,b=0),height=1300,showlegend=True,
         hovermode="x unified", hoverlabel=dict(bgcolor="rgba(22,26,34,0.95)", font_size=12, font_family="Pretendard"),
@@ -816,7 +823,8 @@ def build_ai_prompt(ticker,phist,fundamentals):
 제공된 데이터를 바탕으로 심층 주가 분석 보고서를 작성하세요. 함의와 투자자 행동을 구체적으로 설명하세요.
 
 1. 🚫 환각(Hallucination) 엄금: [YFinance 펀더멘탈]에 없는 데이터는 지어내지 마세요. 옵션이나 공매도 수치는 제공된 숏 비율과 거래량, 차트 흐름을 통해 유추한 수급 상태로 대체 설명하세요.
-2. 🧮 기계적 리스크 관리 (ATR 활용): 손절가와 목표가는 반드시 주어진 **ATR** 데이터를 기반으로 산출하세요.
+2. 🧮 기계적 리스크 관리 (ATR 활용): 손절가와 목표가는 반드시 주어진 **ATR** 데이터를 기반으로 산출하여 표(Table)로 작성하세요.
+   - 스윙 롱 손절가 = 현재가 - (ATR * 1.5) / 1차 목표가 = 현재가 + (ATR * 2.0)
 3. 🌊 추세 맞춤형 전략 (Trend Regime): STRONG BULL, STRONG BEAR, NEUTRAL 에 맞는 전략을 제시하세요.
 4. 📈 데이터 활용: 백테스트 승률(Winrate), VWAP_Osc, ADX, Squeeze 상태 등 제공된 텍스트 데이터를 분석의 근거로 반드시 포함하세요. 지지/저항은 MA선, 볼린저밴드, 최근 고점/저점을 활용하세요.
 
@@ -1042,11 +1050,12 @@ def render_stats(m):
             for sn,sv in sorted(data.items(),key=lambda x:x[1]['count'],reverse=True):
                 wr=sv.get('10d_winrate'); av=sv.get('10d_avg')
                 if wr is None: continue
+                kor_label = ALL_CHART_SIGNALS.get(sn,{}).get('kor', sn)
                 c='#00E676' if wr>50 else ('#FFC107' if wr>40 else '#FF1744')
                 lb=f"승률 <span style='color:{c}'>**{wr:.0f}%**</span>"
                 av_c='#00E676' if av>0 else '#FF1744'
                 ic=ALL_CHART_SIGNALS.get(sn,{}).get('icon','')
-                st.markdown(f"<span style='font-size:.85rem'>{ic} **{sn}** ({sv['count']}회) · {lb} · 평균수익 <span style='color:{av_c}'>**{av:+.1f}%**</span></span>",unsafe_allow_html=True)
+                st.markdown(f"<span style='font-size:.85rem'>{ic} **{kor_label}** ({sv['count']}회) · {lb} · 평균 <span style='color:{av_c}'>**{av:+.1f}%**</span></span>",unsafe_allow_html=True)
         c1,c2=st.columns(2)
         with c1: _side("🟢 BUY 전략",{k:v for k,v in alls.items() if v['direction']=='buy'})
         with c2: _side("🔴 SELL (Short) 전략",{k:v for k,v in alls.items() if v['direction']=='sell'})
@@ -1068,7 +1077,7 @@ def render_analysis(msg):
 # ──────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 🚦 CipherX")
-    st.markdown("<p style='color:#888;font-size:.8rem'>AI 퀀트 주가 분석 · MCB+ v7.6</p>",unsafe_allow_html=True)
+    st.markdown("<p style='color:#888;font-size:.8rem'>AI 퀀트 주가 분석 · MCB+ v8.0</p>",unsafe_allow_html=True)
     st.markdown("---")
     st.markdown("### 📅 차트 기간")
     chart_period=st.radio("표시 기간",['3개월','6개월','1년','2년'],index=2,horizontal=True,key="period")
@@ -1135,7 +1144,7 @@ def _run_ai():
         pb=st.progress(0,text="퀀트 엔진 로딩 중...")
         try:
             pb.progress(10,text="Gemini 모델 초기화 중...")
-            model=genai.GenerativeModel('gemini-1.5-flash-latest') 
+            model=genai.GenerativeModel('gemini-flash-latest') 
             pb.progress(20,text="시장 데이터 및 시그널 취합 중...")
             resp=model.generate_content(pp,stream=True)
             pb.progress(40,text="🚀 AI 리포트 생성 중...")
@@ -1167,11 +1176,11 @@ def process_ticker(tv,refresh=False):
     st.session_state.last_ticker=tv
     with st.chat_message("assistant",avatar="✨"):
         pg=st.progress(0,text=f"🌐 {tv} 데이터 파이프라인 가동...")
-        pg.progress(15,text="📡 YFinance 펀더멘탈 및 숏(공매도) 데이터 조회 중...")
+        pg.progress(20,text="📡 YFinance 펀더멘탈 및 숏(공매도) 데이터 조회 중...")
         fundamentals = fetch_fundamentals(tv)
-        pg.progress(40,text="📊 YFinance 기술적 데이터 및 지표 계산 중...")
+        pg.progress(50,text="📊 YFinance 기술적 데이터 및 지표 계산 중...")
         fig,phist,meta=analyze(tv,chart_days,refresh)
-        pg.progress(80,text="🚦 마켓 사이퍼 시그널 엔진 교차 검증 중...")
+        pg.progress(85,text="🚦 마켓 사이퍼 시그널 엔진 교차 검증 중...")
         if fig:
             prompt=build_ai_prompt(tv,phist,fundamentals)
             st.session_state.messages.append({"role":"assistant","type":"analysis","ticker":tv,
