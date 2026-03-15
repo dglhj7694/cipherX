@@ -14,10 +14,10 @@ import numpy as np
 from plotly.subplots import make_subplots
 from collections import OrderedDict
 
-st.set_page_config(page_title="CipherX V7.5", page_icon="📈", layout="centered")
+st.set_page_config(page_title="CipherX V7.6", page_icon="📈", layout="centered")
 
 # ──────────────────────────────────────────
-# 🎨 CSS
+# 🎨 CSS (UX & 리포트 폰트 최적화)
 # ──────────────────────────────────────────
 st.markdown("""<style>
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -120,7 +120,7 @@ SIGNAL_REGISTRY = {
     'ADX_Momentum_Sell':     _sig(1.5,_S,'💨','ADX Down','arrow-down',11,'#FF3D00','High',1.4,'ADX 하락 점화','ADX>20돌파+-DI>+DI'),
     'Bearish_Engulfing':     _sig(1.5,_S,'🌑','Bear Engulf','x',10,'#D50000','High',1.3,'하락 장악형','상승캔들 감싸는 하락캔들+WT>20'),
     'Death_Cross':           _sig(1.5,_S,'☠️','Death Cross','cross',12,'#FF1744','High',0.8,'데드 크로스','50MA<200MA+ADX>15'),
-    'SuperTrend_Sell':       _sig(2.0,_S,'📉','ST Flip Bear','arrow-down',12,'#FF1744','High',1.5,'슈퍼트렌드 약세','SuperTrend 아래로 돌파'),
+    'SuperTrend_Sell':       _sig(2.0,_S,'📉','ST Flip Bear','arrow-down',12,'#FF1744','High',1.5,'슈퍼트렌드 약세','SuperTrend 하단선 하향 돌파'),
     'Parabolic_Top_Sell':    _sig(3.0,_S,'🌡️','Parabolic Top','diamond',16,'#FF0000','High',3.0,'포물선 천장','WT1>85 꺾임+음봉'),
     'EMA_Pullback_Sell':     _sig(2.0,_S,'🎯','EMA PB Sell','triangle-down',13,'#FF6E40','High',1.8,'EMA 되돌림 매도','하락추세 EMA반등후 WT재하락'),
     'Momentum_Ignition_Sell':_sig(2.5,_S,'💣','Mom. Ign Sell','star-diamond',15,'#D50000','High',2.5,'모멘텀 점화 매도','장대음봉>ATR×1.5+거래량>2.5배'),
@@ -173,7 +173,7 @@ def _cls(val, lo, hi):
     return 'ind-bullish' if val<lo else ('ind-bearish' if val>hi else 'ind-neutral')
 
 # ──────────────────────────────────────────
-# 캐싱 및 데이터 처리
+# 캐싱 및 데이터 처리 (YFinance)
 # ──────────────────────────────────────────
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_fundamentals(ticker):
@@ -432,17 +432,24 @@ def compute_bias(meta,htf1,htf2):
     elif sc>=-8: return 'SELL',sc
     else: return 'STRONG SELL',sc
 
+# ✅ V7.6 FIX: 백테스트 계산 시 한국어 라벨 출력을 위한 수정
 def compute_signal_stats(df, col, direction, fwd=(5, 10, 20), mn=5):
     if col not in df.columns: return None
     mask = df[col].fillna(False).values.astype(bool)
     if mask.sum() < mn: return None
+    
     st_res = {'count': int(mask.sum())}
     entry_price = df['Open'].shift(-1)
+    
     for n in fwd:
         exit_price = df['Close'].shift(-(n + 1))
         pct_change = (exit_price - entry_price) / entry_price * 100
-        if direction == 'sell': pct_change = -pct_change
+        
+        if direction == 'sell':
+            pct_change = -pct_change
+            
         valid_returns = pct_change[mask].dropna()
+        
         if len(valid_returns) >= mn:
             st_res[f'{n}d_avg'] = float(valid_returns.mean())
             st_res[f'{n}d_winrate'] = float((valid_returns > 0).sum() / len(valid_returns) * 100)
@@ -589,7 +596,7 @@ def detect_all_signals(df):
     return df
 
 # ──────────────────────────────────────────
-# 📊 정밀 차트 렌더링 (V7.5: NaN 처리로 툴팁 버그 수정)
+# 📊 정밀 차트 렌더링
 # ──────────────────────────────────────────
 def _hl(fig,mask,idx,fill,txt=None,row=1):
     d=mask.astype(int).diff().fillna(0)
@@ -629,7 +636,6 @@ def build_chart(dc,ticker,regime,shield):
 
     enabled=st.session_state.get('enabled_signals',set(ALL_CHART_SIGNALS.keys()))
     
-    # ✅ V7.5 FIX: 시그널이 없는 날짜를 NaN으로 채워 x unified 프로젝션 버그 해결
     for cn, cfg in ALL_CHART_SIGNALS.items():
         if cn not in dc.columns or cn not in enabled: continue
         
@@ -640,11 +646,8 @@ def build_chart(dc,ticker,regime,shield):
         
         if not mask.any(): continue
         
-        # 전체 인덱스 길이에 맞춘 빈 시리즈 생성
         y_vals = pd.Series(np.nan, index=dc.index)
-        # 시그널이 있는 날만 계산된 y축 위치값 대입
         y_vals[mask] = dc.loc[mask, cfg['base']] + dc.loc[mask, 'ATR'].fillna(dc['ATR'].median()) * cfg['atr_m']
-        
         lw = 2 if cfg['sz'] >= 16 else (1.5 if cfg['sz'] >= 13 else 1)
         
         hover_html = [
@@ -710,7 +713,7 @@ def build_chart(dc,ticker,regime,shield):
 
     stxt=f" | {shield}" if shield else ""
     fig.update_layout(
-        title=dict(text=f"📊 {ticker.upper()} | 💎 MCB+ V7.5 | {regime}{stxt}",font=dict(size=14,color='#FAFAFA')),
+        title=dict(text=f"📊 {ticker.upper()} | 💎 MCB+ V7.6 | {regime}{stxt}",font=dict(size=14,color='#FAFAFA')),
         yaxis_title="Price",yaxis2_title="Vol",yaxis3_title="WT",yaxis4_title="MF",yaxis5_title="MACD",yaxis6_title="Conf",
         template="plotly_dark",margin=dict(l=0,r=0,t=50,b=0),height=1300,showlegend=True,
         hovermode="x unified", hoverlabel=dict(bgcolor="rgba(22,26,34,0.95)", font_size=12, font_family="Pretendard"),
@@ -726,7 +729,7 @@ def build_chart(dc,ticker,regime,shield):
     return fig
 
 # ──────────────────────────────────────────
-# 메타데이터 + 프롬프트 텍스트 빌더
+# 메타데이터 + AI 프롬프트 생성
 # ──────────────────────────────────────────
 def build_metadata(dc,dv,ticker):
     lat,prev=dc.iloc[-1],dc.iloc[-2] if len(dc)>=2 else dc.iloc[-1]
@@ -818,13 +821,10 @@ def build_ai_prompt(ticker,phist,fundamentals):
 ━━━━━━━━━━━━━
 제공된 데이터를 바탕으로 심층 주가 분석 보고서를 작성하세요. 함의와 투자자 행동을 구체적으로 설명하세요.
 
-1. 🚫 환각(Hallucination) 엄금: [YFinance 펀더멘탈]에 없는 콜/풋 옵션이나 구체적인 공매도 수치를 지어내지 마세요. 알 수 없는 정보는 차트의 거래량과 OBV를 통해 유추한 수급 상태로 대체 설명하세요.
-2. 🧮 기계적 리스크 관리 (ATR 활용): 손절가와 목표가는 반드시 주어진 **ATR** 데이터를 기반으로 산출하여 표(Table)로 작성하세요.
-   - 스윙 롱 손절가 = 현재가 - (ATR * 1.5) / 1차 목표가 = 현재가 + (ATR * 2.0)
-3. 🌊 추세 맞춤형 전략 (Trend Regime):
-   - [STRONG BULL]: 공격적 돌파 매수 또는 얕은 눌림목(EMA Pullback) 매수 전략
-   - [STRONG BEAR]: 기술적 반등 시 숏(매도) 또는 관망(Wait & See)
-   - [NEUTRAL]: 박스권 하단 매수 / 상단 매도 트레이딩 전략
+1. 🚫 환각(Hallucination) 엄금: [YFinance 펀더멘탈]에 없는 데이터는 지어내지 마세요. 옵션이나 공매도 수치는 제공된 숏 비율과 거래량, 차트 흐름을 통해 유추한 수급 상태로 대체 설명하세요.
+2. 🧮 기계적 리스크 관리 (ATR 활용): 손절가와 목표가는 반드시 주어진 **ATR** 데이터를 기반으로 산출하세요.
+3. 🌊 추세 맞춤형 전략 (Trend Regime): STRONG BULL, STRONG BEAR, NEUTRAL 에 맞는 전략을 제시하세요.
+4. 📈 데이터 활용: 백테스트 승률(Winrate), VWAP_Osc, ADX, Squeeze 상태 등 제공된 텍스트 데이터를 분석의 근거로 반드시 포함하세요. 지지/저항은 MA선, 볼린저밴드, 최근 고점/저점을 활용하세요.
 
 ---
 ━━━━━━━━━━━━━
@@ -832,80 +832,72 @@ def build_ai_prompt(ticker,phist,fundamentals):
 ━━━━━━━━━━━━━
 [티커: {ticker}]
 
-📌 [주가 + 기술적 지표 + 최근 시그널 + 백테스트 통계]
+📌 [주가 + 기술적 지표 + 시그널 백테스트 요약]
 {phist}
 
-📌 [YFinance 펀더멘탈 및 숏(공매도) 데이터] (반드시 이 데이터만 사용할 것)
+📌 [YFinance 펀더멘탈 및 숏(공매도) 데이터]
 {fundamentals}
 
 ---
 ━━━━━━━━━━━━━
-【 ✍️ Guidelines 】
-━━━━━━━━━━━━━
-① 한국어, 전문적이면서 이해하기 쉽게
-② 확신형 어조 ("~할 가능성이 높습니다" ⭕)
-③ 불릿/강조/이모티콘(🔵긍정 🔴부정 🟠중간) 활용
-④ 거래량 배수 + 매집/투매, ATR 변동폭, WT구간, Diamond/Dot 신뢰도 분석 포함
-⑤ 시나리오별 확률(%) + 근거 명시
-⑥ 기술적 vs 펀더멘탈(수급) 충돌 시 판단
-
----
-━━━━━━━━━━━━━
-【 📄 Output Format (반드시 아래 마크다운 양식을 따를 것) 】
+【 📄 Output Format (반드시 아래 양식을 그대로 출력할 것) 】
 ━━━━━━━━━━━━━
 # 💎 {ticker} 심층 퀀트 리포트
-**[🔵/🔴/🟠] {ticker} 분석:** [가장 중요한 모멘텀 및 현재 상태를 한 줄로 요약]
-[현재 날짜], 전일 대비 [변동률]% [상승/하락]. 거래량 [평균대비 배수]. [핵심 패턴]. 지지 [가격], 저항 [가격].
+[🔵/🔴/🟠] [{ticker}] 분석: [핵심 한 줄]
+[날짜], 전일 대비 [변동률]% [상승/하락]. 거래량 [평균대비 배수]. [핵심 패턴]. 지지 [가격], 저항 [가격].
 
 ---
-### 1. 내용 요약
-[🔵/🔴/🟠] [현재 추세, 주요 시그널, 향후 방향성을 포함해 3~4문장으로 요약]
+### 내용 요약
+[🔵/🔴/🟠] [현재 상황 및 방향성에 대한 3~4문장 요약]
 
 ---
-### 2. 💎 마켓 사이퍼 B+ 시그널 분석
-* **WaveTrend:** [WT1/WT2 값, 과매수/과매도 등 상태]
-* **Money Flow:** [MF_Area 값, 자금 유입/유출 방향]
-* 🔥 **Confluence Score:** [점수, 판정 (예: Strong Buy)]
-* ⚠️ **Signal Proximity:** [매수/매도 임박 여부 퍼센트 및 코멘트]
-* **최근 시그널:** [최근 발생한 주요 시그널 목록 요약]
-* **시그널 신뢰도:** [높음/중간/낮음 + 제공된 백테스트 승률/평균수익 등 근거]
-> 💎 **해석:** [위 지표들이 뜻하는 바를 베테랑의 시선으로 1~2문장 해석]
+### 💎 마켓 사이퍼 B+ 시그널 분석
+* WaveTrend: [WT1/WT2 값, 과매수/과매도 등 상태]
+* Money Flow: [MF_Area 값, 자금 유입/유출 방향]
+* 🔥 Confluence Score: [점수, 판정 (예: Strong Buy), 감쇠 상태]
+* ⚠️ Signal Proximity: [매수/매도 임박 여부 퍼센트 및 코멘트]
+* 최근 시그널: [최근 발생한 주요 시그널 목록 요약]
+* 시그널 신뢰도: [높음/중간/낮음 + 제공된 백테스트 승률/평균수익 등 근거]
+> 💎 해석: [위 지표들이 뜻하는 바를 베테랑의 시선으로 1~2문장 해석]
 
 ---
-### 3. 📊 주가 및 거래량 분석
-* **거래량:** 평균 대비 [배수] 수준. 거래량 지표(VWAP Oscillator): [값]
-* **현재 상태:** [과매수/과매도 여부, ADX 기반 추세 강도 분석]
-> **해석:** [거래량이 갖는 시장 심리 해석]  [긍정:🔵/부정 :🔴/중간:🟠]
-* **거래량 해석:** [스마트 머니 유입/이탈 징후 판단]  [긍정:🔵/부정 :🔴/중간:🟠]
-> **종합 해석:** [🔵/🔴/🟠] [종합 판단]
+### 주가 및 거래량 분석
+* 거래량: 평균 대비 [배수] 수준. 거래량 지표(VWAP Oscillator): [값]
+* 현재 상태: [과매수/과매도 여부, ADX 기반 추세 강도 분석]
+> 해석: [거래량이 갖는 시장 심리 해석]  [긍정:🔵/부정 :🔴/중간:🟠]
+* 거래량 해석: [스마트 머니 유입/이탈 징후 판단]  [긍정:🔵/부정 :🔴/중간:🟠]
+> 종합 해석: [🔵/🔴/🟠] [종합 판단]
 
 ---
-### 4. 📈 장중 기술적 지표 및 S/R
-**[식별된 기술적 패턴 이름 (예: Momentum Ignition, EMA Pullback 등)]**
-* **상태:** [패턴에 대한 설명. ATR 기반 예상 변동 ±__%]
-* **해석:** [패턴이 향후 주가에 미칠 영향]  [긍정:🔵/부정 :🔴/중간:🟠]
-* **역사적 유사패턴:** [백테스트 데이터 기반: 동일 시그널 10일 승률 __%, 평균 수익률 __%]  [긍정:🔵/부정 :🔴/중간:🟠]
-* **지표 요약:** ATR [값] (±__%), ADX [값], TTM Squeeze [ON/OFF], MACD [상태]
-
-**[지지선 및 저항선]**
-* **지지선:** [가격1] (설명), [가격2], [가격3]
-* **저항선:** [가격1] (설명), [가격2], [가격3]
-[이동평균선, 볼린저 밴드 등을 기준으로 현재 주가 위치 설명]
+### 장중 기술적 지표
+[식별된 기술적 패턴 이름 (예: Momentum Ignition, EMA Pullback 등)]
+* 상태: [패턴에 대한 설명. ATR 기반 예상 변동 ±__%]
+* 해석: [패턴이 향후 주가에 미칠 영향]  [긍정:🔵/부정 :🔴/중간:🟠]
+* 역사적 유사패턴: [백테스트 데이터 기반: 동일 시그널 발생 시 10일 승률 __%, 평균 수익률 __%]  [긍정:🔵/부정 :🔴/중간:🟠]
+* 지표 요약: ATR [값] (±__%), ADX [값], TTM Squeeze [ON/OFF], MACD [상태]
 
 ---
-### 5. 🏦 펀더멘탈 및 파생 심리 현황
-* **옵션/파생 심리 추정:** [수급 기반 투자자들의 베팅 심리 분석]
-* **감마 스퀴즈 위험도:** High/Medium/Low
-> [긍정:🔵/부정 :🔴/중간:🟠] **해석:** 수급상 주가를 움직일 에너지가 얼마나 축적되었는가?
-
-* **공매도 현황:** [제공된 Short % of Float, Short Ratio 기반 숏스퀴즈 가능성 등 분석]
-* **주가 변동 이유 (이벤트):** [현재 펀더멘탈 모멘텀 평가]
+### 지지선 및 저항선
+* 지지선: [가격1] (설명), [가격2], [가격3]
+* 저항선: [가격1] (설명), [가격2], [가격3]
+[이동평균선, 볼린저 밴드, 샹들리에 엑시트(Chandelier) 등을 기준으로 현재 주가 위치 설명]
 
 ---
-### 6. 🔮 종합해석 및 전망
+### 파생 심리 및 공매도 현황
+* 공매도 및 숏스퀴즈 가능성: [제공된 Short % of Float, Short Ratio 기반 하방 압력 및 숏커버링 가능성 분석. 숏커버링 압력 지수: High/Medium/Low]
+* 옵션/파생 심리 추정: [현재 추세 및 변동성을 통한 파생 시장의 상방/하방 베팅 심리 유추]
+> [긍정:🔵/부정 :🔴/중간:🟠] 해석: 수급상 주가를 끌어올릴(혹은 내릴) '에너지'가 얼마나 축적되었는가?
+
+---
+### 주가변동이유 및 이벤트
+- [🔵/🔴/🟠] [이유 1] — 단발성/추세형 [현재 펀더멘탈/뉴스 모멘텀 평가]
+- [🔵/🔴/🟠] [이유 2] (필요시)
+
+---
+### 🔮 종합해석 및 시나리오
 * 🔵 **긍정적 시나리오 (Bullish):** [조건] 충족 시 [목표가]까지 상승 예상. 확률: __% (근거: )
 * 🟠 **베이스 시나리오 (Base):** [가장 확률 높은 시나리오]. 확률: __%
-* 🔴 **리스크 시나리오 (Bearish):** [조건] 이탈 시 [목표가]까지 하락 예상. 확률: __% (근거: )
+* 🔴 **리스크 시나리오 (Bearish):** [조건] 이탈 시 [하락 목표가]까지 하락 예상. 확률: __% (근거: )
 
 **실전 트레이딩 전략:**
 * **리스크/리워드 비율:** 목표가 대비 손절가 간 비율 1:__ 확인
@@ -913,16 +905,16 @@ def build_ai_prompt(ticker,phist,fundamentals):
 * **보수적 진입 시점:** [확인 매매 가격대]
 * **손절(Stop-loss) 라인:** [필수 준수 가격] - 이 가격 붕괴 시 예측 시나리오 폐기, 즉시 대응
 * **분할 매도 전략:** 1차 목표 [가격] 도달 시 __% 익절, 2차 목표 [가격] 도달 시 __% 추가 매도
-* **트레일링 스탑:** [Chandelier Exit 값 활용 이익 보존 가이드]
+* **트레일링 스탑:** [Chandelier Exit 값 등을 활용한 이익 보존 가이드]
 
 ---
-### 7. ⚖️ 결론
+### 결론
 [🔵/🔴/🟠] [2~3문장 명확한 결론]
 
 ### 주가 예측 (다음 거래일)
-[🔵/🔴/🟠] **예상:** [방향] · **근거:** [...]
-**[리스크/리워드 최적 진입]:** [가격] 지지 확인 후 [가격] 공략, [비율] 리스크/리워드 최적 진입
-**[GRADE/Score]:** [최종 등급 및 이유]
+[🔵/🔴/🟠] 예상: [방향] · 근거: [...]
+[리스크/리워드 최적 진입] : [가격] 지지 확인 후 [가격] 공략, [비율] 리스크/리워드 최적 진입
+[GRADE/Score]: [최종 등급 및 이유]
 """
 
 # ──────────────────────────────────────────
@@ -1056,11 +1048,13 @@ def render_stats(m):
             for sn,sv in sorted(data.items(),key=lambda x:x[1]['count'],reverse=True):
                 wr=sv.get('10d_winrate'); av=sv.get('10d_avg')
                 if wr is None: continue
+                # V7.6 FIX: 사용자 친화적인 한국어 라벨 출력
+                kor_label = ALL_CHART_SIGNALS.get(sn,{}).get('kor', sn)
                 c='#00E676' if wr>50 else ('#FFC107' if wr>40 else '#FF1744')
                 lb=f"승률 <span style='color:{c}'>**{wr:.0f}%**</span>"
                 av_c='#00E676' if av>0 else '#FF1744'
                 ic=ALL_CHART_SIGNALS.get(sn,{}).get('icon','')
-                st.markdown(f"<span style='font-size:.85rem'>{ic} **{sn}** ({sv['count']}회) · {lb} · 평균수익 <span style='color:{av_c}'>**{av:+.1f}%**</span></span>",unsafe_allow_html=True)
+                st.markdown(f"<span style='font-size:.85rem'>{ic} **{kor_label}** ({sv['count']}회) · {lb} · 평균 <span style='color:{av_c}'>**{av:+.1f}%**</span></span>",unsafe_allow_html=True)
         c1,c2=st.columns(2)
         with c1: _side("🟢 BUY 전략",{k:v for k,v in alls.items() if v['direction']=='buy'})
         with c2: _side("🔴 SELL (Short) 전략",{k:v for k,v in alls.items() if v['direction']=='sell'})
@@ -1082,7 +1076,7 @@ def render_analysis(msg):
 # ──────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 💎 CipherX")
-    st.markdown("<p style='color:#888;font-size:.8rem'>AI 퀀트 주가 분석 · MCB+ v7.5</p>",unsafe_allow_html=True)
+    st.markdown("<p style='color:#888;font-size:.8rem'>AI 퀀트 주가 분석 · MCB+ v7.6</p>",unsafe_allow_html=True)
     st.markdown("---")
     st.markdown("### 📅 차트 기간")
     chart_period=st.radio("표시 기간",['3개월','6개월','1년','2년'],index=2,horizontal=True,key="period")
