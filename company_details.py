@@ -7,7 +7,7 @@ from datetime import datetime
 import plotly.graph_objects as go
 
 # ═══════════════════════════════════════════════════════════════
-# 🛠️ API 변동성 대응을 위한 동의어(Alias) 설정 (🚀 N/A 해결)
+# 🛠️ API 변동성 대응을 위한 동의어(Alias) 설정 (N/A 방어)
 # ═══════════════════════════════════════════════════════════════
 REV_ALIASES = ['Total Revenue', 'Operating Revenue', 'Revenue']
 NI_ALIASES = ['Net Income', 'Net Income Common Stockholders', 'Net Income Continuous Operations', 'Net Income From Continuing Ops', 'Net Income Applicable To Common Shares', 'Net Income Including Noncontrolling Interests']
@@ -16,7 +16,7 @@ BS_ASSETS_ALIASES = ['Total Assets', 'Assets', 'TotalAssets']
 BS_LIAB_ALIASES = ['Total Liabilities Net Minority Interest', 'Total Liab', 'Total Liabilities', 'TotalLiabilities']
 
 # ═══════════════════════════════════════════════════════════════
-# 🛠️ 유틸리티 함수
+# 🛠️ 유틸리티 함수 (생략 없음)
 # ═══════════════════════════════════════════════════════════════
 
 def _fmt_num(num, is_currency=True):
@@ -135,9 +135,9 @@ def _score_dot_row(items):
                   f'text-align:center;line-height:1.2">{name}</span></div>')
     return f'<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:2px;margin:10px 0">{cells}</div>'
 
-# 🚀 Plotly 차트 생성 함수들 (배경색을 s-card와 동일한 #161A22로 설정)
+# 🚀 Plotly 차트 생성기 (데이터 부족 시 아예 렌더링 안 함)
 def _get_plotly_combo_chart(rv, nv, rd):
-    if not rv or not rd: return None
+    if not rv or not rd or len(rv) < 2: return None
     rd_rev, rv_rev, nv_rev = rd[::-1], rv[::-1], nv[::-1]
     labels = [d.strftime('%Y') if hasattr(d, 'strftime') else str(d)[:4] for d in rd_rev]
 
@@ -147,23 +147,23 @@ def _get_plotly_combo_chart(rv, nv, rd):
 
     fig.update_layout(
         title=dict(text="📊 연도별 재무 추이", font=dict(size=14, color='#8b949e')),
-        paper_bgcolor='#161A22', plot_bgcolor='#161A22', # 카드 배경색과 일치
-        font=dict(color='#8b949e', size=11), margin=dict(l=10, r=10, t=40, b=20), height=350,
+        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='#8b949e', size=11), margin=dict(l=10, r=10, t=40, b=10), height=300,
         xaxis=dict(showgrid=False), yaxis=dict(showgrid=True, gridcolor='rgba(45,51,59,0.5)', zeroline=False),
         yaxis2=dict(overlaying='y', side='right', showgrid=False), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
     return fig
 
 def _get_plotly_yearly_bar(dates, y1, y2, name1, name2, c1, c2):
-    if not dates or not y1: return None
+    if not dates or not y1 or len(y1) < 2: return None
     labels = [d.strftime('%Y') if hasattr(d, 'strftime') else str(d)[:4] for d in dates[::-1]]
     fig = go.Figure()
     fig.add_trace(go.Bar(x=labels, y=y1[::-1], name=name1, marker_color=c1))
     fig.add_trace(go.Bar(x=labels, y=y2[::-1], name=name2, marker_color=c2))
     fig.update_layout(
         title=dict(text="📊 연도별 자산/부채 추이", font=dict(size=14, color='#8b949e')),
-        barmode='group', paper_bgcolor='#161A22', plot_bgcolor='#161A22', font=dict(color='#8b949e', size=11), 
-        margin=dict(l=10, r=10, t=40, b=20), height=320, 
+        barmode='group', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='#8b949e', size=11), 
+        margin=dict(l=10, r=10, t=40, b=10), height=300, 
         xaxis=dict(showgrid=False), yaxis=dict(showgrid=True, gridcolor='rgba(45,51,59,0.5)', zeroline=False), 
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
@@ -174,8 +174,8 @@ def _get_plotly_donut(labels, values, colors):
     fig = go.Figure(data=[go.Pie(labels=labels, values=values, hole=.55, marker_colors=colors, textinfo='percent', hoverinfo='label+percent')])
     fig.update_layout(
         title=dict(text="📊 지분 구성 비율", font=dict(size=14, color='#8b949e')),
-        margin=dict(t=40, b=10, l=10, r=10), paper_bgcolor='#161A22', plot_bgcolor='#161A22', 
-        font=dict(color='#8b949e', size=12), showlegend=True, height=300, 
+        margin=dict(t=40, b=10, l=10, r=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', 
+        font=dict(color='#8b949e', size=12), showlegend=True, height=280, 
         legend=dict(orientation="v", yanchor="middle", y=0.5, xanchor="left", x=1)
     )
     return fig
@@ -184,13 +184,13 @@ def _get_plotly_gauge(val, color):
     val_pct = val * 100
     fig = go.Figure(go.Indicator(
         mode = "gauge+number", value = val_pct, number = {'suffix': "%", 'font': {'size': 26, 'color': color}},
-        gauge = {'axis': {'range': [0, max(20, val_pct*1.2)], 'tickwidth': 1, 'tickcolor': "#8b949e"},
+        gauge = {'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "#8b949e"}, # 🚀 100% 스케일로 수정
                  'bar': {'color': color, 'thickness': 0.75}, 'bgcolor': "rgba(0,0,0,0)", 'borderwidth': 0,
-                 'steps': [{'range': [0, 5], 'color': 'rgba(0,230,118,0.1)'}, {'range': [5, 10], 'color': 'rgba(255,193,7,0.1)'}, {'range': [10, 100], 'color': 'rgba(255,23,68,0.1)'}]}
+                 'steps': [{'range': [0, 10], 'color': 'rgba(0,230,118,0.1)'}, {'range': [10, 20], 'color': 'rgba(255,193,7,0.1)'}, {'range': [20, 100], 'color': 'rgba(255,23,68,0.1)'}]}
     ))
     fig.update_layout(
-        title=dict(text="📊 공매도 비율 위험도", font=dict(size=14, color='#8b949e')),
-        paper_bgcolor='#161A22', font=dict(color='#8b949e'), margin=dict(l=20, r=20, t=40, b=20), height=300
+        title=dict(text="📊 공매도 비율 (100% 기준)", font=dict(size=14, color='#8b949e')),
+        paper_bgcolor='rgba(0,0,0,0)', font=dict(color='#8b949e'), margin=dict(l=20, r=20, t=40, b=20), height=280
     )
     return fig
 
@@ -417,18 +417,12 @@ def _sector_pe_live(sector):
 
 
 # ═══════════════════════════════════════════════════════════════
-# 🎨 CSS
+# 🎨 CSS (🚀 Native Container를 s-card처럼 완벽하게 변경)
 # ═══════════════════════════════════════════════════════════════
 
 CSS = """
 <style>
-.s-card{
-    background:#161A22;border:1px solid #2D333B;border-radius:16px;
-    padding:28px 30px;margin-bottom:24px;
-    box-shadow:0 6px 24px rgba(0,0,0,.3);transition:all .3s;
-    max-width:960px;margin-left:auto;margin-right:auto; height: 100%; box-sizing: border-box;}
-.s-card:hover{transform:translateY(-2px);border-color:#444c56;
-    box-shadow:0 12px 36px rgba(0,0,0,.4)}
+/* 기존의 독립적인 HTML용 .s-card 클래스 스타일들 (텍스트 부분용) */
 .s-title{
     font-size:1.15rem;font-weight:700;color:#82aaff;
     margin-bottom:20px;padding-bottom:12px;
@@ -456,9 +450,6 @@ CSS = """
 .m-table{width:100%;border-collapse:collapse;font-size:.85rem;margin-top:8px}
 .m-table th{color:#6e7681;text-align:left;padding:8px;border-bottom:2px solid #21262d;font-weight:600}
 .m-table td{color:#c9d1d9;padding:8px;border-bottom:1px solid #1c2029}
-.p-container{background:#21262d;border-radius:10px;height:30px;display:flex;overflow:hidden;margin:10px 0}
-.p-bar{height:100%;display:flex;align-items:center;justify-content:center;
-    font-size:.72rem;font-weight:700;color:#fff;transition:width .6s}
 .n-item{padding:12px 0;border-bottom:1px solid #2D333B}
 .n-item:last-child{border-bottom:none}
 .n-title{color:#82aaff;font-weight:600;font-size:.93rem;text-decoration:none}
@@ -468,6 +459,28 @@ CSS = """
     flex-wrap:wrap;gap:12px;max-width:960px;margin:0 auto 8px}
 .note-box{font-size:.73rem;color:#6e7681;line-height:1.6;
     padding:10px;background:rgba(0,0,0,.15);border-radius:8px;margin-top:10px}
+
+/* 🚀 하나의 챕터를 위한 네이티브 Streamlit 컨테이너 덮어쓰기 */
+[data-testid="stVerticalBlockBorderWrapper"] {
+    background: #161A22 !important;
+    border: 1px solid #2D333B !important;
+    border-radius: 16px !important;
+    box-shadow: 0 6px 24px rgba(0,0,0,.3) !important;
+    transition: all .3s;
+    max-width: 960px;
+    margin-left: auto;
+    margin-right: auto;
+    margin-bottom: 24px !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:hover {
+    transform: translateY(-2px);
+    border-color: #444c56 !important;
+    box-shadow: 0 12px 36px rgba(0,0,0,.4) !important;
+}
+/* 컨테이너 내부 여백 조절 (기존 s-card 스타일과 유사하게) */
+[data-testid="stVerticalBlockBorderWrapper"] > div {
+    padding: 20px 24px !important;
+}
 </style>
 """
 
@@ -569,8 +582,8 @@ def render_company_details(ticker_str: str):
     }
     all_verdicts.append(("성장사이클", v1_c))
 
-    st.markdown(f"""
-    <div class="s-card">
+    with st.container(border=True): # 🚀 Native Container 적용
+        st.markdown(f"""
         <div class="s-title"><span class="s-num">01</span> 이 회사, 지금 어느 단계인가요?</div>
         <div style="display:flex;gap:3px;margin-bottom:20px">{bar_html}</div>
         <div style="text-align:center;margin:16px 0">
@@ -594,7 +607,7 @@ def render_company_details(ticker_str: str):
             💡 성장률은 Yahoo Finance 기준 분기(QoQ) YoY 수치입니다. 연간 성장률과 다를 수 있습니다.
         </div>
         {_verdict_badge(v1_c, "📌", f"종합: {v1_map.get(sn, '')}")}
-    </div>""", unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
     # 2️⃣ 돈을 잘 버는 회사인가요?
@@ -627,8 +640,8 @@ def render_company_details(ticker_str: str):
     ni_lbl  = f"{yr_ni}년 순이익 CAGR (SEC)" if yr_ni else "순이익 CAGR"
     eps_lbl = f"{yr_eps}년 EPS CAGR (SEC)" if yr_eps else "EPS CAGR"
 
-    st.markdown(f"""
-    <div class="s-card">
+    with st.container(border=True): # 🚀 Native Container 적용
+        st.markdown(f"""
         <div class="s-title"><span class="s-num">02</span> 돈을 잘 버는 회사인가요? <span style="font-size:.75rem;color:#6e7681">SEC 데이터</span></div>
         <div class="two-col">
             <div>
@@ -664,10 +677,10 @@ def render_company_details(ticker_str: str):
             </div>
         </div>
         {_verdict_badge(v2_c, "📌", v2_t)}
-    </div>""", unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 3️⃣ 지금까지 성적 (🚀 쪼개진 HTML 수정 완료)
+    # 3️⃣ 지금까지 성적 (🚀 하나의 카드 + 차트 숨김 기능 반영)
     # ═══════════════════════════════════════════════════
     rev_stab, rev_cv, stab_c = _stability(fin, REV_ALIASES)
     mtrend, _, mtrend_c      = _margin_trend(fin)
@@ -698,11 +711,28 @@ def render_company_details(ticker_str: str):
     else:         v3_c, v3_t = "red",    "❌ 주의 — 수익 불안정 또는 하락 추세"
     all_verdicts.append(("과거성적", v3_c))
 
-    col1, col2 = st.columns([1.1, 1])
-    with col1:
-        st.markdown(f"""
-        <div class="s-card">
-            <div class="s-title"><span class="s-num">03</span> 지금까지 성적 <span style="font-size:.75rem;color:#6e7681">SEC 데이터</span></div>
+    with st.container(border=True): # 🚀 Native Container 적용
+        st.markdown('<div class="s-title"><span class="s-num">03</span> 지금까지 성적 <span style="font-size:.75rem;color:#6e7681">SEC 데이터</span></div>', unsafe_allow_html=True)
+        
+        # 🚀 차트가 있을 때만 2단 분리, 없으면 전체 화면 사용
+        if fig3:
+            col1, col2 = st.columns([1.1, 1])
+            with col1:
+                st.markdown(f"""
+                {_metric_row("수익 안정성", f'{rev_stab} <span style="font-size:.75rem;color:#555">{rev_cv}</span>')}
+                {_metric_row("이익 마진 추이", mtrend)}
+                {_metric_row("성장 가속화", accel)}
+                {_metric_row("ROE 수준", roe_lbl)}
+                <div class="divider"></div>
+                <table class="m-table">
+                    <tr><th>연도</th><th>매출</th><th>순이익</th><th>순이익률</th></tr>
+                    {tbl_rows}
+                </table>
+                """, unsafe_allow_html=True)
+            with col2:
+                st.plotly_chart(fig3, use_container_width=True, config={'displayModeBar': False})
+        else: # 🚀 차트가 없으면 표만 풀사이즈로 표시 (에러 메세지/빈칸 없음)
+            st.markdown(f"""
             {_metric_row("수익 안정성", f'{rev_stab} <span style="font-size:.75rem;color:#555">{rev_cv}</span>')}
             {_metric_row("이익 마진 추이", mtrend)}
             {_metric_row("성장 가속화", accel)}
@@ -712,16 +742,12 @@ def render_company_details(ticker_str: str):
                 <tr><th>연도</th><th>매출</th><th>순이익</th><th>순이익률</th></tr>
                 {tbl_rows}
             </table>
-            {_verdict_badge(v3_c, "📌", v3_t)}
-        </div>""", unsafe_allow_html=True)
-    with col2:
-        if fig3:
-            st.plotly_chart(fig3, use_container_width=True)
-        else:
-            st.markdown("<div style='text-align:center; color:#6e7681; padding:100px 0; background:#161A22; border:1px solid #2D333B; border-radius:16px; height:100%; box-sizing:border-box;'>차트 데이터를 불러올 수 없습니다.</div>", unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
+
+        st.markdown(_verdict_badge(v3_c, "📌", v3_t), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 4️⃣ 성장 가능성 (🚀 PEG 강제 계산 로직 포함)
+    # 4️⃣ 성장 가능성 
     # ═══════════════════════════════════════════════════
     payout    = info.get('payoutRatio', 0) or 0
     retention = max(0, 1 - payout)
@@ -749,8 +775,8 @@ def render_company_details(ticker_str: str):
     eg_cls = "m-green" if eg and eg > 0 else "m-red"
     rg_cls = "m-green" if rg and rg > 0 else "m-red"
 
-    st.markdown(f"""
-    <div class="s-card">
+    with st.container(border=True):
+        st.markdown(f"""
         <div class="s-title"><span class="s-num">04</span> 성장 가능성 <span style="font-size:.75rem;color:#6e7681">SEC + Yahoo</span></div>
         <div class="two-col">
             <div>
@@ -771,10 +797,10 @@ def render_company_details(ticker_str: str):
             </div>
         </div>
         {_verdict_badge(v4_c, "📌", v4_t)}
-    </div>""", unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 5️⃣ 재무 건전성
+    # 5️⃣ 재무 건전성 (🚀 하나의 카드 + 차트 숨김 기능 반영)
     # ═══════════════════════════════════════════════════
     try:
         curr_d = _get_row(bs, ['Current Debt', 'Current Portion Of Long Term Debt']) or 0
@@ -812,11 +838,28 @@ def render_company_details(ticker_str: str):
     else:         v5_c, v5_t = "red",    "❌ 주의 — 부채 높거나 현금 부족"
     all_verdicts.append(("재무건전", v5_c))
 
-    col1, col2 = st.columns([1.1, 1])
-    with col1:
-        st.markdown(f"""
-        <div class="s-card">
-            <div class="s-title"><span class="s-num">05</span> 회사에 돈이 얼마나 있나요? <span style="font-size:.75rem;color:#6e7681">SEC + Yahoo</span></div>
+    with st.container(border=True): # 🚀 Native Container 적용
+        st.markdown('<div class="s-title"><span class="s-num">05</span> 회사에 돈이 얼마나 있나요? <span style="font-size:.75rem;color:#6e7681">SEC + Yahoo</span></div>', unsafe_allow_html=True)
+        
+        if fig5: # 🚀 차트가 있을 때
+            col1, col2 = st.columns([1.1, 1])
+            with col1:
+                st.markdown(f"""
+                {_metric_row("💵 보유 현금", _fmt_num(cash), "m-value m-green m-big")}
+                {_metric_row("순 자산 (자산-부채)", _fmt_num(na), "m-green" if na > 0 else "m-red")}
+                <div class="divider"></div>
+                {_metric_row("부채 수준 (D/E)", dl)}
+                {_metric_row("부채 추세", dt_trend)}
+                {_metric_row("이자 부담 (ICR)", ib_txt)}
+                {_metric_row("부채/자본 비율", f'{dte:.1f}%' if isinstance(dte, (int, float)) else 'N/A')}
+                <div class="note-box">
+                    ※ 순자산(총자산-총부채)과 자본(주주지분)은 이론상 같으나, 비지배지분(Minority Interest) 등에 의해 차이가 날 수 있습니다.
+                </div>
+                """, unsafe_allow_html=True)
+            with col2:
+                st.plotly_chart(fig5, use_container_width=True, config={'displayModeBar': False})
+        else: # 🚀 차트가 없을 때
+            st.markdown(f"""
             {_metric_row("💵 보유 현금", _fmt_num(cash), "m-value m-green m-big")}
             {_metric_row("순 자산 (자산-부채)", _fmt_num(na), "m-green" if na > 0 else "m-red")}
             <div class="divider"></div>
@@ -825,15 +868,11 @@ def render_company_details(ticker_str: str):
             {_metric_row("이자 부담 (ICR)", ib_txt)}
             {_metric_row("부채/자본 비율", f'{dte:.1f}%' if isinstance(dte, (int, float)) else 'N/A')}
             <div class="note-box">
-                ※ 순자산(총자산-총부채)과 자본(주주지분)은 이론상 같으나, 비지배지분(Minority Interest) 등에 의해 차이가 날 수 있습니다.
+                ※ 순자산(총자산-총부채)과 자본(주주지분)은 이론상 같으나, 비지배지분 등에 의해 차이가 날 수 있습니다.
             </div>
-            {_verdict_badge(v5_c, "📌", v5_t)}
-        </div>""", unsafe_allow_html=True)
-    with col2:
-        if fig5:
-            st.plotly_chart(fig5, use_container_width=True)
-        else:
-            st.markdown("<div style='text-align:center; color:#6e7681; padding:100px 0; background:#161A22; border:1px solid #2D333B; border-radius:16px; height:100%; box-sizing:border-box;'>차트 데이터를 불러올 수 없습니다.</div>", unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
+
+        st.markdown(_verdict_badge(v5_c, "📌", v5_t), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
     # 6️⃣ 거래량
@@ -859,8 +898,8 @@ def render_company_details(ticker_str: str):
                      f'display:flex;align-items:center;padding-left:8px;font-size:.72rem;color:#fff;font-weight:600">'
                      f'{_fmt_num(v, False)}</div></div></div>')
 
-    st.markdown(f"""
-    <div class="s-card">
+    with st.container(border=True):
+        st.markdown(f"""
         <div class="s-title"><span class="s-num">06</span> 현재 사람들이 많이 사고 있나요? <span style="font-size:.75rem;color:#6e7681">Yahoo</span></div>
         <div class="two-col">
             <div>
@@ -876,7 +915,7 @@ def render_company_details(ticker_str: str):
             </div>
         </div>
         {_verdict_badge(v6_c, "📌", v6_t)}
-    </div>""", unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
     # 7️⃣ 변동성
@@ -904,8 +943,8 @@ def render_company_details(ticker_str: str):
 
     v7_t = f"베타 {beta:.2f} — {bl}" if isinstance(beta, (int, float)) else "변동성 데이터 부족"
 
-    st.markdown(f"""
-    <div class="s-card">
+    with st.container(border=True):
+        st.markdown(f"""
         <div class="s-title"><span class="s-num">07</span> 변동성이 큰가요? <span style="font-size:.75rem;color:#6e7681">Yahoo</span></div>
         <div class="two-col">
             <div>
@@ -925,7 +964,7 @@ def render_company_details(ticker_str: str):
             </div>
         </div>
         {_verdict_badge(bc, "📌", v7_t)}
-    </div>""", unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
     # 8️⃣ 밸류에이션
@@ -960,8 +999,8 @@ def render_company_details(ticker_str: str):
 
     pe_src_lbl = f"평균 P/E ≈ {s_pe:.1f} ({pe_source})" if s_pe else "N/A"
 
-    st.markdown(f"""
-    <div class="s-card">
+    with st.container(border=True):
+        st.markdown(f"""
         <div class="s-title"><span class="s-num">08</span> 이 종목 비싼가요? <span style="font-size:.75rem;color:#6e7681">Yahoo</span></div>
         <div class="two-col">
             <div>
@@ -982,7 +1021,7 @@ def render_company_details(ticker_str: str):
             </div>
         </div>
         {_verdict_badge(v8_c, "📌", v8_t)}
-    </div>""", unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
     # 9️⃣ 전문가 의견
@@ -1029,8 +1068,8 @@ def render_company_details(ticker_str: str):
 
     v9_t = f"애널리스트 {n_ana}명 {rk} (목표가 {up_str})"
 
-    st.markdown(f"""
-    <div class="s-card">
+    with st.container(border=True):
+        st.markdown(f"""
         <div class="s-title"><span class="s-num">09</span> 전문가들의 의견 <span style="font-size:.75rem;color:#6e7681">Yahoo</span></div>
         <div class="two-col">
             <div>
@@ -1055,10 +1094,10 @@ def render_company_details(ticker_str: str):
             </div>
         </div>
         {_verdict_badge(cc, "📌", v9_t)}
-    </div>""", unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 🔟 지분 구조
+    # 🔟 지분 구조 (🚀 하나의 카드 + 차트 숨김 기능 반영)
     # ═══════════════════════════════════════════════════
     inst = info.get('heldPercentInstitutions', 0) or 0
     ins  = info.get('heldPercentInsiders', 0) or 0
@@ -1073,11 +1112,28 @@ def render_company_details(ticker_str: str):
 
     fig10 = _get_plotly_donut(['기관', '내부자', '개인/기타'], [inst, ins, pub], ['#2196F3', '#FF9800', '#4CAF50'])
 
-    col1, col2 = st.columns([1.1, 1])
-    with col1:
-        st.markdown(f"""
-        <div class="s-card">
-            <div class="s-title"><span class="s-num">10</span> 이 회사 누가 들고 있나요? <span style="font-size:.75rem;color:#6e7681">Yahoo</span></div>
+    with st.container(border=True):
+        st.markdown('<div class="s-title"><span class="s-num">10</span> 이 회사 누가 들고 있나요? <span style="font-size:.75rem;color:#6e7681">Yahoo</span></div>', unsafe_allow_html=True)
+        
+        if fig10:
+            col1, col2 = st.columns([1.1, 1])
+            with col1:
+                st.markdown(f"""
+                {_metric_row("총 발행 주식수", f"{_fmt_num(s_out, False)} 주")}
+                {_metric_row("유통 주식수 (Float)", f"{_fmt_num(s_flt, False)} 주")}
+                <div class="divider"></div>
+                {_metric_row("🏛️ 기관 비율", _fmt_pct(inst))}
+                {_metric_row("👔 내부자 비율", _fmt_pct(ins))}
+                {_metric_row("👤 개인/기타 (추정)", _fmt_pct(pub))}
+                <div class="note-box">
+                    ※ '기관'에는 정부 연기금, 뮤추얼펀드, ETF, 헤지펀드가 포함됩니다.<br>
+                    ※ '개인/기타'는 (100% - 기관 - 내부자)로 추정한 값이며, 실제와 다를 수 있습니다.
+                </div>
+                """, unsafe_allow_html=True)
+            with col2:
+                st.plotly_chart(fig10, use_container_width=True, config={'displayModeBar': False})
+        else:
+            st.markdown(f"""
             {_metric_row("총 발행 주식수", f"{_fmt_num(s_out, False)} 주")}
             {_metric_row("유통 주식수 (Float)", f"{_fmt_num(s_flt, False)} 주")}
             <div class="divider"></div>
@@ -1085,19 +1141,14 @@ def render_company_details(ticker_str: str):
             {_metric_row("👔 내부자 비율", _fmt_pct(ins))}
             {_metric_row("👤 개인/기타 (추정)", _fmt_pct(pub))}
             <div class="note-box">
-                ※ '기관'에는 정부 연기금, 뮤추얼펀드, ETF, 헤지펀드가 포함됩니다.<br>
-                ※ '개인/기타'는 (100% - 기관 - 내부자)로 추정한 값이며, 실제와 다를 수 있습니다.
+                ※ '기관'에는 정부 연기금, 뮤추얼펀드, ETF, 헤지펀드가 포함됩니다.
             </div>
-            {_verdict_badge(v10_c, "📌", v10_t)}
-        </div>""", unsafe_allow_html=True)
-    with col2:
-        if fig10:
-            st.plotly_chart(fig10, use_container_width=True)
-        else:
-            st.markdown("<div style='text-align:center; color:#6e7681; padding:100px 0; background:#161A22; border:1px solid #2D333B; border-radius:16px; height:100%; box-sizing:border-box;'>차트 데이터를 불러올 수 없습니다.</div>", unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
+            
+        st.markdown(_verdict_badge(v10_c, "📌", v10_t), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 1️⃣1️⃣ 옵션 / Max Pain (🚀 기존 구조 원복)
+    # 1️⃣1️⃣ 옵션 / Max Pain
     # ═══════════════════════════════════════════════════
     exp, mp, tc, tp, is_vol_weight = _max_pain(tkr)
 
@@ -1128,8 +1179,8 @@ def render_company_details(ticker_str: str):
     
     vol_warning = "<div style='color:#FFC107; font-size:0.8rem; margin-top:8px;'>⚠️ 미결제약정(OI) 데이터 부족으로 거래량(Volume) 가중치를 사용했습니다. 신뢰도가 낮을 수 있습니다.</div>" if is_vol_weight else ""
 
-    st.markdown(f"""
-    <div class="s-card">
+    with st.container(border=True):
+        st.markdown(f"""
         <div class="s-title"><span class="s-num">11</span> 시장은 어떤 가격을 보고 있을까요? <span style="font-size:.75rem;color:#6e7681">Yahoo 옵션</span></div>
         <div style="text-align:center;margin:10px 0 16px">
             <div style="font-size:.82rem;color:#8b949e;margin-bottom:4px">Max Pain 가격 {exp_html}</div>
@@ -1154,10 +1205,10 @@ def render_company_details(ticker_str: str):
             ※ 참고 지표이며 항상 수렴하지는 않습니다. 만기가 가까울수록 영향력이 커지는 경향이 있습니다.
         </div>
         {_verdict_badge(mp_c, "📌", mp_badge)}
-    </div>""", unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 1️⃣2️⃣ 공매도
+    # 1️⃣2️⃣ 공매도 (🚀 하나의 카드 + 차트 숨김 기능 반영)
     # ═══════════════════════════════════════════════════
     sp  = info.get('shortPercentOfFloat')
     ss  = info.get('sharesShort', 0) or 0
@@ -1180,14 +1231,33 @@ def render_company_details(ticker_str: str):
         elif s_chg < -5: short_trend = f"감소 📉 ({s_chg:+.1f}% vs 전월)"
         else:            short_trend = f"유지 ➡️ ({s_chg:+.1f}% vs 전월)"
 
+    # 🚀 공매도 100% 게이지 차트 생성
     gauge_color = "#FF1744" if (sp or 0) > 0.1 else ("#FFC107" if (sp or 0) > 0.05 else "#00E676")
-    fig12 = _get_plotly_gauge(sp or 0, gauge_color)
+    fig12 = _get_plotly_gauge(sp or 0, gauge_color) if sp else None
 
-    col1, col2 = st.columns([1.1, 1])
-    with col1:
-        st.markdown(f"""
-        <div class="s-card">
-            <div class="s-title"><span class="s-num">12</span> 공매도 비율 <span style="font-size:.75rem;color:#6e7681">Yahoo</span></div>
+    with st.container(border=True):
+        st.markdown('<div class="s-title"><span class="s-num">12</span> 공매도 비율 <span style="font-size:.75rem;color:#6e7681">Yahoo</span></div>', unsafe_allow_html=True)
+        
+        if fig12:
+            col1, col2 = st.columns([1.1, 1])
+            with col1:
+                st.markdown(f"""
+                {_metric_row("유통주식 대비 공매도", _fmt_pct(sp), "m-red" if sc == "red" else "m-value")}
+                {_metric_row("공매도 수준", sl)}
+                {('<div class="m-row"><span class="m-label">전월 대비</span><span class="m-value">' + short_trend + '</span></div>') if short_trend else ''}
+                <div class="divider"></div>
+                {_metric_row("공매도 주식수", f"{_fmt_num(ss, False)} 주")}
+                {_metric_row("숏커버 일수 (DTC)", f"{sr:.2f} 일" if isinstance(sr, (int, float)) else "N/A")}
+                <div class="note-box">
+                    💡 공매도 비율 &gt; 10% = 높은 숏 관심<br>
+                    DTC(Days To Cover)가 높으면 숏스퀴즈 가능성 ↑<br>
+                    ※ 공매도 데이터는 약 2주 지연됩니다.
+                </div>
+                """, unsafe_allow_html=True)
+            with col2:
+                st.plotly_chart(fig12, use_container_width=True, config={'displayModeBar': False})
+        else:
+            st.markdown(f"""
             {_metric_row("유통주식 대비 공매도", _fmt_pct(sp), "m-red" if sc == "red" else "m-value")}
             {_metric_row("공매도 수준", sl)}
             {('<div class="m-row"><span class="m-label">전월 대비</span><span class="m-value">' + short_trend + '</span></div>') if short_trend else ''}
@@ -1195,20 +1265,14 @@ def render_company_details(ticker_str: str):
             {_metric_row("공매도 주식수", f"{_fmt_num(ss, False)} 주")}
             {_metric_row("숏커버 일수 (DTC)", f"{sr:.2f} 일" if isinstance(sr, (int, float)) else "N/A")}
             <div class="note-box">
-                💡 공매도 비율 &gt; 10% = 높은 숏 관심<br>
-                DTC(Days To Cover)가 높으면 숏스퀴즈 가능성 ↑<br>
-                ※ 공매도 데이터는 약 2주 지연됩니다.
+                💡 공매도 비율 &gt; 10% = 높은 숏 관심
             </div>
-            {_verdict_badge(sc, "📌", f"공매도 {_fmt_pct(sp)} — {sl}")}
-        </div>""", unsafe_allow_html=True)
-    with col2:
-        if fig12:
-            st.plotly_chart(fig12, use_container_width=True)
-        else:
-            st.markdown("<div style='text-align:center; color:#6e7681; padding:100px 0; background:#161A22; border:1px solid #2D333B; border-radius:16px; height:100%; box-sizing:border-box;'>차트 데이터를 불러올 수 없습니다.</div>", unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
+
+        st.markdown(_verdict_badge(sc, "📌", f"공매도 {_fmt_pct(sp)} — {sl}"), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 📰 13. 최신 뉴스 (🚀 누락되었던 전체 뉴스 코드 완벽 복구)
+    # 📰 13. 최신 뉴스 
     # ═══════════════════════════════════════════════════
     try:
         news_list = tkr.news
@@ -1227,19 +1291,19 @@ def render_company_details(ticker_str: str):
                 items += (f'<div class="n-item">'
                           f'<a href="{_esc(link)}" target="_blank" class="n-title">{_esc(title)}</a>'
                           f'<div class="n-meta">{_esc(pub_name)} · {dt_str}</div></div>')
-            st.markdown(f"""
-            <div class="s-card">
+            with st.container(border=True):
+                st.markdown(f"""
                 <div class="s-title"><span class="s-num">13</span> 최신 뉴스 <span style="font-size:.75rem;color:#6e7681">Yahoo Finance</span></div>
                 {items}
-            </div>""", unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
         else:
             raise ValueError("No news")
     except Exception:
-        st.markdown("""
-        <div class="s-card">
+        with st.container(border=True):
+            st.markdown("""
             <div class="s-title"><span class="s-num">13</span> 최신 뉴스</div>
             <div style="color:#6e7681;padding:10px 0">뉴스 데이터를 불러올 수 없습니다.</div>
-        </div>""", unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
     # 📋 종합 점수
@@ -1254,15 +1318,15 @@ def render_company_details(ticker_str: str):
 
     pct = (total / mx * 100) if mx > 0 else 0
     if   pct >= 75: oc, oe, ot = "#00E676", "🟢", "매우 양호"
-    elif pct >= 55: oc, oe, ot = "#FFC107", "🟡", "보통"
+    elif pct >= 55: oc, oe, 스 = "#FFC107", "🟡", "보통"
     elif pct >= 35: oc, oe, ot = "#FF9800", "🟠", "주의 필요"
     else:           oc, oe, ot = "#FF1744", "🔴", "위험"
 
     dots = _score_dot_row(all_verdicts)
 
-    st.markdown(f"""
-    <div class="s-card" style="border-color:{oc};border-width:2px">
-        <div class="s-title">📋 종합 분석 요약</div>
+    with st.container(border=True):
+        st.markdown(f"""
+        <div class="s-title" style="border:none; justify-content:center; font-size:1.4rem;">📋 종합 분석 요약</div>
         <div style="text-align:center;margin:8px 0 18px">
             <span style="font-size:2.4rem;font-weight:900;color:{oc}">{oe} {pct:.0f}</span>
             <span style="font-size:1.2rem;color:{oc}"> / 100점</span><br>
@@ -1275,7 +1339,7 @@ def render_company_details(ticker_str: str):
         <div class="note-box" style="margin-top:12px;text-align:center">
             수집 가능한 분석 항목들(🟢=2점, 🔵=1.5점, 🟡=1점, 🔴=0점)만을 취합한 종합 점수입니다. (데이터 누락 항목은 제외됨)
         </div>
-    </div>""", unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
     st.caption("⚠️ 본 분석은 참고용이며 투자 조언이 아닙니다. 투자 결정은 본인의 판단과 책임 하에 이루어져야 합니다.")
 
