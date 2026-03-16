@@ -215,10 +215,10 @@ def render_company_details(ticker_str):
 
     # 11. 옵션 시장 (Max Pain)
     date, pain, top_c, top_p = get_max_pain(tkr)
-    pain_html = f"<div class='metric-row'><span class='metric-label'>만기일: {date}</span> <span class='metric-value metric-warn' style='font-size:1.2rem;'>Max Pain: ${pain}</span></div>" if pain else "옵션 데이터가 없습니다."
+    pain_html = f"<div class='metric-row'><span class='metric-label'>만기일: {date}</span> <span class='metric-value metric-warn' style='font-size:1.2rem;'>Max Pain: ${pain}</span></div>" if pain else "<div class='metric-row'><span class='metric-label'>옵션 데이터:</span> <span class='metric-value'>제공되지 않음</span></div>"
     
-    c_html = "".join([f"<li>행사가 ${c['strike']} (수량: {c['volume']})</li>" for c in top_c]) if top_c else ""
-    p_html = "".join([f"<li>행사가 ${p['strike']} (수량: {p['volume']})</li>" for p in top_p]) if top_p else ""
+    c_html = "".join([f"<li>행사가 ${c['strike']} (수량: {c['volume']})</li>" for c in top_c]) if top_c else "<li>데이터 없음</li>"
+    p_html = "".join([f"<li>행사가 ${p['strike']} (수량: {p['volume']})</li>" for p in top_p]) if top_p else "<li>데이터 없음</li>"
 
     st.markdown(f"""
     <div class="info-card">
@@ -231,13 +231,23 @@ def render_company_details(ticker_str):
     </div>
     """, unsafe_allow_html=True)
 
-    # 13. 관련 최신 뉴스
+    # 13. 관련 최신 뉴스 (🚀 에러 패치 부분: 안전하게 데이터 가져오기)
     st.markdown("""<div class="info-card"><div class="info-title">13. 관련 최신 뉴스</div>""", unsafe_allow_html=True)
     news = tkr.news
     if news:
         for n in news[:3]:
-            pub_date = datetime.fromtimestamp(n['providerPublishTime']).strftime('%Y-%m-%d %H:%M')
-            st.markdown(f"<div style='margin-bottom:8px; font-size:0.9rem;'><span style='color:#888'>[{pub_date}]</span> <a href='{n['link']}' style='color:#667eea; text-decoration:none;' target='_blank'><b>{n['title']}</b></a></div>", unsafe_allow_html=True)
+            title = n.get('title', '제목 없음')
+            link = n.get('link', '#')
+            
+            # providerPublishTime이 없을 경우 대비
+            pub_ts = n.get('providerPublishTime') or n.get('publishTime')
+            if pub_ts:
+                pub_date = datetime.fromtimestamp(pub_ts).strftime('%Y-%m-%d %H:%M')
+                date_str = f"[{pub_date}] "
+            else:
+                date_str = ""
+                
+            st.markdown(f"<div style='margin-bottom:8px; font-size:0.9rem;'><span style='color:#888'>{date_str}</span> <a href='{link}' style='color:#667eea; text-decoration:none;' target='_blank'><b>{title}</b></a></div>", unsafe_allow_html=True)
     else:
         st.write("최신 뉴스를 불러올 수 없습니다.")
     st.markdown("</div>", unsafe_allow_html=True)
