@@ -1285,7 +1285,6 @@ with st.sidebar:
         st.caption(f"현재 차트 표시: {len(enabled)}개")
     st.markdown("---")
     # ✅ 개선1: 사이드바 닫기 안내 (모바일 UX)
-    st.markdown("<p style='color:#555;font-size:.7rem;text-align:center'>← 화살표를 눌러 사이드바를 닫을 수 있습니다</p>", unsafe_allow_html=True)
     if st.button("🗑️ 대화 내역 지우기",use_container_width=True,type="secondary"):
         for key in ['messages','pending_ai_ticker','pending_ai_prompt','last_ticker']:
             st.session_state[key]=[{"role":"assistant","type":"text",
