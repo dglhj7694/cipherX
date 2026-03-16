@@ -12,9 +12,6 @@ import numpy as np
 from plotly.subplots import make_subplots
 from collections import OrderedDict
 
-# ──────────────────────────────────────────
-# 🔧 개선1: initial_sidebar_state="collapsed" → 모바일/데스크톱 모두 닫힌 상태 DEFAULT
-# ──────────────────────────────────────────
 st.set_page_config(
     page_title="CipherX V8.5",
     page_icon="📈",
@@ -22,9 +19,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed"  # ✅ 개선1 핵심
 )
 
-# ──────────────────────────────────────────
-# 🎨 CSS (UX & 리포트 폰트 최적화 + 사이드바 토글 개선)
-# ──────────────────────────────────────────
 st.markdown("""<style>
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 html,body,[class*="css"]{font-family:'Pretendard','Noto Sans KR',sans-serif!important}
@@ -705,7 +699,7 @@ def build_speedometer_gauges(meta):
     return fig
 
 # ──────────────────────────────────────────
-# 📊 정밀 차트 렌더링 (V8.5 - 개선2: 가독성 극대화)
+# 📊 정밀 차트 렌더링 
 # ──────────────────────────────────────────
 def _hl(fig,mask,idx,fill,txt=None,row=1):
     d=mask.astype(int).diff().fillna(0)
@@ -721,7 +715,6 @@ def _hl(fig,mask,idx,fill,txt=None,row=1):
 def build_chart(dc,ticker,regime,shield):
     mac={5:"#ff9900",10:"#ffb74d",20:'#f1c40f',50:'#e74c3c',100:'#9b59b6',125:'#3498db',200:'#2ecc71'}
 
-    # ✅ 개선2: 서브플롯 간격 확대, row_heights 비율 조정, 서브플롯 제목 강조
     fig=make_subplots(rows=6,cols=1,shared_xaxes=True,vertical_spacing=0.035,
         row_heights=[.36,.07,.15,.12,.15,.15],
         subplot_titles=("","Volume","WaveTrend Oscillator","Money Flow","MACD (12, 26, 9)","Confluence Score"))
@@ -835,10 +828,7 @@ def build_chart(dc,ticker,regime,shield):
 
     stxt=f" | {shield}" if shield else ""
 
-    # ✅ 개선2: 차트 레이아웃 가독성 극대화
     fig.update_layout(
-        title=dict(text=f"📊 {ticker.upper()} | 💎 MCB+ V8.5 | {regime}{stxt}",
-                   font=dict(size=15, color='#FAFAFA', family='Pretendard')),
         yaxis_title="Price", yaxis2_title="Vol", yaxis3_title="WT",
         yaxis4_title="MF", yaxis5_title="MACD", yaxis6_title="Conf",
         template="plotly_dark",
@@ -860,7 +850,6 @@ def build_chart(dc,ticker,regime,shield):
         ),
     )
 
-    # ✅ 개선2: 축 스타일 - 그리드라인 가독성 향상
     for i in range(1, 7):
         ya = f'yaxis{i}' if i > 1 else 'yaxis'
         fig.update_layout(**{
@@ -878,7 +867,6 @@ def build_chart(dc,ticker,regime,shield):
     has_weekends = dc.index.dayofweek.isin([5, 6]).any()
     rangebreaks_config = [dict(bounds=["sat", "mon"])] if not has_weekends else []
 
-    # ✅ 개선2: 크로스헤어 스파이크 개선
     fig.update_xaxes(
         showspikes=True, spikecolor="#667eea", spikemode="across",
         spikethickness=1, spikedash="dot", rangebreaks=rangebreaks_config,
@@ -890,7 +878,6 @@ def build_chart(dc,ticker,regime,shield):
         spikethickness=1, spikedash="dot",
     )
 
-    # ✅ 개선2: 서브플롯 제목 스타일링 강화
     for ann in fig['layout']['annotations']:
         ann['font'] = dict(size=12, color='#AAA', family='Pretendard')
 
@@ -1247,7 +1234,7 @@ def render_analysis(msg):
     m,fig=msg.get('meta'),msg.get('fig')
     if m:
         render_price_header(m)
-        render_speedometer(m)     # ✅ 개선3: 기존 render_bias → render_speedometer 교체
+        render_speedometer(m)    
         render_alerts(m)
     if m or fig:
         t1,t2,t3=st.tabs(["📊 정밀 차트","🔔 발생 시그널","📈 백테스트 통계"])
@@ -1259,7 +1246,7 @@ def render_analysis(msg):
             if m: render_stats(m)
 
 # ──────────────────────────────────────────
-# ✅ 개선1: 사이드바 (토글 기능은 initial_sidebar_state="collapsed" + Streamlit 네이티브)
+# ✅  사이드바 
 # ──────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 🚦 CipherX")
@@ -1284,7 +1271,6 @@ with st.sidebar:
         st.session_state['enabled_signals']=enabled
         st.caption(f"현재 차트 표시: {len(enabled)}개")
     st.markdown("---")
-    # ✅ 개선1: 사이드바 닫기 안내 (모바일 UX)
     if st.button("🗑️ 대화 내역 지우기",use_container_width=True,type="secondary"):
         for key in ['messages','pending_ai_ticker','pending_ai_prompt','last_ticker']:
             st.session_state[key]=[{"role":"assistant","type":"text",
