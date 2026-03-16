@@ -7,11 +7,13 @@ from datetime import datetime
 import plotly.graph_objects as go
 
 # ═══════════════════════════════════════════════════════════════
-# 🛠️ API 변동성 대응을 위한 동의어(Alias) 설정 (N/A 해결)
+# 🛠️ API 변동성 대응을 위한 동의어(Alias) 설정 (🚀 N/A 해결)
 # ═══════════════════════════════════════════════════════════════
 REV_ALIASES = ['Total Revenue', 'Operating Revenue', 'Revenue']
-NI_ALIASES = ['Net Income', 'Net Income Common Stockholders', 'Net Income Continuous Operations', 'Net Income From Continuing Ops']
+NI_ALIASES = ['Net Income', 'Net Income Common Stockholders', 'Net Income Continuous Operations', 'Net Income From Continuing Ops', 'Net Income Applicable To Common Shares', 'Net Income Including Noncontrolling Interests']
 EPS_ALIASES = ['Basic EPS', 'Diluted EPS', 'Earnings Per Share']
+BS_ASSETS_ALIASES = ['Total Assets', 'Assets', 'TotalAssets']
+BS_LIAB_ALIASES = ['Total Liabilities Net Minority Interest', 'Total Liab', 'Total Liabilities', 'TotalLiabilities']
 
 # ═══════════════════════════════════════════════════════════════
 # 🛠️ 유틸리티 함수
@@ -118,25 +120,6 @@ def _gauge_bar(pct, color="#00E676", height=8):
             f'<div style="width:{pct:.1f}%;height:100%;background:{color};'
             f'border-radius:{height}px;transition:width .8s"></div></div>')
 
-def _mini_bar_chart(values, dates, color_pos="#00E676", color_neg="#FF1744"):
-    if not values:
-        return ""
-    max_abs = max(abs(v) for v in values if v) or 1
-    rows = ""
-    for i, v in enumerate(values):
-        if v is None:
-            continue
-        pct = abs(v) / max_abs * 100
-        c = color_pos if v >= 0 else color_neg
-        lbl = dates[i].strftime('%Y') if hasattr(dates[i], 'strftime') else str(dates[i])[:4]
-        rows += (f'<div style="display:flex;align-items:center;gap:8px;margin:4px 0">'
-                 f'<span style="min-width:36px;font-size:.75rem;color:#8b949e;text-align:right">{lbl}</span>'
-                 f'<div style="flex:1;background:#21262d;border-radius:4px;height:18px;overflow:hidden">'
-                 f'<div style="width:{pct:.1f}%;height:100%;background:{c};border-radius:4px;'
-                 f'display:flex;align-items:center;justify-content:flex-end;padding-right:6px;'
-                 f'font-size:.7rem;color:#fff;font-weight:600">{_fmt_num(v)}</div></div></div>')
-    return f'<div style="margin:10px 0">{rows}</div>'
-
 def _traffic_light(status):
     m = {"green": "🟢", "yellow": "🟡", "red": "🔴", "blue": "🔵", "gray": "⚪"}
     return m.get(status, "⚪")
@@ -152,7 +135,7 @@ def _score_dot_row(items):
                   f'text-align:center;line-height:1.2">{name}</span></div>')
     return f'<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:2px;margin:10px 0">{cells}</div>'
 
-# 🚀 Plotly 차트 생성 함수들
+# 🚀 Plotly 차트 생성 함수들 (배경색을 s-card와 동일한 #161A22로 설정)
 def _get_plotly_combo_chart(rv, nv, rd):
     if not rv or not rd: return None
     rd_rev, rv_rev, nv_rev = rd[::-1], rv[::-1], nv[::-1]
@@ -164,7 +147,7 @@ def _get_plotly_combo_chart(rv, nv, rd):
 
     fig.update_layout(
         title=dict(text="📊 연도별 재무 추이", font=dict(size=14, color='#8b949e')),
-        paper_bgcolor='#161A22', plot_bgcolor='#161A22',
+        paper_bgcolor='#161A22', plot_bgcolor='#161A22', # 카드 배경색과 일치
         font=dict(color='#8b949e', size=11), margin=dict(l=10, r=10, t=40, b=20), height=350,
         xaxis=dict(showgrid=False), yaxis=dict(showgrid=True, gridcolor='rgba(45,51,59,0.5)', zeroline=False),
         yaxis2=dict(overlaying='y', side='right', showgrid=False), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
@@ -210,7 +193,6 @@ def _get_plotly_gauge(val, color):
         paper_bgcolor='#161A22', font=dict(color='#8b949e'), margin=dict(l=20, r=20, t=40, b=20), height=300
     )
     return fig
-
 
 # ── 분석 함수들 ─────────────────────────────────────────
 
@@ -311,7 +293,7 @@ def _growth_accel(fin, rc):
     return f"유지 ➡️ (최근 {recent_g * 100:.1f}% vs 과거 {past_g_avg * 100:.1f}%)", "green"
 
 def _debt_trend(bs):
-    for nc in [['Total Debt'], ['Long Term Debt'], ['Total Liabilities Net Minority Interest']]:
+    for nc in [BS_LIAB_ALIASES, ['Long Term Debt'], ['Total Debt']]:
         series = _get_row_series(bs, nc)
         if len(series) >= 2:
             series = series.sort_index(ascending=False)
@@ -678,13 +660,14 @@ def render_company_details(ticker_str: str):
             </div>
             <div>
                 {_metric_row(eps_lbl, _fmt_pct(cagr_eps), cr_cls(cagr_eps))}
+                <div class="note-box" style="margin-top:6px;">※ 이익이 적자(-)에서 시작된 경우 성장률(CAGR)은 N/A로 표시됩니다.</div>
             </div>
         </div>
         {_verdict_badge(v2_c, "📌", v2_t)}
     </div>""", unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 3️⃣ 지금까지 성적 (🚀 네이티브 Plotly & 컬럼 레이아웃)
+    # 3️⃣ 지금까지 성적 (🚀 쪼개진 HTML 수정 완료)
     # ═══════════════════════════════════════════════════
     rev_stab, rev_cv, stab_c = _stability(fin, REV_ALIASES)
     mtrend, _, mtrend_c      = _margin_trend(fin)
@@ -733,11 +716,9 @@ def render_company_details(ticker_str: str):
         </div>""", unsafe_allow_html=True)
     with col2:
         if fig3:
-            st.markdown('<div class="s-card">', unsafe_allow_html=True)
             st.plotly_chart(fig3, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
         else:
-            st.markdown("<div class='s-card' style='text-align:center; color:#6e7681; padding:100px 0;'>차트 데이터가 부족합니다.</div>", unsafe_allow_html=True)
+            st.markdown("<div style='text-align:center; color:#6e7681; padding:100px 0; background:#161A22; border:1px solid #2D333B; border-radius:16px; height:100%; box-sizing:border-box;'>차트 데이터를 불러올 수 없습니다.</div>", unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
     # 4️⃣ 성장 가능성 (🚀 PEG 강제 계산 로직 포함)
@@ -793,18 +774,18 @@ def render_company_details(ticker_str: str):
     </div>""", unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 5️⃣ 재무 건전성 (🚀 네이티브 Plotly)
+    # 5️⃣ 재무 건전성
     # ═══════════════════════════════════════════════════
     try:
         curr_d = _get_row(bs, ['Current Debt', 'Current Portion Of Long Term Debt']) or 0
         lt_d   = _get_row(bs, ['Long Term Debt', 'Long Term Debt And Capital Lease Obligation']) or 0
-        ta     = _get_row(bs, ['Total Assets']) or info.get('totalAssets', 0) or 0
-        tl     = _get_row(bs, ['Total Liabilities Net Minority Interest', 'Total Liab']) or 0
+        ta     = _get_row(bs, BS_ASSETS_ALIASES) or info.get('totalAssets', 0) or 0
+        tl     = _get_row(bs, BS_LIAB_ALIASES) or 0
         eq     = _get_row(bs, ['Stockholders Equity', 'Total Stockholder Equity']) or 0
         na     = ta - tl
         
-        ta_s = _get_row_series(bs, ['Total Assets'])
-        tl_s = _get_row_series(bs, ['Total Liabilities Net Minority Interest', 'Total Liab'])
+        ta_s = _get_row_series(bs, BS_ASSETS_ALIASES)
+        tl_s = _get_row_series(bs, BS_LIAB_ALIASES)
         idx = ta_s.index.intersection(tl_s.index).sort_values(ascending=False)[:4]
         fig5 = _get_plotly_yearly_bar(idx, [ta_s[i] for i in idx], [tl_s[i] for i in idx], "총 자산", "총 부채", "#2196F3", "#FF5722") if len(idx) > 0 else None
     except Exception:
@@ -850,11 +831,9 @@ def render_company_details(ticker_str: str):
         </div>""", unsafe_allow_html=True)
     with col2:
         if fig5:
-            st.markdown('<div class="s-card">', unsafe_allow_html=True)
             st.plotly_chart(fig5, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
         else:
-            st.markdown("<div class='s-card' style='text-align:center; color:#6e7681; padding:100px 0;'>차트 데이터가 부족합니다.</div>", unsafe_allow_html=True)
+            st.markdown("<div style='text-align:center; color:#6e7681; padding:100px 0; background:#161A22; border:1px solid #2D333B; border-radius:16px; height:100%; box-sizing:border-box;'>차트 데이터를 불러올 수 없습니다.</div>", unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
     # 6️⃣ 거래량
@@ -1079,7 +1058,7 @@ def render_company_details(ticker_str: str):
     </div>""", unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 🔟 지분 구조 (🚀 네이티브 Plotly 적용)
+    # 🔟 지분 구조
     # ═══════════════════════════════════════════════════
     inst = info.get('heldPercentInstitutions', 0) or 0
     ins  = info.get('heldPercentInsiders', 0) or 0
@@ -1113,12 +1092,12 @@ def render_company_details(ticker_str: str):
         </div>""", unsafe_allow_html=True)
     with col2:
         if fig10:
-            st.markdown('<div class="s-card">', unsafe_allow_html=True)
             st.plotly_chart(fig10, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            st.markdown("<div style='text-align:center; color:#6e7681; padding:100px 0; background:#161A22; border:1px solid #2D333B; border-radius:16px; height:100%; box-sizing:border-box;'>차트 데이터를 불러올 수 없습니다.</div>", unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 1️⃣1️⃣ 옵션 / Max Pain (🚀 기존 리스트 구조 완벽 복구)
+    # 1️⃣1️⃣ 옵션 / Max Pain (🚀 기존 구조 원복)
     # ═══════════════════════════════════════════════════
     exp, mp, tc, tp, is_vol_weight = _max_pain(tkr)
 
@@ -1178,7 +1157,7 @@ def render_company_details(ticker_str: str):
     </div>""", unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 1️⃣2️⃣ 공매도 (🚀 네이티브 Plotly 게이지 차트)
+    # 1️⃣2️⃣ 공매도
     # ═══════════════════════════════════════════════════
     sp  = info.get('shortPercentOfFloat')
     ss  = info.get('sharesShort', 0) or 0
@@ -1224,12 +1203,12 @@ def render_company_details(ticker_str: str):
         </div>""", unsafe_allow_html=True)
     with col2:
         if fig12:
-            st.markdown('<div class="s-card">', unsafe_allow_html=True)
             st.plotly_chart(fig12, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            st.markdown("<div style='text-align:center; color:#6e7681; padding:100px 0; background:#161A22; border:1px solid #2D333B; border-radius:16px; height:100%; box-sizing:border-box;'>차트 데이터를 불러올 수 없습니다.</div>", unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 📰 13. 최신 뉴스 (🚀 원본 뉴스 섹션 완벽 복구)
+    # 📰 13. 최신 뉴스 (🚀 누락되었던 전체 뉴스 코드 완벽 복구)
     # ═══════════════════════════════════════════════════
     try:
         news_list = tkr.news
