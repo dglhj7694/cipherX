@@ -1,5 +1,4 @@
 import streamlit as st
-import google.generativeai as genai
 import time
 import random
 import re
@@ -11,9 +10,10 @@ import pandas as pd
 import numpy as np
 from plotly.subplots import make_subplots
 from collections import OrderedDict
+import google.generativeai as genai
 
-# ✅ 개선 1 & 2: layout을 wide로 변경, 모바일 최적화를 위해 사이드바 기본 닫힘 설정
-st.set_page_config(page_title="CipherX V8.3", page_icon="📈", layout="wide", initial_sidebar_state="collapsed")
+# ✅ 개선: 와이드 레이아웃 및 사이드바 기본 닫힘 설정
+st.set_page_config(page_title="CipherX V8.4", page_icon="📈", layout="wide", initial_sidebar_state="collapsed")
 
 # ──────────────────────────────────────────
 # 🎨 CSS (UX & 리포트 폰트 최적화)
@@ -31,8 +31,7 @@ div[data-testid="stCodeBlock"] span[style*="color: black"],
 div[data-testid="stCodeBlock"] code>span:not([class]){color:#FAFAFA!important}
 div[data-testid="stChatMessage"]:nth-child(even){background-color:#161A22;border-radius:12px;padding:5px 15px}
 header{visibility:hidden}
-/* ✅ 개선 2: 와이드 모드에서 좌우 여백을 넓게 쓰도록 max-width 상향 */
-.block-container{padding-top:1.5rem!important;max-width:1400px; margin: auto;}
+.block-container{padding-top:1.5rem!important;max-width:1400px; margin:auto;}
 div.stButton>button[kind="primary"]{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%)!important;
 color:white!important;border:none!important;border-radius:12px!important;padding:.6rem 1.5rem!important;
 font-weight:600!important;font-size:1rem!important;transition:all .3s ease!important;width:100%}
@@ -51,9 +50,6 @@ div[data-testid="stExpanderDetails"] h2 { font-size: 1.3rem !important; margin-t
 div[data-testid="stExpanderDetails"] h3 { font-size: 1.15rem !important; margin-top: 1.2rem !important; margin-bottom: 0.4rem !important; color: #82aaff !important; }
 div[data-testid="stExpanderDetails"] p, div[data-testid="stExpanderDetails"] li { font-size: 0.95rem !important; line-height: 1.6 !important; color: #D0D7DE !important; margin-bottom: 0.5rem !important; }
 div[data-testid="stExpanderDetails"] blockquote { font-size: 0.95rem !important; border-left-color: #667eea !important; color: #A0B2C6 !important; }
-div[data-testid="stExpanderDetails"] table { font-size: 0.85rem !important; width: 100% !important; border-collapse: collapse; }
-div[data-testid="stExpanderDetails"] th, div[data-testid="stExpanderDetails"] td { padding: 0.5rem 0.8rem !important; border-bottom: 1px solid #2D333B; text-align: left; }
-div[data-testid="stExpanderDetails"] th { background-color: #1A1F2E; color: #82aaff; }
 .signal-card{border-radius:12px;padding:16px 20px;margin:6px 0;border:1px solid #2D333B}
 .signal-card-buy{background:linear-gradient(135deg,rgba(0,230,118,.08),rgba(0,191,255,.05));border-left:4px solid #00E676}
 .signal-card-sell{background:linear-gradient(135deg,rgba(255,23,68,.08),rgba(255,82,82,.05));border-left:4px solid #FF1744}
@@ -68,6 +64,12 @@ div[data-testid="stExpanderDetails"] th { background-color: #1A1F2E; color: #82a
 .ind-neutral{background:rgba(255,193,7,.15);color:#FFC107}
 div[data-testid="stTabs"] button{color:#AAA!important;font-weight:600!important}
 div[data-testid="stTabs"] button[aria-selected="true"]{color:#667eea!important;border-bottom-color:#667eea!important}
+
+/* ✅ 백테스트 커스텀 테이블 (가독성 향상) */
+.stats-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
+.stats-table th { background-color: #1A1F2E; color: #82aaff; padding: 10px; text-align: left; border-bottom: 2px solid #2D333B; }
+.stats-table td { padding: 10px; border-bottom: 1px solid #2D333B; color: #E2E8F0; }
+.stats-table tr:hover { background-color: #1A1D24; }
 </style>""", unsafe_allow_html=True)
 
 # ──────────────────────────────────────────
@@ -135,8 +137,8 @@ ALL_CHART_SIGNALS = {**SIGNAL_REGISTRY, **COMPOSITE_SIGNALS}
 OB1, OB2, OS1, OS2 = 53, 60, -53, -60
 ST_MIN_BAR = 12
 
-GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-genai.configure(api_key=GEMINI_API_KEY)
+if "GEMINI_API_KEY" in st.secrets:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
 COOLDOWN_MAP = {
     'Squeeze_Fire_Buy':5,'Squeeze_Fire_Sell':5, 'Bullish_Engulfing':5,'Bearish_Engulfing':5,
@@ -146,6 +148,9 @@ COOLDOWN_MAP = {
     'StochRSI_Cross_Buy':7,'StochRSI_Cross_Sell':7, 'RSI_Bull_Divergence':10,'RSI_Bear_Divergence':10,
 }
 
+# ──────────────────────────────────────────
+# 공통 유틸
+# ──────────────────────────────────────────
 def _recent(s, lb=3): return s.astype(float).rolling(lb+1, min_periods=1).max().fillna(0).astype(bool)
 def _cooldown(sig, bars=5):
     v = sig.astype(bool).values.copy(); last = -bars-1
@@ -580,19 +585,22 @@ def detect_all_signals(df):
     df['_HTF1_Bull'],df['_HTF2_Bull']=htf1,htf2
     return df
 
-# ✅ 개선 3: 게이지 차트 생성 함수 추가
+# ──────────────────────────────────────────
+# 📊 정밀 차트 렌더링 (V8.4: 스피도미터 게이지 생성)
+# ──────────────────────────────────────────
 def create_gauge_chart(score):
     fig = go.Figure(go.Indicator(
         mode = "gauge+number",
         value = score,
         domain = {'x': [0, 1], 'y': [0, 1]},
-        title = {'text': "추세 강도 (Confluence)", 'font': {'color': '#FAFAFA'}},
+        title = {'text': "추세 강도 (Confluence)", 'font': {'color': '#FAFAFA', 'size': 14}},
+        number = {'font': {'color': '#FAFAFA'}},
         gauge = {
             'axis': {'range': [-10, 10], 'tickwidth': 1, 'tickcolor': "white"},
-            'bar': {'color': "white"},
+            'bar': {'color': "rgba(255,255,255,0.8)", 'thickness': 0.2},
             'bgcolor': "rgba(0,0,0,0)",
-            'borderwidth': 2,
-            'bordercolor': "gray",
+            'borderwidth': 1,
+            'bordercolor': "#2D333B",
             'steps': [
                 {'range': [-10, -6], 'color': "rgba(255, 23, 68, 0.8)"},
                 {'range': [-6, -3.5], 'color': "rgba(255, 82, 82, 0.6)"},
@@ -601,12 +609,9 @@ def create_gauge_chart(score):
                 {'range': [6, 10], 'color': "rgba(0, 230, 118, 0.8)"}],
         }
     ))
-    fig.update_layout(height=250, margin=dict(l=20, r=20, t=50, b=20), paper_bgcolor="rgba(0,0,0,0)", font={'color': "white"})
+    fig.update_layout(height=200, margin=dict(l=20, r=20, t=40, b=20), paper_bgcolor="rgba(0,0,0,0)", font={'color': "white"})
     return fig
 
-# ──────────────────────────────────────────
-# 📊 정밀 차트 렌더링
-# ──────────────────────────────────────────
 def _hl(fig,mask,idx,fill,txt=None,row=1):
     d=mask.astype(int).diff().fillna(0)
     starts=idx[d==1].tolist(); ends=idx[d==-1].tolist()
@@ -735,7 +740,7 @@ def build_chart(dc,ticker,regime,shield):
 
     stxt=f" | {shield}" if shield else ""
     fig.update_layout(
-        title=dict(text=f"📊 {ticker.upper()} | 💎 MCB+ V8.3 | {regime}{stxt}",font=dict(size=14,color='#FAFAFA')),
+        title=dict(text=f"📊 {ticker.upper()} | 🚦 MCB+ V8.4 | {regime}{stxt}",font=dict(size=14,color='#FAFAFA')),
         yaxis_title="Price",yaxis2_title="Vol",yaxis3_title="WT",yaxis4_title="MF",yaxis5_title="MACD",yaxis6_title="Conf",
         template="plotly_dark",margin=dict(l=0,r=0,t=50,b=0),height=1300,showlegend=True,
         hovermode="x unified", hoverlabel=dict(bgcolor="rgba(22,26,34,0.95)", font_size=12, font_family="Pretendard"),
@@ -751,7 +756,7 @@ def build_chart(dc,ticker,regime,shield):
     return fig
 
 # ──────────────────────────────────────────
-# 메타데이터 + 프롬프트 텍스트 빌더
+# 메타데이터 + AI 프롬프트 생성
 # ──────────────────────────────────────────
 def build_metadata(dc,dv,ticker):
     lat,prev=dc.iloc[-1],dc.iloc[-2] if len(dc)>=2 else dc.iloc[-1]
@@ -858,19 +863,8 @@ def build_ai_prompt(ticker,phist,fundamentals):
 📌 [주가 + 기술적 지표 + 시그널 백테스트 요약]
 {phist}
 
-📌 [YFinance 펀더멘탈 및 숏(공매도) 데이터] (반드시 이 데이터만 사용할 것)
+📌 [YFinance 펀더멘탈 및 숏(공매도) 데이터]
 {fundamentals}
-
----
-━━━━━━━━━━━━━
-【 ✍️ Guidelines 】
-━━━━━━━━━━━━━
-① 한국어, 전문적이면서 이해하기 쉽게
-② 확신형 어조 ("~할 가능성이 높습니다" ⭕)
-③ 불릿/강조/이모티콘(🔵긍정 🔴부정 🟠중간) 활용
-④ 거래량 배수 + 매집/투매, ATR 변동폭, WT구간, Diamond/Dot 신뢰도 분석 포함
-⑤ 시나리오별 확률(%) + 근거 명시
-⑥ 기술적 vs 펀더멘탈(수급) 충돌 시 판단
 
 ---
 ━━━━━━━━━━━━━
@@ -959,7 +953,118 @@ def build_ai_prompt(ticker,phist,fundamentals):
 **[GRADE/Score]:** [최종 등급 및 이유]
 """
 
-# ✅ 개선 2: 백테스트 테이블 디자인 (CSS 기반 깔끔한 마크다운 테이블 렌더러)
+# ──────────────────────────────────────────
+# 통합 분석
+# ──────────────────────────────────────────
+def analyze(ticker,chart_days=252,refresh=False):
+    try:
+        ts=int(time.time()) if refresh else None
+        df=compute_and_cache(ticker,ts)
+        if df is None or df.empty: return None,"주가 데이터 없음",None
+        dv=df.dropna(subset=['WT1','WT2']); dc=dv.tail(chart_days).copy()
+        if dc.empty: return None,"차트 데이터 부족",None
+        meta,regime,shield=build_metadata(dc,dv,ticker)
+        fig=build_chart(dc,ticker,regime,shield)
+        return fig,build_prompt_text(dc,meta),meta
+    except Exception as e:
+        return None,f"로딩 실패:{e}",None
+
+# ──────────────────────────────────────────
+# UI 렌더
+# ──────────────────────────────────────────
+def render_price_header(m):
+    chg=m['price_change']; cp=m['price_change_pct']
+    cc='price-change-up' if chg>=0 else 'price-change-down'
+    ci='▲' if chg>=0 else '▼'
+    vr=m['volume']/m['avg_volume'] if m['avg_volume'] else 0
+    cv=m.get('confluence_score',0); sd=m.get('supertrend_dir',0)
+    sh=m.get('shield_status',''); mh=m.get('macd_hist',0)
+    specs=[(_cls(m['wt1'],-20,20),f"WT:{m['wt1']:.0f}"),
+        (_cls(m['rsi'],40,60),f"RSI:{m['rsi']:.0f}"),
+        (_cls(m['mfi'],40,60),f"MFI:{m['mfi']:.0f}"),
+        ('ind-bullish' if m['mf_area']<0 else ('ind-bearish' if m['mf_area']>0 else 'ind-neutral'),f"MF:{m['mf_area']:.1f}"),
+        ('ind-bullish' if vr>1.5 else 'ind-neutral',f"Vol:{vr:.1f}x"),
+        ('ind-bullish' if m['adx']>25 else 'ind-neutral',f"ADX:{m['adx']:.0f}"),
+        (_cls(m['stochk'],30,70),f"StK:{m['stochk']:.0f}"),
+        ('ind-bullish' if cv>=3.5 else ('ind-bearish' if cv<=-3.5 else 'ind-neutral'),f"Conf:{cv:.1f}"),
+        ('ind-bullish' if sd==1 else 'ind-bearish',f"ST:{'▲' if sd==1 else '▼'}"),
+        ('ind-bullish' if mh>0 else ('ind-bearish' if mh<0 else 'ind-neutral'),f"MACD:{mh:+.2f}")]
+    ih="".join([f"<span class='indicator-mini {c}'>{l}</span>" for c,l in specs])
+    if sh: ih+=f"<span class='indicator-mini ind-bearish' style='font-weight:700'>🔓 {sh}</span>"
+    tr=m.get('trend_regime','NEUTRAL ⚪')
+    st.markdown(f"""<div class="price-header">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+            <div><p class="price-label">🚦 {m['ticker']} · {m['last_date']} · <b>{tr}</b></p>
+            <p class="price-big" style="color:#FAFAFA">${m['price']:.2f}
+                <span class="{cc}" style="font-size:1rem;margin-left:8px">
+                    {ci} {abs(chg):.2f} ({abs(cp):.2f}%)</span></p></div>
+            <div style="text-align:right"><p class="price-label">ATR</p>
+            <p style="color:#FFC107;font-size:1.1rem;font-weight:600;margin:0">
+                ${m['atr']:.2f} ({m['atr_pct']:.1f}%)</p></div></div>
+        <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">{ih}</div></div>""",unsafe_allow_html=True)
+
+def render_bias(m):
+    bias=m['overall_bias']; sc=m.get('bias_score',0); cv=m.get('confluence_score',0)
+    styles={'STRONG BUY':('rgba(0,230,118,.2)','#00E676','🟢🟢'),'BUY':('rgba(0,230,118,.12)','#00E676','🟢'),
+        'STRONG SELL':('rgba(255,23,68,.2)','#FF1744','🔴🔴'),'SELL':('rgba(255,23,68,.12)','#FF1744','🔴')}
+    bg,clr,ico=styles.get(bias,('rgba(255,193,7,.12)','#FFC107','🟠'))
+    cc='#00E676' if cv>=3.5 else ('#FF1744' if cv<=-3.5 else '#FFC107')
+    gp=max(0,min(100,((sc+13)/26)*100))
+    st.markdown(f"""<div style="background:{bg};border-radius:10px;padding:12px 16px;text-align:center;margin:8px 0;height:100%;">
+        <span style="font-size:1.2rem;font-weight:700;color:{clr}">{ico} 종합: {bias} ({sc:.1f})</span><br>
+        <span style="font-size:.9rem;color:{cc};font-weight:600">📊 Confluence: {cv:.1f}</span>
+        <div class="bias-gauge-track" style="margin:10px auto;max-width:300px">
+            <div class="bias-gauge-needle" style="left:{gp}%"></div></div>
+        <div style="display:flex;justify-content:space-between;max-width:300px;margin:0 auto">
+            <span style="color:#FF1744;font-size:.65rem">STRONG SELL</span>
+            <span style="color:#888;font-size:.65rem">NEUTRAL</span>
+            <span style="color:#00E676;font-size:.65rem">STRONG BUY</span></div></div>""",unsafe_allow_html=True)
+
+def render_alerts(m):
+    alerts=[]
+    bp,sp=m.get('buy_proximity',0),m.get('sell_proximity',0)
+    if bp>=70: alerts.append(('🟢⚡ 매수 매우 임박!','#00E676',bp))
+    elif bp>=50: alerts.append(('🟢 매수 접근 중','#69F0AE',bp))
+    if sp>=70: alerts.append(('🔴⚡ 매도 매우 임박!','#FF1744',sp))
+    elif sp>=50: alerts.append(('🔴 매도 접근 중','#FF5252',sp))
+    if m.get('squeeze_on'): alerts.append(('💥 Squeeze ON','#FFFF00',80))
+    for txt,clr,pct in alerts:
+        w=min(pct,100)
+        st.markdown(f"""<div style="background:rgba(255,255,255,.03);border:1px solid #2D333B;border-radius:8px;padding:8px 14px;margin:4px 0">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="color:{clr};font-weight:600;font-size:.9rem">{txt}</span>
+                <span style="color:{clr};font-weight:700;font-size:.85rem">{pct:.0f}%</span></div>
+            <div style="background:#1A1D24;border-radius:3px;height:6px;margin-top:6px">
+                <div style="background:{clr};width:{w}%;height:6px;border-radius:3px"></div></div></div>""",unsafe_allow_html=True)
+
+def render_signals(m):
+    sigs=m['recent_signals']
+    if not sigs:
+        st.markdown("""<div class="signal-card signal-card-neutral">
+            <p style="margin:0;color:#FFC107;font-weight:600">🟠 최근 15일 내 시그널 없음</p></div>""",unsafe_allow_html=True)
+        return
+    dg=OrderedDict()
+    for icon,lbl,ds,side in sigs: dg.setdefault(ds,[]).append((icon,lbl,side))
+    alls=m.get('all_signal_stats',{})
+    for ds in reversed(dg):
+        group=dg[ds]; bc=sum(1 for _,_,s in group if s=='buy'); sc=sum(1 for _,_,s in group if s=='sell')
+        ct='signal-card-buy' if bc>sc else ('signal-card-sell' if sc>bc else 'signal-card-neutral')
+        parts=[]
+        for i,l,s in group:
+            cn="ind-bullish" if s=="buy" else "ind-bearish"
+            sh=""
+            for sn,sv in alls.items():
+                if ALL_CHART_SIGNALS.get(sn,{}).get('label')==l:
+                    wr=sv.get('10d_winrate')
+                    if wr is not None: sh=f" ({wr:.0f}%)"
+                    break
+            parts.append(f'<span class="indicator-mini {cn}">{i} {l}{sh}</span>')
+        st.markdown(f"""<div class="signal-card {ct}">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-weight:700;font-size:.9rem;color:#FAFAFA">📅 {ds}</span>
+                <span style="color:#888;font-size:.75rem">{len(group)}개</span></div>
+            <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">{" ".join(parts)}</div></div>""",unsafe_allow_html=True)
+
 def render_stats(m):
     with st.expander("📊 백테스트 통계 (2년, 진입:다음날시가, 청산:종가)", expanded=True):
         alls = m.get('all_signal_stats', {})
@@ -978,9 +1083,7 @@ def render_stats(m):
                 kor_label = ALL_CHART_SIGNALS.get(sn, {}).get('kor', sn)
                 icon = ALL_CHART_SIGNALS.get(sn, {}).get('icon', '')
                 
-                # 승률 색상 (50% 초과면 녹색, 40% 이하면 빨간색)
                 c_wr = '#00E676' if wr > 50 else ('#FFC107' if wr > 40 else '#FF1744')
-                # 수익 색상
                 c_av = '#00E676' if av > 0 else '#FF1744'
                 
                 html += f"<tr><td>{icon} {kor_label}</td><td>{sv['count']}회</td>"
@@ -1000,16 +1103,15 @@ def render_analysis(msg):
     m, fig = msg.get('meta'), msg.get('fig')
     
     if m: 
-        # 상단 헤더
         render_price_header(m)
         
-        # ✅ 개선 3: 스피도미터(게이지 차트)와 Bias 박스 나란히 배치
+        # ✅ V8.4: 스피도미터 게이지와 Bias를 좌우 나란히 배치
         col1, col2 = st.columns([1, 2])
         with col1:
             gauge_fig = create_gauge_chart(m.get('confluence_score', 0))
             st.plotly_chart(gauge_fig, use_container_width=True, config={'displayModeBar': False})
         with col2:
-            st.markdown("<br>", unsafe_allow_html=True) # 줄맞춤용 마진
+            st.markdown("<br>", unsafe_allow_html=True)
             render_bias(m)
             render_alerts(m)
 
@@ -1027,7 +1129,7 @@ def render_analysis(msg):
 # ──────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 🚦 CipherX")
-    st.markdown("<p style='color:#888;font-size:.8rem'>AI 퀀트 주가 분석 · MCB+ v8.3</p>",unsafe_allow_html=True)
+    st.markdown("<p style='color:#888;font-size:.8rem'>AI 퀀트 주가 분석 · MCB+ v8.4</p>",unsafe_allow_html=True)
     st.markdown("---")
     st.markdown("### 📅 차트 기간")
     chart_period=st.radio("표시 기간",['3개월','6개월','1년','2년'],index=2,horizontal=True,key="period")
@@ -1088,7 +1190,7 @@ for i,msg in enumerate(st.session_state.messages):
                 mime="text/markdown",use_container_width=True)
         else: st.markdown(msg.get("content",""))
 
-# ✅ 개선 4: Streamlit 최신 렌더링 (st.write_stream 적용으로 깜빡임 제거)
+# ✅ 개선 4: Streamlit 최신 렌더링 (st.write_stream 적용)
 def _run_ai():
     tp = st.session_state.pending_ai_ticker
     pp = st.session_state.pending_ai_prompt
@@ -1097,7 +1199,6 @@ def _run_ai():
             model = genai.GenerativeModel('gemini-1.5-flash-latest')
             response_stream = model.generate_content(pp, stream=True)
             
-            # 생성된 텍스트 청크를 그대로 write_stream으로 전달하여 부드러운 타이핑 효과 연출
             def stream_parser():
                 for chunk in response_stream:
                     yield chunk.text
@@ -1112,7 +1213,7 @@ def _run_ai():
         except Exception as e:
             st.error(f"AI 리포트 생성 중 오류가 발생했습니다: {e}")
 
-def process_ticker(tv,refresh=False):
+def process_ticker(tv, chart_days_val, refresh=False):
     tv=tv.strip().upper()
     st.session_state.pending_ai_ticker=None; st.session_state.pending_ai_prompt=None
     if not _valid_fmt(tv):
@@ -1134,7 +1235,7 @@ def process_ticker(tv,refresh=False):
             fundamentals = fetch_fundamentals(tv)
             
             st.write("📊 YFinance 기술적 데이터 로딩 및 지표 계산 중...")
-            fig,phist,meta=analyze(tv,chart_days,refresh)
+            fig,phist,meta=analyze(tv, chart_days_val, refresh)
             
             st.write("🚦 마켓 사이퍼 시그널 엔진 교차 검증 중...")
             
@@ -1143,7 +1244,7 @@ def process_ticker(tv,refresh=False):
                 st.session_state.messages.append({"role":"assistant","type":"analysis","ticker":tv,
                     "content":f"✅ **{tv}** 분석 완료! 아래에서 정밀 차트를 확인하세요.","fig":fig,"meta":meta,"prompt":prompt})
                 st.session_state.pending_ai_ticker=tv; st.session_state.pending_ai_prompt=prompt
-                status.update(label="✅ 분석 데이터 로드 완료!", state="complete", expanded=False)
+                status.update(label="✅ 분석 로딩 완료!", state="complete", expanded=False)
                 time.sleep(0.3)
                 st.rerun()
             else:
@@ -1165,11 +1266,11 @@ if st.session_state.last_ticker:
                 _run_ai()
     with c2:
         if st.button(f"🔄 {lt} 새로고침",type="secondary",use_container_width=True,key="re"):
-            process_ticker(lt,refresh=True)
+            process_ticker(lt, chart_days, refresh=True)
 elif st.session_state.pending_ai_ticker and st.session_state.pending_ai_prompt:
     if st.button(f"🚀 {st.session_state.pending_ai_ticker.upper()} AI 심층 퀀트 분석 시작",
                  type="primary",use_container_width=True):
         _run_ai()
 
 if ticker_input:=st.chat_input("미국 주식 티커를 입력하세요 (예: TSLA, AAPL, QQQ)"):
-    process_ticker(ticker_input)
+    process_ticker(ticker_input, chart_days)
