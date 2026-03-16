@@ -18,7 +18,7 @@ BS_LIAB_ALIASES = ['Total Liabilities Net Minority Interest', 'Total Liab', 'Tot
 EQ_ALIASES = ['Stockholders Equity', 'Total Stockholder Equity', 'Common Stock Equity', 'Total Equity Gross Minority Interest', 'Total Equity', 'Net Tangible Assets']
 
 # ═══════════════════════════════════════════════════════════════
-# 🛠️ 유틸리티 함수 (🚀 퍼지 매칭 탑재로 데이터 증발 방지)
+# 🛠️ 유틸리티 함수
 # ═══════════════════════════════════════════════════════════════
 
 def _fmt_num(num, is_currency=True):
@@ -53,38 +53,27 @@ def _safe(val, fallback="N/A"):
 def _esc(text):
     return html_module.escape(str(text)) if text else ""
 
-# 🚀 대소문자 및 공백을 무시하고 항목을 찾아내는 퍼지 매칭 함수
-def _find_idx(df, candidates):
-    if df is None or df.empty: return None
-    # 1. 정확 일치 우선 탐색
-    for name in candidates:
-        if name in df.index: return name
-    # 2. 공백 및 대소문자 무시 탐색 (yfinance 변덕 대응)
-    norm_cands = [str(c).lower().replace(" ", "") for c in candidates]
-    for idx in df.index:
-        if str(idx).lower().replace(" ", "") in norm_cands:
-            return idx
-    return None
-
 def _get_row(df, candidates, col_idx=0):
-    idx = _find_idx(df, candidates)
-    if idx is not None:
-        try:
-            row = df.loc[idx]
-            if isinstance(row, pd.DataFrame): row = row.iloc[0]
-            val = row.dropna()
-            if len(val) > col_idx: return val.iloc[col_idx]
-        except Exception: pass
+    if df is None or df.empty: return None
+    for name in candidates:
+        if name in df.index:
+            try:
+                row = df.loc[name]
+                if isinstance(row, pd.DataFrame): row = row.iloc[0]
+                val = row.dropna()
+                if len(val) > col_idx: return val.iloc[col_idx]
+            except Exception: pass
     return None
 
 def _get_row_series(df, candidates):
-    idx = _find_idx(df, candidates)
-    if idx is not None:
-        try:
-            row = df.loc[idx]
-            if isinstance(row, pd.DataFrame): row = row.iloc[0]
-            return row.dropna().sort_index()
-        except Exception: pass
+    if df is None or df.empty: return pd.Series(dtype=float)
+    for name in candidates:
+        if name in df.index:
+            try:
+                row = df.loc[name]
+                if isinstance(row, pd.DataFrame): row = row.iloc[0]
+                return row.dropna().sort_index()
+            except Exception: pass
     return pd.Series(dtype=float)
 
 def _calc_cagr_with_years(financials, row_candidates):
@@ -140,6 +129,14 @@ def _metric_row(label, value, value_class="m-value"):
     return (f'<div class="m-row"><span class="m-label">{label}</span>'
             f'<span class="{value_class}">{value}</span></div>')
 
+# 🚀 누락되었던 게이지 바 함수 복구!
+def _gauge_bar(pct, color="#00E676", height=8):
+    pct = max(0, min(100, pct))
+    return (f'<div style="background:rgba(255,255,255,0.1);border-radius:{height}px;'
+            f'height:{height}px;overflow:hidden;margin:6px 0">'
+            f'<div style="width:{pct:.1f}%;height:100%;background:{color};'
+            f'border-radius:{height}px;transition:width .8s"></div></div>')
+
 def _traffic_light(status):
     m = {"green": "🟢", "yellow": "🟡", "red": "🔴", "blue": "🔵", "gray": "⚪"}
     return m.get(status, "⚪")
@@ -175,8 +172,7 @@ def _get_plotly_combo_chart(rv, nv, rd):
 
     fig.update_layout(
         title=dict(text="<b>📊 연도별 재무 추이</b>", font=dict(size=16, color='white', family="Arial")),
-        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='white', size=13, weight='bold'), 
+        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white', size=13, weight='bold'),
         margin=dict(l=10, r=10, t=40, b=10), height=320,
         xaxis=dict(showgrid=False, tickfont=dict(color='white')), 
         yaxis=dict(showgrid=True, gridcolor='rgba(255, 255, 255, 0.15)', zeroline=False, tickfont=dict(color='white')),
@@ -334,8 +330,7 @@ def _margin_trend(fin):
         if l_m > f_m + 0.02: return f"증가 추세 📈 ({f_m * 100:.1f}% → {l_m * 100:.1f}%)", margins, "green"
         if l_m < f_m - 0.02: return f"감소 추세 📉 ({f_m * 100:.1f}% → {l_m * 100:.1f}%)", margins, "red"
         return f"유지 ➡️ ({l_m * 100:.1f}%)", margins, "yellow"
-    except Exception:
-        return "N/A", [], "gray"
+    except Exception: return "N/A", [], "gray"
 
 def _growth_accel(fin, rc):
     vals, _ = _annual_values(fin, rc)
@@ -371,8 +366,7 @@ def _interest_burden(fin, info):
     interest = _get_row(fin, ['Interest Expense', 'Interest Expense Non Operating'])
     
     if ebit is not None and interest is not None and abs(interest) > 0:
-        if ebit < 0:
-            return "위험 ❌ (영업적자로 이자 지급 불가)", "red"
+        if ebit < 0: return "위험 ❌ (영업적자로 이자 지급 불가)", "red"
         icr = abs(ebit / interest)
         src = "SEC 실제"
         if   icr > 10: return f"매우 낮음 ✅ (ICR {icr:.1f}x, {src})", "green"
@@ -383,8 +377,7 @@ def _interest_burden(fin, info):
     ebitda = info.get('ebitda', 0) or 0
     debt = info.get('totalDebt', 0) or 0
     if ebitda is not None and debt is not None and debt > 0:
-        if ebitda < 0:
-            return "위험 ❌ (EBITDA 적자)", "red"
+        if ebitda < 0: return "위험 ❌ (EBITDA 적자)", "red"
         est_rate = 0.05
         cov = ebitda / (debt * est_rate)
         src = f"추정, 이자율 {est_rate * 100:.0f}% 가정"
@@ -406,18 +399,6 @@ def _vol_trend(info):
     else:         return f"급감 ⚠️ ({r:.1f}배)", "red"
 
 def _max_pain(tkr):
-    """
-    💡 [OptionCharts 등 외부 API 연동 방법]
-    무료 API Key가 발급되었다면 아래 주석 코드를 해제하여 활용하세요.
-    
-    try:
-        url = f"https://api.optioncharts.io/v1/options/{tkr.ticker}/maxpain"
-        headers = {"Authorization": "Bearer YOUR_API_KEY"}
-        res = requests.get(url, headers=headers).json()
-        return res['expiration'], res['max_pain'], [], [], False
-    except:
-        pass # 실패 시 아래 yfinance 로직으로 자동 폴백
-    """
     try:
         dates = tkr.options
         if not dates: return None, None, None, None, False
@@ -428,15 +409,12 @@ def _max_pain(tkr):
         for col in ['openInterest', 'volume']:
             if col not in c.columns: c[col] = 0
             if col not in p.columns: p[col] = 0
-            c[col] = c[col].fillna(0)
-            p[col] = p[col].fillna(0)
+            c[col], p[col] = c[col].fillna(0), p[col].fillna(0)
             
         c_oi_sum = c['openInterest'].sum()
         p_oi_sum = p['openInterest'].sum()
         
         is_vol_weight = False
-        
-        # 🚀 미결제약정 데이터가 비정상적으로 적을 경우 거래량(volume)을 대신 사용하는 든든한 방어막
         if c_oi_sum == 0 or p_oi_sum == 0 or (c_oi_sum / max(p_oi_sum, 1) < 0.02) or (p_oi_sum / max(c_oi_sum, 1) < 0.02):
             weight_c = c['volume']
             weight_p = p['volume']
@@ -469,7 +447,6 @@ def _sector_pe_live(sector):
         "Industrials": "XLI", "Communication Services": "XLC",
         "Utilities": "XLU", "Real Estate": "XLRE", "Basic Materials": "XLB",
     }.get(sector)
-    
     if etf:
         try:
             pe = yf.Ticker(etf).info.get('trailingPE')
@@ -486,7 +463,7 @@ def _sector_pe_live(sector):
 
 
 # ═══════════════════════════════════════════════════════════════
-# 🎨 CSS (🚀 UI 개선: 카드 입체감 & 선명도 완벽 세팅)
+# 🎨 CSS
 # ═══════════════════════════════════════════════════════════════
 
 CSS = """
@@ -753,7 +730,7 @@ def render_company_details(ticker_str: str):
             </div>
             <div>
                 {_metric_row(eps_lbl, _fmt_cagr(cagr_eps), cr_cls(cagr_eps))}
-                <div class="note-box">※ 이익이 적자(-)에서 시작된 경우 수학적 한계로 비율(%) 대신 방향성 텍스트로 표기합니다.</div>
+                <div class="note-box">※ 이익이 적자(-)에서 시작된 경우 수학적 한계로 비율(%) 대신 방향성 텍스트로 대체 표기합니다.</div>
             </div>
         </div>
         {_verdict_badge(v2_c, "📌", v2_t)}
@@ -829,7 +806,6 @@ def render_company_details(ticker_str: str):
     eg        = info.get('earningsGrowth')
     fwd_eps   = info.get('forwardEps')
     
-    # 🚀 PEG 비율 직접 계산 방어 로직
     peg = info.get('pegRatio')
     if peg is None or pd.isna(peg):
         t_pe_val = info.get('trailingPE')
@@ -838,7 +814,6 @@ def render_company_details(ticker_str: str):
         elif t_pe_val and isinstance(cagr_ni, float) and cagr_ni > 0:
             peg = t_pe_val / (cagr_ni * 100)
             
-    # PEG 텍스트 처리
     if peg and not pd.isna(peg):
         if peg < 0.5:
             peg_txt = f"{peg:.2f} (매우 저평가)"
@@ -880,10 +855,9 @@ def render_company_details(ticker_str: str):
                 {_metric_row("수익 유보율 (1 - 배당성향)", _fmt_pct(retention))}
                 {_metric_row("지속가능 성장률 (g)", _fmt_pct(sust_g), "m-green" if sust_g and sust_g > 0.1 else "m-value")}
                 <div class="note-box">
-                    💡 <b>PEG (주가수익성장비율)</b> = P/E Ratio ÷ 예상 이익 성장률<br>
-                    • <b>PEG &lt; 0.5</b> : 매우 저평가 (성장성 대비 가격 쌈)<br>
-                    • <b>PEG 0.5 ~ 1.5</b> : 적정 가치<br>
-                    • <b>PEG &gt; 1.5</b> : 고평가 (성장성보다 가격이 앞서감)
+                    💡 <b>지속가능 성장률(g)</b> = ROE × 유보율. 외부 자금 없이 달성 가능한 이론적 최대 성장률.<br>
+                    💡 <b>PEG (주가수익성장비율)</b> = P/E Ratio ÷ 이익 성장률<br>
+                    • <b>PEG &lt; 0.5</b> : 매우 저평가 &nbsp; • <b>0.5 ~ 1.5</b> : 적정 가치 &nbsp; • <b>PEG &gt; 1.5</b> : 고평가
                 </div>
             </div>
         </div>
@@ -1105,8 +1079,8 @@ def render_company_details(ticker_str: str):
         <div class="s-title"><span class="s-num">08</span> 이 종목 비싼가요? <span style="font-size:.8rem;color:#768390">Yahoo</span></div>
         <div class="two-col">
             <div>
-                {_metric_row("Trailing P/E", f"{t_pe:.2f}" if isinstance(t_pe, (int, float)) else "N/A")}
-                {_metric_row("Forward P/E", f"{f_pe:.2f}" if isinstance(f_pe, (int, float)) else "N/A")}
+                {_metric_row("Trailing P/E <span style='font-size:0.75rem;color:#768390;margin-left:4px'>(현재가÷TTM EPS)</span>", f"{t_pe:.2f}" if isinstance(t_pe, (int, float)) else "N/A")}
+                {_metric_row("Forward P/E <span style='font-size:0.75rem;color:#768390;margin-left:4px'>(현재가÷Fwd EPS)</span>", f"{f_pe:.2f}" if isinstance(f_pe, (int, float)) else "N/A")}
                 {_metric_row("P/S (TTM)", f"{p_s:.2f}" if isinstance(p_s, (int, float)) else "N/A")}
                 {_metric_row("P/B", f"{p_b:.2f}" if isinstance(p_b, (int, float)) else "N/A")}
                 <div class="divider"></div>
@@ -1116,8 +1090,10 @@ def render_company_details(ticker_str: str):
             <div>
                 {pe_visual}
                 <div class="note-box">
-                    ※ 섹터 P/E는 {pe_source} 기준입니다. 실시간 조회 실패 시 추정치로 대체됩니다.<br>
-                    섹터 ETF P/E를 함께 참고하면 더 정확합니다.
+                    ※ P/E는 현재가 ÷ EPS로 교차 검증되었습니다.<br>
+                    <b>Trailing P/E</b> = 현재가 ÷ 과거 12개월 실적 EPS<br>
+                    <b>Forward P/E</b> = 현재가 ÷ 향후 12개월 추정 EPS<br>
+                    섹터 P/E는 실시간 기준입니다.
                 </div>
             </div>
         </div>
