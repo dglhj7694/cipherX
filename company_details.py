@@ -78,6 +78,19 @@ def _find_idx(df, candidates):
             return idx
     return None
 
+def _get_val_from_series(series, aliases):
+    if series is None or series.empty: return None
+    for alias in aliases:
+        if alias in series.index:
+            val = series[alias]
+            if pd.notna(val): return float(val)
+    norm_aliases = [str(a).lower().replace(" ", "") for a in aliases]
+    for idx in series.index:
+        if str(idx).lower().replace(" ", "") in norm_aliases:
+            val = series[idx]
+            if pd.notna(val): return float(val)
+    return None
+
 def _get_row_series(df, candidates):
     idx = _find_idx(df, candidates)
     if idx is not None:
@@ -510,10 +523,6 @@ def render_company_details(ticker_str: str):
 
     rev_lbl = f"{yr_rev}년 매출 평균성장" if yr_rev else "매출 성장추세"
     ni_lbl  = f"{yr_ni}년 순이익 평균성장" if yr_ni else "순이익 추세"
-    
-    # 🚀 Forward EPS 복구 완료!
-    fwd_eps = info.get('forwardEps')
-    
     if yr_eps and yr_eps == 1 and cagr_eps is not None:
         eps_lbl = f"{yr_eps}년 EPS 추세 (Forward 추정)" if isinstance(cagr_eps, float) else f"{yr_eps}년 EPS 추세 (SEC)"
     elif yr_eps: eps_lbl = f"{yr_eps}년 EPS 추세 (SEC)"
@@ -592,22 +601,29 @@ def render_company_details(ticker_str: str):
         st.markdown(_verdict_badge(v3_c, "📌", v3_t), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 4️⃣ 성장 가능성 
+    # 4️⃣ 성장 가능성 & 🚀 PEG 비율 방어 로직 완벽 적용
     # ═══════════════════════════════════════════════════
     t_pe, f_pe = info.get('trailingPE'), info.get('forwardPE')
+    t_eps, f_eps = info.get('trailingEps'), info.get('forwardEps')
     payout, roe_v = info.get('payoutRatio', 0) or 0, info.get('returnOnEquity', 0) or 0
     retention, sust_g = max(0, 1 - payout), (roe_v * max(0, 1 - payout) if roe_v else None)
-    eg, fwd_eps = info.get('earningsGrowth'), info.get('forwardEps')
+    eg = info.get('earningsGrowth')
     
+    # 🚀 PEG 비율 직접 계산 (모든 수단 동원)
     peg = info.get('pegRatio')
-    if peg is None or pd.isna(peg):
-        pe_val = f_pe if (f_pe and not pd.isna(f_pe)) else t_pe
+    if peg is None or pd.isna(peg) or peg == 0:
+        pe_val = f_pe if (f_pe and not pd.isna(f_pe) and f_pe > 0) else t_pe
         growth_val = eg
-        if (growth_val is None or growth_val <= 0) and isinstance(cagr_eps, float) and cagr_eps > 0: growth_val = cagr_eps
-        if (growth_val is None or growth_val <= 0) and isinstance(cagr_ni, float) and cagr_ni > 0: growth_val = cagr_ni
-        if pe_val and growth_val and growth_val > 0: peg = pe_val / (growth_val * 100)
+        if (growth_val is None or growth_val <= 0):
+            if isinstance(cagr_eps, float) and cagr_eps > 0: growth_val = cagr_eps
+            elif isinstance(cagr_ni, float) and cagr_ni > 0: growth_val = cagr_ni
+            elif isinstance(ann_rev_g, float) and ann_rev_g > 0: growth_val = ann_rev_g
+        
+        if pe_val and growth_val and growth_val > 0: 
+            peg = pe_val / (growth_val * 100)
 
-    if peg and not pd.isna(peg):
+    # 🚀 PEG 직관적 평가 표기
+    if peg and not pd.isna(peg) and peg > 0:
         if peg < 0.5: peg_txt, peg_cls = f"{peg:.2f} (매우 저평가)", "m-blue"
         elif peg <= 1.5: peg_txt, peg_cls = f"{peg:.2f} (적정 가치)", "m-green"
         else: peg_txt, peg_cls = f"{peg:.2f} (고평가)", "m-red"
@@ -627,8 +643,8 @@ def render_company_details(ticker_str: str):
 <div class="s-title"><span class="s-num">04</span> 성장 가능성 <span style="font-size:.8rem;color:#768390">SEC + Yahoo</span></div>
 <div class="two-col">
     <div>
-        {_metric_row("분기 이익 성장률 (YoY)", _fmt_pct(eg), "m-green" if eg and eg > 0 else "m-red")}
-        {_metric_row("분기 매출 성장률 (YoY)", _fmt_pct(yoy_q_rev_g), "m-green" if yoy_q_rev_g and isinstance(yoy_q_rev_g, float) and yoy_q_rev_g > 0 else "m-red")}
+        {_metric_row("분기 이익 성장률 (YoY)", _fmt_pct(eg), eg_cls)}
+        {_metric_row("분기 매출 성장률 (YoY)", _fmt_pct(yoy_q_rev_g), rg_cls)}
         {_metric_row("Forward EPS", f"${_safe(fwd_eps)}")}
         {_metric_row("PEG 비율", peg_txt, peg_cls)}
     </div>
@@ -647,7 +663,7 @@ def render_company_details(ticker_str: str):
         """.strip(), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 5️⃣ 재무 건전성
+    # 5️⃣ 재무 건전성 & 🚀 D/E 강제 계산 
     # ═══════════════════════════════════════════════════
     na = None
     info_total_debt = None
@@ -701,12 +717,14 @@ def render_company_details(ticker_str: str):
         fig5 = None
 
     cash = info.get('totalCash', 0) or 0
-    dte  = info.get('debtToEquity')
     dt_trend, dt_c = _debt_trend(bs)
     ib_txt, ib_c   = _interest_burden(fin, info)
 
-    if (dte is None or pd.isna(dte)) and na and na > 0 and info_total_debt and info_total_debt > 0:
+    # 🚀 부채/자본 비율(D/E) 강제 직접 계산! (야후의 이상한 데이터 덮어쓰기)
+    if na and na > 0 and info_total_debt is not None and info_total_debt >= 0:
         dte = (info_total_debt / na) * 100
+    else:
+        dte = info.get('debtToEquity')
 
     if isinstance(dte, (int, float)):
         if   dte < 50:  dl, dl_c = "낮음 ✅", "green"
@@ -735,7 +753,10 @@ def render_company_details(ticker_str: str):
 {_metric_row("부채 추세", dt_trend)}
 {_metric_row("이자 부담 (ICR)", ib_txt)}
 {_metric_row("부채/자본 비율", f'{dte:.1f}%' if isinstance(dte, (int, float)) else 'N/A')}
-<div class="note-box">※ 순자산(총자산-총부채)과 자본(주주지분)은 이론상 같으나, 비지배지분 등에 의해 차이가 날 수 있습니다.</div>
+<div class="note-box">
+    ※ <b>부채/자본 비율</b> = (위 표시된 총 부채 ÷ 순 자산) × 100 으로 직접 교차 검증 계산됩니다.<br>
+    ※ 순자산(총자산-총부채)과 자본(주주지분)은 이론상 같으나, 비지배지분 등에 의해 차이가 날 수 있습니다.
+</div>
             """.strip(), unsafe_allow_html=True)
         with col2:
             if fig5: st.plotly_chart(fig5, use_container_width=True, config={'displayModeBar': False})
@@ -810,6 +831,9 @@ def render_company_details(ticker_str: str):
     # ═══════════════════════════════════════════════════
     p_s, p_b = info.get('priceToSalesTrailing12Months'), info.get('priceToBook')
     
+    if (t_pe is None or pd.isna(t_pe)) and t_eps and t_eps > 0 and price: t_pe = price / t_eps
+    if (f_pe is None or pd.isna(f_pe)) and f_eps and f_eps > 0 and price: f_pe = price / f_eps
+
     s_pe, pe_source = _sector_pe_live(sector)
 
     pe_comp = ""
@@ -956,7 +980,7 @@ def render_company_details(ticker_str: str):
     mp_val = f"${mp:.2f}" if mp else ""
     mp_html = f"<span style='font-size:1.8rem;font-weight:900;color:#ffffff'>{mp_val}</span>" if mp else "<span style='color:#768390;font-size:1.2rem;font-weight:700'>데이터 없음</span>"
     exp_html = f"<span style='font-size:.85rem;color:#adbac7;font-weight:700'>(만기: {exp})</span>" if exp else ""
-    vol_warning = "<div style='color:#FFC107; font-size:.85rem; margin-top:12px; font-weight:700;'>⚠️ 미결제약정(OI) 부족으로 거래량 가중치를 임시 사용했습니다.</div>" if is_vol_weight else ""
+    vol_warning = "<div style='color:#FFC107; font-size:.85rem; margin-top:12px; font-weight:700;'>⚠️ 미결제약정(OI) 데이터 부족으로 임시로 거래량(Volume) 가중치를 사용했습니다.</div>" if is_vol_weight else ""
 
     with st.container(border=True):
         st.markdown(f"""
@@ -973,7 +997,7 @@ def render_company_details(ticker_str: str):
     <div class="opt-box" style="flex:1;min-width:220px"><b style="color:#FF1744;font-size:1rem">🔴 Put (하락 베팅) Top 3</b><ul class="opt-list">{ph}</ul></div>
 </div>
 <div class="note-box" style="margin-top:20px">
-    💡 <b>Max Pain 이론</b>: 옵션 만기 시 가장 많은 옵션 매수자가 손실을 보는 가격.<br>
+    💡 <b>Max Pain 이론</b>: 옵션 만기 시 가장 많은 옵션 매수자(보유자)가 손실을 보는 가격.<br>
     옵션 매도자(마켓메이커)의 이익이 극대화되는 지점으로, 주가가 만기일에 이 가격 부근으로 수렴하는 경향이 있습니다.
 </div>
 {_verdict_badge(mp_c, "📌", f"Max Pain {mp_val} — {mp_note.replace('<b>', '').replace('</b>', '')}" if mp else "옵션 데이터 없음")}
@@ -982,14 +1006,29 @@ def render_company_details(ticker_str: str):
     # ═══════════════════════════════════════════════════
     # 1️⃣2️⃣ 공매도
     # ═══════════════════════════════════════════════════
-    sp = info.get('shortPercentOfFloat')
+    sp  = info.get('shortPercentOfFloat')
+    ss  = info.get('sharesShort', 0) or 0
+    sr  = info.get('shortRatio')
+    pss = info.get('sharesShortPriorMonth', 0) or 0
+
     if isinstance(sp, (int, float)):
         if   sp > 0.20: sl, sc = "매우 높음 🔴 (숏스퀴즈 가능)", "red"
         elif sp > 0.10: sl, sc = "높음 🟠", "red"
         elif sp > 0.05: sl, sc = "보통 🟡", "yellow"
         else:           sl, sc = "낮음 🟢", "green"
-    else: sl, sc = "N/A", "gray"
+    else:
+        sl, sc = "N/A", "gray"
     all_verdicts.append(("공매도", sc))
+
+    short_trend = ""
+    if ss > 0 and pss > 0:
+        s_chg = ((ss - pss) / pss) * 100
+        if   s_chg > 5:  short_trend = f"증가 📈 ({s_chg:+.1f}% vs 전월)"
+        elif s_chg < -5: short_trend = f"감소 📉 ({s_chg:+.1f}% vs 전월)"
+        else:            short_trend = f"유지 ➡️ ({s_chg:+.1f}% vs 전월)"
+
+    gauge_color = "#FF1744" if (sp or 0) > 0.1 else ("#FFC107" if (sp or 0) > 0.05 else "#00E676")
+    fig12 = _get_plotly_gauge(sp or 0, gauge_color) if sp else None
 
     with st.container(border=True):
         st.markdown('<div class="s-title"><span class="s-num">12</span> 공매도 비율 <span style="font-size:.8rem;color:#768390">Yahoo</span></div>', unsafe_allow_html=True)
@@ -998,9 +1037,10 @@ def render_company_details(ticker_str: str):
             st.markdown(f"""
 {_metric_row("유통주식 대비 공매도", _fmt_pct(sp), "m-red" if sc == "red" else "m-value")}
 {_metric_row("공매도 수준", sl)}
+{('<div class="m-row"><span class="m-label">전월 대비</span><span class="m-value">' + short_trend + '</span></div>') if short_trend else ''}
 <div class="divider"></div>
-{_metric_row("공매도 주식수", f"{_fmt_num(info.get('sharesShort', 0), False)} 주")}
-{_metric_row("숏커버 일수 (DTC)", f"{info.get('shortRatio'):.2f} 일" if info.get('shortRatio') else "N/A")}
+{_metric_row("공매도 주식수", f"{_fmt_num(ss, False)} 주")}
+{_metric_row("숏커버 일수 (DTC)", f"{sr:.2f} 일" if isinstance(sr, (int, float)) else "N/A")}
 <div class="note-box">
     💡 공매도 비율 &gt; 10% = 높은 숏 관심<br>
     DTC(Days To Cover)가 높으면 숏스퀴즈 가능성 ↑<br>
@@ -1008,8 +1048,7 @@ def render_company_details(ticker_str: str):
 </div>
             """.strip(), unsafe_allow_html=True)
         with col2:
-            fig12 = _get_plotly_gauge(sp or 0, "#FF1744" if (sp or 0) > 0.1 else ("#FFC107" if (sp or 0) > 0.05 else "#00E676"))
-            st.plotly_chart(fig12, use_container_width=True, config={'displayModeBar': False})
+            if fig12: st.plotly_chart(fig12, use_container_width=True, config={'displayModeBar': False})
         st.markdown(_verdict_badge(sc, "📌", f"공매도 {_fmt_pct(sp)} — {sl}"), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
