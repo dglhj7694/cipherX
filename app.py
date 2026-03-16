@@ -11,6 +11,7 @@ import pandas as pd
 import numpy as np
 from plotly.subplots import make_subplots
 from collections import OrderedDict
+from company_details import render_company_details
 
 st.set_page_config(
     page_title="CipherX V9.0",
@@ -1226,7 +1227,8 @@ def render_analysis(msg):
         render_speedometer(m)    
         render_alerts(m)
     if m or fig:
-        t1,t2,t3=st.tabs(["📊 정밀 차트","🔔 발생 시그널","📈 백테스트 통계"])
+        # 👇 탭 1개(🏢 기업 펀더멘탈 상세) 추가
+        t1,t2,t3,t4=st.tabs(["📊 정밀 차트","🔔 발생 시그널","📈 백테스트 통계", "🏢 기업 펀더멘탈 상세"])
         with t1:
             plotly_config = {
                 'displaylogo': False,
@@ -1237,7 +1239,9 @@ def render_analysis(msg):
             if m: render_signals(m)
         with t3:
             if m: render_stats(m)
-
+        with t4:
+            # 👇 새로운 탭을 눌렀을 때 외부 파일의 함수 실행!
+            if m: render_company_details(m['ticker'])
 # ──────────────────────────────────────────
 # 사이드바 
 # ──────────────────────────────────────────
