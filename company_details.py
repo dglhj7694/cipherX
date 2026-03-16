@@ -67,7 +67,6 @@ def _safe(val, fallback="N/A"):
 def _esc(text):
     return html_module.escape(str(text)) if text else ""
 
-# 🚀 퍼지 매칭 함수 (대소문자/공백 완전 무시)
 def _find_idx(df, candidates):
     if df is None or df.empty: return None
     for name in candidates:
@@ -86,7 +85,7 @@ def _get_val_from_series(series, aliases):
             if pd.notna(val): return float(val)
     norm_aliases = [str(a).lower().replace(" ", "") for a in aliases]
     for idx in series.index:
-        if str(idx).lower().replace(" ", "") in norm_cands:
+        if str(idx).lower().replace(" ", "") in norm_aliases:
             val = series[idx]
             if pd.notna(val): return float(val)
     return None
@@ -97,7 +96,6 @@ def _get_row_series(df, candidates):
         try:
             row = df.loc[idx]
             if isinstance(row, pd.DataFrame): row = row.iloc[0]
-            # yfinance는 컬럼이 최신순서이므로 dropna()만 해서 리턴
             return row.dropna()
         except Exception: pass
     return pd.Series(dtype=float)
@@ -107,7 +105,6 @@ def _calc_cagr_with_years(financials, row_candidates):
         rc = row_candidates if isinstance(row_candidates, list) else [row_candidates]
         series = _get_row_series(financials, rc)
         if len(series) >= 2:
-            # 안전하게 날짜 정렬 후 계산
             series = series.sort_index()
             s_val, e_val = series.iloc[0], series.iloc[-1]
             years = len(series) - 1
@@ -720,7 +717,7 @@ def render_company_details(ticker_str: str):
     dt_trend, dt_c = _debt_trend(bs)
     ib_txt, ib_c   = _interest_burden(fin, info)
 
-    # 🚀 부채/자본 비율(D/E) 강제 직접 계산! (야후의 이상한 데이터 덮어쓰기)
+    # 🚀 D/E 비율 강제 계산
     if na and na > 0 and info_total_debt is not None and info_total_debt >= 0:
         dte = (info_total_debt / na) * 100
     else:
@@ -827,8 +824,14 @@ def render_company_details(ticker_str: str):
         """.strip(), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 8️⃣ 밸류에이션
+    # 8️⃣ 밸류에이션 (🚀 P/S 및 P/B 복구)
     # ═══════════════════════════════════════════════════
+    p_s = info.get('priceToSalesTrailing12Months')
+    p_b = info.get('priceToBook')
+    
+    if (t_pe is None or pd.isna(t_pe)) and t_eps and t_eps > 0 and price: t_pe = price / t_eps
+    if (f_pe is None or pd.isna(f_pe)) and f_eps and f_eps > 0 and price: f_pe = price / f_eps
+
     s_pe, pe_source = _sector_pe_live(sector)
 
     pe_comp = ""
@@ -1106,7 +1109,7 @@ def render_company_details(ticker_str: str):
     st.caption("⚠️ 본 분석은 참고용 지표이며 어떠한 경우에도 투자 조언이 아닙니다. 투자에 대한 최종 결정은 본인의 판단과 책임 하에 이루어져야 합니다.")
 
 if __name__ == "__main__":
-    st.set_page_config(page_title="종목 상세 분석", page_icon="📊", layout="layout")
+    st.set_page_config(page_title="종목 상세 분석", page_icon="📊", layout="wide")
     st.title("📊 종목 상세 분석 대시보드")
     t = st.text_input("🔍 티커 심볼 입력", value="AAPL", placeholder="예: AAPL, MSFT, TSLA")
     if t: render_company_details(t.strip().upper())
