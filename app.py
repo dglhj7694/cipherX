@@ -488,8 +488,8 @@ def compute_bias(meta, htf1, htf2):
     elif sc > -9.0: return 'SELL', sc
     else: return 'STRONG SELL', sc
 
-# 🚀 1. 백테스트 수익률 계산 로직 최적화 (실제 가격 변동 반환)
-def compute_signal_stats(df, col, direction, fwd=(3, 5, 10), mn=5):
+# 🚀 1. 백테스트 수익률 계산 로직 최적화 (2일/2d 기준 추가 반영)
+def compute_signal_stats(df, col, direction, fwd=(2, 3, 5), mn=5):
     if col not in df.columns: return None
     mask = df[col].fillna(False).values.astype(bool)
     if mask.sum() < mn: return None
@@ -657,7 +657,7 @@ def detect_all_signals(df):
     return df
 
 # ──────────────────────────────────────────
-# 통합 분석 로직 (복원 완료 🚀)
+# 통합 분석 로직
 # ──────────────────────────────────────────
 def analyze(ticker,chart_days=252,refresh=False):
     try:
@@ -930,6 +930,7 @@ def build_metadata(dc,dv,ticker):
         'macd_hist':float(lat.get('MACD_Hist',0)),
     },regime,shield_str
 
+# 🚀 3. AI 프롬프트도 2일 통계를 참조하도록 수정
 def build_prompt_text(dc,meta):
     lat=dc.iloc[-1]; rd=dc.tail(60)
     ps=", ".join([f"'{d.strftime('%Y-%m-%d')}:{r['Close']:.2f}'" for d,r in rd.iterrows()])
@@ -960,8 +961,8 @@ def build_prompt_text(dc,meta):
     if stats:
         lines=[]
         for sn,sv in sorted(stats.items(),key=lambda x:x[1]['count'],reverse=True)[:10]:
-            wr=sv.get('5d_winrate'); avg=sv.get('5d_avg')
-            if wr is not None: lines.append(f"  {sn}:{sv['count']}회,5일승률{wr:.0f}%,평균주가변동{avg:+.1f}%")
+            wr=sv.get('2d_winrate'); avg=sv.get('2d_avg')
+            if wr is not None: lines.append(f"  {sn}:{sv['count']}회,2일승률{wr:.0f}%,평균주가변동{avg:+.1f}%")
         if lines: st_txt="\n📌 [백테스트(2년,상위10)]\n"+"\n".join(lines)
     return f"{ps}\n\n📌 [지표 요약]\n{inds}\n\n📌 [최근 시그널]\n{st_text}{st_txt}"
 
@@ -1031,7 +1032,7 @@ def build_ai_prompt(ticker,phist,fundamentals):
 [식별된 기술적 패턴 이름 (예: Momentum Ignition, EMA Pullback 등)]
 * 상태: [패턴에 대한 설명. ATR 기반 예상 변동 ±__%]
 * 해석: [패턴이 향후 주가에 미칠 영향]  [긍정:🔵/부정 :🔴/중간:🟠]
-* 역사적 유사패턴: [백테스트 데이터 기반: 동일 시그널 발생 시 5일 승률 __%, 평균 수익률 __%]  [긍정:🔵/부정 :🔴/중간:🟠]
+* 역사적 유사패턴: [백테스트 데이터 기반: 동일 시그널 발생 시 2일 승률 __%, 평균 수익률 __%]  [긍정:🔵/부정 :🔴/중간:🟠]
 * 지표 요약: ATR [값] (±__%), ADX [값], TTM Squeeze [ON/OFF], MACD [상태]
 
 ---
@@ -1076,130 +1077,23 @@ def build_ai_prompt(ticker,phist,fundamentals):
 """
 
 # ──────────────────────────────────────────
-# UI 렌더 부속 (복원 완료 🚀)
+# 🚀 UI 렌더
 # ──────────────────────────────────────────
-_IT={'wt1':[(-53,'극과매도'),(-20,'과매도'),(20,'중립'),(53,'과매수'),(999,'극과매수')],
-     'rsi':[(30,'과매도'),(45,'약세'),(55,'중립'),(70,'강세'),(999,'과매수')],
-     'mfi':[(30,'과매도'),(45,'약세'),(55,'중립'),(70,'강세'),(999,'과매수')],
-     'stochk':[(20,'바닥'),(80,''),(999,'천장')]}
-
-def _il(n,v):
-    for t,l in _IT.get(n,[]):
-        if v<=t: return l
-    return ''
-
-def render_price_header(m):
-    chg=m['price_change']; cp=m['price_change_pct']
-    cc='price-change-up' if chg>=0 else 'price-change-down'
-    ci='▲' if chg>=0 else '▼'
-    vr=m['volume']/m['avg_volume'] if m['avg_volume'] else 0
-    cv=m.get('confluence_score',0); sd=m.get('supertrend_dir',0)
-    sh=m.get('shield_status',''); mh_val=m.get('macd_hist',0)
-    
-    specs=[(_cls(m['wt1'],-20,20),f"WT:{m['wt1']:.0f} {_il('wt1',m['wt1'])}"),
-        (_cls(m['rsi'],40,60),f"RSI:{m['rsi']:.0f} {_il('rsi',m['rsi'])}"),
-        (_cls(m['mfi'],40,60),f"MFI:{m['mfi']:.0f} {_il('mfi',m['mfi'])}"),
-        ('ind-bullish' if m['mf_area']<0 else ('ind-bearish' if m['mf_area']>0 else 'ind-neutral'),f"MF:{m['mf_area']:.1f}"),
-        ('ind-bullish' if vr>1.5 else 'ind-neutral',f"Vol:{vr:.1f}x"),
-        ('ind-bullish' if m['adx']>25 else 'ind-neutral',f"ADX:{m['adx']:.0f}"),
-        (_cls(m['stochk'],30,70),f"StK:{m['stochk']:.0f} {_il('stochk',m['stochk'])}"),
-        ('ind-bullish' if cv>=3.5 else ('ind-bearish' if cv<=-3.5 else 'ind-neutral'),f"Conf:{cv:.1f}"),
-        ('ind-bullish' if sd==1 else 'ind-bearish',f"ST:{'▲' if sd==1 else '▼'}"),
-        ('ind-bullish' if mh_val>0 else ('ind-bearish' if mh_val<0 else 'ind-neutral'),f"MACD:{mh_val:+.2f}")]
-    ih="".join([f"<span class='indicator-mini {c}'>{l}</span>" for c,l in specs])
-    if sh: ih+=f"<span class='indicator-mini ind-bearish' style='font-weight:700'>🔓 {sh}</span>"
-    tr=m.get('trend_regime','NEUTRAL ⚪')
-    st.markdown(f"""<div class="price-header">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-            <div><p class="price-label">🚦 {m['ticker']} · {m['last_date']} · <b>{tr}</b></p>
-            <p class="price-big" style="color:#FAFAFA">${m['price']:.2f}
-                <span class="{cc}" style="font-size:1rem;margin-left:8px">
-                    {ci} {abs(chg):.2f} ({abs(cp):.2f}%)</span></p></div>
-            <div style="text-align:right"><p class="price-label">ATR</p>
-            <p style="color:#FFC107;font-size:1.1rem;font-weight:600;margin:0">
-                ${m['atr']:.2f} ({m['atr_pct']:.1f}%)</p></div></div>
-        <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">{ih}</div></div>""",unsafe_allow_html=True)
-
-def render_speedometer(m):
-    gauge_fig = build_speedometer_gauges(m)
-    st.plotly_chart(gauge_fig, use_container_width=True, theme=None, config={'displayModeBar': False})
-    bias = m['overall_bias']; sc = m.get('bias_score', 0)
-    styles = {
-        'STRONG BUY': ('rgba(0,230,118,.15)', '#00E676', '🟢🟢'),
-        'BUY': ('rgba(0,230,118,.10)', '#00E676', '🟢'),
-        'STRONG SELL': ('rgba(255,23,68,.15)', '#FF1744', '🔴🔴'),
-        'SELL': ('rgba(255,23,68,.10)', '#FF1744', '🔴')
-    }
-    bg, clr, ico = styles.get(bias, ('rgba(255,193,7,.10)', '#FFC107', '🟠'))
-    bp = m.get('buy_proximity', 0); sp = m.get('sell_proximity', 0)
-    prox_txt = ""
-    if bp >= 50: prox_txt = f"<span style='color:#00E676'>매수 임박 {bp:.0f}%</span>"
-    elif sp >= 50: prox_txt = f"<span style='color:#FF1744'>매도 임박 {sp:.0f}%</span>"
-    sq_txt = " · <span style='color:#FFFF00;font-weight:600'>💥 Squeeze ON</span>" if m.get('squeeze_on') else ""
-
-    st.markdown(f"""<div style="background:{bg};border-radius:10px;padding:10px 16px;text-align:center;margin:4px 0 12px 0">
-        <span style="font-size:1.1rem;font-weight:700;color:{clr}">{ico} 종합 판정: {bias} ({sc:.1f})</span>
-        {f' · {prox_txt}' if prox_txt else ''}{sq_txt}</div>""", unsafe_allow_html=True)
-
-def render_alerts(m):
-    alerts=[]
-    bp,sp=m.get('buy_proximity',0),m.get('sell_proximity',0)
-    if bp>=70: alerts.append(('🟢⚡ 매수 매우 임박!','#00E676',bp))
-    elif bp>=50: alerts.append(('🟢 매수 접근 중','#69F0AE',bp))
-    if sp>=70: alerts.append(('🔴⚡ 매도 매우 임박!','#FF1744',sp))
-    elif sp>=50: alerts.append(('🔴 매도 접근 중','#FF5252',sp))
-    if m.get('squeeze_on'): alerts.append(('💥 Squeeze ON','#FFFF00',80))
-    for txt,clr,pct in alerts:
-        w=min(pct,100)
-        st.markdown(f"""<div style="background:rgba(255,255,255,.03);border:1px solid #2D333B;border-radius:8px;padding:8px 14px;margin:4px 0">
-            <div style="display:flex;justify-content:space-between;align-items:center">
-                <span style="color:{clr};font-weight:600;font-size:.9rem">{txt}</span>
-                <span style="color:{clr};font-weight:700;font-size:.85rem">{pct:.0f}%</span></div>
-            <div style="background:#1A1D24;border-radius:3px;height:6px;margin-top:6px">
-                <div style="background:{clr};width:{w}%;height:6px;border-radius:3px"></div></div></div>""",unsafe_allow_html=True)
-
-def render_signals(m):
-    sigs=m['recent_signals']
-    if not sigs:
-        st.markdown("""<div class="signal-card signal-card-neutral">
-            <p style="margin:0;color:#FFC107;font-weight:600">🟠 최근 15일 내 시그널 없음</p></div>""",unsafe_allow_html=True)
-        return
-    dg=OrderedDict()
-    for icon,lbl,ds,side in sigs: dg.setdefault(ds,[]).append((icon,lbl,side))
-    alls=m.get('all_signal_stats',{})
-    for ds in reversed(dg):
-        group=dg[ds]; bc=sum(1 for _,_,s in group if s=='buy'); sc_count=sum(1 for _,_,s in group if s=='sell')
-        ct='signal-card-buy' if bc>sc_count else ('signal-card-sell' if sc_count>bc else 'signal-card-neutral')
-        parts=[]
-        for i,l,s in group:
-            cn="ind-bullish" if s=="buy" else "ind-bearish"
-            sh=""
-            for sn,sv in alls.items():
-                if ALL_CHART_SIGNALS.get(sn,{}).get('label')==l:
-                    wr=sv.get('5d_winrate')
-                    if wr is not None: sh=f" ({wr:.0f}%)"
-                    break
-            parts.append(f'<span class="indicator-mini {cn}">{i} {l}{sh}</span>')
-        st.markdown(f"""<div class="signal-card {ct}">
-            <div style="display:flex;justify-content:space-between;align-items:center">
-                <span style="font-weight:700;font-size:.9rem;color:#FAFAFA">📅 {ds}</span>
-                <span style="color:#888;font-size:.75rem">{len(group)}개</span></div>
-            <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">{" ".join(parts)}</div></div>""",unsafe_allow_html=True)
-
 def render_stats(m):
-    with st.expander("📊 백테스트 (2년, 진입: 시그널 다음날 시가, 청산: 5일 후 종가)",expanded=True):
+    with st.expander("📊 백테스트 (2년, 진입: 시그널 다음날 시가, 청산: 2일 후 종가)",expanded=True):
         alls=m.get('all_signal_stats',{})
         if not alls: st.caption("통계 없음"); return
         
         def _side(title, data, is_sell=False):
             st.markdown(f"##### {title}")
             for sn,sv in sorted(data.items(),key=lambda x:x[1]['count'],reverse=True):
-                wr=sv.get('5d_winrate'); av=sv.get('5d_avg')
+                wr=sv.get('2d_winrate'); av=sv.get('2d_avg')
                 if wr is None: continue
                 kor_label = ALL_CHART_SIGNALS.get(sn,{}).get('kor', sn)
                 c='#00E676' if wr>50 else ('#FFC107' if wr>40 else '#FF1744')
                 lb=f"승률 <span style='color:{c}'>**{wr:.0f}%**</span>"
                 
+                # 💡 매도(Sell) 포지션은 평균이 마이너스(-)여야 성공적인 하락을 의미합니다.
                 if is_sell:
                     av_c = '#00E676' if av < 0 else '#FF1744'
                     av_text = f"<span style='color:{av_c}'>**{abs(av):.1f}% 하락**</span>" if av < 0 else f"<span style='color:{av_c}'>**{av:+.1f}% 상승(실패)**</span>"
