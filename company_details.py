@@ -1318,7 +1318,7 @@ def render_company_details(ticker_str: str):
 
     pct = (total / mx * 100) if mx > 0 else 0
     if   pct >= 75: oc, oe, ot = "#00E676", "🟢", "매우 양호"
-    elif pct >= 55: oc, oe, 스 = "#FFC107", "🟡", "보통"
+    elif pct >= 55: oc, oe, ot = "#FFC107", "🟡", "보통"  # ✅ '스'를 'ot'로 수정했습니다.
     elif pct >= 35: oc, oe, ot = "#FF9800", "🟠", "주의 필요"
     else:           oc, oe, ot = "#FF1744", "🔴", "위험"
 
