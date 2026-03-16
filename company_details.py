@@ -3,19 +3,42 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import html as html_module
-import requests
+import logging
 from datetime import datetime
 import plotly.graph_objects as go
 
+# 🚀 로깅 설정 (bare except 방지 및 디버깅 용이)
+logger = logging.getLogger(__name__)
+
 # ═══════════════════════════════════════════════════════════════
-# 🛠️ API 변동성 대응을 위한 동의어(Alias) 설정
+# 🛠️ API 변동성 대응을 위한 동의어(Alias) 설정 (CamelCase 완벽 대응)
 # ═══════════════════════════════════════════════════════════════
-REV_ALIASES = ['Total Revenue', 'Operating Revenue', 'Revenue']
-NI_ALIASES = ['Net Income', 'Net Income Common Stockholders', 'Net Income Continuous Operations', 'Net Income From Continuing Ops', 'Net Income Applicable To Common Shares', 'Net Income Including Noncontrolling Interests']
-EPS_ALIASES = ['Basic EPS', 'Diluted EPS', 'Earnings Per Share']
-BS_ASSETS_ALIASES = ['Total Assets', 'Assets', 'TotalAssets']
-BS_LIAB_ALIASES = ['Total Liabilities Net Minority Interest', 'Total Liab', 'Total Liabilities', 'TotalLiabilities']
-EQ_ALIASES = ['Stockholders Equity', 'Total Stockholder Equity', 'Common Stock Equity', 'Total Equity Gross Minority Interest', 'Total Equity', 'Net Tangible Assets']
+REV_ALIASES = ['Total Revenue', 'TotalRevenue', 'Operating Revenue', 'OperatingRevenue', 'Revenue']
+NI_ALIASES = [
+    'Net Income', 'NetIncome', 'Net Income Common Stockholders', 'NetIncomeCommonStockholders',
+    'Net Income Continuous Operations', 'NetIncomeContinuousOperations', 'Net Income From Continuing Ops', 
+    'NetIncomeFromContinuingOps', 'Net Income Applicable To Common Shares', 'Net Income Including Noncontrolling Interests',
+    'NetIncomeIncludingNoncontrollingInterests'
+]
+EPS_ALIASES = ['Basic EPS', 'BasicEPS', 'Diluted EPS', 'DilutedEPS', 'Earnings Per Share', 'EarningsPerShare']
+
+# 대차대조표(BS) 항목 강화
+BS_ASSETS_ALIASES = ['Total Assets', 'TotalAssets', 'Assets']
+BS_LIAB_ALIASES = [
+    'Total Liabilities Net Minority Interest', 'TotalLiabilitiesNetMinorityInterest',
+    'Total Liab', 'TotalLiab', 'Total Liabilities', 'TotalLiabilities',
+    'Total Non Current Liabilities Net Minority Interest', 'TotalNonCurrentLiabilitiesNetMinorityInterest'
+]
+EQ_ALIASES = [
+    'Total Stockholder Equity', 'TotalStockholderEquity', 'Stockholders Equity', 'StockholdersEquity',
+    'Common Stock Equity', 'CommonStockEquity', 'Total Equity Gross Minority Interest', 
+    'TotalEquityGrossMinorityInterest', 'Total Equity', 'TotalEquity', 'Net Tangible Assets', 'NetTangibleAssets'
+]
+DEBT_ALIASES = [
+    'Total Debt', 'TotalDebt', 'Long Term Debt', 'LongTermDebt',
+    'Long Term Debt And Capital Lease Obligation', 'LongTermDebtAndCapitalLeaseObligation',
+    'Current Debt', 'CurrentDebt', 'Current Debt And Capital Lease Obligation', 'CurrentDebtAndCapitalLeaseObligation'
+]
 
 # ═══════════════════════════════════════════════════════════════
 # 🛠️ 유틸리티 함수
@@ -40,7 +63,8 @@ def _fmt_pct(num):
         return num
     try:
         return f"{float(num) * 100:.2f}%"
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Percentage formatting failed for {num}: {e}")
         return "N/A"
 
 def _safe(val, fallback="N/A"):
@@ -53,27 +77,38 @@ def _safe(val, fallback="N/A"):
 def _esc(text):
     return html_module.escape(str(text)) if text else ""
 
-def _get_row(df, candidates, col_idx=0):
+# 🚀 강력한 퍼지 매칭 함수 (공백 및 대소문자 완전 무시)
+def _find_idx(df, candidates):
     if df is None or df.empty: return None
     for name in candidates:
-        if name in df.index:
-            try:
-                row = df.loc[name]
-                if isinstance(row, pd.DataFrame): row = row.iloc[0]
-                val = row.dropna()
-                if len(val) > col_idx: return val.iloc[col_idx]
-            except Exception: pass
+        if name in df.index: return name
+    norm_cands = [str(c).lower().replace(" ", "") for c in candidates]
+    for idx in df.index:
+        if str(idx).lower().replace(" ", "") in norm_cands:
+            return idx
+    return None
+
+def _get_row(df, candidates, latest=True):
+    idx = _find_idx(df, candidates)
+    if idx is not None:
+        try:
+            row = df.loc[idx]
+            if isinstance(row, pd.DataFrame): row = row.iloc[0]
+            val = row.dropna().sort_index(ascending=not latest)
+            if len(val) > 0: return val.iloc[0]
+        except Exception as e:
+            logger.warning(f"Row extraction failed for {idx}: {e}")
     return None
 
 def _get_row_series(df, candidates):
-    if df is None or df.empty: return pd.Series(dtype=float)
-    for name in candidates:
-        if name in df.index:
-            try:
-                row = df.loc[name]
-                if isinstance(row, pd.DataFrame): row = row.iloc[0]
-                return row.dropna().sort_index()
-            except Exception: pass
+    idx = _find_idx(df, candidates)
+    if idx is not None:
+        try:
+            row = df.loc[idx]
+            if isinstance(row, pd.DataFrame): row = row.iloc[0]
+            return row.dropna().sort_index(ascending=True)
+        except Exception as e:
+            logger.warning(f"Series extraction failed for {idx}: {e}")
     return pd.Series(dtype=float)
 
 def _calc_cagr_with_years(financials, row_candidates):
@@ -81,7 +116,6 @@ def _calc_cagr_with_years(financials, row_candidates):
         rc = row_candidates if isinstance(row_candidates, list) else [row_candidates]
         series = _get_row_series(financials, rc)
         if len(series) >= 2:
-            series = series.sort_index()
             s_val, e_val = series.iloc[0], series.iloc[-1]
             years = len(series) - 1
             if s_val > 0 and e_val > 0:
@@ -91,7 +125,8 @@ def _calc_cagr_with_years(financials, row_candidates):
             elif s_val < 0 and e_val < 0:
                 if e_val > s_val: return "적자축소 📈", years
                 else: return "적자지속 📉", years
-    except Exception: pass
+    except Exception as e:
+        logger.warning(f"CAGR calculation failed: {e}")
     return None, 0
 
 def _fmt_cagr(val):
@@ -106,8 +141,8 @@ def _annual_values(financials, row_candidates):
         if len(series) > 0:
             series = series.sort_index(ascending=False)
             return series.tolist(), series.index.tolist()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Annual values extraction failed: {e}")
     return [], []
 
 # ── 시각 요소 및 Plotly 차트 생성기 ─────────────────────────────────────
@@ -267,7 +302,8 @@ def _growth_stage(info, fin, bs, cf):
                 if n in cf.index:
                     op_cf = cf.loc[n].dropna().iloc[0] or 0
                     break
-    except Exception: pass
+    except Exception as e: 
+        logger.warning(f"Growth stage CF extraction failed: {e}")
 
     rev_declining = False
     try:
@@ -276,7 +312,8 @@ def _growth_stage(info, fin, bs, cf):
             rd = rs.sort_index(ascending=False)
             if sum(1 for i in range(len(rd) - 1) if rd.iloc[i] < rd.iloc[i + 1]) >= 2:
                 rev_declining = True
-    except Exception: pass
+    except Exception as e: 
+        logger.warning(f"Revenue declining check failed: {e}")
 
     stages = {
         1: ("🌱 1단계 : 스타트업 / 개발", "매출 미미·R&D 집중. 시장 검증 전, 높은 리스크·높은 잠재력."),
@@ -329,7 +366,8 @@ def _margin_trend(fin):
         if l_m > f_m + 0.02: return f"증가 추세 📈 ({f_m * 100:.1f}% → {l_m * 100:.1f}%)", margins, "green"
         if l_m < f_m - 0.02: return f"감소 추세 📉 ({f_m * 100:.1f}% → {l_m * 100:.1f}%)", margins, "red"
         return f"유지 ➡️ ({l_m * 100:.1f}%)", margins, "yellow"
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Margin trend calc failed: {e}")
         return "N/A", [], "gray"
 
 def _growth_accel(fin, rc):
@@ -342,7 +380,7 @@ def _growth_accel(fin, rc):
     if len(g) < 2: return "N/A", "gray"
     
     recent_g = g[0]
-    past_g_avg = np.mean(g[1:4]) if len(g) > 2 else g[1]
+    past_g_avg = np.mean(g[1:4]) if len(g) > 2 else (g[1] if len(g) > 1 else 0)
     
     if recent_g > past_g_avg + 0.05: return f"가속화 🚀 (최근 {recent_g * 100:.1f}% vs 과거 {past_g_avg * 100:.1f}%)", "green"
     elif recent_g < past_g_avg - 0.05: return f"감속 🐌 (최근 {recent_g * 100:.1f}% vs 과거 {past_g_avg * 100:.1f}%)", "yellow"
@@ -411,7 +449,8 @@ def _max_pain(tkr):
         for col in ['openInterest', 'volume']:
             if col not in c.columns: c[col] = 0
             if col not in p.columns: p[col] = 0
-            c[col], p[col] = c[col].fillna(0), p[col].fillna(0)
+            c[col] = c[col].fillna(0)
+            p[col] = p[col].fillna(0)
             
         c_oi_sum = c['openInterest'].sum()
         p_oi_sum = p['openInterest'].sum()
@@ -440,7 +479,9 @@ def _max_pain(tkr):
         tc = c.nlargest(3, 'volume')[['strike', 'volume']].to_dict('records')
         tp = p.nlargest(3, 'volume')[['strike', 'volume']].to_dict('records')
         return exp, mp, tc, tp, is_vol_weight
-    except Exception: return None, None, None, None, False
+    except Exception as e:
+        logger.warning(f"Max pain calc failed: {e}")
+        return None, None, None, None, False
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def _sector_pe_live(sector):
@@ -545,6 +586,7 @@ def render_company_details(ticker_str: str):
             info = tkr.info or {}
         except Exception as e:
             st.error(f"❌ 데이터를 불러올 수 없습니다 — {e}")
+            logger.error(f"Ticker info failed: {e}")
             return
 
         if not info or 'shortName' not in info:
@@ -561,8 +603,17 @@ def render_company_details(ticker_str: str):
             if q_fin is None or q_fin.empty: q_fin = tkr.quarterly_income_stmt
         except Exception: q_fin = None
 
-        try: bs = tkr.balance_sheet
-        except Exception: bs = None
+        # 🚀 대차대조표(BS) 이중 호출 로직 추가 (데이터 누락 철벽 방어)
+        bs = None
+        try:
+            bs = tkr.balance_sheet
+            if bs is None or bs.empty:
+                bs = tkr.get_balance_sheet(pretty=True)
+            if bs is None or bs.empty:
+                bs = tkr.get_balance_sheet(pretty=False)
+        except Exception as e:
+            logger.warning(f"Balance sheet load failed: {e}")
+            
         try: cf = tkr.cashflow
         except Exception: cf = None
 
@@ -813,6 +864,7 @@ def render_company_details(ticker_str: str):
     eg        = info.get('earningsGrowth')
     fwd_eps   = info.get('forwardEps')
     
+    # 🚀 PEG 비율 직접 계산 방어 로직
     peg = info.get('pegRatio')
     if peg is None or pd.isna(peg):
         pe_val = f_pe if (f_pe and not pd.isna(f_pe)) else t_pe
@@ -874,35 +926,34 @@ def render_company_details(ticker_str: str):
         """.strip(), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 5️⃣ 재무 건전성 
+    # 5️⃣ 재무 건전성 (🚀 3중 Fallback으로 순자산 강제 표시)
     # ═══════════════════════════════════════════════════
     try:
         curr_d = _get_row(bs, ['Current Debt', 'Current Portion Of Long Term Debt']) or 0
         lt_d   = _get_row(bs, ['Long Term Debt', 'Long Term Debt And Capital Lease Obligation']) or 0
         
-        ta = _get_row(bs, BS_ASSETS_ALIASES) or info.get('totalAssets')
-        tl = _get_row(bs, BS_LIAB_ALIASES)
+        ta = _get_row(bs, BS_ASSETS_ALIASES) or info.get('totalAssets', 0) or 0
+        tl = _get_row(bs, BS_LIAB_ALIASES) or 0
         eq = _get_row(bs, EQ_ALIASES)
         
-        # 총 부채 백업 처리
         info_total_debt = info.get('totalDebt')
         if info_total_debt is None or pd.isna(info_total_debt) or info_total_debt == 0:
-            bs_debt = _get_row(bs, ['Total Debt', 'TotalDebt'])
-            if bs_debt is not None and not pd.isna(bs_debt):
-                info_total_debt = bs_debt
-            else:
-                info_total_debt = (curr_d or 0) + (lt_d or 0)
+            bs_debt = _get_row(bs, DEBT_ALIASES)
+            if bs_debt is not None and not pd.isna(bs_debt): info_total_debt = bs_debt
+            else: info_total_debt = (curr_d or 0) + (lt_d or 0)
         
-        # 순자산(자본) 백업 처리
+        # 🚀 순자산 산출 3단계 로직
         na = None
         if eq is not None and not pd.isna(eq):
             na = eq
-        elif ta is not None and tl is not None:
+        elif ta > 0 and tl > 0:
             na = ta - tl
-        else:
-            bv = info.get('bookValue')
-            shares = info.get('sharesOutstanding')
-            if bv is not None and shares is not None:
+        
+        # 최종 백업: 주당순자산 * 주식수
+        if na is None or na == 0:
+            bv = info.get('bookValue', 0)
+            shares = info.get('sharesOutstanding', 0)
+            if bv and shares:
                 na = bv * shares
 
         na_display = _fmt_num(na) if na is not None else "N/A"
@@ -912,7 +963,8 @@ def render_company_details(ticker_str: str):
         tl_s = _get_row_series(bs, BS_LIAB_ALIASES)
         idx = ta_s.index.intersection(tl_s.index).sort_values(ascending=False)[:4]
         fig5 = _get_plotly_yearly_bar(idx, [ta_s[i] for i in idx], [tl_s[i] for i in idx], "총 자산", "총 부채", "#2196F3", "#FF5722") if len(idx) > 0 else None
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Financial health calc failed: {e}")
         curr_d = lt_d = ta = tl = eq = na = info_total_debt = 0
         fig5 = None
         na_display = "N/A"
@@ -922,6 +974,10 @@ def render_company_details(ticker_str: str):
     dte  = info.get('debtToEquity')
     dt_trend, dt_c = _debt_trend(bs)
     ib_txt, ib_c   = _interest_burden(fin, info)
+
+    # D/E 비율 강제 계산 백업
+    if (dte is None or pd.isna(dte)) and na and na > 0 and info_total_debt and info_total_debt > 0:
+        dte = (info_total_debt / na) * 100
 
     if isinstance(dte, (int, float)):
         if   dte < 50:  dl, dl_c = "낮음 ✅", "green"
@@ -1065,7 +1121,7 @@ def render_company_details(ticker_str: str):
         """.strip(), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 8️⃣ 밸류에이션
+    # 8️⃣ 밸류에이션 (🚀 마크다운 들여쓰기 에러 완벽 해결)
     # ═══════════════════════════════════════════════════
     p_s  = info.get('priceToSalesTrailing12Months')
     p_b  = info.get('priceToBook')
@@ -1096,6 +1152,7 @@ def render_company_details(ticker_str: str):
     pe_src_lbl = f"평균 P/E ≈ {s_pe:.1f} ({pe_source})" if s_pe else "N/A"
 
     with st.container(border=True):
+        # 🚨 들여쓰기 붕괴를 막기 위해 좌측으로 완전히 밀착시켜 작성합니다.
         st.markdown(f"""
 <div class="s-title"><span class="s-num">08</span> 이 종목 비싼가요? <span style="font-size:.8rem;color:#768390">Yahoo</span></div>
 <div class="two-col">
@@ -1251,7 +1308,7 @@ def render_company_details(ticker_str: str):
         st.markdown(_verdict_badge(v10_c, "📌", v10_t), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 1️⃣1️⃣ 옵션 / Max Pain
+    # 1️⃣1️⃣ 옵션 / Max Pain 
     # ═══════════════════════════════════════════════════
     exp, mp, tc, tp, is_vol_weight = _max_pain(tkr)
 
@@ -1399,7 +1456,8 @@ def render_company_details(ticker_str: str):
                 """.strip(), unsafe_allow_html=True)
         else:
             raise ValueError("No news")
-    except Exception:
+    except Exception as e:
+        logger.warning(f"News fetch failed: {e}")
         with st.container(border=True):
             st.markdown("""
 <div class="s-title"><span class="s-num">13</span> 최신 뉴스</div>
@@ -1416,6 +1474,7 @@ def render_company_details(ticker_str: str):
             if   c == "green":  total += 2
             elif c == "yellow": total += 1
             elif c == "blue":   total += 1.5
+            elif c == "red":    total += 0
 
     pct = (total / mx * 100) if mx > 0 else 0
     if   pct >= 75: oc, oe, ot = "#00E676", "🟢", "매우 양호"
@@ -1443,6 +1502,7 @@ def render_company_details(ticker_str: str):
         """.strip(), unsafe_allow_html=True)
 
     st.caption("⚠️ 본 분석은 참고용 지표이며 어떠한 경우에도 투자 조언이 아닙니다. 투자에 대한 최종 결정은 본인의 판단과 책임 하에 이루어져야 합니다.")
+
 
 # ═══════════════════════════════════════════════════════════════
 # ▶️ 실행
