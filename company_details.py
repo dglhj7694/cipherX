@@ -330,7 +330,8 @@ def _margin_trend(fin):
         if l_m > f_m + 0.02: return f"증가 추세 📈 ({f_m * 100:.1f}% → {l_m * 100:.1f}%)", margins, "green"
         if l_m < f_m - 0.02: return f"감소 추세 📉 ({f_m * 100:.1f}% → {l_m * 100:.1f}%)", margins, "red"
         return f"유지 ➡️ ({l_m * 100:.1f}%)", margins, "yellow"
-    except Exception: return "N/A", [], "gray"
+    except Exception:
+        return "N/A", [], "gray"
 
 def _growth_accel(fin, rc):
     vals, _ = _annual_values(fin, rc)
@@ -366,7 +367,8 @@ def _interest_burden(fin, info):
     interest = _get_row(fin, ['Interest Expense', 'Interest Expense Non Operating'])
     
     if ebit is not None and interest is not None and abs(interest) > 0:
-        if ebit < 0: return "위험 ❌ (영업적자로 이자 지급 불가)", "red"
+        if ebit < 0:
+            return "위험 ❌ (영업적자로 이자 지급 불가)", "red"
         icr = abs(ebit / interest)
         src = "SEC 실제"
         if   icr > 10: return f"매우 낮음 ✅ (ICR {icr:.1f}x, {src})", "green"
@@ -377,7 +379,8 @@ def _interest_burden(fin, info):
     ebitda = info.get('ebitda', 0) or 0
     debt = info.get('totalDebt', 0) or 0
     if ebitda is not None and debt is not None and debt > 0:
-        if ebitda < 0: return "위험 ❌ (EBITDA 적자)", "red"
+        if ebitda < 0:
+            return "위험 ❌ (EBITDA 적자)", "red"
         est_rate = 0.05
         cov = ebitda / (debt * est_rate)
         src = f"추정, 이자율 {est_rate * 100:.0f}% 가정"
@@ -409,12 +412,14 @@ def _max_pain(tkr):
         for col in ['openInterest', 'volume']:
             if col not in c.columns: c[col] = 0
             if col not in p.columns: p[col] = 0
-            c[col], p[col] = c[col].fillna(0), p[col].fillna(0)
+            c[col] = c[col].fillna(0)
+            p[col] = p[col].fillna(0)
             
         c_oi_sum = c['openInterest'].sum()
         p_oi_sum = p['openInterest'].sum()
         
         is_vol_weight = False
+        
         if c_oi_sum == 0 or p_oi_sum == 0 or (c_oi_sum / max(p_oi_sum, 1) < 0.02) or (p_oi_sum / max(c_oi_sum, 1) < 0.02):
             weight_c = c['volume']
             weight_p = p['volume']
@@ -447,6 +452,7 @@ def _sector_pe_live(sector):
         "Industrials": "XLI", "Communication Services": "XLC",
         "Utilities": "XLU", "Real Estate": "XLRE", "Basic Materials": "XLB",
     }.get(sector)
+    
     if etf:
         try:
             pe = yf.Ticker(etf).info.get('trailingPE')
@@ -463,7 +469,7 @@ def _sector_pe_live(sector):
 
 
 # ═══════════════════════════════════════════════════════════════
-# 🎨 CSS
+# 🎨 CSS (🚀 UI 개선: 카드 입체감 & 선명도 완벽 세팅)
 # ═══════════════════════════════════════════════════════════════
 
 CSS = """
@@ -799,6 +805,8 @@ def render_company_details(ticker_str: str):
     # ═══════════════════════════════════════════════════
     # 4️⃣ 성장 가능성 
     # ═══════════════════════════════════════════════════
+    t_pe = info.get('trailingPE')
+    f_pe = info.get('forwardPE')
     payout    = info.get('payoutRatio', 0) or 0
     retention = max(0, 1 - payout)
     roe_v     = info.get('returnOnEquity', 0) or 0
@@ -806,14 +814,17 @@ def render_company_details(ticker_str: str):
     eg        = info.get('earningsGrowth')
     fwd_eps   = info.get('forwardEps')
     
+    # 🚀 PEG 비율 계산 방어 로직 (N/A 원천 봉쇄)
     peg = info.get('pegRatio')
     if peg is None or pd.isna(peg):
-        t_pe_val = info.get('trailingPE')
-        if t_pe_val and eg and eg > 0:
-            peg = t_pe_val / (eg * 100)
-        elif t_pe_val and isinstance(cagr_ni, float) and cagr_ni > 0:
-            peg = t_pe_val / (cagr_ni * 100)
-            
+        pe_val = f_pe if (f_pe and not pd.isna(f_pe)) else t_pe
+        growth_val = eg
+        if (growth_val is None or growth_val <= 0) and isinstance(cagr_eps, float) and cagr_eps > 0: growth_val = cagr_eps
+        if (growth_val is None or growth_val <= 0) and isinstance(cagr_ni, float) and cagr_ni > 0: growth_val = cagr_ni
+        
+        if pe_val and growth_val and growth_val > 0:
+            peg = pe_val / (growth_val * 100)
+
     if peg and not pd.isna(peg):
         if peg < 0.5:
             peg_txt = f"{peg:.2f} (매우 저평가)"
@@ -857,7 +868,7 @@ def render_company_details(ticker_str: str):
                 <div class="note-box">
                     💡 <b>지속가능 성장률(g)</b> = ROE × 유보율. 외부 자금 없이 달성 가능한 이론적 최대 성장률.<br>
                     💡 <b>PEG (주가수익성장비율)</b> = P/E Ratio ÷ 이익 성장률<br>
-                    • <b>PEG &lt; 0.5</b> : 매우 저평가 &nbsp; • <b>0.5 ~ 1.5</b> : 적정 가치 &nbsp; • <b>PEG &gt; 1.5</b> : 고평가
+                    &nbsp;&nbsp;• <b>PEG &lt; 0.5</b> : 매우 저평가 &nbsp; • <b>0.5 ~ 1.5</b> : 적정 가치 &nbsp; • <b>PEG &gt; 1.5</b> : 고평가
                 </div>
             </div>
         </div>
@@ -880,6 +891,15 @@ def render_company_details(ticker_str: str):
         if tl == 0 and ta > 0 and eq > 0: tl = ta - eq
         na = eq if eq > 0 else (ta - tl) 
         
+        # 🚀 신규 백업 로직: 순자산(na)이 0일 경우 BookValue * Shares 로 계산
+        if na == 0:
+            bv = info.get('bookValue', 0)
+            shares = info.get('sharesOutstanding', 0)
+            if bv and shares:
+                na = bv * shares
+
+        na_display = _fmt_num(na) if na != 0 else "N/A"
+        
         ta_s = _get_row_series(bs, BS_ASSETS_ALIASES)
         tl_s = _get_row_series(bs, BS_LIAB_ALIASES)
         idx = ta_s.index.intersection(tl_s.index).sort_values(ascending=False)[:4]
@@ -887,6 +907,7 @@ def render_company_details(ticker_str: str):
     except Exception:
         curr_d = lt_d = ta = tl = eq = na = info_total_debt = 0
         fig5 = None
+        na_display = "N/A"
 
     cash = info.get('totalCash', 0) or 0
     dte  = info.get('debtToEquity')
@@ -915,7 +936,7 @@ def render_company_details(ticker_str: str):
             with col1:
                 st.markdown(f"""
                 {_metric_row("💵 보유 현금", _fmt_num(cash), "m-value m-green m-big")}
-                {_metric_row("순 자산 (자본)", _fmt_num(na), "m-green" if na > 0 else "m-red")}
+                {_metric_row("순 자산 (자본)", na_display, "m-green" if na > 0 else "m-red")}
                 <div class="divider"></div>
                 {_metric_row("총 부채", _fmt_num(info_total_debt), "m-value")}
                 {_metric_row("부채 수준 (D/E)", dl)}
@@ -931,7 +952,7 @@ def render_company_details(ticker_str: str):
             <div class="two-col">
                 <div>
                     {_metric_row("💵 보유 현금", _fmt_num(cash), "m-value m-green m-big")}
-                    {_metric_row("순 자산 (자본)", _fmt_num(na), "m-green" if na > 0 else "m-red")}
+                    {_metric_row("순 자산 (자본)", na_display, "m-green" if na > 0 else "m-red")}
                     {_metric_row("총 부채", _fmt_num(info_total_debt), "m-value")}
                     {_metric_row("부채 수준 (D/E)", dl)}
                 </div>
@@ -1000,9 +1021,7 @@ def render_company_details(ticker_str: str):
         bl, bc = "N/A", "gray"
     all_verdicts.append(("변동성", bc))
 
-    w52h = info.get('fiftyTwoWeekHigh')
-    w52l = info.get('fiftyTwoWeekLow')
-    w52c = info.get('52WeekChange')
+    w52h, w52l, w52c = info.get('fiftyTwoWeekHigh'), info.get('fiftyTwoWeekLow'), info.get('52WeekChange')
 
     if price and w52h and w52l and w52h != w52l:
         pos52 = max(0, min(100, (price - w52l) / (w52h - w52l) * 100))
@@ -1039,8 +1058,6 @@ def render_company_details(ticker_str: str):
     # ═══════════════════════════════════════════════════
     # 8️⃣ 밸류에이션
     # ═══════════════════════════════════════════════════
-    t_pe = info.get('trailingPE')
-    f_pe = info.get('forwardPE')
     p_s  = info.get('priceToSalesTrailing12Months')
     p_b  = info.get('priceToBook')
     
@@ -1079,8 +1096,8 @@ def render_company_details(ticker_str: str):
         <div class="s-title"><span class="s-num">08</span> 이 종목 비싼가요? <span style="font-size:.8rem;color:#768390">Yahoo</span></div>
         <div class="two-col">
             <div>
-                {_metric_row("Trailing P/E <span style='font-size:0.75rem;color:#768390;margin-left:4px'>(현재가÷TTM EPS)</span>", f"{t_pe:.2f}" if isinstance(t_pe, (int, float)) else "N/A")}
-                {_metric_row("Forward P/E <span style='font-size:0.75rem;color:#768390;margin-left:4px'>(현재가÷Fwd EPS)</span>", f"{f_pe:.2f}" if isinstance(f_pe, (int, float)) else "N/A")}
+                {_metric_row("Trailing P/E <span style='font-size:0.75rem;color:#768390;margin-left:4px'>(현재가÷과거EPS)</span>", f"{t_pe:.2f}" if isinstance(t_pe, (int, float)) else "N/A")}
+                {_metric_row("Forward P/E <span style='font-size:0.75rem;color:#768390;margin-left:4px'>(현재가÷예상EPS)</span>", f"{f_pe:.2f}" if isinstance(f_pe, (int, float)) else "N/A")}
                 {_metric_row("P/S (TTM)", f"{p_s:.2f}" if isinstance(p_s, (int, float)) else "N/A")}
                 {_metric_row("P/B", f"{p_b:.2f}" if isinstance(p_b, (int, float)) else "N/A")}
                 <div class="divider"></div>
