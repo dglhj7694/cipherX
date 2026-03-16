@@ -37,7 +37,6 @@ div[data-testid="stCodeBlock"] span[style*="color: rgb(0, 0, 0)"],
 div[data-testid="stCodeBlock"] span[style*="color: black"],
 div[data-testid="stCodeBlock"] code>span:not([class]){color:#FAFAFA!important}
 div[data-testid="stChatMessage"]:nth-child(even){background-color:#161A22;border-radius:12px;padding:5px 15px}
-header{visibility:hidden}
 .block-container{padding-top:1rem!important;max-width:950px}
 div.stButton>button[kind="primary"]{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%)!important;
 color:white!important;border:none!important;border-radius:12px!important;padding:.6rem 1.5rem!important;
@@ -51,6 +50,17 @@ div.stButton>button[kind="secondary"]:hover{border-color:#667eea!important;color
 .streamlit-expanderHeader p{color:#414df2!important}
 div[data-testid="stExpander"]{border:1px solid #2D333B!important;border-radius:10px!important;background-color:#161A22}
 
+/* 헤더 배경은 투명하게 처리하되 버튼은 살려둠 */
+header {
+    background-color: transparent !important;
+}
+
+/* 닫힌 사이드바를 여는 화살표 버튼 강제 노출 및 최상단 배치 */
+div[data-testid="collapsedControl"] {
+    display: flex !important;
+    z-index: 999999 !important;
+}
+            
 /* ✅ 개선1: 사이드바 토글 버튼 스타일 */
 section[data-testid="stSidebar"]{background-color:#0A0D12;border-right:1px solid #1E2127}
 section[data-testid="stSidebar"] .stMarkdown p{color:#AAA!important}
