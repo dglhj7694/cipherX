@@ -656,6 +656,22 @@ def detect_all_signals(df):
     df['_HTF1_Bull'],df['_HTF2_Bull']=htf1,htf2
     return df
 
+# ──────────────────────────────────────────
+# 통합 분석 로직 (복원 완료 🚀)
+# ──────────────────────────────────────────
+def analyze(ticker,chart_days=252,refresh=False):
+    try:
+        ts=int(time.time()) if refresh else None
+        df=compute_and_cache(ticker,ts)
+        if df is None or df.empty: return None,"주가 데이터 없음",None
+        dv=df.dropna(subset=['WT1','WT2']); dc=dv.tail(chart_days).copy()
+        if dc.empty: return None,"차트 데이터 부족",None
+        meta,regime,shield=build_metadata(dc,dv,ticker)
+        fig=build_chart(dc,ticker,regime,shield)
+        return fig,build_prompt_text(dc,meta),meta
+    except Exception as e:
+        return None,f"로딩 실패:{e}",None
+
 def build_speedometer_gauges(meta):
     conf_score = meta.get('confluence_score', 0)
     bias_score = meta.get('bias_score', 0)
@@ -914,7 +930,6 @@ def build_metadata(dc,dv,ticker):
         'macd_hist':float(lat.get('MACD_Hist',0)),
     },regime,shield_str
 
-# 🚀 3. AI 프롬프트도 10일에서 5일 통계를 참조하도록 수정
 def build_prompt_text(dc,meta):
     lat=dc.iloc[-1]; rd=dc.tail(60)
     ps=", ".join([f"'{d.strftime('%Y-%m-%d')}:{r['Close']:.2f}'" for d,r in rd.iterrows()])
@@ -1061,8 +1076,18 @@ def build_ai_prompt(ticker,phist,fundamentals):
 """
 
 # ──────────────────────────────────────────
-# UI 렌더
+# UI 렌더 부속 (복원 완료 🚀)
 # ──────────────────────────────────────────
+_IT={'wt1':[(-53,'극과매도'),(-20,'과매도'),(20,'중립'),(53,'과매수'),(999,'극과매수')],
+     'rsi':[(30,'과매도'),(45,'약세'),(55,'중립'),(70,'강세'),(999,'과매수')],
+     'mfi':[(30,'과매도'),(45,'약세'),(55,'중립'),(70,'강세'),(999,'과매수')],
+     'stochk':[(20,'바닥'),(80,''),(999,'천장')]}
+
+def _il(n,v):
+    for t,l in _IT.get(n,[]):
+        if v<=t: return l
+    return ''
+
 def render_price_header(m):
     chg=m['price_change']; cp=m['price_change_pct']
     cc='price-change-up' if chg>=0 else 'price-change-down'
@@ -1071,7 +1096,6 @@ def render_price_header(m):
     cv=m.get('confluence_score',0); sd=m.get('supertrend_dir',0)
     sh=m.get('shield_status',''); mh_val=m.get('macd_hist',0)
     
-    def _il(n,v): return next((l for t,l in _IT.get(n,[]) if v<=t), '')
     specs=[(_cls(m['wt1'],-20,20),f"WT:{m['wt1']:.0f} {_il('wt1',m['wt1'])}"),
         (_cls(m['rsi'],40,60),f"RSI:{m['rsi']:.0f} {_il('rsi',m['rsi'])}"),
         (_cls(m['mfi'],40,60),f"MFI:{m['mfi']:.0f} {_il('mfi',m['mfi'])}"),
@@ -1152,7 +1176,7 @@ def render_signals(m):
             sh=""
             for sn,sv in alls.items():
                 if ALL_CHART_SIGNALS.get(sn,{}).get('label')==l:
-                    wr=sv.get('5d_winrate') # 🚀 5d 지표 참조
+                    wr=sv.get('5d_winrate')
                     if wr is not None: sh=f" ({wr:.0f}%)"
                     break
             parts.append(f'<span class="indicator-mini {cn}">{i} {l}{sh}</span>')
@@ -1162,7 +1186,6 @@ def render_signals(m):
                 <span style="color:#888;font-size:.75rem">{len(group)}개</span></div>
             <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">{" ".join(parts)}</div></div>""",unsafe_allow_html=True)
 
-# 🚀 4. 수정된 백테스트 결과 렌더링 (하락/상승 명확히 구분)
 def render_stats(m):
     with st.expander("📊 백테스트 (2년, 진입: 시그널 다음날 시가, 청산: 5일 후 종가)",expanded=True):
         alls=m.get('all_signal_stats',{})
@@ -1177,7 +1200,6 @@ def render_stats(m):
                 c='#00E676' if wr>50 else ('#FFC107' if wr>40 else '#FF1744')
                 lb=f"승률 <span style='color:{c}'>**{wr:.0f}%**</span>"
                 
-                # 💡 매도(Sell) 포지션은 평균이 마이너스(-)여야 성공적인 하락을 의미합니다.
                 if is_sell:
                     av_c = '#00E676' if av < 0 else '#FF1744'
                     av_text = f"<span style='color:{av_c}'>**{abs(av):.1f}% 하락**</span>" if av < 0 else f"<span style='color:{av_c}'>**{av:+.1f}% 상승(실패)**</span>"
