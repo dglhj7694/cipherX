@@ -1253,7 +1253,7 @@ with st.sidebar:
     st.markdown("<p style='color:#888;font-size:.8rem'>AI 퀀트 주가 분석 · MCB+ v8.5</p>",unsafe_allow_html=True)
     st.markdown("---")
     st.markdown("### 📅 차트 기간")
-    chart_period=st.radio("표시 기간",['3개월','6개월','1년','2년'],index=2,horizontal=True,key="period")
+    chart_period=st.radio("표시 기간",['3개월','6개월','1년','2년'],index=0,horizontal=True,key="period")
     chart_days={'3개월':63,'6개월':126,'1년':252,'2년':504}[chart_period]
     st.markdown("---")
     with st.expander("🎛️ 시그널 활성화 필터",expanded=False):
