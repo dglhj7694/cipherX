@@ -161,7 +161,6 @@ def _score_dot_row(items):
 # ── 분석 함수들 ─────────────────────────────────────────
 
 def _growth_stage(info, fin, bs, cf):
-    # revenueGrowth는 Yahoo 기준 분기 YoY — 임계값에 주의
     rev_g  = info.get('revenueGrowth', 0) or 0
     margin = info.get('profitMargins', 0) or 0
     rev    = info.get('totalRevenue', 0) or 0
@@ -301,19 +300,28 @@ def _debt_trend(bs):
     return "데이터 부족", "gray"
 
 
+# 🚀 수정 1: 이자보상배율 적자 엣지케이스(Negative EBIT) 완벽 방어
 def _interest_burden(fin, info):
     ebit = _get_row(fin, ['EBIT', 'Operating Income'])
     interest = _get_row(fin, ['Interest Expense', 'Interest Expense Non Operating'])
-    if ebit and interest and abs(interest) > 0:
+    
+    if ebit is not None and interest is not None and abs(interest) > 0:
+        if ebit < 0:
+            return "위험 ❌ (영업적자로 이자 지급 불가)", "red"
+        
         icr = abs(ebit / interest)
         src = "SEC 실제"
         if   icr > 10: return f"매우 낮음 ✅ (ICR {icr:.1f}x, {src})", "green"
         elif icr >  5: return f"낮음 ✅ (ICR {icr:.1f}x, {src})", "green"
         elif icr >  2: return f"보통 ⚠️ (ICR {icr:.1f}x, {src})", "yellow"
         else:          return f"높음 ❌ (ICR {icr:.1f}x, {src})", "red"
+        
     ebitda = info.get('ebitda', 0) or 0
     debt = info.get('totalDebt', 0) or 0
-    if ebitda > 0 and debt > 0:
+    if ebitda is not None and debt is not None and debt > 0:
+        if ebitda < 0:
+            return "위험 ❌ (EBITDA 적자)", "red"
+            
         est_rate = 0.05
         cov = ebitda / (debt * est_rate)
         src = f"추정, 이자율 {est_rate * 100:.0f}% 가정"
@@ -321,6 +329,7 @@ def _interest_burden(fin, info):
         elif cov >  5: return f"낮음 ✅ ({cov:.1f}x, {src})", "green"
         elif cov >  2: return f"보통 ⚠️ ({cov:.1f}x, {src})", "yellow"
         else:          return f"높음 ❌ ({cov:.1f}x, {src})", "red"
+        
     return "N/A", "gray"
 
 
@@ -338,13 +347,17 @@ def _vol_trend(info):
 
 
 def _max_pain(tkr):
+    """옵션 Max-Pain 계산 (데이터 누락 방어 로직 탑재)"""
     try:
         dates = tkr.options
         if not dates:
             return None, None, None, None
-        exp = dates[0]
+            
+        exp = dates[0]  # 가장 가까운 만기일
         o = tkr.option_chain(exp)
         c, p = o.calls.copy(), o.puts.copy()
+        
+        # 1. 컬럼이 없거나 NaN인 경우 0으로 초기화
         for col in ['openInterest', 'volume']:
             if col not in c.columns:
                 c[col] = 0
@@ -352,18 +365,37 @@ def _max_pain(tkr):
                 p[col] = 0
             c[col] = c[col].fillna(0)
             p[col] = p[col].fillna(0)
+
+        # 🚀 2. 핵심 방어 로직: Open Interest가 통째로 누락되었는지 확인
+        total_oi = c['openInterest'].sum() + p['openInterest'].sum()
+        
+        # 미결제약정 총합이 너무 적으면(야후 API 오류 시), 차선책으로 '거래량(volume)'을 사용
+        weight_col = 'volume' if total_oi < 10 else 'openInterest'
+        
+        # 대체 후에도 가중치 데이터가 아예 없으면 계산 포기
+        if c[weight_col].sum() + p[weight_col].sum() == 0:
+            return exp, None, [], []
+
+        # 3. Max Pain 계산 루프 (월스트리트 표준)
         strikes = sorted(set(c['strike']).union(set(p['strike'])))
         pain = {}
         for s in strikes:
-            pain[s] = (np.sum(c['openInterest'] * np.maximum(0, s - c['strike']))
-                       + np.sum(p['openInterest'] * np.maximum(0, p['strike'] - s)))
+            # 가상 만기 주가가 s일 때, 옵션 매도자의 고통(손실액) 합산
+            call_pain = np.sum(c[weight_col] * np.maximum(0, s - c['strike']))
+            put_pain  = np.sum(p[weight_col] * np.maximum(0, p['strike'] - s))
+            pain[s] = call_pain + put_pain
+
+        # 4. 고통이 가장 작은 가격 추출
         mp = min(pain, key=pain.get) if pain else None
+
+        # 5. 거래량 Top 3 추출
         tc = c.nlargest(3, 'volume')[['strike', 'volume']].to_dict('records')
         tp = p.nlargest(3, 'volume')[['strike', 'volume']].to_dict('records')
+        
         return exp, mp, tc, tp
+        
     except Exception:
         return None, None, None, None
-
 
 # ── 섹터 P/E ───────────────────────────────────────────
 
@@ -789,7 +821,7 @@ def render_company_details(ticker_str: str):
         dl, dl_c = "N/A", "gray"
 
     hs = sum(1 for x in [dl_c == "green", dt_c == "green", ib_c == "green",
-                          cash > tl * 0.2 if tl else False] if x)
+                         cash > tl * 0.2 if tl else False] if x)
     if   hs >= 3: v5_c, v5_t = "green",  "💪 재무 건전 — 낮은 부채, 충분한 현금"
     elif hs >= 2: v5_c, v5_t = "yellow", "⚠️ 보통 — 부채 관리 모니터링 필요"
     else:         v5_c, v5_t = "red",    "❌ 주의 — 부채 높거나 현금 부족"
@@ -984,7 +1016,7 @@ def render_company_details(ticker_str: str):
         <div class="s-title"><span class="s-num">08</span> 이 종목 비싼가요? <span style="font-size:.75rem;color:#6e7681">Yahoo</span></div>
         <div class="two-col">
             <div>
-                {_metric_row("Trailing P/E", f"{t_pe:.2f}" if isinstance(t_pe, (int, float)) else "N/A")}
+                {_metric_row("Trailing P/E (주가수익비율)", f"{t_pe:.2f}" if isinstance(t_pe, (int, float)) else "N/A")}
                 {_metric_row("Forward P/E", f"{f_pe:.2f}" if isinstance(f_pe, (int, float)) else "N/A")}
                 {_metric_row("P/S (TTM)", f"{p_s:.2f}" if isinstance(p_s, (int, float)) else "N/A")}
                 {_metric_row("P/B", f"{p_b:.2f}" if isinstance(p_b, (int, float)) else "N/A")}
@@ -1036,6 +1068,7 @@ def render_company_details(ticker_str: str):
         up_pct, up_str = 0, "N/A"
 
     target_bar = ""
+    # 🚀 수정 3: 최고/최저 목표가가 같은 경우 Division Error 방지
     if t_low and t_high and t_median and price and t_high > t_low:
         rng = t_high - t_low
         curr_pos = max(0, min(100, (price - t_low) / rng * 100))
@@ -1272,14 +1305,16 @@ def render_company_details(ticker_str: str):
         </div>""", unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 📋 종합 점수
+    # 🚀 📋 종합 점수 (오류 수정 완벽 패치)
     # ═══════════════════════════════════════════════════
     total, mx = 0, 0
     for _, c in all_verdicts:
-        mx += 2
-        if   c == "green":  total += 2
-        elif c == "yellow": total += 1
-        elif c == "blue":   total += 1.5
+        # 🚀 수정 2: 데이터가 없는 경우("gray")는 아예 분모(mx)에서 뺌!
+        if c != "gray":
+            mx += 2
+            if   c == "green":  total += 2
+            elif c == "yellow": total += 1
+            elif c == "blue":   total += 1.5
 
     pct = (total / mx * 100) if mx > 0 else 0
     if   pct >= 75: oc, oe, ot = "#00E676", "🟢", "매우 양호"
@@ -1302,7 +1337,7 @@ def render_company_details(ticker_str: str):
         </div>
         <div style="margin-top:18px">{dots}</div>
         <div class="note-box" style="margin-top:12px;text-align:center">
-            12개 분석 항목(🟢=2점, 🟡=1점, 🔵=1.5점, 🔴=0점) 기반 종합 점수입니다.
+            12개 분석 항목(🟢=2점, 🔵=1.5점, 🟡=1점, 🔴=0점) 기반 종합 점수입니다. (데이터 누락 항목 제외)
         </div>
     </div>""", unsafe_allow_html=True)
 
