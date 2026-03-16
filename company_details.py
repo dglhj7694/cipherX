@@ -129,14 +129,6 @@ def _metric_row(label, value, value_class="m-value"):
     return (f'<div class="m-row"><span class="m-label">{label}</span>'
             f'<span class="{value_class}">{value}</span></div>')
 
-# 🚀 누락되었던 게이지 바 함수 복구!
-def _gauge_bar(pct, color="#00E676", height=8):
-    pct = max(0, min(100, pct))
-    return (f'<div style="background:rgba(255,255,255,0.1);border-radius:{height}px;'
-            f'height:{height}px;overflow:hidden;margin:6px 0">'
-            f'<div style="width:{pct:.1f}%;height:100%;background:{color};'
-            f'border-radius:{height}px;transition:width .8s"></div></div>')
-
 def _traffic_light(status):
     m = {"green": "🟢", "yellow": "🟡", "red": "🔴", "blue": "🔵", "gray": "⚪"}
     return m.get(status, "⚪")
@@ -415,6 +407,7 @@ def _max_pain(tkr):
         p_oi_sum = p['openInterest'].sum()
         
         is_vol_weight = False
+        
         if c_oi_sum == 0 or p_oi_sum == 0 or (c_oi_sum / max(p_oi_sum, 1) < 0.02) or (p_oi_sum / max(c_oi_sum, 1) < 0.02):
             weight_c = c['volume']
             weight_p = p['volume']
@@ -447,6 +440,7 @@ def _sector_pe_live(sector):
         "Industrials": "XLI", "Communication Services": "XLC",
         "Utilities": "XLU", "Real Estate": "XLRE", "Basic Materials": "XLB",
     }.get(sector)
+    
     if etf:
         try:
             pe = yf.Ticker(etf).info.get('trailingPE')
@@ -463,7 +457,7 @@ def _sector_pe_live(sector):
 
 
 # ═══════════════════════════════════════════════════════════════
-# 🎨 CSS
+# 🎨 CSS (UI 개선: 카드 입체감 & 선명도 완벽 세팅)
 # ═══════════════════════════════════════════════════════════════
 
 CSS = """
@@ -576,6 +570,7 @@ def render_company_details(ticker_str: str):
         cagr_ni,  yr_ni  = _calc_cagr_with_years(fin, NI_ALIASES)
         cagr_eps, yr_eps = _calc_cagr_with_years(fin, EPS_ALIASES)
 
+        # 🚀 연간 매출 성장 직접 계산
         ann_rev_g = "N/A"
         try:
             rv_ann, _ = _annual_values(fin, REV_ALIASES)
@@ -597,17 +592,18 @@ def render_company_details(ticker_str: str):
     # ═══════════════════════════════════════════════════
     name_safe = _esc(info.get('shortName', ticker_str))
     st.markdown(f"""
-    <div class="header-wrap">
-        <div>
-            <span style="font-size:1.8rem;font-weight:900;color:#ffffff">🏢 {name_safe}</span>
-            <span style="font-size:1.1rem;color:#adbac7;margin-left:8px;font-weight:800">({_esc(ticker_str)})</span><br>
-            <span style="font-size:.9rem;color:#8b949e;font-weight:700">{_esc(sector)} · {_esc(industry)}</span>
-        </div>
-        <div style="text-align:right">
-            <span style="font-size:2.2rem;font-weight:900;color:{chg_c}">${price:,.2f}</span><br>
-            <span style="font-size:1.1rem;font-weight:800;color:{chg_c}">{chg_s}{day_chg:.2f}% 오늘</span>
-        </div>
-    </div>""", unsafe_allow_html=True)
+<div class="header-wrap">
+    <div>
+        <span style="font-size:1.8rem;font-weight:900;color:#ffffff">🏢 {name_safe}</span>
+        <span style="font-size:1.1rem;color:#adbac7;margin-left:8px;font-weight:800">({_esc(ticker_str)})</span><br>
+        <span style="font-size:.9rem;color:#8b949e;font-weight:700">{_esc(sector)} · {_esc(industry)}</span>
+    </div>
+    <div style="text-align:right">
+        <span style="font-size:2.2rem;font-weight:900;color:{chg_c}">${price:,.2f}</span><br>
+        <span style="font-size:1.1rem;font-weight:800;color:{chg_c}">{chg_s}{day_chg:.2f}% 오늘</span>
+    </div>
+</div>
+    """.strip(), unsafe_allow_html=True)
 
     all_verdicts = []
 
@@ -640,29 +636,29 @@ def render_company_details(ticker_str: str):
 
     with st.container(border=True):
         st.markdown(f"""
-        <div class="s-title"><span class="s-num">01</span> 이 회사, 지금 어느 단계인가요?</div>
-        <div style="display:flex;gap:3px;margin-bottom:24px">{bar_html}</div>
-        <div style="text-align:center;margin:20px 0">
-            <span style="display:inline-block;padding:12px 32px;border-radius:24px;
-                         font-weight:800;background:{scolor};color:#fff;font-size:1.2rem;
-                         box-shadow:0 6px 20px {scolor}66">{sname}</span>
-            <div style="font-size:1rem;color:#e6edf3;font-weight:700;margin-top:16px;line-height:1.7">{sdesc}</div>
-        </div>
-        <div class="divider"></div>
-        <div class="two-col">
-            <div>
-                {_metric_row("최근 연간 매출성장 (YoY)", _fmt_pct(ann_rev_g))}
-                {_metric_row("최근 분기 매출성장 (YoY)", _fmt_pct(yoy_q_rev_g))}
-                {_metric_row("직전 분기 대비 성장 (QoQ)", _fmt_pct(qoq_rev_g))}
-            </div>
-            <div>
-                {_metric_row("순이익률", _fmt_pct(info.get('profitMargins')))}
-                {_metric_row("ROE", _fmt_pct(info.get('returnOnEquity')))}
-                {_metric_row("배당수익률", _fmt_pct(info.get('dividendYield')))}
-            </div>
-        </div>
-        {_verdict_badge(v1_c, "📌", f"종합: {v1_map.get(sn, '')}")}
-        """, unsafe_allow_html=True)
+<div class="s-title"><span class="s-num">01</span> 이 회사, 지금 어느 단계인가요?</div>
+<div style="display:flex;gap:3px;margin-bottom:24px">{bar_html}</div>
+<div style="text-align:center;margin:20px 0">
+    <span style="display:inline-block;padding:12px 32px;border-radius:24px;
+                 font-weight:800;background:{scolor};color:#fff;font-size:1.2rem;
+                 box-shadow:0 6px 20px {scolor}66">{sname}</span>
+    <div style="font-size:1rem;color:#e6edf3;font-weight:700;margin-top:16px;line-height:1.7">{sdesc}</div>
+</div>
+<div class="divider"></div>
+<div class="two-col">
+    <div>
+        {_metric_row("최근 연간 매출성장 (YoY)", _fmt_pct(ann_rev_g))}
+        {_metric_row("최근 분기 매출성장 (YoY)", _fmt_pct(yoy_q_rev_g))}
+        {_metric_row("직전 분기 대비 성장 (QoQ)", _fmt_pct(qoq_rev_g))}
+    </div>
+    <div>
+        {_metric_row("순이익률", _fmt_pct(info.get('profitMargins')))}
+        {_metric_row("ROE", _fmt_pct(info.get('returnOnEquity')))}
+        {_metric_row("배당수익률", _fmt_pct(info.get('dividendYield')))}
+    </div>
+</div>
+{_verdict_badge(v1_c, "📌", f"종합: {v1_map.get(sn, '')}")}
+        """.strip(), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
     # 2️⃣ 돈을 잘 버는 회사인가요?
@@ -699,42 +695,42 @@ def render_company_details(ticker_str: str):
 
     with st.container(border=True):
         st.markdown(f"""
-        <div class="s-title"><span class="s-num">02</span> 돈을 잘 버는 회사인가요? <span style="font-size:.8rem;color:#768390">SEC 데이터</span></div>
-        <div class="two-col">
-            <div>
-                {_metric_row("시가총액", _fmt_num(mcap), "m-value m-big")}
-                {_metric_row("TTM EPS (주당순이익)", f"${_safe(ttm_eps)}")}
-                {_metric_row("최근 12개월 매출", _fmt_num(ttm_rev))}
-                {_metric_row("최근 12개월 순이익", _fmt_num(ttm_ni), ni_cls)}
-            </div>
-            <div>
-                <div style="margin-bottom:16px">
-                    <div style="display:flex;justify-content:space-between;font-size:.95rem">
-                        <span style="color:#adbac7;font-weight:700">총이익률 (Gross)</span>
-                        <span style="color:#ffffff;font-weight:800">{_fmt_pct(gross_m)}</span>
-                    </div>{gm_gauge}
-                </div>
-                <div style="margin-bottom:16px">
-                    <div style="display:flex;justify-content:space-between;font-size:.95rem">
-                        <span style="color:#adbac7;font-weight:700">순이익률 (Net)</span>
-                        <span style="color:#ffffff;font-weight:800">{_fmt_pct(net_m)}</span>
-                    </div>{nm_gauge}
-                </div>
-            </div>
+<div class="s-title"><span class="s-num">02</span> 돈을 잘 버는 회사인가요? <span style="font-size:.8rem;color:#768390">SEC 데이터</span></div>
+<div class="two-col">
+    <div>
+        {_metric_row("시가총액", _fmt_num(mcap), "m-value m-big")}
+        {_metric_row("TTM EPS (주당순이익)", f"${_safe(ttm_eps)}")}
+        {_metric_row("최근 12개월 매출", _fmt_num(ttm_rev))}
+        {_metric_row("최근 12개월 순이익", _fmt_num(ttm_ni), ni_cls)}
+    </div>
+    <div>
+        <div style="margin-bottom:16px">
+            <div style="display:flex;justify-content:space-between;font-size:.95rem">
+                <span style="color:#adbac7;font-weight:700">총이익률 (Gross)</span>
+                <span style="color:#ffffff;font-weight:800">{_fmt_pct(gross_m)}</span>
+            </div>{gm_gauge}
         </div>
-        <div class="divider"></div>
-        <div class="two-col">
-            <div>
-                {_metric_row(rev_lbl, _fmt_cagr(cagr_rev), cr_cls(cagr_rev))}
-                {_metric_row(ni_lbl, _fmt_cagr(cagr_ni), cr_cls(cagr_ni))}
-            </div>
-            <div>
-                {_metric_row(eps_lbl, _fmt_cagr(cagr_eps), cr_cls(cagr_eps))}
-                <div class="note-box">※ 이익이 적자(-)에서 시작된 경우 수학적 한계로 비율(%) 대신 방향성 텍스트로 대체 표기합니다.</div>
-            </div>
+        <div style="margin-bottom:16px">
+            <div style="display:flex;justify-content:space-between;font-size:.95rem">
+                <span style="color:#adbac7;font-weight:700">순이익률 (Net)</span>
+                <span style="color:#ffffff;font-weight:800">{_fmt_pct(net_m)}</span>
+            </div>{nm_gauge}
         </div>
-        {_verdict_badge(v2_c, "📌", v2_t)}
-        """, unsafe_allow_html=True)
+    </div>
+</div>
+<div class="divider"></div>
+<div class="two-col">
+    <div>
+        {_metric_row(rev_lbl, _fmt_cagr(cagr_rev), cr_cls(cagr_rev))}
+        {_metric_row(ni_lbl, _fmt_cagr(cagr_ni), cr_cls(cagr_ni))}
+    </div>
+    <div>
+        {_metric_row(eps_lbl, _fmt_cagr(cagr_eps), cr_cls(cagr_eps))}
+        <div class="note-box">※ 이익이 적자(-)에서 시작된 경우 수학적 한계로 비율(%) 대신 방향성 텍스트로 대체 표기합니다.</div>
+    </div>
+</div>
+{_verdict_badge(v2_c, "📌", v2_t)}
+        """.strip(), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
     # 3️⃣ 지금까지 성적
@@ -775,30 +771,32 @@ def render_company_details(ticker_str: str):
             col1, col2 = st.columns([1.1, 1])
             with col1:
                 st.markdown(f"""
-                {_metric_row("수익 안정성", f'{rev_stab} <span style="font-size:.8rem;color:#8b949e;font-weight:600">{rev_cv}</span>')}
-                {_metric_row("이익 마진 추이", mtrend)}
-                {_metric_row("성장 가속화", accel)}
-                {_metric_row("ROE 수준", roe_lbl)}
-                <div class="divider"></div>
-                <table class="m-table"><tr><th>연도</th><th>매출</th><th>순이익</th><th>이익률</th></tr>{tbl_rows}</table>
-                """, unsafe_allow_html=True)
+{_metric_row("수익 안정성", f'{rev_stab} <span style="font-size:.8rem;color:#8b949e;font-weight:600">{rev_cv}</span>')}
+{_metric_row("이익 마진 추이", mtrend)}
+{_metric_row("성장 가속화", accel)}
+{_metric_row("ROE 수준", roe_lbl)}
+<div class="divider"></div>
+<table class="m-table"><tr><th>연도</th><th>매출</th><th>순이익</th><th>이익률</th></tr>{tbl_rows}</table>
+                """.strip(), unsafe_allow_html=True)
             with col2:
                 st.plotly_chart(fig3, use_container_width=True, config={'displayModeBar': False})
         else:
             st.markdown(f"""
-            {_metric_row("수익 안정성", f'{rev_stab} <span style="font-size:.8rem;color:#8b949e;font-weight:600">{rev_cv}</span>')}
-            {_metric_row("이익 마진 추이", mtrend)}
-            {_metric_row("성장 가속화", accel)}
-            {_metric_row("ROE 수준", roe_lbl)}
-            <div class="divider"></div>
-            <table class="m-table"><tr><th>연도</th><th>매출</th><th>순이익</th><th>이익률</th></tr>{tbl_rows}</table>
-            """, unsafe_allow_html=True)
+{_metric_row("수익 안정성", f'{rev_stab} <span style="font-size:.8rem;color:#8b949e;font-weight:600">{rev_cv}</span>')}
+{_metric_row("이익 마진 추이", mtrend)}
+{_metric_row("성장 가속화", accel)}
+{_metric_row("ROE 수준", roe_lbl)}
+<div class="divider"></div>
+<table class="m-table"><tr><th>연도</th><th>매출</th><th>순이익</th><th>이익률</th></tr>{tbl_rows}</table>
+            """.strip(), unsafe_allow_html=True)
 
         st.markdown(_verdict_badge(v3_c, "📌", v3_t), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
     # 4️⃣ 성장 가능성 
     # ═══════════════════════════════════════════════════
+    t_pe = info.get('trailingPE')
+    f_pe = info.get('forwardPE')
     payout    = info.get('payoutRatio', 0) or 0
     retention = max(0, 1 - payout)
     roe_v     = info.get('returnOnEquity', 0) or 0
@@ -806,14 +804,17 @@ def render_company_details(ticker_str: str):
     eg        = info.get('earningsGrowth')
     fwd_eps   = info.get('forwardEps')
     
+    # 🚀 PEG 비율 계산 방어 로직 (N/A 원천 봉쇄)
     peg = info.get('pegRatio')
     if peg is None or pd.isna(peg):
-        t_pe_val = info.get('trailingPE')
-        if t_pe_val and eg and eg > 0:
-            peg = t_pe_val / (eg * 100)
-        elif t_pe_val and isinstance(cagr_ni, float) and cagr_ni > 0:
-            peg = t_pe_val / (cagr_ni * 100)
-            
+        pe_val = f_pe if (f_pe and not pd.isna(f_pe)) else t_pe
+        growth_val = eg
+        if (growth_val is None or growth_val <= 0) and isinstance(cagr_eps, float) and cagr_eps > 0: growth_val = cagr_eps
+        if (growth_val is None or growth_val <= 0) and isinstance(cagr_ni, float) and cagr_ni > 0: growth_val = cagr_ni
+        
+        if pe_val and growth_val and growth_val > 0:
+            peg = pe_val / (growth_val * 100)
+
     if peg and not pd.isna(peg):
         if peg < 0.5:
             peg_txt = f"{peg:.2f} (매우 저평가)"
@@ -842,27 +843,27 @@ def render_company_details(ticker_str: str):
 
     with st.container(border=True):
         st.markdown(f"""
-        <div class="s-title"><span class="s-num">04</span> 성장 가능성 <span style="font-size:.8rem;color:#768390">SEC + Yahoo</span></div>
-        <div class="two-col">
-            <div>
-                {_metric_row("분기 이익 성장률 (YoY)", _fmt_pct(eg), eg_cls)}
-                {_metric_row("분기 매출 성장률 (YoY)", _fmt_pct(yoy_q_rev_g), rg_cls)}
-                {_metric_row("Forward EPS", f"${_safe(fwd_eps)}")}
-                {_metric_row("PEG 비율", peg_txt, peg_cls)}
-            </div>
-            <div>
-                {_metric_row("ROE", _fmt_pct(roe_v))}
-                {_metric_row("수익 유보율 (1 - 배당성향)", _fmt_pct(retention))}
-                {_metric_row("지속가능 성장률 (g)", _fmt_pct(sust_g), "m-green" if sust_g and sust_g > 0.1 else "m-value")}
-                <div class="note-box">
-                    💡 <b>지속가능 성장률(g)</b> = ROE × 유보율. 외부 자금 없이 달성 가능한 이론적 최대 성장률.<br>
-                    💡 <b>PEG (주가수익성장비율)</b> = P/E Ratio ÷ 이익 성장률<br>
-                    • <b>PEG &lt; 0.5</b> : 매우 저평가 &nbsp; • <b>0.5 ~ 1.5</b> : 적정 가치 &nbsp; • <b>PEG &gt; 1.5</b> : 고평가
-                </div>
-            </div>
+<div class="s-title"><span class="s-num">04</span> 성장 가능성 <span style="font-size:.8rem;color:#768390">SEC + Yahoo</span></div>
+<div class="two-col">
+    <div>
+        {_metric_row("분기 이익 성장률 (YoY)", _fmt_pct(eg), eg_cls)}
+        {_metric_row("분기 매출 성장률 (YoY)", _fmt_pct(yoy_q_rev_g), rg_cls)}
+        {_metric_row("Forward EPS", f"${_safe(fwd_eps)}")}
+        {_metric_row("PEG 비율", peg_txt, peg_cls)}
+    </div>
+    <div>
+        {_metric_row("ROE", _fmt_pct(roe_v))}
+        {_metric_row("수익 유보율 (1 - 배당성향)", _fmt_pct(retention))}
+        {_metric_row("지속가능 성장률 (g)", _fmt_pct(sust_g), "m-green" if sust_g and sust_g > 0.1 else "m-value")}
+        <div class="note-box">
+            💡 <b>지속가능 성장률(g)</b> = ROE × 유보율. 외부 자금 없이 달성 가능한 이론적 최대 성장률.<br>
+            💡 <b>PEG (주가수익성장비율)</b> = P/E Ratio ÷ 이익 성장률<br>
+            &nbsp;&nbsp;• <b>PEG &lt; 0.5</b> : 매우 저평가 &nbsp; • <b>0.5 ~ 1.5</b> : 적정 가치 &nbsp; • <b>PEG &gt; 1.5</b> : 고평가
         </div>
-        {_verdict_badge(v4_c, "📌", v4_t)}
-        """, unsafe_allow_html=True)
+    </div>
+</div>
+{_verdict_badge(v4_c, "📌", v4_t)}
+        """.strip(), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
     # 5️⃣ 재무 건전성 
@@ -880,6 +881,15 @@ def render_company_details(ticker_str: str):
         if tl == 0 and ta > 0 and eq > 0: tl = ta - eq
         na = eq if eq > 0 else (ta - tl) 
         
+        # 🚀 신규 백업 로직: 순자산(na)이 0일 경우 BookValue * Shares 로 계산
+        if na == 0:
+            bv = info.get('bookValue', 0)
+            shares = info.get('sharesOutstanding', 0)
+            if bv and shares:
+                na = bv * shares
+
+        na_display = _fmt_num(na) if na != 0 else "N/A"
+        
         ta_s = _get_row_series(bs, BS_ASSETS_ALIASES)
         tl_s = _get_row_series(bs, BS_LIAB_ALIASES)
         idx = ta_s.index.intersection(tl_s.index).sort_values(ascending=False)[:4]
@@ -887,6 +897,7 @@ def render_company_details(ticker_str: str):
     except Exception:
         curr_d = lt_d = ta = tl = eq = na = info_total_debt = 0
         fig5 = None
+        na_display = "N/A"
 
     cash = info.get('totalCash', 0) or 0
     dte  = info.get('debtToEquity')
@@ -914,35 +925,35 @@ def render_company_details(ticker_str: str):
             col1, col2 = st.columns([1.1, 1])
             with col1:
                 st.markdown(f"""
-                {_metric_row("💵 보유 현금", _fmt_num(cash), "m-value m-green m-big")}
-                {_metric_row("순 자산 (자본)", _fmt_num(na), "m-green" if na > 0 else "m-red")}
-                <div class="divider"></div>
-                {_metric_row("총 부채", _fmt_num(info_total_debt), "m-value")}
-                {_metric_row("부채 수준 (D/E)", dl)}
-                {_metric_row("부채 추세", dt_trend)}
-                {_metric_row("이자 부담 (ICR)", ib_txt)}
-                {_metric_row("부채/자본 비율", f'{dte:.1f}%' if isinstance(dte, (int, float)) else 'N/A')}
-                <div class="note-box">※ 순자산(총자산-총부채)과 자본(주주지분)은 이론상 같으나, 비지배지분 등에 의해 차이가 날 수 있습니다.</div>
-                """, unsafe_allow_html=True)
+{_metric_row("💵 보유 현금", _fmt_num(cash), "m-value m-green m-big")}
+{_metric_row("순 자산 (자본)", na_display, "m-green" if na > 0 else "m-red")}
+<div class="divider"></div>
+{_metric_row("총 부채", _fmt_num(info_total_debt), "m-value")}
+{_metric_row("부채 수준 (D/E)", dl)}
+{_metric_row("부채 추세", dt_trend)}
+{_metric_row("이자 부담 (ICR)", ib_txt)}
+{_metric_row("부채/자본 비율", f'{dte:.1f}%' if isinstance(dte, (int, float)) else 'N/A')}
+<div class="note-box">※ 순자산(총자산-총부채)과 자본(주주지분)은 이론상 같으나, 비지배지분 등에 의해 차이가 날 수 있습니다.</div>
+                """.strip(), unsafe_allow_html=True)
             with col2:
                 st.plotly_chart(fig5, use_container_width=True, config={'displayModeBar': False})
         else:
             st.markdown(f"""
-            <div class="two-col">
-                <div>
-                    {_metric_row("💵 보유 현금", _fmt_num(cash), "m-value m-green m-big")}
-                    {_metric_row("순 자산 (자본)", _fmt_num(na), "m-green" if na > 0 else "m-red")}
-                    {_metric_row("총 부채", _fmt_num(info_total_debt), "m-value")}
-                    {_metric_row("부채 수준 (D/E)", dl)}
-                </div>
-                <div>
-                    {_metric_row("부채 추세", dt_trend)}
-                    {_metric_row("이자 부담 (ICR)", ib_txt)}
-                    {_metric_row("부채/자본 비율", f'{dte:.1f}%' if isinstance(dte, (int, float)) else 'N/A')}
-                </div>
-            </div>
-            <div class="note-box">※ 자산/부채 데이터를 모두 불러올 수 없어 차트가 생략되었습니다.</div>
-            """, unsafe_allow_html=True)
+<div class="two-col">
+    <div>
+        {_metric_row("💵 보유 현금", _fmt_num(cash), "m-value m-green m-big")}
+        {_metric_row("순 자산 (자본)", na_display, "m-green" if na > 0 else "m-red")}
+        {_metric_row("총 부채", _fmt_num(info_total_debt), "m-value")}
+        {_metric_row("부채 수준 (D/E)", dl)}
+    </div>
+    <div>
+        {_metric_row("부채 추세", dt_trend)}
+        {_metric_row("이자 부담 (ICR)", ib_txt)}
+        {_metric_row("부채/자본 비율", f'{dte:.1f}%' if isinstance(dte, (int, float)) else 'N/A')}
+    </div>
+</div>
+<div class="note-box">※ 자산/부채 데이터를 모두 불러올 수 없어 차트가 생략되었습니다.</div>
+            """.strip(), unsafe_allow_html=True)
 
         st.markdown(_verdict_badge(v5_c, "📌", v5_t), unsafe_allow_html=True)
 
@@ -970,22 +981,22 @@ def render_company_details(ticker_str: str):
 
     with st.container(border=True):
         st.markdown(f"""
-        <div class="s-title"><span class="s-num">06</span> 현재 사람들이 많이 사고 있나요? <span style="font-size:.8rem;color:#768390">Yahoo</span></div>
-        <div class="two-col">
-            <div>
-                {_metric_row("현재 거래량", f"{_fmt_num(vol, False)} 주")}
-                {_metric_row("10일 평균", f"{_fmt_num(avg10, False)} 주")}
-                {_metric_row("3개월 평균", f"{_fmt_num(avg3m, False)} 주")}
-                <div class="divider"></div>
-                {_metric_row("거래량 변동 추이", vt_txt)}
-            </div>
-            <div>
-                <div style="font-size:.95rem;color:#ffffff;margin-bottom:10px;font-weight:800">📊 거래량 비교</div>
-                {vol_bars}
-            </div>
-        </div>
-        {_verdict_badge(v6_c, "📌", v6_t)}
-        """, unsafe_allow_html=True)
+<div class="s-title"><span class="s-num">06</span> 현재 사람들이 많이 사고 있나요? <span style="font-size:.8rem;color:#768390">Yahoo</span></div>
+<div class="two-col">
+    <div>
+        {_metric_row("현재 거래량", f"{_fmt_num(vol, False)} 주")}
+        {_metric_row("10일 평균", f"{_fmt_num(avg10, False)} 주")}
+        {_metric_row("3개월 평균", f"{_fmt_num(avg3m, False)} 주")}
+        <div class="divider"></div>
+        {_metric_row("거래량 변동 추이", vt_txt)}
+    </div>
+    <div>
+        <div style="font-size:.95rem;color:#ffffff;margin-bottom:10px;font-weight:800">📊 거래량 비교</div>
+        {vol_bars}
+    </div>
+</div>
+{_verdict_badge(v6_c, "📌", v6_t)}
+        """.strip(), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
     # 7️⃣ 변동성
@@ -1000,9 +1011,7 @@ def render_company_details(ticker_str: str):
         bl, bc = "N/A", "gray"
     all_verdicts.append(("변동성", bc))
 
-    w52h = info.get('fiftyTwoWeekHigh')
-    w52l = info.get('fiftyTwoWeekLow')
-    w52c = info.get('52WeekChange')
+    w52h, w52l, w52c = info.get('fiftyTwoWeekHigh'), info.get('fiftyTwoWeekLow'), info.get('52WeekChange')
 
     if price and w52h and w52l and w52h != w52l:
         pos52 = max(0, min(100, (price - w52l) / (w52h - w52l) * 100))
@@ -1015,32 +1024,30 @@ def render_company_details(ticker_str: str):
 
     with st.container(border=True):
         st.markdown(f"""
-        <div class="s-title"><span class="s-num">07</span> 변동성이 큰가요? <span style="font-size:.8rem;color:#768390">Yahoo</span></div>
-        <div class="two-col">
-            <div>
-                {_metric_row("베타 (β)", f"{beta:.2f} ({bl})" if isinstance(beta, (int, float)) else "N/A")}
-                {_metric_row("52주 가격 변화율", _fmt_pct(w52c), "m-green" if w52c and w52c > 0 else "m-red")}
-                {_metric_row("52주 최고가", f"${w52h:,.2f}" if w52h else "N/A")}
-                {_metric_row("52주 최저가", f"${w52l:,.2f}" if w52l else "N/A")}
-                {_metric_row("현재가 위치 (52주 내)", pos_str)}
-            </div>
-            <div>
-                <div style="font-size:.95rem;color:#ffffff;margin-bottom:8px;font-weight:800">📍 52주 범위 내 위치</div>
-                {pos_bar}
-                <div class="note-box">
-                    💡 베타 &lt; 1 = 시장(S&amp;P500) 대비 안정적<br>
-                    베타 &gt; 1 = 시장보다 변동성이 큽니다.
-                </div>
-            </div>
+<div class="s-title"><span class="s-num">07</span> 변동성이 큰가요? <span style="font-size:.8rem;color:#768390">Yahoo</span></div>
+<div class="two-col">
+    <div>
+        {_metric_row("베타 (β)", f"{beta:.2f} ({bl})" if isinstance(beta, (int, float)) else "N/A")}
+        {_metric_row("52주 가격 변화율", _fmt_pct(w52c), "m-green" if w52c and w52c > 0 else "m-red")}
+        {_metric_row("52주 최고가", f"${w52h:,.2f}" if w52h else "N/A")}
+        {_metric_row("52주 최저가", f"${w52l:,.2f}" if w52l else "N/A")}
+        {_metric_row("현재가 위치 (52주 내)", pos_str)}
+    </div>
+    <div>
+        <div style="font-size:.95rem;color:#ffffff;margin-bottom:8px;font-weight:800">📍 52주 범위 내 위치</div>
+        {pos_bar}
+        <div class="note-box">
+            💡 베타 &lt; 1 = 시장(S&amp;P500) 대비 안정적<br>
+            베타 &gt; 1 = 시장보다 변동성이 큽니다.
         </div>
-        {_verdict_badge(bc, "📌", v7_t)}
-        """, unsafe_allow_html=True)
+    </div>
+</div>
+{_verdict_badge(bc, "📌", v7_t)}
+        """.strip(), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 8️⃣ 밸류에이션
+    # 8️⃣ 밸류에이션 (🚀 들여쓰기 붕괴 버그 완전 해결)
     # ═══════════════════════════════════════════════════
-    t_pe = info.get('trailingPE')
-    f_pe = info.get('forwardPE')
     p_s  = info.get('priceToSalesTrailing12Months')
     p_b  = info.get('priceToBook')
     
@@ -1076,29 +1083,29 @@ def render_company_details(ticker_str: str):
 
     with st.container(border=True):
         st.markdown(f"""
-        <div class="s-title"><span class="s-num">08</span> 이 종목 비싼가요? <span style="font-size:.8rem;color:#768390">Yahoo</span></div>
-        <div class="two-col">
-            <div>
-                {_metric_row("Trailing P/E <span style='font-size:0.75rem;color:#768390;margin-left:4px'>(현재가÷TTM EPS)</span>", f"{t_pe:.2f}" if isinstance(t_pe, (int, float)) else "N/A")}
-                {_metric_row("Forward P/E <span style='font-size:0.75rem;color:#768390;margin-left:4px'>(현재가÷Fwd EPS)</span>", f"{f_pe:.2f}" if isinstance(f_pe, (int, float)) else "N/A")}
-                {_metric_row("P/S (TTM)", f"{p_s:.2f}" if isinstance(p_s, (int, float)) else "N/A")}
-                {_metric_row("P/B", f"{p_b:.2f}" if isinstance(p_b, (int, float)) else "N/A")}
-                <div class="divider"></div>
-                {_metric_row(f"섹터 ({_esc(sector)})", pe_src_lbl)}
-                {_metric_row("섹터 대비", pe_comp if pe_comp else "N/A")}
-            </div>
-            <div>
-                {pe_visual}
-                <div class="note-box">
-                    ※ P/E는 현재가 ÷ EPS로 교차 검증되었습니다.<br>
-                    <b>Trailing P/E</b> = 현재가 ÷ 과거 12개월 실적 EPS<br>
-                    <b>Forward P/E</b> = 현재가 ÷ 향후 12개월 추정 EPS<br>
-                    섹터 P/E는 실시간 기준입니다.
-                </div>
-            </div>
+<div class="s-title"><span class="s-num">08</span> 이 종목 비싼가요? <span style="font-size:.8rem;color:#768390">Yahoo</span></div>
+<div class="two-col">
+    <div>
+        {_metric_row("Trailing P/E <span style='font-size:0.75rem;color:#768390;margin-left:4px'>(현재가÷과거EPS)</span>", f"{t_pe:.2f}" if isinstance(t_pe, (int, float)) else "N/A")}
+        {_metric_row("Forward P/E <span style='font-size:0.75rem;color:#768390;margin-left:4px'>(현재가÷예상EPS)</span>", f"{f_pe:.2f}" if isinstance(f_pe, (int, float)) else "N/A")}
+        {_metric_row("P/S (TTM)", f"{p_s:.2f}" if isinstance(p_s, (int, float)) else "N/A")}
+        {_metric_row("P/B", f"{p_b:.2f}" if isinstance(p_b, (int, float)) else "N/A")}
+        <div class="divider"></div>
+        {_metric_row(f"섹터 ({_esc(sector)})", pe_src_lbl)}
+        {_metric_row("섹터 대비", pe_comp if pe_comp else "N/A")}
+    </div>
+    <div>
+        {pe_visual}
+        <div class="note-box">
+            ※ P/E는 현재가 ÷ EPS로 교차 검증되었습니다.<br>
+            <b>Trailing P/E</b> = 현재가 ÷ 과거 12개월 실적 EPS<br>
+            <b>Forward P/E</b> = 현재가 ÷ 향후 12개월 추정 EPS<br>
+            섹터 P/E는 실시간 기준입니다.
         </div>
-        {_verdict_badge(v8_c, "📌", v8_t)}
-        """, unsafe_allow_html=True)
+    </div>
+</div>
+{_verdict_badge(v8_c, "📌", v8_t)}
+        """.strip(), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
     # 9️⃣ 전문가 의견
@@ -1263,30 +1270,30 @@ def render_company_details(ticker_str: str):
 
     with st.container(border=True):
         st.markdown(f"""
-        <div class="s-title"><span class="s-num">11</span> 시장은 어떤 가격을 보고 있을까요? <span style="font-size:.8rem;color:#768390">Yahoo 옵션</span></div>
-        <div style="text-align:center;margin:10px 0 20px">
-            <div style="font-size:.9rem;color:#adbac7;font-weight:700;margin-bottom:8px">Max Pain 가격 {exp_html}</div>
-            {mp_html}
-            <div style="font-size:1.05rem;color:#ffffff;font-weight:700;margin-top:10px">{mp_note}</div>
-            {vol_warning}
-        </div>
-        <div class="divider"></div>
-        <div style="display:flex;gap:16px;flex-wrap:wrap">
-            <div class="opt-box" style="flex:1;min-width:220px">
-                <b style="color:#00E676;font-size:1rem">🟢 Call (상승 베팅) Top 3</b>
-                <ul class="opt-list">{ch}</ul>
-            </div>
-            <div class="opt-box" style="flex:1;min-width:220px">
-                <b style="color:#FF1744;font-size:1rem">🔴 Put (하락 베팅) Top 3</b>
-                <ul class="opt-list">{ph}</ul>
-            </div>
-        </div>
-        <div class="note-box" style="margin-top:20px">
-            💡 <b>Max Pain 이론</b>: 옵션 만기 시 가장 많은 옵션 매수자(보유자)가 손실을 보는 가격.<br>
-            옵션 매도자(마켓메이커)의 이익이 극대화되는 지점으로, 주가가 만기일에 이 가격 부근으로 수렴하는 경향이 있다는 이론입니다.
-        </div>
-        {_verdict_badge(mp_c, "📌", mp_badge)}
-        """, unsafe_allow_html=True)
+<div class="s-title"><span class="s-num">11</span> 시장은 어떤 가격을 보고 있을까요? <span style="font-size:.8rem;color:#768390">Yahoo 옵션</span></div>
+<div style="text-align:center;margin:10px 0 20px">
+    <div style="font-size:.9rem;color:#adbac7;font-weight:700;margin-bottom:8px">Max Pain 가격 {exp_html}</div>
+    {mp_html}
+    <div style="font-size:1.05rem;color:#ffffff;font-weight:700;margin-top:10px">{mp_note}</div>
+    {vol_warning}
+</div>
+<div class="divider"></div>
+<div style="display:flex;gap:16px;flex-wrap:wrap">
+    <div class="opt-box" style="flex:1;min-width:220px">
+        <b style="color:#00E676;font-size:1rem">🟢 Call (상승 베팅) Top 3</b>
+        <ul class="opt-list">{ch}</ul>
+    </div>
+    <div class="opt-box" style="flex:1;min-width:220px">
+        <b style="color:#FF1744;font-size:1rem">🔴 Put (하락 베팅) Top 3</b>
+        <ul class="opt-list">{ph}</ul>
+    </div>
+</div>
+<div class="note-box" style="margin-top:20px">
+    💡 <b>Max Pain 이론</b>: 옵션 만기 시 가장 많은 옵션 매수자(보유자)가 손실을 보는 가격.<br>
+    옵션 매도자(마켓메이커)의 이익이 극대화되는 지점으로, 주가가 만기일에 이 가격 부근으로 수렴하는 경향이 있다는 이론입니다.
+</div>
+{_verdict_badge(mp_c, "📌", mp_badge)}
+        """.strip(), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
     # 1️⃣2️⃣ 공매도
@@ -1373,17 +1380,17 @@ def render_company_details(ticker_str: str):
                           f'<div class="n-meta">{_esc(pub_name)} · {dt_str}</div></div>')
             with st.container(border=True):
                 st.markdown(f"""
-                <div class="s-title"><span class="s-num">13</span> 최신 뉴스 <span style="font-size:.8rem;color:#768390">Yahoo Finance</span></div>
-                {items}
-                """, unsafe_allow_html=True)
+<div class="s-title"><span class="s-num">13</span> 최신 뉴스 <span style="font-size:.8rem;color:#768390">Yahoo Finance</span></div>
+{items}
+                """.strip(), unsafe_allow_html=True)
         else:
             raise ValueError("No news")
     except Exception:
         with st.container(border=True):
             st.markdown("""
-            <div class="s-title"><span class="s-num">13</span> 최신 뉴스</div>
-            <div style="color:#8b949e;padding:10px 0;text-align:center;">뉴스 데이터를 불러올 수 없습니다.</div>
-            """, unsafe_allow_html=True)
+<div class="s-title"><span class="s-num">13</span> 최신 뉴스</div>
+<div style="color:#8b949e;padding:10px 0;text-align:center;">뉴스 데이터를 불러올 수 없습니다.</div>
+            """.strip(), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
     # 📋 종합 점수
@@ -1406,20 +1413,20 @@ def render_company_details(ticker_str: str):
 
     with st.container(border=True):
         st.markdown(f"""
-        <div class="s-title" style="border:none; justify-content:center; font-size:1.6rem;">📋 종합 분석 요약</div>
-        <div style="text-align:center;margin:8px 0 24px">
-            <span style="font-size:2.8rem;font-weight:900;color:{oc}">{oe} {pct:.0f}</span>
-            <span style="font-size:1.4rem;color:{oc}"> / 100점</span><br>
-            <span style="font-size:1.25rem;color:{oc};font-weight:800">{ot}</span>
-        </div>
-        <div style="background:rgba(0,0,0,0.4);border-radius:10px;height:16px;overflow:hidden;margin:0 40px;border:1px solid #3b424a">
-            <div style="width:{pct:.1f}%;height:100%;background:{oc};border-radius:10px;transition:width 1s;box-shadow:0 0 10px {oc}"></div>
-        </div>
-        <div style="margin-top:24px">{dots}</div>
-        <div class="note-box" style="margin-top:20px;text-align:center">
-            수집 가능한 분석 항목들(🟢=2점, 🔵=1.5점, 🟡=1점, 🔴=0점)만을 취합한 종합 점수입니다. (데이터가 누락된 항목은 점수 산정에서 제외됩니다.)
-        </div>
-        """, unsafe_allow_html=True)
+<div class="s-title" style="border:none; justify-content:center; font-size:1.6rem;">📋 종합 분석 요약</div>
+<div style="text-align:center;margin:8px 0 24px">
+    <span style="font-size:2.8rem;font-weight:900;color:{oc}">{oe} {pct:.0f}</span>
+    <span style="font-size:1.4rem;color:{oc}"> / 100점</span><br>
+    <span style="font-size:1.25rem;color:{oc};font-weight:800">{ot}</span>
+</div>
+<div style="background:rgba(0,0,0,0.4);border-radius:10px;height:16px;overflow:hidden;margin:0 40px;border:1px solid #3b424a">
+    <div style="width:{pct:.1f}%;height:100%;background:{oc};border-radius:10px;transition:width 1s;box-shadow:0 0 10px {oc}"></div>
+</div>
+<div style="margin-top:24px">{dots}</div>
+<div class="note-box" style="margin-top:20px;text-align:center">
+    수집 가능한 분석 항목들(🟢=2점, 🔵=1.5점, 🟡=1점, 🔴=0점)만을 취합한 종합 점수입니다. (데이터가 누락된 항목은 점수 산정에서 제외됩니다.)
+</div>
+        """.strip(), unsafe_allow_html=True)
 
     st.caption("⚠️ 본 분석은 참고용 지표이며 어떠한 경우에도 투자 조언이 아닙니다. 투자에 대한 최종 결정은 본인의 판단과 책임 하에 이루어져야 합니다.")
 
