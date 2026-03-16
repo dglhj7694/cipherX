@@ -15,7 +15,9 @@ NI_ALIASES = ['Net Income', 'Net Income Common Stockholders', 'Net Income Contin
 EPS_ALIASES = ['Basic EPS', 'Diluted EPS', 'Earnings Per Share']
 BS_ASSETS_ALIASES = ['Total Assets', 'Assets', 'TotalAssets']
 BS_LIAB_ALIASES = ['Total Liabilities Net Minority Interest', 'Total Liab', 'Total Liabilities', 'TotalLiabilities']
-EQ_ALIASES = ['Stockholders Equity', 'Total Stockholder Equity', 'Common Stock Equity', 'Total Equity Gross Minority Interest', 'Total Equity', 'Net Tangible Assets']
+# 🚀 'Total Stockholder Equity' 최우선 배치
+EQ_ALIASES = ['Total Stockholder Equity', 'Stockholders Equity', 'Common Stock Equity', 'Total Equity Gross Minority Interest', 'Total Equity', 'Net Tangible Assets']
+DEBT_ALIASES = ['Total Debt', 'TotalDebt']
 
 # ═══════════════════════════════════════════════════════════════
 # 🛠️ 유틸리티 함수
@@ -129,7 +131,6 @@ def _metric_row(label, value, value_class="m-value"):
     return (f'<div class="m-row"><span class="m-label">{label}</span>'
             f'<span class="{value_class}">{value}</span></div>')
 
-# 🚀 누락되었던 게이지 바 함수 복구!
 def _gauge_bar(pct, color="#00E676", height=8):
     pct = max(0, min(100, pct))
     return (f'<div style="background:rgba(255,255,255,0.1);border-radius:{height}px;'
@@ -367,8 +368,7 @@ def _interest_burden(fin, info):
     interest = _get_row(fin, ['Interest Expense', 'Interest Expense Non Operating'])
     
     if ebit is not None and interest is not None and abs(interest) > 0:
-        if ebit < 0:
-            return "위험 ❌ (영업적자로 이자 지급 불가)", "red"
+        if ebit < 0: return "위험 ❌ (영업적자로 이자 지급 불가)", "red"
         icr = abs(ebit / interest)
         src = "SEC 실제"
         if   icr > 10: return f"매우 낮음 ✅ (ICR {icr:.1f}x, {src})", "green"
@@ -379,8 +379,7 @@ def _interest_burden(fin, info):
     ebitda = info.get('ebitda', 0) or 0
     debt = info.get('totalDebt', 0) or 0
     if ebitda is not None and debt is not None and debt > 0:
-        if ebitda < 0:
-            return "위험 ❌ (EBITDA 적자)", "red"
+        if ebitda < 0: return "위험 ❌ (EBITDA 적자)", "red"
         est_rate = 0.05
         cov = ebitda / (debt * est_rate)
         src = f"추정, 이자율 {est_rate * 100:.0f}% 가정"
@@ -412,8 +411,7 @@ def _max_pain(tkr):
         for col in ['openInterest', 'volume']:
             if col not in c.columns: c[col] = 0
             if col not in p.columns: p[col] = 0
-            c[col] = c[col].fillna(0)
-            p[col] = p[col].fillna(0)
+            c[col], p[col] = c[col].fillna(0), p[col].fillna(0)
             
         c_oi_sum = c['openInterest'].sum()
         p_oi_sum = p['openInterest'].sum()
@@ -469,7 +467,7 @@ def _sector_pe_live(sector):
 
 
 # ═══════════════════════════════════════════════════════════════
-# 🎨 CSS (🚀 UI 개선: 카드 입체감 & 선명도 완벽 세팅)
+# 🎨 CSS (UI 개선: 카드 입체감 & 선명도 완벽 세팅)
 # ═══════════════════════════════════════════════════════════════
 
 CSS = """
@@ -736,7 +734,7 @@ def render_company_details(ticker_str: str):
             </div>
             <div>
                 {_metric_row(eps_lbl, _fmt_cagr(cagr_eps), cr_cls(cagr_eps))}
-                <div class="note-box">※ 이익이 적자(-)에서 시작된 경우 수학적 한계로 비율(%) 대신 방향성 텍스트로 대체 표기합니다.</div>
+                <div class="note-box">※ 이익이 적자(-)에서 시작된 경우 수학적 한계로 연평균 비율(%) 대신 방향성 텍스트로 표기됩니다.</div>
             </div>
         </div>
         {_verdict_badge(v2_c, "📌", v2_t)}
@@ -803,10 +801,11 @@ def render_company_details(ticker_str: str):
         st.markdown(_verdict_badge(v3_c, "📌", v3_t), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 4️⃣ 성장 가능성 
+    # 4️⃣ 성장 가능성
     # ═══════════════════════════════════════════════════
     t_pe = info.get('trailingPE')
     f_pe = info.get('forwardPE')
+    
     payout    = info.get('payoutRatio', 0) or 0
     retention = max(0, 1 - payout)
     roe_v     = info.get('returnOnEquity', 0) or 0
@@ -814,7 +813,7 @@ def render_company_details(ticker_str: str):
     eg        = info.get('earningsGrowth')
     fwd_eps   = info.get('forwardEps')
     
-    # 🚀 PEG 비율 계산 방어 로직 (N/A 원천 봉쇄)
+    # 🚀 PEG 비율 직접 계산 방어 로직 (N/A 원천 봉쇄)
     peg = info.get('pegRatio')
     if peg is None or pd.isna(peg):
         pe_val = f_pe if (f_pe and not pd.isna(f_pe)) else t_pe
@@ -891,7 +890,6 @@ def render_company_details(ticker_str: str):
         if tl == 0 and ta > 0 and eq > 0: tl = ta - eq
         na = eq if eq > 0 else (ta - tl) 
         
-        # 🚀 신규 백업 로직: 순자산(na)이 0일 경우 BookValue * Shares 로 계산
         if na == 0:
             bv = info.get('bookValue', 0)
             shares = info.get('sharesOutstanding', 0)
@@ -1056,15 +1054,10 @@ def render_company_details(ticker_str: str):
         """, unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 8️⃣ 밸류에이션
+    # 8️⃣ 밸류에이션 (🚀 들여쓰기 붕괴 방지 마크다운 구조)
     # ═══════════════════════════════════════════════════
     p_s  = info.get('priceToSalesTrailing12Months')
     p_b  = info.get('priceToBook')
-    
-    t_eps = info.get('trailingEps')
-    f_eps = info.get('forwardEps')
-    if (t_pe is None or pd.isna(t_pe)) and t_eps and t_eps > 0 and price: t_pe = price / t_eps
-    if (f_pe is None or pd.isna(f_pe)) and f_eps and f_eps > 0 and price: f_pe = price / f_eps
 
     s_pe, pe_source = _sector_pe_live(sector)
 
@@ -1092,30 +1085,31 @@ def render_company_details(ticker_str: str):
     pe_src_lbl = f"평균 P/E ≈ {s_pe:.1f} ({pe_source})" if s_pe else "N/A"
 
     with st.container(border=True):
+        # HTML 렌더링 시 들여쓰기 에러 방지를 위해 좌측 정렬 유지
         st.markdown(f"""
-        <div class="s-title"><span class="s-num">08</span> 이 종목 비싼가요? <span style="font-size:.8rem;color:#768390">Yahoo</span></div>
-        <div class="two-col">
-            <div>
-                {_metric_row("Trailing P/E <span style='font-size:0.75rem;color:#768390;margin-left:4px'>(현재가÷과거EPS)</span>", f"{t_pe:.2f}" if isinstance(t_pe, (int, float)) else "N/A")}
-                {_metric_row("Forward P/E <span style='font-size:0.75rem;color:#768390;margin-left:4px'>(현재가÷예상EPS)</span>", f"{f_pe:.2f}" if isinstance(f_pe, (int, float)) else "N/A")}
-                {_metric_row("P/S (TTM)", f"{p_s:.2f}" if isinstance(p_s, (int, float)) else "N/A")}
-                {_metric_row("P/B", f"{p_b:.2f}" if isinstance(p_b, (int, float)) else "N/A")}
-                <div class="divider"></div>
-                {_metric_row(f"섹터 ({_esc(sector)})", pe_src_lbl)}
-                {_metric_row("섹터 대비", pe_comp if pe_comp else "N/A")}
-            </div>
-            <div>
-                {pe_visual}
-                <div class="note-box">
-                    ※ P/E는 현재가 ÷ EPS로 교차 검증되었습니다.<br>
-                    <b>Trailing P/E</b> = 현재가 ÷ 과거 12개월 실적 EPS<br>
-                    <b>Forward P/E</b> = 현재가 ÷ 향후 12개월 추정 EPS<br>
-                    섹터 P/E는 실시간 기준입니다.
-                </div>
-            </div>
+<div class="s-title"><span class="s-num">08</span> 이 종목 비싼가요? <span style="font-size:.8rem;color:#768390">Yahoo</span></div>
+<div class="two-col">
+    <div>
+        {_metric_row("Trailing P/E <span style='font-size:0.75rem;color:#768390;margin-left:4px'>(현재가÷과거EPS)</span>", f"{t_pe:.2f}" if isinstance(t_pe, (int, float)) else "N/A")}
+        {_metric_row("Forward P/E <span style='font-size:0.75rem;color:#768390;margin-left:4px'>(현재가÷예상EPS)</span>", f"{f_pe:.2f}" if isinstance(f_pe, (int, float)) else "N/A")}
+        {_metric_row("P/S (TTM)", f"{p_s:.2f}" if isinstance(p_s, (int, float)) else "N/A")}
+        {_metric_row("P/B", f"{p_b:.2f}" if isinstance(p_b, (int, float)) else "N/A")}
+        <div class="divider"></div>
+        {_metric_row(f"섹터 ({_esc(sector)})", pe_src_lbl)}
+        {_metric_row("섹터 대비", pe_comp if pe_comp else "N/A")}
+    </div>
+    <div>
+        {pe_visual}
+        <div class="note-box">
+            ※ P/E는 현재가 ÷ EPS로 교차 검증되었습니다.<br>
+            <b>Trailing P/E</b> = 현재가 ÷ 과거 12개월 실적 EPS<br>
+            <b>Forward P/E</b> = 현재가 ÷ 향후 12개월 추정 EPS<br>
+            섹터 P/E는 실시간 기준입니다.
         </div>
-        {_verdict_badge(v8_c, "📌", v8_t)}
-        """, unsafe_allow_html=True)
+    </div>
+</div>
+{_verdict_badge(v8_c, "📌", v8_t)}
+        """.strip(), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
     # 9️⃣ 전문가 의견
