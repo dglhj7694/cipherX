@@ -86,7 +86,7 @@ def _get_val_from_series(series, aliases):
             if pd.notna(val): return float(val)
     norm_aliases = [str(a).lower().replace(" ", "") for a in aliases]
     for idx in series.index:
-        if str(idx).lower().replace(" ", "") in norm_aliases:
+        if str(idx).lower().replace(" ", "") in norm_cands:
             val = series[idx]
             if pd.notna(val): return float(val)
     return None
@@ -523,6 +523,9 @@ def render_company_details(ticker_str: str):
 
     rev_lbl = f"{yr_rev}년 매출 평균성장" if yr_rev else "매출 성장추세"
     ni_lbl  = f"{yr_ni}년 순이익 평균성장" if yr_ni else "순이익 추세"
+    
+    fwd_eps = info.get('forwardEps')
+    
     if yr_eps and yr_eps == 1 and cagr_eps is not None:
         eps_lbl = f"{yr_eps}년 EPS 추세 (Forward 추정)" if isinstance(cagr_eps, float) else f"{yr_eps}년 EPS 추세 (SEC)"
     elif yr_eps: eps_lbl = f"{yr_eps}년 EPS 추세 (SEC)"
@@ -601,15 +604,13 @@ def render_company_details(ticker_str: str):
         st.markdown(_verdict_badge(v3_c, "📌", v3_t), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 4️⃣ 성장 가능성 & 🚀 PEG 비율 방어 로직 완벽 적용
+    # 4️⃣ 성장 가능성 
     # ═══════════════════════════════════════════════════
     t_pe, f_pe = info.get('trailingPE'), info.get('forwardPE')
-    t_eps, f_eps = info.get('trailingEps'), info.get('forwardEps')
     payout, roe_v = info.get('payoutRatio', 0) or 0, info.get('returnOnEquity', 0) or 0
     retention, sust_g = max(0, 1 - payout), (roe_v * max(0, 1 - payout) if roe_v else None)
     eg = info.get('earningsGrowth')
     
-    # 🚀 PEG 비율 직접 계산 (모든 수단 동원)
     peg = info.get('pegRatio')
     if peg is None or pd.isna(peg) or peg == 0:
         pe_val = f_pe if (f_pe and not pd.isna(f_pe) and f_pe > 0) else t_pe
@@ -622,7 +623,6 @@ def render_company_details(ticker_str: str):
         if pe_val and growth_val and growth_val > 0: 
             peg = pe_val / (growth_val * 100)
 
-    # 🚀 PEG 직관적 평가 표기
     if peg and not pd.isna(peg) and peg > 0:
         if peg < 0.5: peg_txt, peg_cls = f"{peg:.2f} (매우 저평가)", "m-blue"
         elif peg <= 1.5: peg_txt, peg_cls = f"{peg:.2f} (적정 가치)", "m-green"
@@ -663,7 +663,7 @@ def render_company_details(ticker_str: str):
         """.strip(), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 5️⃣ 재무 건전성 & 🚀 D/E 강제 계산 
+    # 5️⃣ 재무 건전성 
     # ═══════════════════════════════════════════════════
     na = None
     info_total_debt = None
@@ -829,11 +829,6 @@ def render_company_details(ticker_str: str):
     # ═══════════════════════════════════════════════════
     # 8️⃣ 밸류에이션
     # ═══════════════════════════════════════════════════
-    p_s, p_b = info.get('priceToSalesTrailing12Months'), info.get('priceToBook')
-    
-    if (t_pe is None or pd.isna(t_pe)) and t_eps and t_eps > 0 and price: t_pe = price / t_eps
-    if (f_pe is None or pd.isna(f_pe)) and f_eps and f_eps > 0 and price: f_pe = price / f_eps
-
     s_pe, pe_source = _sector_pe_live(sector)
 
     pe_comp = ""
@@ -980,7 +975,7 @@ def render_company_details(ticker_str: str):
     mp_val = f"${mp:.2f}" if mp else ""
     mp_html = f"<span style='font-size:1.8rem;font-weight:900;color:#ffffff'>{mp_val}</span>" if mp else "<span style='color:#768390;font-size:1.2rem;font-weight:700'>데이터 없음</span>"
     exp_html = f"<span style='font-size:.85rem;color:#adbac7;font-weight:700'>(만기: {exp})</span>" if exp else ""
-    vol_warning = "<div style='color:#FFC107; font-size:.85rem; margin-top:12px; font-weight:700;'>⚠️ 미결제약정(OI) 데이터 부족으로 임시로 거래량(Volume) 가중치를 사용했습니다.</div>" if is_vol_weight else ""
+    vol_warning = "<div style='color:#FFC107; font-size:.85rem; margin-top:12px; font-weight:700;'>⚠️ 미결제약정(OI) 부족으로 임시로 거래량(Volume) 가중치를 사용했습니다.</div>" if is_vol_weight else ""
 
     with st.container(border=True):
         st.markdown(f"""
@@ -997,7 +992,7 @@ def render_company_details(ticker_str: str):
     <div class="opt-box" style="flex:1;min-width:220px"><b style="color:#FF1744;font-size:1rem">🔴 Put (하락 베팅) Top 3</b><ul class="opt-list">{ph}</ul></div>
 </div>
 <div class="note-box" style="margin-top:20px">
-    💡 <b>Max Pain 이론</b>: 옵션 만기 시 가장 많은 옵션 매수자(보유자)가 손실을 보는 가격.<br>
+    💡 <b>Max Pain 이론</b>: 옵션 만기 시 가장 많은 옵션 매수자가 손실을 보는 가격.<br>
     옵션 매도자(마켓메이커)의 이익이 극대화되는 지점으로, 주가가 만기일에 이 가격 부근으로 수렴하는 경향이 있습니다.
 </div>
 {_verdict_badge(mp_c, "📌", f"Max Pain {mp_val} — {mp_note.replace('<b>', '').replace('</b>', '')}" if mp else "옵션 데이터 없음")}
@@ -1111,7 +1106,7 @@ def render_company_details(ticker_str: str):
     st.caption("⚠️ 본 분석은 참고용 지표이며 어떠한 경우에도 투자 조언이 아닙니다. 투자에 대한 최종 결정은 본인의 판단과 책임 하에 이루어져야 합니다.")
 
 if __name__ == "__main__":
-    st.set_page_config(page_title="종목 상세 분석", page_icon="📊", layout="wide")
+    st.set_page_config(page_title="종목 상세 분석", page_icon="📊", layout="layout")
     st.title("📊 종목 상세 분석 대시보드")
     t = st.text_input("🔍 티커 심볼 입력", value="AAPL", placeholder="예: AAPL, MSFT, TSLA")
     if t: render_company_details(t.strip().upper())
