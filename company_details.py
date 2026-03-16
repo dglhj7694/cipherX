@@ -67,7 +67,7 @@ def _safe(val, fallback="N/A"):
 def _esc(text):
     return html_module.escape(str(text)) if text else ""
 
-# 🚀 퍼지 매칭 함수
+# 🚀 퍼지 매칭 함수 (대소문자/공백 완전 무시)
 def _find_idx(df, candidates):
     if df is None or df.empty: return None
     for name in candidates:
@@ -84,6 +84,7 @@ def _get_row_series(df, candidates):
         try:
             row = df.loc[idx]
             if isinstance(row, pd.DataFrame): row = row.iloc[0]
+            # yfinance는 컬럼이 최신순서이므로 dropna()만 해서 리턴
             return row.dropna()
         except Exception: pass
     return pd.Series(dtype=float)
@@ -93,6 +94,7 @@ def _calc_cagr_with_years(financials, row_candidates):
         rc = row_candidates if isinstance(row_candidates, list) else [row_candidates]
         series = _get_row_series(financials, rc)
         if len(series) >= 2:
+            # 안전하게 날짜 정렬 후 계산
             series = series.sort_index()
             s_val, e_val = series.iloc[0], series.iloc[-1]
             years = len(series) - 1
@@ -508,6 +510,10 @@ def render_company_details(ticker_str: str):
 
     rev_lbl = f"{yr_rev}년 매출 평균성장" if yr_rev else "매출 성장추세"
     ni_lbl  = f"{yr_ni}년 순이익 평균성장" if yr_ni else "순이익 추세"
+    
+    # 🚀 Forward EPS 복구 완료!
+    fwd_eps = info.get('forwardEps')
+    
     if yr_eps and yr_eps == 1 and cagr_eps is not None:
         eps_lbl = f"{yr_eps}년 EPS 추세 (Forward 추정)" if isinstance(cagr_eps, float) else f"{yr_eps}년 EPS 추세 (SEC)"
     elif yr_eps: eps_lbl = f"{yr_eps}년 EPS 추세 (SEC)"
@@ -536,7 +542,7 @@ def render_company_details(ticker_str: str):
     </div>
     <div>
         {_metric_row(eps_lbl, _fmt_cagr(cagr_eps), cr_cls(cagr_eps))}
-        <div class="note-box">※ 이익이 적자(-)에서 시작된 경우 수학적 한계로 비율(%) 대신 방향성 텍스트로 대체 표기합니다.</div>
+        <div class="note-box">※ 이익이 적자(-)에서 시작된 경우 수익성장의 수학적 한계로 비율(%) 대신 텍스트로 표기됩니다.</div>
     </div>
 </div>
 {_verdict_badge(v2_c, "📌", v2_t)}
@@ -586,33 +592,22 @@ def render_company_details(ticker_str: str):
         st.markdown(_verdict_badge(v3_c, "📌", v3_t), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 4️⃣ 성장 가능성 & 🚀 1. PEG 비율 방어 로직 완벽 적용
+    # 4️⃣ 성장 가능성 
     # ═══════════════════════════════════════════════════
     t_pe, f_pe = info.get('trailingPE'), info.get('forwardPE')
-    t_eps, f_eps = info.get('trailingEps'), info.get('forwardEps')
-    
-    if (t_pe is None or pd.isna(t_pe)) and t_eps and t_eps > 0 and price: t_pe = price / t_eps
-    if (f_pe is None or pd.isna(f_pe)) and f_eps and f_eps > 0 and price: f_pe = price / f_eps
-
     payout, roe_v = info.get('payoutRatio', 0) or 0, info.get('returnOnEquity', 0) or 0
     retention, sust_g = max(0, 1 - payout), (roe_v * max(0, 1 - payout) if roe_v else None)
-    eg = info.get('earningsGrowth')
+    eg, fwd_eps = info.get('earningsGrowth'), info.get('forwardEps')
     
-    # 🚀 PEG 비율 직접 계산 (모든 수단 동원)
     peg = info.get('pegRatio')
-    if peg is None or pd.isna(peg) or peg == 0:
-        pe_val = f_pe if (f_pe and not pd.isna(f_pe) and f_pe > 0) else t_pe
+    if peg is None or pd.isna(peg):
+        pe_val = f_pe if (f_pe and not pd.isna(f_pe)) else t_pe
         growth_val = eg
-        if (growth_val is None or growth_val <= 0):
-            if isinstance(cagr_eps, float) and cagr_eps > 0: growth_val = cagr_eps
-            elif isinstance(cagr_ni, float) and cagr_ni > 0: growth_val = cagr_ni
-            elif isinstance(ann_rev_g, float) and ann_rev_g > 0: growth_val = ann_rev_g
-        
-        if pe_val and growth_val and growth_val > 0: 
-            peg = pe_val / (growth_val * 100)
+        if (growth_val is None or growth_val <= 0) and isinstance(cagr_eps, float) and cagr_eps > 0: growth_val = cagr_eps
+        if (growth_val is None or growth_val <= 0) and isinstance(cagr_ni, float) and cagr_ni > 0: growth_val = cagr_ni
+        if pe_val and growth_val and growth_val > 0: peg = pe_val / (growth_val * 100)
 
-    # 🚀 PEG 직관적 평가 표기
-    if peg and not pd.isna(peg) and peg > 0:
+    if peg and not pd.isna(peg):
         if peg < 0.5: peg_txt, peg_cls = f"{peg:.2f} (매우 저평가)", "m-blue"
         elif peg <= 1.5: peg_txt, peg_cls = f"{peg:.2f} (적정 가치)", "m-green"
         else: peg_txt, peg_cls = f"{peg:.2f} (고평가)", "m-red"
@@ -632,8 +627,8 @@ def render_company_details(ticker_str: str):
 <div class="s-title"><span class="s-num">04</span> 성장 가능성 <span style="font-size:.8rem;color:#768390">SEC + Yahoo</span></div>
 <div class="two-col">
     <div>
-        {_metric_row("분기 이익 성장률 (YoY)", _fmt_pct(eg), eg_cls)}
-        {_metric_row("분기 매출 성장률 (YoY)", _fmt_pct(yoy_q_rev_g), rg_cls)}
+        {_metric_row("분기 이익 성장률 (YoY)", _fmt_pct(eg), "m-green" if eg and eg > 0 else "m-red")}
+        {_metric_row("분기 매출 성장률 (YoY)", _fmt_pct(yoy_q_rev_g), "m-green" if yoy_q_rev_g and isinstance(yoy_q_rev_g, float) and yoy_q_rev_g > 0 else "m-red")}
         {_metric_row("Forward EPS", f"${_safe(fwd_eps)}")}
         {_metric_row("PEG 비율", peg_txt, peg_cls)}
     </div>
@@ -652,51 +647,66 @@ def render_company_details(ticker_str: str):
         """.strip(), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 5️⃣ 재무 건전성 & 🚀 2. 부채/자본(D/E) 강제 직접 계산 로직
+    # 5️⃣ 재무 건전성
     # ═══════════════════════════════════════════════════
+    na = None
+    info_total_debt = None
+    ta = None
+    tl = None
+    
     try:
-        curr_d = _get_row(bs, ['Current Debt', 'Current Portion Of Long Term Debt']) or 0
-        lt_d   = _get_row(bs, ['Long Term Debt', 'Long Term Debt And Capital Lease Obligation']) or 0
-        
-        ta = _get_row(bs, BS_ASSETS_ALIASES) or info.get('totalAssets', 0) or 0
-        tl = _get_row(bs, BS_LIAB_ALIASES) or 0
-        eq = _get_row(bs, EQ_ALIASES)
-        
-        info_total_debt = info.get('totalDebt')
-        if info_total_debt is None or pd.isna(info_total_debt) or info_total_debt == 0:
-            bs_debt = _get_row(bs, DEBT_ALIASES)
-            if bs_debt is not None and not pd.isna(bs_debt): info_total_debt = bs_debt
-            else: info_total_debt = (curr_d or 0) + (lt_d or 0)
-        
-        na = eq if eq is not None else None
-        if na is None and ta > 0 and tl > 0: na = ta - tl
-        if na is None:
-            bv = info.get('bookValue', 0)
-            shares = info.get('sharesOutstanding', 0)
-            if bv and shares: na = bv * shares
+        if bs is not None and not bs.empty:
+            latest_bs = bs.iloc[:, 0]
+            
+            eq_idx = _find_idx(bs, EQ_ALIASES)
+            if eq_idx: na = latest_bs.get(eq_idx)
+            
+            debt_idx = _find_idx(bs, DEBT_ALIASES)
+            if debt_idx: info_total_debt = latest_bs.get(debt_idx)
+            
+            ta_idx = _find_idx(bs, BS_ASSETS_ALIASES)
+            if ta_idx: ta = latest_bs.get(ta_idx)
+            
+            tl_idx = _find_idx(bs, BS_LIAB_ALIASES)
+            if tl_idx: tl = latest_bs.get(tl_idx)
+            
+    except Exception as e:
+        logger.warning(f"iloc extraction failed: {e}")
 
-        na_display = _fmt_num(na) if na is not None else "N/A"
-        debt_display = _fmt_num(info_total_debt) if info_total_debt is not None else "N/A"
+    if pd.isna(na) or na is None:
+        if ta is not None and tl is not None and ta > 0 and tl > 0:
+            na = ta - tl
+    if pd.isna(na) or na is None:
+        bv = info.get('bookValue', 0)
+        shares = info.get('sharesOutstanding', 0)
+        if bv and shares: na = bv * shares
+
+    if pd.isna(info_total_debt) or info_total_debt is None:
+        info_total_debt = info.get('totalDebt', 0)
         
+    na_display = _fmt_num(na) if (na is not None and not pd.isna(na)) else "N/A"
+    debt_display = _fmt_num(info_total_debt) if (info_total_debt is not None and not pd.isna(info_total_debt)) else "N/A"
+    
+    try:
         ta_s = _get_row_series(bs, BS_ASSETS_ALIASES)
         tl_s = _get_row_series(bs, BS_LIAB_ALIASES)
-        idx = ta_s.index.intersection(tl_s.index).sort_values(ascending=False)[:4]
-        fig5 = _get_plotly_yearly_bar(idx, [ta_s[i] for i in idx], [tl_s[i] for i in idx], "총 자산", "총 부채", "#2196F3", "#FF5722") if len(idx) > 0 else None
+        common_idx = [i for i in ta_s.index if i in tl_s.index]
+        common_idx = sorted(common_idx, reverse=True)[:4]
+        
+        if len(common_idx) > 0:
+            fig5 = _get_plotly_yearly_bar(common_idx, [ta_s[i] for i in common_idx], [tl_s[i] for i in common_idx], "총 자산", "총 부채", "#2196F3", "#FF5722")
+        else:
+            fig5 = None
     except Exception:
-        curr_d = lt_d = ta = tl = eq = na = info_total_debt = 0
         fig5 = None
-        na_display = "N/A"
-        debt_display = "N/A"
 
     cash = info.get('totalCash', 0) or 0
+    dte  = info.get('debtToEquity')
     dt_trend, dt_c = _debt_trend(bs)
     ib_txt, ib_c   = _interest_burden(fin, info)
 
-    # 🚀 D/E 비율 강제 계산 (야후의 이상한 데이터 덮어쓰기)
-    if na and na > 0 and info_total_debt is not None and info_total_debt >= 0:
+    if (dte is None or pd.isna(dte)) and na and na > 0 and info_total_debt and info_total_debt > 0:
         dte = (info_total_debt / na) * 100
-    else:
-        dte = info.get('debtToEquity')
 
     if isinstance(dte, (int, float)):
         if   dte < 50:  dl, dl_c = "낮음 ✅", "green"
@@ -725,10 +735,7 @@ def render_company_details(ticker_str: str):
 {_metric_row("부채 추세", dt_trend)}
 {_metric_row("이자 부담 (ICR)", ib_txt)}
 {_metric_row("부채/자본 비율", f'{dte:.1f}%' if isinstance(dte, (int, float)) else 'N/A')}
-<div class="note-box">
-    ※ <b>부채/자본 비율</b> = (위 표시된 총 부채 ÷ 순 자산) × 100 으로 직접 교차 검증 계산됩니다.<br>
-    ※ 순자산(총자산-총부채)과 자본(주주지분)은 이론상 같으나, 비지배지분 등에 의해 차이가 날 수 있습니다.
-</div>
+<div class="note-box">※ 순자산(총자산-총부채)과 자본(주주지분)은 이론상 같으나, 비지배지분 등에 의해 차이가 날 수 있습니다.</div>
             """.strip(), unsafe_allow_html=True)
         with col2:
             if fig5: st.plotly_chart(fig5, use_container_width=True, config={'displayModeBar': False})
@@ -801,6 +808,8 @@ def render_company_details(ticker_str: str):
     # ═══════════════════════════════════════════════════
     # 8️⃣ 밸류에이션
     # ═══════════════════════════════════════════════════
+    p_s, p_b = info.get('priceToSalesTrailing12Months'), info.get('priceToBook')
+    
     s_pe, pe_source = _sector_pe_live(sector)
 
     pe_comp = ""
@@ -822,7 +831,6 @@ def render_company_details(ticker_str: str):
     pe_visual = f"<div style='margin:16px 0'><div style='font-size:.95rem;color:#ffffff;margin-bottom:12px;font-weight:800'>P/E 비교</div><div style='display:flex;align-items:center;gap:12px;margin:8px 0'><span style='min-width:60px;font-size:.85rem;font-weight:700;color:#82aaff'>이 종목</span><div style='flex:1;background:rgba(0,0,0,0.3);border-radius:6px;height:24px;overflow:hidden'><div style='width:{t_pe / (max(t_pe, s_pe) * 1.3) * 100:.1f}%;height:100%;background:#82aaff;border-radius:6px;display:flex;align-items:center;justify-content:flex-end;padding-right:10px;font-size:.85rem;color:white;font-weight:800'>{t_pe:.1f}</div></div></div><div style='display:flex;align-items:center;gap:12px;margin:8px 0'><span style='min-width:60px;font-size:.85rem;font-weight:700;color:#adbac7'>섹터평균</span><div style='flex:1;background:rgba(0,0,0,0.3);border-radius:6px;height:24px;overflow:hidden'><div style='width:{s_pe / (max(t_pe, s_pe) * 1.3) * 100:.1f}%;height:100%;background:#607D8B;border-radius:6px;display:flex;align-items:center;justify-content:flex-end;padding-right:10px;font-size:.85rem;color:white;font-weight:800'>{s_pe:.1f}</div></div></div></div>" if t_pe and s_pe else ""
 
     pe_src_lbl = f"평균 P/E ≈ {s_pe:.1f} ({pe_source})" if s_pe else "N/A"
-    
     pe_warning = "<div class='note-box' style='border-left-color:#FFC107;'>⚠️ <b>주의:</b> Forward P/E가 Trailing P/E보다 비정상적으로 높습니다. 향후 실적 악화 전망이거나 yfinance 추정치 오류일 수 있습니다.</div>" if t_pe and f_pe and f_pe > t_pe * 1.5 else ""
 
     with st.container(border=True):
@@ -832,8 +840,8 @@ def render_company_details(ticker_str: str):
     <div>
         {_metric_row("Trailing P/E <span style='font-size:0.75rem;color:#768390;margin-left:4px'>(현재가÷과거EPS)</span>", f"{t_pe:.2f}" if isinstance(t_pe, (int, float)) else "N/A")}
         {_metric_row("Forward P/E <span style='font-size:0.75rem;color:#768390;margin-left:4px'>(현재가÷예상EPS)</span>", f"{f_pe:.2f}" if isinstance(f_pe, (int, float)) else "N/A")}
-        {_metric_row("P/S (TTM)", f"{info.get('priceToSalesTrailing12Months', 0):.2f}" if isinstance(info.get('priceToSalesTrailing12Months'), (int, float)) else "N/A")}
-        {_metric_row("P/B", f"{info.get('priceToBook', 0):.2f}" if isinstance(info.get('priceToBook'), (int, float)) else "N/A")}
+        {_metric_row("P/S (TTM)", f"{p_s:.2f}" if isinstance(p_s, (int, float)) else "N/A")}
+        {_metric_row("P/B", f"{p_b:.2f}" if isinstance(p_b, (int, float)) else "N/A")}
         <div class="divider"></div>
         {_metric_row(f"섹터 ({_esc(sector)})", pe_src_lbl)}
         {_metric_row("섹터 대비", pe_comp if pe_comp else "N/A")}
@@ -948,7 +956,7 @@ def render_company_details(ticker_str: str):
     mp_val = f"${mp:.2f}" if mp else ""
     mp_html = f"<span style='font-size:1.8rem;font-weight:900;color:#ffffff'>{mp_val}</span>" if mp else "<span style='color:#768390;font-size:1.2rem;font-weight:700'>데이터 없음</span>"
     exp_html = f"<span style='font-size:.85rem;color:#adbac7;font-weight:700'>(만기: {exp})</span>" if exp else ""
-    vol_warning = "<div style='color:#FFC107; font-size:.85rem; margin-top:12px; font-weight:700;'>⚠️ 미결제약정(OI) 부족으로 임시로 거래량(Volume) 가중치를 사용했습니다.</div>" if is_vol_weight else ""
+    vol_warning = "<div style='color:#FFC107; font-size:.85rem; margin-top:12px; font-weight:700;'>⚠️ 미결제약정(OI) 부족으로 거래량 가중치를 임시 사용했습니다.</div>" if is_vol_weight else ""
 
     with st.container(border=True):
         st.markdown(f"""
