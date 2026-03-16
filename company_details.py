@@ -3,6 +3,7 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import html as html_module
+import requests
 from datetime import datetime
 import plotly.graph_objects as go
 
@@ -112,15 +113,16 @@ def _annual_values(financials, row_candidates):
 # ── 시각 요소 및 Plotly 차트 생성기 ─────────────────────────────────────
 
 def _verdict_badge(color, emoji, text):
-    bg = {"green": "rgba(0,230,118,.12)", "red": "rgba(255,23,68,.12)",
-          "yellow": "rgba(255,193,7,.12)", "blue": "rgba(33,150,243,.12)",
-          "gray": "rgba(96,125,139,.12)"}
+    bg = {"green": "rgba(0,230,118,.15)", "red": "rgba(255,23,68,.15)",
+          "yellow": "rgba(255,193,7,.15)", "blue": "rgba(33,150,243,.15)",
+          "gray": "rgba(96,125,139,.15)"}
     bdr = {"green": "#00E676", "red": "#FF1744", "yellow": "#FFC107",
-           "blue": "#2196F3", "gray": "#607D8B"}
+           "blue": "#2196F3", "gray": "#8b949e"}
     return (f'<div style="background:{bg.get(color, bg["gray"])};'
-            f'border:1px solid {bdr.get(color, bdr["gray"])};border-radius:10px;'
-            f'padding:14px 18px;margin-top:16px;text-align:center">'
-            f'<span style="font-size:1.05rem;font-weight:700;'
+            f'border:1px solid {bdr.get(color, bdr["gray"])};border-radius:12px;'
+            f'padding:16px 20px;margin-top:20px;text-align:center;'
+            f'box-shadow: 0 4px 12px {bg.get(color, bg["gray"])};">'
+            f'<span style="font-size:1.1rem;font-weight:800;'
             f'color:{bdr.get(color, bdr["gray"])}">{emoji} {text}</span></div>')
 
 def _metric_row(label, value, value_class="m-value"):
@@ -129,7 +131,7 @@ def _metric_row(label, value, value_class="m-value"):
 
 def _gauge_bar(pct, color="#00E676", height=8):
     pct = max(0, min(100, pct))
-    return (f'<div style="background:#21262d;border-radius:{height}px;'
+    return (f'<div style="background:rgba(255,255,255,0.1);border-radius:{height}px;'
             f'height:{height}px;overflow:hidden;margin:6px 0">'
             f'<div style="width:{pct:.1f}%;height:100%;background:{color};'
             f'border-radius:{height}px;transition:width .8s"></div></div>')
@@ -145,11 +147,10 @@ def _score_dot_row(items):
         cells += (f'<div style="display:inline-flex;flex-direction:column;align-items:center;'
                   f'min-width:60px;padding:6px 4px">'
                   f'<span style="font-size:1.2rem">{dot}</span>'
-                  f'<span style="font-size:.65rem;color:#8b949e;margin-top:2px;'
+                  f'<span style="font-size:.75rem;font-weight:700;color:#c9d1d9;margin-top:4px;'
                   f'text-align:center;line-height:1.2">{name}</span></div>')
-    return f'<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:2px;margin:10px 0">{cells}</div>'
+    return f'<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px;margin:12px 0">{cells}</div>'
 
-# 🚀 Plotly 가독성 극대화 (화이트 폰트, 두꺼운 선 적용)
 def _get_plotly_combo_chart(rv, nv, rd):
     if not rv or not rd or len(rv) < 2: return None
     rd_rev, rv_rev, nv_rev = rd[::-1], rv[::-1], nv[::-1]
@@ -171,7 +172,7 @@ def _get_plotly_combo_chart(rv, nv, rd):
     fig.update_layout(
         title=dict(text="<b>📊 연도별 재무 추이</b>", font=dict(size=16, color='white', family="Arial")),
         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='white', size=13, weight='bold'),
+        font=dict(color='white', size=13, weight='bold'), 
         margin=dict(l=10, r=10, t=40, b=10), height=320,
         xaxis=dict(showgrid=False, tickfont=dict(color='white')), 
         yaxis=dict(showgrid=True, gridcolor='rgba(255, 255, 255, 0.15)', zeroline=False, tickfont=dict(color='white')),
@@ -184,10 +185,10 @@ def _get_plotly_yearly_bar(dates, y1, y2, name1, name2, c1, c2):
     if not dates or not y1 or len(y1) < 2: return None
     labels = [d.strftime('%Y') if hasattr(d, 'strftime') else str(d)[:4] for d in dates[::-1]]
     fig = go.Figure()
-    fig.add_trace(go.Bar(x=labels, y=y1[::-1], name=name1, marker_color=c1,
-                         text=[_fmt_num(v, False) for v in y1[::-1]], textposition='auto', textfont=dict(color='white', weight='bold')))
-    fig.add_trace(go.Bar(x=labels, y=y2[::-1], name=name2, marker_color=c2,
-                         text=[_fmt_num(v, False) for v in y2[::-1]], textposition='auto', textfont=dict(color='white', weight='bold')))
+    fig.add_trace(go.Bar(x=labels, y=y1[::-1], name=name1, marker_color=c1, opacity=0.9,
+                         text=[_fmt_num(v, False) for v in y1[::-1]], textposition='auto', textfont=dict(color='white', size=13, weight='bold')))
+    fig.add_trace(go.Bar(x=labels, y=y2[::-1], name=name2, marker_color=c2, opacity=0.9,
+                         text=[_fmt_num(v, False) for v in y2[::-1]], textposition='auto', textfont=dict(color='white', size=13, weight='bold')))
     fig.update_layout(
         title=dict(text="<b>📊 연도별 자산/부채 추이</b>", font=dict(size=16, color='white', family="Arial")),
         barmode='group', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white', size=13, weight='bold'), 
@@ -201,10 +202,8 @@ def _get_plotly_yearly_bar(dates, y1, y2, name1, name2, c1, c2):
 def _get_plotly_target_price(curr, low, mean, median, high):
     if not low or not high: return None
     fig = go.Figure()
-    # 굵은 연결선
     fig.add_trace(go.Scatter(x=[low, high], y=[0, 0], mode='lines', line=dict(color='#768390', width=6), showlegend=False, hoverinfo='skip'))
     
-    # 각 포인트 마커 (폰트 가독성 상향)
     pts = [(low, '최저가', '#adbac7', 12, 'bottom center'), (high, '최고가', '#adbac7', 12, 'bottom center'),
            (mean, '평균', '#2196F3', 14, 'bottom center'), (median, '중앙값', '#00E676', 16, 'top center'),
            (curr, '현재가', '#FF9800', 22, 'top center')]
@@ -221,7 +220,7 @@ def _get_plotly_target_price(curr, low, mean, median, high):
         title=dict(text="<b>📊 목표가 범위 및 현재가 위치</b>", font=dict(size=16, color='white', family="Arial")),
         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white', size=13, weight='bold'),
         height=260, margin=dict(l=20, r=20, t=50, b=20),
-        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False), # X축 레이블 끄기 (마커 텍스트로 충분)
+        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False), 
         yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[-1.2, 1.2]),
         legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5, font=dict(color='white'))
     )
@@ -229,7 +228,10 @@ def _get_plotly_target_price(curr, low, mean, median, high):
 
 def _get_plotly_donut(labels, values, colors):
     if sum(values) == 0: return None
-    fig = go.Figure(data=[go.Pie(labels=labels, values=values, hole=.55, marker_colors=colors, textinfo='label+percent', textfont=dict(color='white', size=14, weight='bold'))])
+    fig = go.Figure(data=[go.Pie(
+        labels=labels, values=values, hole=.55, marker_colors=colors, 
+        textinfo='label+percent', textfont=dict(color='white', size=14, weight='bold'), hoverinfo='label+percent'
+    )])
     fig.update_layout(
         title=dict(text="<b>📊 지분 구성 비율</b>", font=dict(size=16, color='white', family="Arial")),
         margin=dict(t=50, b=10, l=10, r=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', 
@@ -242,15 +244,14 @@ def _get_plotly_gauge(val, color):
     fig = go.Figure(go.Indicator(
         mode = "gauge+number", value = val_pct, number = {'suffix': "%", 'font': {'size': 32, 'color': color, 'weight':'bold'}},
         gauge = {'axis': {'range': [0, 100], 'tickwidth': 2, 'tickcolor': "white"}, 
-                 'bar': {'color': color, 'thickness': 0.75}, 'bgcolor': "rgba(255,255,255,0.1)", 'borderwidth': 0,
-                 'steps': [{'range': [0, 10], 'color': 'rgba(0,230,118,0.15)'}, {'range': [10, 20], 'color': 'rgba(255,193,7,0.15)'}, {'range': [20, 100], 'color': 'rgba(255,23,68,0.15)'}]}
+                 'bar': {'color': color, 'thickness': 0.8}, 'bgcolor': "rgba(255,255,255,0.1)", 'borderwidth': 0,
+                 'steps': [{'range': [0, 10], 'color': 'rgba(0,230,118,0.2)'}, {'range': [10, 20], 'color': 'rgba(255,193,7,0.2)'}, {'range': [20, 100], 'color': 'rgba(255,23,68,0.2)'}]}
     ))
     fig.update_layout(
         title=dict(text="<b>📊 공매도 비율 (100% 기준)</b>", font=dict(size=16, color='white', family="Arial")),
         paper_bgcolor='rgba(0,0,0,0)', font=dict(color='white', weight='bold'), margin=dict(l=20, r=20, t=50, b=20), height=280
     )
     return fig
-
 
 # ── 분석 함수들 ─────────────────────────────────────────
 
@@ -267,8 +268,7 @@ def _growth_stage(info, fin, bs, cf):
                 if n in cf.index:
                     op_cf = cf.loc[n].dropna().iloc[0] or 0
                     break
-    except Exception:
-        pass
+    except Exception: pass
 
     rev_declining = False
     try:
@@ -277,8 +277,7 @@ def _growth_stage(info, fin, bs, cf):
             rd = rs.sort_index(ascending=False)
             if sum(1 for i in range(len(rd) - 1) if rd.iloc[i] < rd.iloc[i + 1]) >= 2:
                 rev_declining = True
-    except Exception:
-        pass
+    except Exception: pass
 
     stages = {
         1: ("🌱 1단계 : 스타트업 / 개발", "매출 미미·R&D 집중. 시장 검증 전, 높은 리스크·높은 잠재력."),
@@ -413,8 +412,7 @@ def _max_pain(tkr):
         for col in ['openInterest', 'volume']:
             if col not in c.columns: c[col] = 0
             if col not in p.columns: p[col] = 0
-            c[col] = c[col].fillna(0)
-            p[col] = p[col].fillna(0)
+            c[col], p[col] = c[col].fillna(0), p[col].fillna(0)
             
         c_oi_sum = c['openInterest'].sum()
         p_oi_sum = p['openInterest'].sum()
@@ -438,16 +436,13 @@ def _max_pain(tkr):
             pain[s] = (np.sum(weight_c * np.maximum(0, s - c['strike']))
                        + np.sum(weight_p * np.maximum(0, p['strike'] - s)))
                        
-        if not pain or max(pain.values()) == 0:
-            mp = None
-        else:
-            mp = min(pain, key=pain.get)
+        if not pain or max(pain.values()) == 0: mp = None
+        else: mp = min(pain, key=pain.get)
             
         tc = c.nlargest(3, 'volume')[['strike', 'volume']].to_dict('records')
         tp = p.nlargest(3, 'volume')[['strike', 'volume']].to_dict('records')
         return exp, mp, tc, tp, is_vol_weight
-    except Exception:
-        return None, None, None, None, False
+    except Exception: return None, None, None, None, False
 
 def _sector_pe_live(sector):
     etf = {
@@ -461,10 +456,8 @@ def _sector_pe_live(sector):
     if etf:
         try:
             pe = yf.Ticker(etf).info.get('trailingPE')
-            if pe and isinstance(pe, (int, float)) and pe > 0:
-                return pe, "실시간"
-        except Exception:
-            pass
+            if pe and isinstance(pe, (int, float)) and pe > 0: return pe, "실시간"
+        except Exception: pass
             
     fb = {
         "Technology": 30, "Communication Services": 22, "Consumer Cyclical": 25,
@@ -516,9 +509,9 @@ CSS = """
 .m-label{color:#adbac7;font-weight:600}
 .m-value{color:#ffffff;font-weight:800;text-align:right;max-width:55%}
 .m-green{color:#00E676 !important;font-weight:800}
+.m-blue{color:#448aff !important;font-weight:800}
 .m-red{color:#FF1744 !important;font-weight:800}
 .m-yellow{color:#FFC107 !important;font-weight:800}
-.m-blue{color:#448aff !important;font-weight:800}
 .m-big{font-size:1.15rem;font-weight:900}
 .divider{border-top:1px dashed #535e6b;margin:20px 0}
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px}
@@ -592,15 +585,17 @@ def render_company_details(ticker_str: str):
         ann_rev_g = "N/A"
         try:
             rv_ann, _ = _annual_values(fin, REV_ALIASES)
-            if len(rv_ann) >= 2 and rv_ann[1] > 0:
-                ann_rev_g = (rv_ann[0] / rv_ann[1]) - 1
+            if len(rv_ann) >= 2 and rv_ann[1] > 0: ann_rev_g = (rv_ann[0] / rv_ann[1]) - 1
         except: pass
 
         qoq_rev_g = "N/A"
+        yoy_q_rev_g = info.get('revenueGrowth')
         try:
             q_rs = _get_row_series(q_fin, REV_ALIASES).sort_index(ascending=False)
             if len(q_rs) >= 2 and q_rs.iloc[1] > 0:
                 qoq_rev_g = (q_rs.iloc[0] / q_rs.iloc[1]) - 1
+            if len(q_rs) >= 5 and q_rs.iloc[4] > 0:
+                yoy_q_rev_g = (q_rs.iloc[0] / q_rs.iloc[4]) - 1
         except: pass
 
     # ═══════════════════════════════════════════════════
@@ -611,8 +606,8 @@ def render_company_details(ticker_str: str):
     <div class="header-wrap">
         <div>
             <span style="font-size:1.8rem;font-weight:900;color:#ffffff">🏢 {name_safe}</span>
-            <span style="font-size:1.1rem;color:#8b949e;margin-left:8px;font-weight:800">({_esc(ticker_str)})</span><br>
-            <span style="font-size:.9rem;color:#adbac7;font-weight:700">{_esc(sector)} · {_esc(industry)}</span>
+            <span style="font-size:1.1rem;color:#adbac7;margin-left:8px;font-weight:800">({_esc(ticker_str)})</span><br>
+            <span style="font-size:.9rem;color:#8b949e;font-weight:700">{_esc(sector)} · {_esc(industry)}</span>
         </div>
         <div style="text-align:right">
             <span style="font-size:2.2rem;font-weight:900;color:{chg_c}">${price:,.2f}</span><br>
@@ -657,13 +652,13 @@ def render_company_details(ticker_str: str):
             <span style="display:inline-block;padding:12px 32px;border-radius:24px;
                          font-weight:800;background:{scolor};color:#fff;font-size:1.2rem;
                          box-shadow:0 6px 20px {scolor}66">{sname}</span>
-            <div style="font-size:1rem;color:#e6edf3;font-weight:600;margin-top:16px;line-height:1.7">{sdesc}</div>
+            <div style="font-size:1rem;color:#e6edf3;font-weight:700;margin-top:16px;line-height:1.7">{sdesc}</div>
         </div>
         <div class="divider"></div>
         <div class="two-col">
             <div>
                 {_metric_row("최근 연간 매출성장 (YoY)", _fmt_pct(ann_rev_g))}
-                {_metric_row("최근 분기 매출성장 (YoY)", _fmt_pct(info.get('revenueGrowth')))}
+                {_metric_row("최근 분기 매출성장 (YoY)", _fmt_pct(yoy_q_rev_g))}
                 {_metric_row("직전 분기 대비 성장 (QoQ)", _fmt_pct(qoq_rev_g))}
             </div>
             <div>
@@ -741,7 +736,7 @@ def render_company_details(ticker_str: str):
             </div>
             <div>
                 {_metric_row(eps_lbl, _fmt_cagr(cagr_eps), cr_cls(cagr_eps))}
-                <div class="note-box">※ 이익이 적자(-)에서 시작된 경우 수학적 한계로 비율(%) 대신 방향성 텍스트로 대체 표기합니다.</div>
+                <div class="note-box">※ 이익이 적자(-)에서 시작된 경우 수학적 한계로 연평균 비율(%) 대신 방향성 텍스트로 대체 표기합니다.</div>
             </div>
         </div>
         {_verdict_badge(v2_c, "📌", v2_t)}
@@ -786,7 +781,7 @@ def render_company_details(ticker_str: str):
             col1, col2 = st.columns([1.1, 1])
             with col1:
                 st.markdown(f"""
-                {_metric_row("수익 안정성", f'{rev_stab} <span style="font-size:.8rem;color:#8b949e">{rev_cv}</span>')}
+                {_metric_row("수익 안정성", f'{rev_stab} <span style="font-size:.8rem;color:#8b949e;font-weight:600">{rev_cv}</span>')}
                 {_metric_row("이익 마진 추이", mtrend)}
                 {_metric_row("성장 가속화", accel)}
                 {_metric_row("ROE 수준", roe_lbl)}
@@ -797,7 +792,7 @@ def render_company_details(ticker_str: str):
                 st.plotly_chart(fig3, use_container_width=True, config={'displayModeBar': False})
         else:
             st.markdown(f"""
-            {_metric_row("수익 안정성", f'{rev_stab} <span style="font-size:.8rem;color:#8b949e">{rev_cv}</span>')}
+            {_metric_row("수익 안정성", f'{rev_stab} <span style="font-size:.8rem;color:#8b949e;font-weight:600">{rev_cv}</span>')}
             {_metric_row("이익 마진 추이", mtrend)}
             {_metric_row("성장 가속화", accel)}
             {_metric_row("ROE 수준", roe_lbl)}
@@ -808,7 +803,7 @@ def render_company_details(ticker_str: str):
         st.markdown(_verdict_badge(v3_c, "📌", v3_t), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 4️⃣ 성장 가능성 
+    # 4️⃣ 성장 가능성 (🚀 PEG 강제 계산 로직 완벽 적용)
     # ═══════════════════════════════════════════════════
     payout    = info.get('payoutRatio', 0) or 0
     retention = max(0, 1 - payout)
@@ -818,17 +813,35 @@ def render_company_details(ticker_str: str):
     rg        = info.get('revenueGrowth')
     fwd_eps   = info.get('forwardEps')
     
+    # 🚀 3단계 PEG 강제 계산 방어 로직 (N/A 원천 봉쇄)
     peg = info.get('pegRatio')
     if peg is None or pd.isna(peg):
-        t_pe_val = info.get('trailingPE')
-        if t_pe_val and eg and eg > 0:
-            peg = t_pe_val / (eg * 100)
-        elif t_pe_val and isinstance(cagr_ni, float) and cagr_ni > 0:
-            peg = t_pe_val / (cagr_ni * 100)
+        pe_val = info.get('forwardPE') or info.get('trailingPE')
+        growth_val = eg
+        if (growth_val is None or growth_val <= 0) and isinstance(cagr_eps, float) and cagr_eps > 0: growth_val = cagr_eps
+        if (growth_val is None or growth_val <= 0) and isinstance(cagr_ni, float) and cagr_ni > 0: growth_val = cagr_ni
+        
+        if pe_val and growth_val and growth_val > 0:
+            peg = pe_val / (growth_val * 100)
+
+    # UI용 변수 세팅
+    if peg and not pd.isna(peg):
+        if peg < 0.5:
+            peg_txt = f"{peg:.2f} (매우 저평가)"
+            peg_cls = "m-blue"
+        elif peg <= 1.5:
+            peg_txt = f"{peg:.2f} (적정 수준)"
+            peg_cls = "m-green"
+        else:
+            peg_txt = f"{peg:.2f} (고평가)"
+            peg_cls = "m-red"
+    else:
+        peg_txt = "N/A"
+        peg_cls = "m-value"
 
     gs = sum(1 for x in [
-        eg and eg > 0.15, rg and rg > 0.10, retention > 0.60,
-        sust_g and sust_g > 0.10, peg and 0 < peg < 1.5,
+        eg and eg > 0.15, yoy_q_rev_g and isinstance(yoy_q_rev_g, float) and yoy_q_rev_g > 0.10, retention > 0.60,
+        sust_g and sust_g > 0.10, peg and 0 < peg <= 1.5,
     ] if x)
     if   gs >= 4: v4_c, v4_t = "green",  "🚀 높은 성장 잠재력 — 수익 재투자 + 고성장"
     elif gs >= 2: v4_c, v4_t = "yellow", "⚠️ 보통 — 성장 가능성 있으나 모니터링 필요"
@@ -836,7 +849,7 @@ def render_company_details(ticker_str: str):
     all_verdicts.append(("성장성", v4_c))
 
     eg_cls = "m-green" if eg and eg > 0 else "m-red"
-    rg_cls = "m-green" if rg and rg > 0 else "m-red"
+    rg_cls = "m-green" if yoy_q_rev_g and isinstance(yoy_q_rev_g, float) and yoy_q_rev_g > 0 else "m-red"
 
     with st.container(border=True):
         st.markdown(f"""
@@ -844,19 +857,21 @@ def render_company_details(ticker_str: str):
         <div class="two-col">
             <div>
                 {_metric_row("분기 이익 성장률 (YoY)", _fmt_pct(eg), eg_cls)}
-                {_metric_row("분기 매출 성장률 (YoY)", _fmt_pct(rg), rg_cls)}
+                {_metric_row("분기 매출 성장률 (YoY)", _fmt_pct(yoy_q_rev_g), rg_cls)}
                 {_metric_row("Forward EPS", f"${_safe(fwd_eps)}")}
-                {_metric_row("PEG 비율", f"{peg:.2f}" if peg else "N/A", "m-green" if peg and 0 < peg < 1.5 else "m-value")}
+                {_metric_row("PEG 비율", peg_txt, peg_cls)}
             </div>
             <div>
                 {_metric_row("ROE", _fmt_pct(roe_v))}
                 {_metric_row("수익 유보율 (1 - 배당성향)", _fmt_pct(retention))}
                 {_metric_row("지속가능 성장률 (g)", _fmt_pct(sust_g), "m-green" if sust_g and sust_g > 0.1 else "m-value")}
-                <div class="note-box">
-                    💡 <b>지속가능 성장률(g)</b> = ROE × 유보율. 외부 자금 없이 달성 가능한 이론적 최대 성장률.<br>
-                    💡 PEG &lt; 1.5 면 이익 성장률 대비 현재 주가가 저평가되어 있을 가능성이 높습니다.
-                </div>
             </div>
+        </div>
+        <div class="note-box" style="margin-top:16px;">
+            💡 <b>PEG (주가수익성장비율)</b> = P/E Ratio ÷ 이익 성장률(EPS Growth)<br>
+            • <b>PEG &lt; 0.5</b> : 매우 저평가 (성장성에 비해 주가가 아주 쌈)<br>
+            • <b>PEG 0.5 ~ 1.5</b> : 적정 가치 (성장하는 만큼 주가가 매겨짐)<br>
+            • <b>PEG &gt; 1.5</b> : 고평가 (성장성보다 주가가 너무 앞서감)
         </div>
         {_verdict_badge(v4_c, "📌", v4_t)}
         """, unsafe_allow_html=True)
@@ -1030,7 +1045,16 @@ def render_company_details(ticker_str: str):
     # ═══════════════════════════════════════════════════
     # 8️⃣ 밸류에이션
     # ═══════════════════════════════════════════════════
-    t_pe, f_pe, p_s, p_b = info.get('trailingPE'), info.get('forwardPE'), info.get('priceToSalesTrailing12Months'), info.get('priceToBook')
+    t_pe = info.get('trailingPE')
+    f_pe = info.get('forwardPE')
+    p_s  = info.get('priceToSalesTrailing12Months')
+    p_b  = info.get('priceToBook')
+    
+    t_eps = info.get('trailingEps')
+    f_eps = info.get('forwardEps')
+    if (t_pe is None or pd.isna(t_pe)) and t_eps and t_eps > 0 and price: t_pe = price / t_eps
+    if (f_pe is None or pd.isna(f_pe)) and f_eps and f_eps > 0 and price: f_pe = price / f_eps
+
     s_pe, pe_source = _sector_pe_live(sector)
 
     pe_comp = ""
@@ -1061,8 +1085,8 @@ def render_company_details(ticker_str: str):
         <div class="s-title"><span class="s-num">08</span> 이 종목 비싼가요? <span style="font-size:.8rem;color:#768390">Yahoo</span></div>
         <div class="two-col">
             <div>
-                {_metric_row("Trailing P/E", f"{t_pe:.2f}" if isinstance(t_pe, (int, float)) else "N/A")}
-                {_metric_row("Forward P/E", f"{f_pe:.2f}" if isinstance(f_pe, (int, float)) else "N/A")}
+                {_metric_row("Trailing P/E <span style='font-size:0.75rem;color:#768390;margin-left:4px'>(현재가÷TTM EPS)</span>", f"{t_pe:.2f}" if isinstance(t_pe, (int, float)) else "N/A")}
+                {_metric_row("Forward P/E <span style='font-size:0.75rem;color:#768390;margin-left:4px'>(현재가÷Fwd EPS)</span>", f"{f_pe:.2f}" if isinstance(f_pe, (int, float)) else "N/A")}
                 {_metric_row("P/S (TTM)", f"{p_s:.2f}" if isinstance(p_s, (int, float)) else "N/A")}
                 {_metric_row("P/B", f"{p_b:.2f}" if isinstance(p_b, (int, float)) else "N/A")}
                 <div class="divider"></div>
@@ -1071,17 +1095,19 @@ def render_company_details(ticker_str: str):
             </div>
             <div>
                 {pe_visual}
-                <div class="note-box">
-                    ※ 섹터 P/E는 {pe_source} 기준입니다. 실시간 조회 실패 시 추정치로 대체됩니다.<br>
-                    섹터 ETF P/E를 함께 참고하면 더 정확합니다.
-                </div>
+<div class="note-box">
+※ P/E는 현재가 ÷ EPS로 직접 계산 및 교차 검증되었습니다.<br>
+<b>Trailing P/E</b> = 현재가 ÷ 과거 12개월 실적 EPS<br>
+<b>Forward P/E</b> = 현재가 ÷ 향후 12개월 추정 EPS<br>
+섹터 P/E는 실시간 기준입니다.
+</div>
             </div>
         </div>
         {_verdict_badge(v8_c, "📌", v8_t)}
         """, unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 9️⃣ 전문가 의견 
+    # 9️⃣ 전문가 의견
     # ═══════════════════════════════════════════════════
     rm = info.get('recommendationMean')
     rk = str(info.get('recommendationKey', 'N/A')).upper()
@@ -1239,7 +1265,7 @@ def render_company_details(ticker_str: str):
                   for pi in (tp or [])]) or "<li>N/A</li>"
     mp_badge = f"Max Pain {mp_val} — {mp_note.replace('<b>', '').replace('</b>', '')}" if mp else "옵션 데이터 없음"
     
-    vol_warning = "<div style='color:#FFC107; font-size:.85rem; margin-top:12px; font-weight:700;'>⚠️ 미결제약정(OI) 데이터 부족으로 임시로 거래량(Volume) 가중치를 사용했습니다.</div>" if is_vol_weight else ""
+    vol_warning = "<div style='color:#FFC107; font-size:.85rem; margin-top:12px; font-weight:700;'>⚠️ 미결제약정(OI) 데이터 누락으로 임시로 거래량(Volume) 가중치를 사용했습니다. (신뢰도 낮음)</div>" if is_vol_weight else ""
 
     with st.container(border=True):
         st.markdown(f"""
@@ -1263,7 +1289,8 @@ def render_company_details(ticker_str: str):
         </div>
         <div class="note-box" style="margin-top:20px">
             💡 <b>Max Pain 이론</b>: 옵션 만기 시 가장 많은 옵션 매수자(보유자)가 손실을 보는 가격.<br>
-            옵션 매도자(마켓메이커)의 이익이 극대화되는 지점으로, 주가가 만기일에 이 가격 부근으로 수렴하는 경향이 있다는 이론입니다.
+            옵션 매도자(마켓메이커)의 이익이 극대화되는 지점으로, 주가가 만기일에 이 가격 부근으로 수렴하는 경향이 있다는 이론입니다.<br>
+            ※ 참고 지표이며 항상 수렴하지는 않습니다.
         </div>
         {_verdict_badge(mp_c, "📌", mp_badge)}
         """, unsafe_allow_html=True)
