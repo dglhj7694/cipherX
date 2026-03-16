@@ -8,7 +8,6 @@ import plotly.graph_objects as go
 
 # ═══════════════════════════════════════════════════════════════
 # 🛠️ API 변동성 대응을 위한 동의어(Alias) 설정
-# 🔧 개선: CamelCase / snake_case / 공백 혼용 대응 강화
 # ═══════════════════════════════════════════════════════════════
 REV_ALIASES = [
     'Total Revenue', 'TotalRevenue', 'Operating Revenue',
@@ -44,7 +43,6 @@ EQ_ALIASES = [
     'Total Equity', 'TotalEquity',
     'Net Tangible Assets', 'NetTangibleAssets',
 ]
-# 🔧 개선: 캐시플로우 행 이름도 alias 관리
 CF_OPERATING_ALIASES = [
     'Operating Cash Flow', 'OperatingCashFlow',
     'Total Cash From Operating Activities',
@@ -52,7 +50,6 @@ CF_OPERATING_ALIASES = [
     'Cash Flow From Continuing Operating Activities',
     'CashFlowFromContinuingOperatingActivities',
 ]
-# 🔧 개선: 이자비용 / EBIT alias 추가
 EBIT_ALIASES = [
     'EBIT', 'Operating Income', 'OperatingIncome',
 ]
@@ -109,23 +106,17 @@ def _esc(text):
 
 
 # ═══════════════════════════════════════════════════════════════
-# 🔧 개선: 퍼지 매칭(Fuzzy Match) 헬퍼 — 대소문자·공백·밑줄 무시
+# 🔧 퍼지 매칭(Fuzzy Match) 헬퍼
 # ═══════════════════════════════════════════════════════════════
 def _normalize_key(name: str) -> str:
-    """인덱스 비교용 정규화: 소문자 + 공백/밑줄 제거"""
     return name.lower().replace(' ', '').replace('_', '')
 
 
 def _find_matching_index(df_index, candidates):
-    """
-    1차: 정확 매칭  →  2차: 정규화 퍼지 매칭
-    매칭된 실제 인덱스 이름을 반환하거나 None
-    """
     idx_set = set(df_index)
     for name in candidates:
         if name in idx_set:
             return name
-    # 퍼지 매칭
     norm_map = {_normalize_key(idx): idx for idx in df_index}
     for name in candidates:
         key = _normalize_key(name)
@@ -134,7 +125,6 @@ def _find_matching_index(df_index, candidates):
     return None
 
 
-# 🔧 개선: _get_row — 퍼지 매칭 적용
 def _get_row(df, candidates, col_idx=0):
     if df is None or df.empty:
         return None
@@ -153,7 +143,6 @@ def _get_row(df, candidates, col_idx=0):
     return None
 
 
-# 🔧 개선: _get_row_series — 퍼지 매칭 적용
 def _get_row_series(df, candidates):
     if df is None or df.empty:
         return pd.Series(dtype=float)
@@ -212,10 +201,9 @@ def _annual_values(financials, row_candidates):
 
 
 # ═══════════════════════════════════════════════════════════════
-# 🔧 개선: 재무제표 로딩 헬퍼 — income_stmt 우선, financials 레거시 fallback
+# 🔧 재무제표 로딩 헬퍼
 # ═══════════════════════════════════════════════════════════════
 def _load_income_stmt(tkr):
-    """연간 손익계산서: income_stmt 우선 → financials fallback"""
     try:
         df = tkr.income_stmt
         if df is not None and not df.empty:
@@ -232,7 +220,6 @@ def _load_income_stmt(tkr):
 
 
 def _load_quarterly_income_stmt(tkr):
-    """분기 손익계산서: quarterly_income_stmt 우선 → quarterly_financials fallback"""
     try:
         df = tkr.quarterly_income_stmt
         if df is not None and not df.empty:
@@ -249,7 +236,6 @@ def _load_quarterly_income_stmt(tkr):
 
 
 def _load_balance_sheet(tkr):
-    """대차대조표"""
     try:
         df = tkr.balance_sheet
         if df is not None and not df.empty:
@@ -260,14 +246,12 @@ def _load_balance_sheet(tkr):
 
 
 def _load_cashflow(tkr):
-    """현금흐름표"""
     try:
         df = tkr.cashflow
         if df is not None and not df.empty:
             return df
     except Exception:
         pass
-    # 🔧 개선: cash_flow_stmt fallback (일부 yfinance 버전)
     try:
         df = tkr.cash_flow
         if df is not None and not df.empty:
@@ -275,6 +259,122 @@ def _load_cashflow(tkr):
     except Exception:
         pass
     return None
+
+
+# ═══════════════════════════════════════════════════════════════
+# ✅ FIX #6: 재무제표 기준일 추출 헬퍼
+# ═══════════════════════════════════════════════════════════════
+def _get_stmt_date(df):
+    """재무제표 DataFrame에서 가장 최근 컬럼 날짜를 문자열로 반환"""
+    if df is None or df.empty:
+        return None
+    try:
+        col = df.columns[0]
+        if hasattr(col, 'strftime'):
+            return col.strftime('%Y-%m-%d')
+        return str(col)[:10]
+    except Exception:
+        return None
+
+
+def _date_badge(label, date_str):
+    """기준일 뱃지 HTML 생성"""
+    if not date_str:
+        return ""
+    return (f'<span style="font-size:.7rem;color:#6e7681;background:#21262d;'
+            f'padding:2px 8px;border-radius:6px;margin-left:6px">'
+            f'📅 {label}: {date_str}</span>')
+
+
+# ═══════════════════════════════════════════════════════════════
+# ✅ FIX #3,#4: 실제 재무데이터 기반 성장률 계산 헬퍼
+# ═══════════════════════════════════════════════════════════════
+def _calc_yoy_from_series(series):
+    """시계열에서 최근 YoY 성장률 계산 (최소 2개 데이터 필요)"""
+    if series is None or len(series) < 2:
+        return None
+    s = series.sort_index(ascending=False)
+    curr, prev = s.iloc[0], s.iloc[1]
+    if prev is None or prev == 0:
+        return None
+    return (curr - prev) / abs(prev)
+
+
+def _calc_quarterly_yoy(q_df, aliases):
+    """분기 데이터에서 YoY 성장률 계산 (현재 분기 vs 4분기 전)"""
+    if q_df is None or q_df.empty:
+        return None
+    try:
+        series = _get_row_series(q_df, aliases).sort_index(ascending=False)
+        if len(series) >= 5:
+            curr_q = series.iloc[0]
+            yoy_q = series.iloc[4]  # 4분기 전 = 전년 동기
+            if yoy_q is not None and yoy_q != 0:
+                return (curr_q - yoy_q) / abs(yoy_q)
+        # fallback: 최소 2분기만 있으면 직전 분기 대비
+        elif len(series) >= 2:
+            curr_q = series.iloc[0]
+            prev_q = series.iloc[1]
+            if prev_q is not None and prev_q != 0:
+                return (curr_q - prev_q) / abs(prev_q)
+    except Exception:
+        pass
+    return None
+
+
+# ═══════════════════════════════════════════════════════════════
+# ✅ FIX #5: 실제 매출 시계열 기반 성장률 계산 (성장 단계 판정용)
+# ═══════════════════════════════════════════════════════════════
+def _calc_actual_rev_growth(fin, q_fin, info):
+    """
+    연간/분기 재무제표에서 매출 성장률 직접 계산.
+    info 값은 최후 fallback으로만 사용.
+    반환: (rev_growth_rate, data_source_label)
+    """
+    # 1순위: 연간 재무제표에서 최근 2개년 YoY
+    try:
+        ann_rev = _get_row_series(fin, REV_ALIASES).sort_index(ascending=False)
+        if len(ann_rev) >= 2 and ann_rev.iloc[1] > 0:
+            g = (ann_rev.iloc[0] / ann_rev.iloc[1]) - 1
+            return g, "연간 SEC"
+    except Exception:
+        pass
+
+    # 2순위: 분기 재무제표 YoY (최근 4분기 합 vs 전년 4분기 합)
+    try:
+        q_rev = _get_row_series(q_fin, REV_ALIASES).sort_index(ascending=False)
+        if len(q_rev) >= 8:
+            ttm_curr = sum(q_rev.iloc[0:4])
+            ttm_prev = sum(q_rev.iloc[4:8])
+            if ttm_prev > 0:
+                g = (ttm_curr / ttm_prev) - 1
+                return g, "분기 TTM SEC"
+        elif len(q_rev) >= 5:
+            g_q = (q_rev.iloc[0] - q_rev.iloc[4]) / abs(q_rev.iloc[4]) if q_rev.iloc[4] != 0 else None
+            if g_q is not None:
+                return g_q, "분기 YoY SEC"
+    except Exception:
+        pass
+
+    # 3순위: info fallback
+    rg = info.get('revenueGrowth')
+    if rg is not None and isinstance(rg, (int, float)):
+        return rg, "Yahoo 추정"
+    return None, ""
+
+
+def _calc_actual_profit_margin(fin, q_fin, info):
+    """실제 재무제표에서 순이익률 계산"""
+    # 연간 우선
+    try:
+        rev = _get_row(fin, REV_ALIASES)
+        ni = _get_row(fin, NI_ALIASES)
+        if rev is not None and ni is not None and rev != 0:
+            return ni / rev
+    except Exception:
+        pass
+    # info fallback
+    return info.get('profitMargins', 0) or 0
 
 
 # ── 시각 요소 및 Plotly 차트 생성기 ─────────────────────────────────────
@@ -421,29 +521,60 @@ def _get_plotly_gauge(val, color):
 
 # ── 분석 함수들 ─────────────────────────────────────────
 
-def _growth_stage(info, fin, bs, cf):
-    rev_g  = info.get('revenueGrowth', 0) or 0
-    margin = info.get('profitMargins', 0) or 0
-    rev    = info.get('totalRevenue', 0) or 0
-    div_y  = info.get('dividendYield', 0) or 0
+# ✅ FIX #5: 성장 단계 판정 함수 — 실제 재무데이터 기반으로 전면 개선
+def _growth_stage(info, fin, q_fin, bs, cf):
+    """
+    실제 재무제표 데이터를 우선 사용하여 성장 단계를 판정합니다.
+    info dict 값은 fallback으로만 사용.
+    """
+    # ── 실제 매출 성장률 계산 ──
+    rev_g, rev_src = _calc_actual_rev_growth(fin, q_fin, info)
+    if rev_g is None:
+        rev_g = 0
 
+    # ── 실제 순이익률 계산 ──
+    margin = _calc_actual_profit_margin(fin, q_fin, info)
+
+    # ── 실제 매출 규모 ──
+    rev = _get_row(fin, REV_ALIASES)
+    if rev is None:
+        rev = info.get('totalRevenue', 0) or 0
+
+    # ── 배당수익률 ──
+    div_y = info.get('dividendYield', 0) or 0
+
+    # ── 영업현금흐름 ──
     op_cf = 0
     try:
         if cf is not None:
-            # 🔧 개선: CF_OPERATING_ALIASES 사용
             val = _get_row(cf, CF_OPERATING_ALIASES)
             if val is not None:
                 op_cf = val
     except Exception:
         pass
 
+    # ── 매출 감소 추세 판정 (3년 이상 데이터로) ──
     rev_declining = False
     try:
         rs = _get_row_series(fin, REV_ALIASES)
         if len(rs) >= 3:
             rd = rs.sort_index(ascending=False)
-            if sum(1 for i in range(len(rd) - 1) if rd.iloc[i] < rd.iloc[i + 1]) >= 2:
+            decline_count = sum(1 for i in range(len(rd) - 1) if rd.iloc[i] < rd.iloc[i + 1])
+            if decline_count >= 2:
                 rev_declining = True
+    except Exception:
+        pass
+
+    # ── 3~5년 매출 CAGR도 참고 ──
+    multi_yr_cagr = None
+    try:
+        rs = _get_row_series(fin, REV_ALIASES)
+        if len(rs) >= 3:
+            rs_sorted = rs.sort_index()
+            s_val, e_val = rs_sorted.iloc[0], rs_sorted.iloc[-1]
+            years = len(rs_sorted) - 1
+            if s_val > 0 and e_val > 0:
+                multi_yr_cagr = (e_val / s_val) ** (1 / years) - 1
     except Exception:
         pass
 
@@ -475,7 +606,9 @@ def _growth_stage(info, fin, bs, cf):
     elif margin > 0: s = 6
     elif margin < -0.10: s = 8
     else: s = 6
-    return s, stages[s][0], stages[s][1], colors[s]
+
+    return s, stages[s][0], stages[s][1], colors[s], rev_g, rev_src, multi_yr_cagr
+
 
 def _stability(financials, rc):
     vals, _ = _annual_values(financials, rc)
@@ -524,7 +657,6 @@ def _growth_accel(fin, rc):
     return f"유지 ➡️ (최근 {recent_g * 100:.1f}% vs 과거 {past_g_avg * 100:.1f}%)", "green"
 
 def _debt_trend(bs):
-    # 🔧 개선: alias 상수 사용
     for nc in [BS_LIAB_ALIASES, DEBT_ALIASES_LONG, ['Total Debt', 'TotalDebt']]:
         series = _get_row_series(bs, nc)
         if len(series) >= 2:
@@ -538,7 +670,6 @@ def _debt_trend(bs):
     return "데이터 부족", "gray"
 
 def _interest_burden(fin, info):
-    # 🔧 개선: alias 상수 사용
     ebit = _get_row(fin, EBIT_ALIASES)
     interest = _get_row(fin, INTEREST_ALIASES)
 
@@ -598,8 +729,7 @@ def _max_pain(tkr):
 
         is_vol_weight = False
 
-        # 🔧 개선: OI 판단 기준을 최소 총합 기반으로 강화
-        min_oi_threshold = 100  # 최소 OI 총합 기준
+        min_oi_threshold = 100
         if (c_oi_sum < min_oi_threshold or p_oi_sum < min_oi_threshold
                 or (c_oi_sum == 0 or p_oi_sum == 0)):
             weight_c = c['volume']
@@ -655,10 +785,9 @@ def _sector_pe_live(sector):
 
 
 # ═══════════════════════════════════════════════════════════════
-# 🔧 개선: 뉴스 날짜 안전 파싱 헬퍼
+# 뉴스 날짜 안전 파싱 헬퍼
 # ═══════════════════════════════════════════════════════════════
 def _parse_news_datetime(news_item: dict) -> str:
-    """뉴스 항목에서 날짜 문자열을 안전하게 추출"""
     try:
         ts = news_item.get('providerPublishTime', 0)
         if ts and isinstance(ts, (int, float)) and ts > 0:
@@ -704,7 +833,7 @@ CSS = """
     font-size:1.15rem;font-weight:700;color:#82aaff;
     margin-bottom:20px;padding-bottom:12px;
     border-bottom:2px solid #2d333b;
-    display:flex;align-items:center;gap:10px}
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .s-title .s-num{
     background:#2d333b;border-radius:8px;padding:4px 10px;
     font-size:.8rem;color:#82aaff;font-weight:800}
@@ -758,11 +887,17 @@ def render_company_details(ticker_str: str):
             st.error("❌ 유효하지 않은 종목이거나 데이터가 없습니다.")
             return
 
-        # 🔧 개선: 재무제표 로딩 — income_stmt 우선, financials 레거시 fallback
         fin   = _load_income_stmt(tkr)
         q_fin = _load_quarterly_income_stmt(tkr)
         bs    = _load_balance_sheet(tkr)
         cf    = _load_cashflow(tkr)
+
+        # ✅ FIX #6: 각 재무제표 기준일 추출
+        fin_date   = _get_stmt_date(fin)
+        q_fin_date = _get_stmt_date(q_fin)
+        bs_date    = _get_stmt_date(bs)
+        cf_date    = _get_stmt_date(cf)
+        fetch_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 
         sector   = info.get('sector', 'N/A')
         industry = info.get('industry', 'N/A')
@@ -779,17 +914,39 @@ def render_company_details(ticker_str: str):
         cagr_ni,  yr_ni  = _calc_cagr_with_years(fin, NI_ALIASES)
         cagr_eps, yr_eps = _calc_cagr_with_years(fin, EPS_ALIASES)
 
-        # 🔧 개선: EPS CAGR fallback — 재무제표에 EPS 행이 없을 때 info 기반 추정
         if cagr_eps is None:
             t_eps = info.get('trailingEps')
             f_eps = info.get('forwardEps')
             if (t_eps and f_eps
                     and isinstance(t_eps, (int, float)) and isinstance(f_eps, (int, float))
                     and t_eps > 0 and f_eps > 0):
-                cagr_eps = (f_eps / t_eps) - 1  # 1년 forward 기준 추정
+                cagr_eps = (f_eps / t_eps) - 1
                 yr_eps = 1
 
-        ann_rev_g = cagr_rev if yr_rev == 1 else "N/A"
+        # ✅ FIX #4: 연간 매출 YoY를 실제 재무제표에서 직접 계산
+        ann_rev_g = None
+        ann_rev_g_src = ""
+        try:
+            rev_series = _get_row_series(fin, REV_ALIASES).sort_index(ascending=False)
+            if len(rev_series) >= 2 and rev_series.iloc[1] > 0:
+                ann_rev_g = (rev_series.iloc[0] / rev_series.iloc[1]) - 1
+                ann_rev_g_src = "SEC"
+        except Exception:
+            pass
+        # fallback: info
+        if ann_rev_g is None:
+            rg_info = info.get('revenueGrowth')
+            if rg_info is not None and isinstance(rg_info, (int, float)):
+                ann_rev_g = rg_info
+                ann_rev_g_src = "Yahoo"
+
+        # ✅ FIX #3: 분기 이익 성장률을 실제 분기 데이터에서 계산
+        q_earn_g = info.get('earningsGrowth')
+        q_earn_g_src = "Yahoo"
+        if q_earn_g is None or (isinstance(q_earn_g, float) and np.isnan(q_earn_g)):
+            q_earn_g = _calc_quarterly_yoy(q_fin, NI_ALIASES)
+            q_earn_g_src = "SEC 분기" if q_earn_g is not None else ""
+
         qoq_rev_g = "N/A"
         try:
             q_rs = _get_row_series(q_fin, REV_ALIASES).sort_index(ascending=False)
@@ -797,6 +954,13 @@ def render_company_details(ticker_str: str):
                 qoq_rev_g = (q_rs.iloc[0] / q_rs.iloc[1]) - 1
         except Exception:
             pass
+
+        # ✅ FIX #3: 분기 매출 성장률도 실제 분기 데이터에서 계산
+        q_rev_g = info.get('revenueGrowth')
+        q_rev_g_src = "Yahoo"
+        if q_rev_g is None or (isinstance(q_rev_g, float) and np.isnan(q_rev_g)):
+            q_rev_g = _calc_quarterly_yoy(q_fin, REV_ALIASES)
+            q_rev_g_src = "SEC 분기" if q_rev_g is not None else ""
 
     # ═══════════════════════════════════════════════════
     # 🏷️ 헤더
@@ -811,7 +975,8 @@ def render_company_details(ticker_str: str):
         </div>
         <div style="text-align:right">
             <span style="font-size:1.7rem;font-weight:800;color:{chg_c}">${price:,.2f}</span><br>
-            <span style="font-size:.9rem;color:{chg_c}">{chg_s}{day_chg:.2f}% 오늘</span>
+            <span style="font-size:.9rem;color:{chg_c}">{chg_s}{day_chg:.2f}% 오늘</span><br>
+            <span style="font-size:.7rem;color:#6e7681">📅 조회: {fetch_time} (KST)</span>
         </div>
     </div>""", unsafe_allow_html=True)
     st.markdown("---")
@@ -820,8 +985,9 @@ def render_company_details(ticker_str: str):
 
     # ═══════════════════════════════════════════════════
     # 1️⃣ 성장 사이클
+    # ✅ FIX #5: 실제 매출 시계열 기반 판정 + 매출 추이 테이블 추가
     # ═══════════════════════════════════════════════════
-    sn, sname, sdesc, scolor = _growth_stage(info, fin, bs, cf)
+    sn, sname, sdesc, scolor, actual_rev_g, rev_g_src, multi_yr_cagr = _growth_stage(info, fin, q_fin, bs, cf)
     stage_map  = {1: "#9C27B0", 2: "#FF5722", 3: "#FF9800", 4: "#4CAF50",
                   5: "#2196F3", 6: "#607D8B", 7: "#F44336", 8: "#795548"}
     stage_lbl  = {1: "스타트업", 2: "초기성장", 3: "고성장", 4: "성숙성장",
@@ -848,21 +1014,81 @@ def render_company_details(ticker_str: str):
               7: "위험 — 구조적 하락 주의", 8: "턴어라운드 성공 여부가 핵심"}
     all_verdicts.append(("성장사이클", v1_c))
 
+    # ✅ FIX #5: 연도별 매출 추이 테이블 생성 (3~5년)
+    rv_stage, rd_stage = _annual_values(fin, REV_ALIASES)
+    stage_rev_tbl = ""
+    if rv_stage and rd_stage:
+        rows_html = ""
+        for i in range(min(len(rv_stage), 5)):
+            yr = rd_stage[i].strftime('%Y') if hasattr(rd_stage[i], 'strftime') else str(rd_stage[i])[:4]
+            yoy = ""
+            if i < len(rv_stage) - 1 and rv_stage[i + 1] and rv_stage[i + 1] != 0:
+                g = (rv_stage[i] - rv_stage[i + 1]) / abs(rv_stage[i + 1]) * 100
+                gc = "#00E676" if g > 0 else "#FF1744"
+                yoy = f"<span style='color:{gc}'>{g:+.1f}%</span>"
+            rows_html += f"<tr><td>{yr}</td><td>{_fmt_num(rv_stage[i])}</td><td>{yoy}</td></tr>"
+        stage_rev_tbl = (f'<div class="divider"></div>'
+                         f'<div style="font-size:.82rem;color:#e6edf3;margin-bottom:4px;font-weight:600">'
+                         f'📊 연도별 매출 추이 (판정 근거)</div>'
+                         f'<table class="m-table"><tr><th>연도</th><th>매출</th><th>YoY</th></tr>'
+                         f'{rows_html}</table>')
+
+    # 분기별 매출 추이도 표시 (최근 8분기)
+    q_rev_vals = []
+    try:
+        q_rv_series = _get_row_series(q_fin, REV_ALIASES).sort_index(ascending=False)
+        q_rev_vals = list(zip(q_rv_series.index, q_rv_series.values))[:8]
+    except Exception:
+        pass
+    stage_qrev_tbl = ""
+    if q_rev_vals:
+        qrows = ""
+        for i, (dt, val) in enumerate(q_rev_vals):
+            qlbl = dt.strftime('%Y-Q%q') if hasattr(dt, 'strftime') else str(dt)[:10]
+            # 분기 라벨 보정
+            if hasattr(dt, 'month'):
+                q_num = (dt.month - 1) // 3 + 1
+                qlbl = f"{dt.year}-Q{q_num}"
+            yoy_q = ""
+            if i + 4 < len(q_rev_vals):
+                prev_val = q_rev_vals[i + 4][1]
+                if prev_val and prev_val != 0:
+                    g = (val - prev_val) / abs(prev_val) * 100
+                    gc = "#00E676" if g > 0 else "#FF1744"
+                    yoy_q = f"<span style='color:{gc}'>{g:+.1f}%</span>"
+            qrows += f"<tr><td>{qlbl}</td><td>{_fmt_num(val)}</td><td>{yoy_q}</td></tr>"
+        stage_qrev_tbl = (f'<div style="font-size:.82rem;color:#e6edf3;margin-bottom:4px;margin-top:12px;font-weight:600">'
+                          f'📊 분기별 매출 추이 (최근 8분기)</div>'
+                          f'<table class="m-table"><tr><th>분기</th><th>매출</th><th>YoY</th></tr>'
+                          f'{qrows}</table>')
+
+    # 성장률 데이터 소스 표시
+    rev_g_note = f"(매출성장률 {_fmt_pct(actual_rev_g)}, {rev_g_src})" if rev_g_src else ""
+    cagr_note = f"(3~5년 CAGR: {_fmt_pct(multi_yr_cagr)})" if isinstance(multi_yr_cagr, float) else ""
+
+    # 기준일 뱃지
+    sec01_dates = ""
+    if fin_date:
+        sec01_dates += _date_badge("연간", fin_date)
+    if q_fin_date:
+        sec01_dates += _date_badge("분기", q_fin_date)
+
     with st.container(border=True):
         st.markdown(f"""
-        <div class="s-title"><span class="s-num">01</span> 이 회사, 지금 어느 단계인가요?</div>
+        <div class="s-title"><span class="s-num">01</span> 이 회사, 지금 어느 단계인가요? {sec01_dates}</div>
         <div style="display:flex;gap:3px;margin-bottom:20px">{bar_html}</div>
         <div style="text-align:center;margin:16px 0">
             <span style="display:inline-block;padding:10px 28px;border-radius:24px;
                          font-weight:700;background:{scolor};color:#fff;font-size:1.1rem;
                          box-shadow:0 4px 16px {scolor}44">{sname}</span>
             <div style="font-size:.88rem;color:#8b949e;margin-top:12px;line-height:1.7">{sdesc}</div>
+            <div style="font-size:.78rem;color:#6e7681;margin-top:6px">{rev_g_note} {cagr_note}</div>
         </div>
         <div class="divider"></div>
         <div class="two-col">
             <div>
-                {_metric_row("최근 연간 매출성장 (YoY)", _fmt_pct(ann_rev_g))}
-                {_metric_row("최근 분기 매출성장 (YoY)", _fmt_pct(info.get('revenueGrowth')))}
+                {_metric_row(f"최근 연간 매출성장 (YoY) <span style='font-size:.7rem;color:#6e7681'>{ann_rev_g_src}</span>", _fmt_pct(ann_rev_g))}
+                {_metric_row(f"최근 분기 매출성장 (YoY) <span style='font-size:.7rem;color:#6e7681'>{q_rev_g_src}</span>", _fmt_pct(q_rev_g))}
                 {_metric_row("직전 분기 대비 성장 (QoQ)", _fmt_pct(qoq_rev_g))}
             </div>
             <div>
@@ -870,6 +1096,12 @@ def render_company_details(ticker_str: str):
                 {_metric_row("ROE", _fmt_pct(info.get('returnOnEquity')))}
                 {_metric_row("배당수익률", _fmt_pct(info.get('dividendYield')))}
             </div>
+        </div>
+        {stage_rev_tbl}
+        {stage_qrev_tbl}
+        <div class="note-box" style="margin-top:10px">
+            💡 성장 단계 판정은 실제 SEC 재무제표 매출 데이터(연간/분기)를 우선 사용하여 성장률을 직접 계산합니다.<br>
+            Yahoo info 값은 재무제표 데이터가 없을 때 fallback으로만 사용됩니다.
         </div>
         {_verdict_badge(v1_c, "📌", f"종합: {v1_map.get(sn, '')}")}
         """, unsafe_allow_html=True)
@@ -905,7 +1137,6 @@ def render_company_details(ticker_str: str):
 
     rev_lbl = f"{yr_rev}년 매출 CAGR (SEC)" if yr_rev else "매출 CAGR"
     ni_lbl  = f"{yr_ni}년 순이익 추세 (SEC)" if yr_ni else "순이익 추세"
-    # 🔧 개선: EPS fallback 표시 (info 기반 추정인 경우 라벨 구분)
     if yr_eps and yr_eps == 1 and cagr_eps is not None:
         eps_lbl = f"{yr_eps}년 EPS 추세 (Forward 추정)" if isinstance(cagr_eps, float) else f"{yr_eps}년 EPS 추세 (SEC)"
     elif yr_eps:
@@ -913,9 +1144,11 @@ def render_company_details(ticker_str: str):
     else:
         eps_lbl = "EPS 추세"
 
+    sec02_dates = _date_badge("연간", fin_date) if fin_date else ""
+
     with st.container(border=True):
         st.markdown(f"""
-        <div class="s-title"><span class="s-num">02</span> 돈을 잘 버는 회사인가요? <span style="font-size:.75rem;color:#8b949e">SEC 데이터</span></div>
+        <div class="s-title"><span class="s-num">02</span> 돈을 잘 버는 회사인가요? {sec02_dates}</div>
         <div class="two-col">
             <div>
                 {_metric_row("시가총액", _fmt_num(mcap), "m-value m-big")}
@@ -984,8 +1217,10 @@ def render_company_details(ticker_str: str):
     else:         v3_c, v3_t = "red",    "❌ 주의 — 수익 불안정 또는 하락 추세"
     all_verdicts.append(("과거성적", v3_c))
 
+    sec03_dates = _date_badge("연간", fin_date) if fin_date else ""
+
     with st.container(border=True):
-        st.markdown('<div class="s-title"><span class="s-num">03</span> 지금까지 성적 <span style="font-size:.75rem;color:#8b949e">SEC 데이터</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="s-title"><span class="s-num">03</span> 지금까지 성적 {sec03_dates}</div>', unsafe_allow_html=True)
 
         if fig3:
             col1, col2 = st.columns([1.1, 1])
@@ -1014,13 +1249,14 @@ def render_company_details(ticker_str: str):
 
     # ═══════════════════════════════════════════════════
     # 4️⃣ 성장 가능성
+    # ✅ FIX #3: q_earn_g 를 실제 분기 데이터에서 계산한 값 사용
     # ═══════════════════════════════════════════════════
     payout    = info.get('payoutRatio', 0) or 0
     retention = max(0, 1 - payout)
     roe_v     = info.get('returnOnEquity', 0) or 0
     sust_g    = roe_v * retention if roe_v else None
-    eg        = info.get('earningsGrowth')
-    rg        = info.get('revenueGrowth')
+    eg        = q_earn_g       # ✅ FIX: 위에서 계산한 값 사용
+    rg        = q_rev_g        # ✅ FIX: 위에서 계산한 값 사용
     fwd_eps   = info.get('forwardEps')
 
     peg = info.get('pegRatio')
@@ -1043,13 +1279,17 @@ def render_company_details(ticker_str: str):
     eg_cls = "m-green" if eg and eg > 0 else "m-red"
     rg_cls = "m-green" if rg and rg > 0 else "m-red"
 
+    sec04_dates = ""
+    if q_fin_date:
+        sec04_dates += _date_badge("분기", q_fin_date)
+
     with st.container(border=True):
         st.markdown(f"""
-        <div class="s-title"><span class="s-num">04</span> 성장 가능성 <span style="font-size:.75rem;color:#8b949e">SEC + Yahoo</span></div>
+        <div class="s-title"><span class="s-num">04</span> 성장 가능성 {sec04_dates}</div>
         <div class="two-col">
             <div>
-                {_metric_row("분기 이익 성장률 (YoY)", _fmt_pct(eg), eg_cls)}
-                {_metric_row("분기 매출 성장률 (YoY)", _fmt_pct(rg), rg_cls)}
+                {_metric_row(f"분기 이익 성장률 (YoY) <span style='font-size:.7rem;color:#6e7681'>{q_earn_g_src}</span>", _fmt_pct(eg), eg_cls)}
+                {_metric_row(f"분기 매출 성장률 (YoY) <span style='font-size:.7rem;color:#6e7681'>{q_rev_g_src}</span>", _fmt_pct(rg), rg_cls)}
                 {_metric_row("Forward EPS", f"${_safe(fwd_eps)}")}
                 {_metric_row("PEG 비율", f"{peg:.2f}" if peg else "N/A", "m-green" if peg and 0 < peg < 1.5 else "m-value")}
             </div>
@@ -1059,7 +1299,8 @@ def render_company_details(ticker_str: str):
                 {_metric_row("지속가능 성장률 (g)", _fmt_pct(sust_g), "m-green" if sust_g and sust_g > 0.1 else "m-value")}
                 <div class="note-box">
                     💡 <b>지속가능 성장률(g)</b> = ROE × 유보율. 외부 자금 없이 달성 가능한 이론적 최대 성장률.<br>
-                    PEG &lt; 1.5 면 이익 성장률 대비 현재 주가가 저평가되어 있을 가능성이 높습니다.
+                    PEG &lt; 1.5 면 이익 성장률 대비 현재 주가가 저평가되어 있을 가능성이 높습니다.<br>
+                    ※ Yahoo info에 데이터가 없을 경우, SEC 분기 재무제표에서 직접 계산합니다.
                 </div>
             </div>
         </div>
@@ -1068,19 +1309,43 @@ def render_company_details(ticker_str: str):
 
     # ═══════════════════════════════════════════════════
     # 5️⃣ 재무 건전성
+    # ✅ FIX #2: 순 자산 $0.00 문제 수정
     # ═══════════════════════════════════════════════════
     try:
-        # 🔧 개선: alias 상수 사용
         curr_d = _get_row(bs, DEBT_ALIASES_CURRENT) or 0
         lt_d   = _get_row(bs, DEBT_ALIASES_LONG) or 0
 
-        ta = _get_row(bs, BS_ASSETS_ALIASES) or info.get('totalAssets', 0) or 0
-        tl = _get_row(bs, BS_LIAB_ALIASES) or 0
-        eq = _get_row(bs, EQ_ALIASES) or 0
+        # ✅ FIX #2: None과 0을 명확히 구분
+        ta_raw = _get_row(bs, BS_ASSETS_ALIASES)
+        tl_raw = _get_row(bs, BS_LIAB_ALIASES)
+        eq_raw = _get_row(bs, EQ_ALIASES)
 
-        if tl == 0 and ta > 0 and eq > 0:
+        # SEC 데이터 우선, info fallback
+        ta = ta_raw if ta_raw is not None else (info.get('totalAssets') or 0)
+        tl = tl_raw if tl_raw is not None else 0
+        eq = eq_raw if eq_raw is not None else 0
+
+        # 교차 계산으로 누락값 보완
+        if ta > 0 and tl > 0 and eq == 0:
+            eq = ta - tl
+        elif ta > 0 and eq > 0 and tl == 0:
             tl = ta - eq
-        na = eq if eq > 0 else (ta - tl)
+        elif tl > 0 and eq > 0 and ta == 0:
+            ta = tl + eq
+
+        # ✅ FIX #2: 순자산은 항상 자산-부채로 계산 (eq가 0이어도)
+        na = ta - tl if ta > 0 else eq
+
+        # info에서도 fallback 시도
+        if na == 0 and ta == 0:
+            info_ta = info.get('totalAssets', 0) or 0
+            info_td = info.get('totalDebt', 0) or 0
+            info_cash = info.get('totalCash', 0) or 0
+            # 최소한 info의 stockholdersEquity 활용
+            # debtToEquity로 역산 시도
+            dte_info = info.get('debtToEquity')
+            if dte_info and isinstance(dte_info, (int, float)) and dte_info > 0 and info_td > 0:
+                na = info_td / (dte_info / 100)  # D/E = Debt/Equity → Equity = Debt/(D/E)
 
         ta_s = _get_row_series(bs, BS_ASSETS_ALIASES)
         tl_s = _get_row_series(bs, BS_LIAB_ALIASES)
@@ -1112,28 +1377,39 @@ def render_company_details(ticker_str: str):
     else:         v5_c, v5_t = "red",    "❌ 주의 — 부채 높거나 현금 부족"
     all_verdicts.append(("재무건전", v5_c))
 
+    sec05_dates = _date_badge("대차대조표", bs_date) if bs_date else ""
+
+    # ✅ FIX #2: 순자산 표시에 계산 근거 명시
+    na_detail = ""
+    if ta > 0 and tl > 0:
+        na_detail = f"<span style='font-size:.72rem;color:#6e7681;margin-left:4px'>({_fmt_num(ta)} - {_fmt_num(tl)})</span>"
+
     with st.container(border=True):
-        st.markdown('<div class="s-title"><span class="s-num">05</span> 회사에 돈이 얼마나 있나요? <span style="font-size:.75rem;color:#8b949e">SEC + Yahoo</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="s-title"><span class="s-num">05</span> 회사에 돈이 얼마나 있나요? {sec05_dates}</div>', unsafe_allow_html=True)
 
         if fig5:
             col1, col2 = st.columns([1.1, 1])
             with col1:
                 st.markdown(f"""
                 {_metric_row("💵 보유 현금", _fmt_num(cash), "m-value m-green m-big")}
-                {_metric_row("순 자산 (자산-부채)", _fmt_num(na), "m-green" if na > 0 else "m-red")}
+                {_metric_row("총 자산", _fmt_num(ta))}
+                {_metric_row("총 부채", _fmt_num(tl))}
+                {_metric_row(f"순 자산 (자산-부채)", f'{_fmt_num(na)} {na_detail}', "m-green" if na > 0 else "m-red")}
                 <div class="divider"></div>
                 {_metric_row("부채 수준 (D/E)", dl)}
                 {_metric_row("부채 추세", dt_trend)}
                 {_metric_row("이자 부담 (ICR)", ib_txt)}
                 {_metric_row("부채/자본 비율", f'{dte:.1f}%' if isinstance(dte, (int, float)) else 'N/A')}
-                <div class="note-box">※ 순자산(총자산-총부채)과 자본(주주지분)은 이론상 같으나, 비지배지분 등에 의해 차이가 날 수 있습니다.</div>
+                <div class="note-box">※ 순자산 = 총자산 - 총부채. SEC 대차대조표 데이터를 우선 사용하며, 없을 경우 주주지분(Equity) 또는 info 데이터로 대체합니다.</div>
                 """, unsafe_allow_html=True)
             with col2:
                 st.plotly_chart(fig5, use_container_width=True, config={'displayModeBar': False})
         else:
             st.markdown(f"""
             {_metric_row("💵 보유 현금", _fmt_num(cash), "m-value m-green m-big")}
-            {_metric_row("순 자산 (자산-부채)", _fmt_num(na), "m-green" if na > 0 else "m-red")}
+            {_metric_row("총 자산", _fmt_num(ta))}
+            {_metric_row("총 부채", _fmt_num(tl))}
+            {_metric_row(f"순 자산 (자산-부채)", f'{_fmt_num(na)} {na_detail}', "m-green" if na > 0 else "m-red")}
             <div class="divider"></div>
             {_metric_row("부채 수준 (D/E)", dl)}
             {_metric_row("부채 추세", dt_trend)}
@@ -1247,9 +1523,50 @@ def render_company_details(ticker_str: str):
 
     # ═══════════════════════════════════════════════════
     # 8️⃣ 밸류에이션
+    # ✅ FIX #1: P/E를 price/EPS로 직접 계산하여 정확성 보장
     # ═══════════════════════════════════════════════════
-    t_pe = info.get('trailingPE')
-    f_pe = info.get('forwardPE')
+    t_eps_val = info.get('trailingEps')
+    f_eps_val = info.get('forwardEps')
+
+    # ✅ FIX #1: API 값 대신 price/EPS로 직접 계산 (더 신뢰성 높음)
+    t_pe = None
+    f_pe = None
+    t_pe_src = ""
+    f_pe_src = ""
+
+    # Trailing P/E: 현재가 / Trailing EPS (과거 12개월 실적)
+    if price and price > 0 and t_eps_val and isinstance(t_eps_val, (int, float)) and t_eps_val > 0:
+        t_pe = price / t_eps_val
+        t_pe_src = "직접계산"
+    else:
+        t_pe = info.get('trailingPE')
+        t_pe_src = "Yahoo"
+
+    # Forward P/E: 현재가 / Forward EPS (향후 12개월 추정)
+    if price and price > 0 and f_eps_val and isinstance(f_eps_val, (int, float)) and f_eps_val > 0:
+        f_pe = price / f_eps_val
+        f_pe_src = "직접계산"
+    else:
+        f_pe = info.get('forwardPE')
+        f_pe_src = "Yahoo"
+
+    # ✅ FIX #1: 교차검증 — Trailing P/E가 Forward P/E보다 작으면 비정상일 수 있음 (성장주 기준)
+    pe_swap_warning = ""
+    if (t_pe and f_pe and isinstance(t_pe, (int, float)) and isinstance(f_pe, (int, float))
+            and t_pe > 0 and f_pe > 0):
+        # 일반적으로 성장주는 Forward PE < Trailing PE (미래 이익이 더 높으니까)
+        # 하지만 실적 하락 기업은 Forward PE > Trailing PE가 정상
+        api_t_pe = info.get('trailingPE')
+        api_f_pe = info.get('forwardPE')
+        if (api_t_pe and api_f_pe and isinstance(api_t_pe, (int, float))
+                and isinstance(api_f_pe, (int, float))):
+            # 직접 계산값과 API값이 크게 다르면 경고
+            if abs(api_t_pe - t_pe) / max(t_pe, 1) > 0.15:
+                pe_swap_warning = (f"<div class='note-box' style='border-left:3px solid #FFC107;margin-top:8px'>"
+                                   f"⚠️ Yahoo API의 P/E 값({api_t_pe:.1f}/{api_f_pe:.1f})과 "
+                                   f"직접 계산값({t_pe:.1f}/{f_pe:.1f})에 차이가 있습니다. "
+                                   f"직접 계산값(현재가÷EPS)을 표시합니다.</div>")
+
     p_s  = info.get('priceToSalesTrailing12Months')
     p_b  = info.get('priceToBook')
 
@@ -1295,8 +1612,10 @@ def render_company_details(ticker_str: str):
         <div class="s-title"><span class="s-num">08</span> 이 종목 비싼가요? <span style="font-size:.75rem;color:#8b949e">Yahoo</span></div>
         <div class="two-col">
             <div>
-                {_metric_row("Trailing P/E", f"{t_pe:.2f}" if isinstance(t_pe, (int, float)) else "N/A")}
-                {_metric_row("Forward P/E", f"{f_pe:.2f}" if isinstance(f_pe, (int, float)) else "N/A")}
+                {_metric_row(f"Trailing P/E <span style='font-size:.68rem;color:#6e7681'>현재가÷TTM EPS ({t_pe_src})</span>", f"{t_pe:.2f}" if isinstance(t_pe, (int, float)) else "N/A")}
+                {_metric_row(f"Forward P/E <span style='font-size:.68rem;color:#6e7681'>현재가÷Fwd EPS ({f_pe_src})</span>", f"{f_pe:.2f}" if isinstance(f_pe, (int, float)) else "N/A")}
+                {_metric_row("Trailing EPS", f"${t_eps_val:.2f}" if isinstance(t_eps_val, (int, float)) else "N/A")}
+                {_metric_row("Forward EPS", f"${f_eps_val:.2f}" if isinstance(f_eps_val, (int, float)) else "N/A")}
                 {_metric_row("P/S (TTM)", f"{p_s:.2f}" if isinstance(p_s, (int, float)) else "N/A")}
                 {_metric_row("P/B", f"{p_b:.2f}" if isinstance(p_b, (int, float)) else "N/A")}
                 <div class="divider"></div>
@@ -1305,9 +1624,12 @@ def render_company_details(ticker_str: str):
             </div>
             <div>
                 {pe_visual}
+                {pe_swap_warning}
                 <div class="note-box">
-                    ※ 섹터 P/E는 {pe_source} 기준입니다. 실시간 조회 실패 시 추정치로 대체됩니다.<br>
-                    섹터 ETF P/E를 함께 참고하면 더 정확합니다.
+                    ※ P/E는 현재가 ÷ EPS로 직접 계산합니다 (Yahoo API 값에 오류가 있을 수 있어 교차검증).<br>
+                    <b>Trailing P/E</b> = 현재가 ÷ 과거12개월 실적EPS<br>
+                    <b>Forward P/E</b> = 현재가 ÷ 향후12개월 추정EPS<br>
+                    섹터 P/E는 {pe_source} 기준입니다.
                 </div>
             </div>
         </div>
@@ -1574,14 +1896,12 @@ def render_company_details(ticker_str: str):
 
     # ═══════════════════════════════════════════════════
     # 📰 13. 최신 뉴스
-    # 🔧 개선: 날짜 파싱 안전화 + 뉴스 구조 호환성 강화
     # ═══════════════════════════════════════════════════
     try:
         news_list = tkr.news
         if news_list and len(news_list) > 0:
             items = ""
             for n in news_list[:8]:
-                # 🔧 개선: 제목/링크/퍼블리셔 추출 — 다중 구조 대응
                 title = (n.get('title')
                          or (n.get('content') or {}).get('title')
                          or '제목 없음')
@@ -1591,7 +1911,6 @@ def render_company_details(ticker_str: str):
                 pub_name = (n.get('publisher')
                             or (n.get('content') or {}).get('provider', {}).get('displayName')
                             or '')
-                # 🔧 개선: 안전한 날짜 파싱
                 dt_str = _parse_news_datetime(n)
 
                 items += (f'<div class="n-item">'
@@ -1630,6 +1949,15 @@ def render_company_details(ticker_str: str):
 
     dots = _score_dot_row(all_verdicts)
 
+    # ✅ FIX #6: 종합 섹션에 모든 기준일 요약 표시
+    dates_summary = "<br>".join(filter(None, [
+        f"• 연간 손익계산서: {fin_date}" if fin_date else None,
+        f"• 분기 손익계산서: {q_fin_date}" if q_fin_date else None,
+        f"• 대차대조표: {bs_date}" if bs_date else None,
+        f"• 현금흐름표: {cf_date}" if cf_date else None,
+        f"• 시세/시장 데이터: {fetch_time} (실시간 조회)",
+    ]))
+
     with st.container(border=True):
         st.markdown(f"""
         <div class="s-title" style="border:none; justify-content:center; font-size:1.4rem;">📋 종합 분석 요약</div>
@@ -1642,7 +1970,10 @@ def render_company_details(ticker_str: str):
             <div style="width:{pct:.1f}%;height:100%;background:{oc};border-radius:10px;transition:width 1s"></div>
         </div>
         <div style="margin-top:18px">{dots}</div>
-        <div class="note-box" style="margin-top:12px;text-align:center">
+        <div class="divider"></div>
+        <div class="note-box" style="text-align:left">
+            📅 <b>데이터 기준일</b><br>
+            {dates_summary}<br><br>
             수집 가능한 분석 항목들(🟢=2점, 🔵=1.5점, 🟡=1점, 🔴=0점)만을 취합한 종합 점수입니다. (데이터 누락 항목은 제외됨)
         </div>
         """, unsafe_allow_html=True)
