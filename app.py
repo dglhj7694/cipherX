@@ -22,6 +22,14 @@ st.set_page_config(
 st.markdown("""<style>
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 html,body,[class*="css"]{font-family:'Pretendard','Noto Sans KR',sans-serif!important}
+/* 🚨 스트림릿 기본 아이콘(Material) 폰트 깨짐 복구 🚨 */
+span[class*="material-symbols"], 
+span[class*="material-icons"], 
+i[class*="material-icons"], 
+.stIcon, 
+[data-testid="stIconMaterial"] {
+    font-family: 'Material Symbols Rounded', 'Material Icons', sans-serif !important;
+}           
 .stApp{background-color:#0E1117}
 p,div[data-testid="stMarkdownContainer"] p,div[data-testid="stChatMessageContent"] p,
 h1,h2,h3,h4,h5,h6,li{color:#FAFAFA!important}
