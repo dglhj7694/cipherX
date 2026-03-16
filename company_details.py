@@ -2,10 +2,9 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import numpy as np
-from datetime import datetime
 
 # ═══════════════════════════════════════════════════════════════
-# 🛠️  유틸리티 함수
+# 🛠️  유틸리티 및 계산 함수
 # ═══════════════════════════════════════════════════════════════
 def _fmt_num(num, is_currency=True):
     if pd.isna(num) or num is None: return "N/A"
@@ -39,8 +38,7 @@ def _get_row_series(df, candidates):
     if df is None: return pd.Series(dtype=float)
     for name in candidates:
         if name in df.index:
-            try:
-                return df.loc[name].dropna().sort_index()
+            try: return df.loc[name].dropna().sort_index()
             except: pass
     return pd.Series(dtype=float)
 
@@ -70,6 +68,7 @@ def _verdict_badge(color, emoji, text):
     border_map = {"green": "#00E676", "red": "#FF1744", "yellow": "#FFC107", "blue": "#2196F3", "gray": "#607D8B"}
     return f"""<div style="background:{bg_map.get(color,'rgba(96,125,139,0.1)')};border:1px solid {border_map.get(color,'#607D8B')};border-radius:10px;padding:12px 16px;margin-top:14px;text-align:center"><span style="font-size:1.05rem;font-weight:700;color:{border_map.get(color,'#607D8B')}">{emoji} {text}</span></div>"""
 
+# 🚀 개선: 8단계 성장주기 판별 (분기 매출성장률 적용 한계 감안)
 def _growth_stage(info, fin, bs, cf):
     rev_g = info.get('revenueGrowth', 0) or 0
     margin = info.get('profitMargins', 0) or 0
@@ -108,6 +107,7 @@ def _growth_stage(info, fin, bs, cf):
     if rev < 1e8 and margin < -0.20: s = 1
     elif rev_g > 0.30 and margin < 0: s = 2
     elif rev_g > 0.20 and margin > 0: s = 3
+    # 🚀 개선: 경계값 논리적 충돌 해결 (elif 순서 엄격 적용)
     elif rev_g > 0.05 and margin > 0.10: s = 4
     elif 0 <= rev_g <= 0.05 and margin > 0.10 and (div_y > 0.01 or op_cf > rev * 0.1): s = 5
     elif -0.05 <= rev_g <= 0.02 and margin > 0: s = 6
@@ -165,23 +165,28 @@ def _debt_trend(bs):
                 else:             return f"안정적 유지 ➡️ ({chg*100:.1f}%)", "yellow"
     return "데이터 부족", "gray"
 
+# 🚀 개선: 이자보상배율(ICR) 폴백 면책 조항 추가
 def _interest_burden(fin, info):
     ebit = _get_row(fin, ['EBIT', 'Operating Income'])
     interest = _get_row(fin, ['Interest Expense', 'Interest Expense Non Operating'])
+    
     if ebit and interest and abs(interest) > 0:
         icr = abs(ebit / interest)
-        if   icr > 10: return f"매우 낮음 ✅ (ICR {icr:.1f}x)", "green"
-        elif icr >  5: return f"낮음 ✅ (ICR {icr:.1f}x)", "green"
-        elif icr >  2: return f"보통 ⚠️ (ICR {icr:.1f}x)", "yellow"
-        else:          return f"높음 ❌ (ICR {icr:.1f}x)", "red"
+        label = "SEC 실제비용"
+        if   icr > 10: return f"매우 낮음 ✅ (ICR {icr:.1f}x, {label})", "green"
+        elif icr >  5: return f"낮음 ✅ (ICR {icr:.1f}x, {label})", "green"
+        elif icr >  2: return f"보통 ⚠️ (ICR {icr:.1f}x, {label})", "yellow"
+        else:          return f"높음 ❌ (ICR {icr:.1f}x, {label})", "red"
 
     ebitda, debt = info.get('ebitda', 0) or 0, info.get('totalDebt', 0) or 0
     if ebitda > 0 and debt > 0:
-        cov = ebitda / (debt * 0.05)
-        if   cov > 10: return f"매우 낮음 ✅ ({cov:.1f}x)", "green"
-        elif cov >  5: return f"낮음 ✅ ({cov:.1f}x)", "green"
-        elif cov >  2: return f"보통 ⚠️ ({cov:.1f}x)", "yellow"
-        else:          return f"높음 ❌ ({cov:.1f}x)", "red"
+        est_rate = 0.05
+        cov = ebitda / (debt * est_rate)
+        label = f"추정 (이자율 {est_rate*100:.0f}% 가정)"
+        if   cov > 10: return f"매우 낮음 ✅ ({cov:.1f}x, {label})", "green"
+        elif cov >  5: return f"낮음 ✅ ({cov:.1f}x, {label})", "green"
+        elif cov >  2: return f"보통 ⚠️ ({cov:.1f}x, {label})", "yellow"
+        else:          return f"높음 ❌ ({cov:.1f}x, {label})", "red"
     return "N/A", "gray"
 
 def _vol_trend(info):
@@ -215,9 +220,28 @@ def _max_pain(tkr):
         return exp, mp, tc, tp
     except: return None, None, None, None
 
-def _sector_pe(sector):
-    SECTOR_PE_APPROX = {"Technology": 30, "Communication Services": 22, "Consumer Cyclical": 25, "Consumer Defensive": 22, "Financial Services": 14, "Healthcare": 22, "Industrials": 20, "Energy": 12, "Basic Materials": 15, "Real Estate": 35, "Utilities": 18}
-    return SECTOR_PE_APPROX.get(sector, None)
+# 🚀 개선: 섹터 P/E 실시간 (ETF 기반) 우선 조회 + 폴백
+SECTOR_ETF = {
+    "Technology":"XLK", "Financial Services":"XLF", "Healthcare":"XLV", "Energy":"XLE",
+    "Consumer Cyclical":"XLY", "Consumer Defensive":"XLP", "Industrials":"XLI",
+    "Communication Services":"XLC", "Utilities":"XLU", "Real Estate":"XLRE", "Basic Materials":"XLB",
+}
+SECTOR_PE_FALLBACK = {
+    "Technology":30, "Communication Services":22, "Consumer Cyclical":25,
+    "Consumer Defensive":22, "Financial Services":14, "Healthcare":22,
+    "Industrials":20, "Energy":12, "Basic Materials":15, "Real Estate":35, "Utilities":18,
+}
+def _sector_pe_live(sector):
+    etf = SECTOR_ETF.get(sector)
+    if etf:
+        try:
+            pe = yf.Ticker(etf).info.get('trailingPE')
+            if pe and isinstance(pe, (int, float)) and pe > 0:
+                return pe, "실시간(ETF)"
+        except: pass
+    fb = SECTOR_PE_FALLBACK.get(sector)
+    return fb, "정적 추정치" if fb else (None, "")
+
 
 # ═══════════════════════════════════════════════════════════════
 # 🎨 CSS
@@ -269,8 +293,11 @@ def render_company_details(ticker_str: str):
 
         cagr_rev = _calc_cagr(fin, ['Total Revenue'])
         cagr_ni  = _calc_cagr(fin, ['Net Income'])
-        # 🚀 버그 패치: EPS CAGR 추출 오류 방지
-        cagr_eps = _calc_cagr(fin, ['Diluted EPS', 'Basic EPS'])
+        cagr_eps = _calc_cagr(fin, ['Basic EPS', 'Diluted EPS'])
+
+        # 🚀 개선: 데이터 길이 확인을 통해 정확한 연수 명시
+        rv_list, _ = _annual_values(fin, ['Total Revenue'])
+        yr_rev = len(rv_list) - 1 if len(rv_list) >= 2 else 0
 
         sector   = info.get('sector',   'N/A')
         industry = info.get('industry', 'N/A')
@@ -310,6 +337,7 @@ def render_company_details(ticker_str: str):
     verdict_1_color = "green" if sn in [3,4] else ("blue" if sn == 5 else ("yellow" if sn in [1,2,6] else "red"))
     verdict_1_text = {1: "초기 단계 — 높은 리스크, 높은 잠재력", 2: "폭풍 성장 중 — 적자이지만 매출 급증", 3: "성장 + 이익 = 투자 최적 시점 가능", 4: "안정 성장 우량주 — 핵심 보유 후보", 5: "현금 창출 기계 — 배당·안정성 우선", 6: "새 성장 동력이 필요한 시점", 7: "위험 — 구조적 하락 가능성 주의", 8: "턴어라운드 성공 여부가 핵심"}
 
+    # 🚀 개선: 라벨 명확화 (분기 YoY)
     st.markdown(f"""
     <div class="info-card">
         <div class="info-title">🔄 1. 이 회사, 지금 어느 단계인가요?</div>
@@ -319,10 +347,11 @@ def render_company_details(ticker_str: str):
             <div style="font-size:.88rem;color:#8b949e;margin-top:10px;line-height:1.6">{sdesc}</div>
         </div>
         <div class="divider"></div>
-        <div class="metric-row"><span class="metric-label">YOY 매출 성장률</span><span class="metric-value">{_fmt_pct(info.get('revenueGrowth'))}</span></div>
+        <div class="metric-row"><span class="metric-label">분기 매출 성장률 (QoQ YoY)</span><span class="metric-value">{_fmt_pct(info.get('revenueGrowth'))}</span></div>
         <div class="metric-row"><span class="metric-label">순이익률</span><span class="metric-value">{_fmt_pct(info.get('profitMargins'))}</span></div>
         <div class="metric-row"><span class="metric-label">배당수익률</span><span class="metric-value">{_fmt_pct(info.get('dividendYield'))}</span></div>
         <div class="metric-row"><span class="metric-label">ROE</span><span class="metric-value">{_fmt_pct(info.get('returnOnEquity'))}</span></div>
+        <div style="font-size:.73rem;color:#6e7681;margin-top:8px">※ 성장사이클은 분기(YoY) 매출 성장률을 기준으로 보수적으로 추정됩니다.</div>
         {_verdict_badge(verdict_1_color, "📌", f"종합: {verdict_1_text.get(sn, '')}")}
     </div>""", unsafe_allow_html=True)
 
@@ -339,6 +368,7 @@ def render_company_details(ticker_str: str):
     elif profit_score >= 2: v2_color, v2_text = "yellow", "⚠️ 보통 — 일부 지표 개선 필요"
     else:                   v2_color, v2_text = "red",    "❌ 수익성 미흡 — 적자 또는 마진 악화"
 
+    # 🚀 개선: CAGR 연도 정확하게 명시
     st.markdown(f"""
     <div class="info-card">
         <div class="info-title">💵 2. 돈을 잘 버는 회사인가요? (SEC)</div>
@@ -350,9 +380,9 @@ def render_company_details(ticker_str: str):
         <div class="metric-row"><span class="metric-label">총이익률 (Gross Margin)</span><span class="metric-value">{_fmt_pct(gross_m)}</span></div>
         <div class="metric-row"><span class="metric-label">순이익률 (Net Margin)</span><span class="metric-value">{_fmt_pct(net_m)}</span></div>
         <div class="divider"></div>
-        <div class="metric-row"><span class="metric-label">5년 매출 CAGR</span><span class="metric-value {'metric-highlight' if cagr_rev and cagr_rev > 0 else 'metric-warn'}">{_fmt_pct(cagr_rev)}</span></div>
-        <div class="metric-row"><span class="metric-label">5년 순이익 CAGR</span><span class="metric-value {'metric-highlight' if cagr_ni and cagr_ni > 0 else 'metric-warn'}">{_fmt_pct(cagr_ni)}</span></div>
-        <div class="metric-row"><span class="metric-label">5년 EPS CAGR</span><span class="metric-value {'metric-highlight' if cagr_eps and cagr_eps > 0 else 'metric-warn'}">{_fmt_pct(cagr_eps)}</span></div>
+        <div class="metric-row"><span class="metric-label">매출 CAGR ({yr_rev}년)</span><span class="metric-value {'metric-highlight' if cagr_rev and cagr_rev > 0 else 'metric-warn'}">{_fmt_pct(cagr_rev)}</span></div>
+        <div class="metric-row"><span class="metric-label">순이익 CAGR ({yr_rev}년)</span><span class="metric-value {'metric-highlight' if cagr_ni and cagr_ni > 0 else 'metric-warn'}">{_fmt_pct(cagr_ni)}</span></div>
+        <div class="metric-row"><span class="metric-label">EPS CAGR ({yr_rev}년)</span><span class="metric-value {'metric-highlight' if cagr_eps and cagr_eps > 0 else 'metric-warn'}">{_fmt_pct(cagr_eps)}</span></div>
         {_verdict_badge(v2_color, "📌", v2_text)}
     </div>""", unsafe_allow_html=True)
 
@@ -396,16 +426,18 @@ def render_company_details(ticker_str: str):
         {_verdict_badge(v3_color, "📌", v3_text)}
     </div>""", unsafe_allow_html=True)
 
+    # 🚀 개선: 미래 ROE 오명명(Misnomer) 수정 -> 지속가능 성장률(SGR)
     payout    = info.get('payoutRatio', 0) or 0
     retention = max(0, 1 - payout)
     roe_val   = info.get('returnOnEquity', 0) or 0
-    fut_roe   = roe_val * retention if roe_val else None
+    sust_g    = roe_val * retention if roe_val else None
+    
     eg        = info.get('earningsGrowth')
     rg        = info.get('revenueGrowth')
     peg       = info.get('pegRatio')
     fwd_eps   = info.get('forwardEps')
 
-    g_score = sum([1 for c in [eg and eg > 0.15, rg and rg > 0.10, retention > 0.60, fut_roe and fut_roe > 0.10, peg and 0 < peg < 1.5] if c])
+    g_score = sum([1 for c in [eg and eg > 0.15, rg and rg > 0.10, retention > 0.60, sust_g and sust_g > 0.10, peg and 0 < peg < 1.5] if c])
     if   g_score >= 4: v4_color, v4_text = "green",  "🚀 높은 성장 잠재력 — 수익 재투자 + 고성장"
     elif g_score >= 2: v4_color, v4_text = "yellow", "⚠️ 보통 — 성장 가능성은 있으나 모니터링 필요"
     else:              v4_color, v4_text = "red",    "❌ 성장 둔화 — 새로운 동력 부재"
@@ -413,12 +445,13 @@ def render_company_details(ticker_str: str):
     st.markdown(f"""
     <div class="info-card">
         <div class="info-title">🚀 4. 성장 가능성 (SEC + Yahoo)</div>
-        <div class="metric-row"><span class="metric-label">이익 성장률 (YOY)</span><span class="metric-value {'metric-highlight' if eg and eg>0 else 'metric-warn'}">{_fmt_pct(eg)}</span></div>
-        <div class="metric-row"><span class="metric-label">매출 성장률 (YOY)</span><span class="metric-value {'metric-highlight' if rg and rg>0 else 'metric-warn'}">{_fmt_pct(rg)}</span></div>
+        <div class="metric-row"><span class="metric-label">분기 이익 성장률 (YoY)</span><span class="metric-value {'metric-highlight' if eg and eg>0 else 'metric-warn'}">{_fmt_pct(eg)}</span></div>
+        <div class="metric-row"><span class="metric-label">분기 매출 성장률 (YoY)</span><span class="metric-value {'metric-highlight' if rg and rg>0 else 'metric-warn'}">{_fmt_pct(rg)}</span></div>
         <div class="divider"></div>
         <div class="metric-row"><span class="metric-label">ROE</span><span class="metric-value">{_fmt_pct(roe_val)}</span></div>
-        <div class="metric-row"><span class="metric-label">수익 유보율(저축률)</span><span class="metric-value">{_fmt_pct(retention)}</span></div>
-        <div class="metric-row"><span class="metric-label">미래 예상 ROE (ROE×유보율)</span><span class="metric-value {'metric-highlight' if fut_roe and fut_roe > 0.1 else 'metric-value'}">{_fmt_pct(fut_roe)}</span></div>
+        <div class="metric-row"><span class="metric-label">수익 유보율 (1 - 배당성향)</span><span class="metric-value">{_fmt_pct(retention)}</span></div>
+        <div class="metric-row"><span class="metric-label">지속가능 성장률 (ROE × 유보율)</span><span class="metric-value {'metric-highlight' if sust_g and sust_g > 0.1 else 'metric-value'}">{_fmt_pct(sust_g)}</span></div>
+        <div style="font-size:.73rem;color:#6e7681;margin-top:8px;line-height:1.6">💡 지속가능 성장률(g): 외부 자금 조달 없이 회사 내부의 유보금만으로 달성 가능한 이론적 최대 성장률입니다.</div>
         <div class="divider"></div>
         <div class="metric-row"><span class="metric-label">Forward EPS</span><span class="metric-value">${_safe(fwd_eps)}</span></div>
         <div class="metric-row"><span class="metric-label">PEG 비율</span><span class="metric-value {'metric-highlight' if peg and 0 < peg < 1.5 else 'metric-value'}">{_safe(peg)}</span></div>
@@ -451,6 +484,7 @@ def render_company_details(ticker_str: str):
     elif h_score >= 2: v5_color, v5_text = "yellow", "⚠️ 보통 — 부채 관리 모니터링 필요"
     else:              v5_color, v5_text = "red",    "❌ 주의 — 부채 수준이 높거나 현금 부족"
 
+    # 🚀 개선: 자본금과 순자산 명확한 구분
     st.markdown(f"""
     <div class="info-card">
         <div class="info-title">🏦 5. 회사에 돈이 얼마나 있나요? (SEC + Yahoo)</div>
@@ -460,13 +494,14 @@ def render_company_details(ticker_str: str):
         <div class="divider"></div>
         <div class="metric-row"><span class="metric-label">부채 수준</span><span class="metric-value">{dl}</span></div>
         <div class="metric-row"><span class="metric-label">부채 추세</span><span class="metric-value">{dt_trend}</span></div>
-        <div class="metric-row"><span class="metric-label">이자 부담 (ICR)</span><span class="metric-value">{i_burden}</span></div>
+        <div class="metric-row"><span class="metric-label">이자 부담 (이자보상배율)</span><span class="metric-value">{i_burden}</span></div>
         <div class="metric-row"><span class="metric-label">부채/자본 비율 (D/E)</span><span class="metric-value">{f'{dte:.1f}%' if isinstance(dte,(int,float)) else 'N/A'}</span></div>
         <div class="divider"></div>
         <div class="metric-row"><span class="metric-label">총 자산</span><span class="metric-value">{_fmt_num(ta)}</span></div>
         <div class="metric-row"><span class="metric-label">총 부채</span><span class="metric-value">{_fmt_num(tl)}</span></div>
-        <div class="metric-row"><span class="metric-label">자본 (Equity)</span><span class="metric-value">{_fmt_num(eq)}</span></div>
-        <div class="metric-row"><span class="metric-label">순 자산 (자산-부채)</span><span class="metric-value {'metric-highlight' if na > 0 else 'metric-warn'}">{_fmt_num(na)}</span></div>
+        <div class="metric-row"><span class="metric-label">자본 (순수 주주 지분)</span><span class="metric-value">{_fmt_num(eq)}</span></div>
+        <div class="metric-row"><span class="metric-label">순 자산 (자산 - 부채)</span><span class="metric-value {'metric-highlight' if na > 0 else 'metric-warn'}">{_fmt_num(na)}</span></div>
+        <div style="font-size:.73rem;color:#6e7681;margin-top:8px;line-height:1.6">※ 순자산과 자본은 이론상 같으나, 비지배지분(Minority Interest) 등에 의해 차이가 발생할 수 있습니다.</div>
         {_verdict_badge(v5_color, "📌", v5_text)}
     </div>""", unsafe_allow_html=True)
 
@@ -529,7 +564,9 @@ def render_company_details(ticker_str: str):
     f_pe = info.get('forwardPE')
     ps   = info.get('priceToSalesTrailing12Months')
     pb   = info.get('priceToBook')
-    s_pe = _sector_pe(sector)
+    
+    # 🚀 개선: 섹터 P/E 실시간 ETF 조회 폴백 구현
+    s_pe, pe_source = _sector_pe_live(sector)
 
     pe_comp = ""
     if t_pe and s_pe:
@@ -553,8 +590,9 @@ def render_company_details(ticker_str: str):
         <div class="metric-row"><span class="metric-label">P/S (주가매출비율, TTM)</span><span class="metric-value">{f'{ps:.2f}' if isinstance(ps,(int,float)) else 'N/A'}</span></div>
         <div class="metric-row"><span class="metric-label">P/B (주가순자산비율)</span><span class="metric-value">{f'{pb:.2f}' if isinstance(pb,(int,float)) else 'N/A'}</span></div>
         <div class="divider"></div>
-        <div class="metric-row"><span class="metric-label">섹터 ({sector})</span><span class="metric-value">평균 P/E ≈ {s_pe if s_pe else 'N/A'}</span></div>
+        <div class="metric-row"><span class="metric-label">섹터 ({sector})</span><span class="metric-value">평균 P/E ≈ {s_pe if s_pe else 'N/A'} ({pe_source})</span></div>
         <div class="metric-row"><span class="metric-label">섹터 대비 평가</span><span class="metric-value">{pe_comp if pe_comp else 'N/A'}</span></div>
+        <div style="font-size:.73rem;color:#6e7681;margin-top:8px;line-height:1.6">※ 섹터 평균은 대표 ETF 기준이거나 하드코딩된 추정치입니다. 절대적 기준이 될 수 없습니다.</div>
         {_verdict_badge(v8_color, "📌", v8_text)}
     </div>""", unsafe_allow_html=True)
 
@@ -604,6 +642,7 @@ def render_company_details(ticker_str: str):
         {_verdict_badge(con_c, "📌", v9_text)}
     </div>""", unsafe_allow_html=True)
 
+    # 🚀 개선: 지분 구조 라벨 
     inst = info.get('heldPercentInstitutions', 0) or 0
     ins  = info.get('heldPercentInsiders', 0)     or 0
     pub  = max(0, 1 - inst - ins)
@@ -620,19 +659,21 @@ def render_company_details(ticker_str: str):
         <div class="metric-row"><span class="metric-label">총 발행 주식수</span><span class="metric-value">{_fmt_num(shares_out, False)} 주</span></div>
         <div class="metric-row"><span class="metric-label">유통 주식수 (Float)</span><span class="metric-value">{_fmt_num(float_shares, False)} 주</span></div>
         <div class="divider"></div>
-        <div class="metric-row"><span class="metric-label">🏛️ 기관 투자자</span><span class="metric-value">{_fmt_pct(inst)}</span></div>
-        <div class="metric-row"><span class="metric-label">👔 내부자 / 임원</span><span class="metric-value">{_fmt_pct(ins)}</span></div>
-        <div class="metric-row"><span class="metric-label">👤 일반 / 개인 (추정)</span><span class="metric-value">{_fmt_pct(pub)}</span></div>
+        <div class="metric-row"><span class="metric-label">🏛️ 기관 (연기금·펀드·정부 포함)</span><span class="metric-value">{_fmt_pct(inst)}</span></div>
+        <div class="metric-row"><span class="metric-label">👔 내부자 (임원·이사회)</span><span class="metric-value">{_fmt_pct(ins)}</span></div>
+        <div class="metric-row"><span class="metric-label">👤 개인/기타 (추정치)</span><span class="metric-value">{_fmt_pct(pub)}</span></div>
         <div class="divider"></div>
         <div style="font-size:.83rem;color:#6e7681;margin-bottom:4px">지분 구성 비율</div>
         <div class="progress-container">
-            <div class="progress-bar" style="width:{inst*100:.1f}%;background:#2196F3">{'기관 ' + str(round(inst*100)) + '%' if inst > 0.08 else ''}</div>
-            <div class="progress-bar" style="width:{ins*100:.1f}%;background:#FF9800">{'내부 ' + str(round(ins*100)) + '%' if ins > 0.05 else ''}</div>
-            <div class="progress-bar" style="width:{pub*100:.1f}%;background:#4CAF50">{'일반 ' + str(round(pub*100)) + '%' if pub > 0.08 else ''}</div>
+            <div class="progress-bar" style="width:{max(inst*100, 5):.1f}%;background:#2196F3">{'기관 ' + str(round(inst*100)) + '%' if inst > 0.08 else ''}</div>
+            <div class="progress-bar" style="width:{max(ins*100, 5):.1f}%;background:#FF9800">{'내부 ' + str(round(ins*100)) + '%' if ins > 0.05 else ''}</div>
+            <div class="progress-bar" style="width:{max(pub*100, 5):.1f}%;background:#4CAF50">{'일반 ' + str(round(pub*100)) + '%' if pub > 0.08 else ''}</div>
         </div>
+        <div style="font-size:.73rem;color:#6e7681;margin-top:8px;line-height:1.6">※ '개인/기타'는 100% - 기관 - 내부자로 추정한 값입니다.</div>
         {_verdict_badge(v10_color, "📌", v10_text)}
     </div>""", unsafe_allow_html=True)
 
+    # 🚀 개선: Max Pain 해석 및 면책 
     exp, mp, tc, tp = _max_pain(tkr)
     
     mp_val_str = f"${mp:.2f}" if mp else ""
@@ -644,13 +685,13 @@ def render_company_details(ticker_str: str):
     if mp and isinstance(price, (int, float)) and price > 0:
         d = ((mp - price) / price) * 100
         if d > 2:
-            mp_note = f"현재가보다 {d:+.1f}% 위 → 상승 압력 가능"
+            mp_note = f"현재가보다 Max Pain이 {d:+.1f}% 위 → 만기 시 가격 수렴(상승) 가능성"
             mp_color = "green"
         elif d < -2:
-            mp_note = f"현재가보다 {d:+.1f}% 아래 → 하락 압력 가능"
+            mp_note = f"현재가보다 Max Pain이 {d:+.1f}% 아래 → 만기 시 가격 수렴(하락) 가능성"
             mp_color = "red"
         else:
-            mp_note = f"현재가와 유사 ({d:+.1f}%) → 횡보 가능"
+            mp_note = f"현재가와 Max Pain 유사 ({d:+.1f}%) → 현재 가격대 유지 가능성"
             mp_color = "yellow"
 
     ch = "".join([f"<li>${c_item['strike']:.1f} <span style='color:#6e7681'>(Vol: {int(c_item['volume']):,})</span></li>" for c_item in (tc or [])]) or "<li>N/A</li>"
@@ -674,9 +715,13 @@ def render_company_details(ticker_str: str):
                 <ul class="opt-list">{ph}</ul>
             </div>
         </div>
+        <div style="font-size:.73rem;color:#6e7681;margin-top:12px;line-height:1.6;padding:10px;background:rgba(0,0,0,.15);border-radius:8px">
+            💡 <b>Max Pain 이론</b>: 옵션 만기 시 가장 많은 옵션 매수자가 손실을 보는 가격. 옵션 매도자(마켓메이커)의 이익이 극대화되는 지점으로, 주가가 이 가격으로 수렴하는 경향이 있다는 이론입니다.
+        </div>
         {_verdict_badge(mp_color, "📌", mp_badge_text)}
     </div>""", unsafe_allow_html=True)
 
+    # 🚀 개선: 공매도 게이지 
     sp = info.get('shortPercentOfFloat')
     shares_short = info.get('sharesShort', 0) or 0
     short_ratio  = info.get('shortRatio')
@@ -698,10 +743,17 @@ def render_company_details(ticker_str: str):
 
     v12_text = f"공매도 {_fmt_pct(sp)} — {sl}"
 
+    # 20%가 되면 바가 가득 차게 조정 (sp_pct * 5)
+    sp_pct_val = sp if isinstance(sp, (int, float)) else 0
+    sp_bar_w = min(sp_pct_val * 5 * 100, 100) 
+    
     st.markdown(f"""
     <div class="info-card">
         <div class="info-title">📉 12. 공매도 비율 (Yahoo)</div>
         <div class="metric-row"><span class="metric-label">유통주식 대비 공매도 비율</span><span class="metric-value {'metric-warn' if sl_c == 'red' else 'metric-value'}">{_fmt_pct(sp)}</span></div>
+        <div class="progress-container">
+            <div class="progress-bar" style="width:{sp_bar_w:.1f}%;background:#FF1744"></div>
+        </div>
         <div class="metric-row"><span class="metric-label">공매도 수준</span><span class="metric-value">{sl}</span></div>
         <div class="metric-row"><span class="metric-label">공매도 주식수</span><span class="metric-value">{_fmt_num(shares_short, False)} 주</span></div>
         <div class="metric-row"><span class="metric-label">발행 주식수</span><span class="metric-value">{_fmt_num(info.get('sharesOutstanding'), False)} 주</span></div>
@@ -711,11 +763,11 @@ def render_company_details(ticker_str: str):
     </div>""", unsafe_allow_html=True)
 
     # ════════════════════════════════════════════════════
-    # 🚀 📋 종합 점수 요약 (오류 수정 완료)
+    # 🚀 📋 종합 점수 요약 (버그 해결: Gray 제외)
     # ════════════════════════════════════════════════════
     total_score = 0
     max_score = 0
-    # 11번 옵션 항목까지 모두 포함
+    
     score_items = [
         ("성장 사이클", verdict_1_color),
         ("수익성", v2_color),
@@ -732,13 +784,11 @@ def render_company_details(ticker_str: str):
     ]
 
     for name, color in score_items:
-        # 💡 버그 패치: 데이터가 없는("gray") 항목은 아예 채점 모수(max_score)에서 제외합니다.
         if color != "gray":
             max_score += 2
             if   color == "green":  total_score += 2
             elif color == "yellow": total_score += 1
             elif color == "blue":   total_score += 1.5
-            # red는 0점이므로 total_score 변동 없음
 
     pct_score = (total_score / max_score * 100) if max_score > 0 else 0
 
@@ -749,7 +799,6 @@ def render_company_details(ticker_str: str):
 
     score_rows = ""
     for name, color in score_items:
-        # 💡 버그 패치: 캐시카우의 blue 색상도 UI에 매핑 완료
         dot = {"green":"🟢", "yellow":"🟡", "red":"🔴", "blue":"🔵", "gray":"⚪"}.get(color, "⚪")
         score_rows += f"<td style='text-align:center; padding: 5px;'>{dot}<br><span style='font-size:.7rem;color:#8b949e'>{name}</span></td>"
 
