@@ -4,6 +4,13 @@ import pandas as pd
 import numpy as np
 import html as html_module
 from datetime import datetime
+import plotly.graph_objects as go  # 🚀 추가: Plotly 차트 렌더링용
+
+# ═══════════════════════════════════════════════════════════════
+# 🛠️  API 변동성 대응을 위한 동의어(Alias) 설정 (🚀 개선사항 1)
+# ═══════════════════════════════════════════════════════════════
+REV_ALIASES = ['Total Revenue', 'Operating Revenue', 'Revenue']
+NI_ALIASES = ['Net Income', 'Net Income Common Stockholders', 'Net Income Continuous Operations']
 
 # ═══════════════════════════════════════════════════════════════
 # 🛠️  유틸리티 함수
@@ -129,6 +136,30 @@ def _mini_bar_chart(values, dates, color_pos="#00E676", color_neg="#FF1744"):
                  f'font-size:.7rem;color:#fff;font-weight:600">{_fmt_num(v)}</div></div></div>')
     return f'<div style="margin:10px 0">{rows}</div>'
 
+# 🚀 추가: Plotly 차트 HTML 주입 렌더러 (개선사항 2)
+def _render_plotly_chart_html(rv, nv, rd):
+    if not rv or not rd:
+        return "<div style='color:#6e7681;text-align:center;padding:20px'>차트 데이터가 부족합니다.</div>"
+    
+    # 시간순 정렬 (과거 -> 최신)
+    rd_rev, rv_rev, nv_rev = rd[::-1], rv[::-1], nv[::-1]
+    labels = [d.strftime('%Y') if hasattr(d, 'strftime') else str(d)[:4] for d in rd_rev]
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(x=labels, y=rv_rev, name='매출', marker_color='#2196F3', opacity=0.85))
+    fig.add_trace(go.Scatter(x=labels, y=nv_rev, name='순이익', mode='lines+markers', 
+                             line=dict(color='#00E676', width=3), marker=dict(size=8), yaxis='y2'))
+
+    fig.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='#8b949e', size=11), margin=dict(l=0, r=0, t=20, b=0), height=240,
+        xaxis=dict(showgrid=False),
+        yaxis=dict(showgrid=True, gridcolor='rgba(45,51,59,0.5)', zeroline=False, title='매출 ($)'),
+        yaxis2=dict(title='순이익 ($)', overlaying='y', side='right', showgrid=False),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    )
+    return fig.to_html(full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})
+
 def _traffic_light(status):
     m = {"green": "🟢", "yellow": "🟡", "red": "🔴", "blue": "🔵", "gray": "⚪"}
     return m.get(status, "⚪")
@@ -164,7 +195,7 @@ def _growth_stage(info, fin, bs, cf):
 
     rev_declining = False
     try:
-        rs = _get_row_series(fin, ['Total Revenue'])
+        rs = _get_row_series(fin, REV_ALIASES)
         if len(rs) >= 3:
             rd = rs.sort_index(ascending=False)
             if sum(1 for i in range(len(rd) - 1) if rd.iloc[i] < rd.iloc[i + 1]) >= 2:
@@ -208,14 +239,14 @@ def _stability(financials, rc):
     if len(arr) < 2 or np.mean(arr) == 0: return "데이터 부족", "", "gray"
     cv = np.std(arr) / abs(np.mean(arr))
     if   cv < 0.10: return "매우 안정적 ✅", f"CV {cv:.3f}", "green"
-    elif cv < 0.25: return "안정적 ✅",     f"CV {cv:.3f}", "green"
-    elif cv < 0.50: return "보통 ⚠️",       f"CV {cv:.3f}", "yellow"
-    else:           return "불안정 ❌",      f"CV {cv:.3f}", "red"
+    elif cv < 0.25: return "안정적 ✅",      f"CV {cv:.3f}", "green"
+    elif cv < 0.50: return "보통 ⚠️",        f"CV {cv:.3f}", "yellow"
+    else:           return "불안정 ❌",       f"CV {cv:.3f}", "red"
 
 def _margin_trend(fin):
     try:
-        rs = _get_row_series(fin, ['Total Revenue'])
-        ns = _get_row_series(fin, ['Net Income'])
+        rs = _get_row_series(fin, REV_ALIASES)
+        ns = _get_row_series(fin, NI_ALIASES)
         idx = rs.index.intersection(ns.index).sort_values()
         margins = [(i, ns[i] / rs[i]) for i in idx if rs[i] != 0]
         if len(margins) < 2: return "N/A", [], "gray"
@@ -226,6 +257,7 @@ def _margin_trend(fin):
     except Exception:
         return "N/A", [], "gray"
 
+# 🚀 수정: 가속도 알고리즘 고도화 (개선사항 3)
 def _growth_accel(fin, rc):
     vals, _ = _annual_values(fin, rc)
     if len(vals) < 3: return "N/A", "gray"
@@ -234,8 +266,13 @@ def _growth_accel(fin, rc):
         if vals[i + 1] and vals[i + 1] != 0:
             g.append((vals[i] - vals[i + 1]) / abs(vals[i + 1]))
     if len(g) < 2: return "N/A", "gray"
-    if g[0] > g[1]: return f"가속화 🚀 (최근 {g[0] * 100:.1f}% vs 이전 {g[1] * 100:.1f}%)", "green"
-    return f"감속 🐌 (최근 {g[0] * 100:.1f}% vs 이전 {g[1] * 100:.1f}%)", "yellow"
+    
+    recent_g = g[0]
+    past_g_avg = np.mean(g[1:4]) if len(g) > 2 else g[1]  # 최대 과거 3년 평균과 최근 1년 비교
+    
+    if recent_g > past_g_avg + 0.05: return f"가속화 🚀 (최근 {recent_g * 100:.1f}% vs 과거 {past_g_avg * 100:.1f}%)", "green"
+    elif recent_g < past_g_avg - 0.05: return f"감속 🐌 (최근 {recent_g * 100:.1f}% vs 과거 {past_g_avg * 100:.1f}%)", "yellow"
+    return f"유지 ➡️ (최근 {recent_g * 100:.1f}% vs 과거 {past_g_avg * 100:.1f}%)", "green"
 
 def _debt_trend(bs):
     for nc in [['Total Debt'], ['Long Term Debt'], ['Total Liabilities Net Minority Interest']]:
@@ -289,11 +326,10 @@ def _vol_trend(info):
     elif r > 0.5: return f"감소 📉 ({r:.1f}배)", "yellow"
     else:         return f"급감 ⚠️ ({r:.1f}배)", "red"
 
-# 🚀 수정: 데이터 불균형 방어 로직 추가
 def _max_pain(tkr):
     try:
         dates = tkr.options
-        if not dates: return None, None, None, None
+        if not dates: return None, None, None, None, False
         exp = dates[0]
         o = tkr.option_chain(exp)
         c, p = o.calls.copy(), o.puts.copy()
@@ -307,12 +343,15 @@ def _max_pain(tkr):
         c_oi_sum = c['openInterest'].sum()
         p_oi_sum = p['openInterest'].sum()
         
+        is_vol_weight = False
+        
         # 야후 API 데이터 누락 방어: 한쪽이 비정상적으로 적으면(2% 미만) 거래량 가중치 사용
         if c_oi_sum == 0 or p_oi_sum == 0 or (c_oi_sum / max(p_oi_sum, 1) < 0.02) or (p_oi_sum / max(c_oi_sum, 1) < 0.02):
             weight_c = c['volume']
             weight_p = p['volume']
+            is_vol_weight = True # 🚀 추가: 거래량 가중치 사용 여부 반환 (개선사항 4)
             if weight_c.sum() == 0 and weight_p.sum() == 0:
-                return exp, None, [], [] # 데이터 완전히 없음
+                return exp, None, [], [], False # 데이터 완전히 없음
         else:
             weight_c = c['openInterest']
             weight_p = p['openInterest']
@@ -330,9 +369,9 @@ def _max_pain(tkr):
             
         tc = c.nlargest(3, 'volume')[['strike', 'volume']].to_dict('records')
         tp = p.nlargest(3, 'volume')[['strike', 'volume']].to_dict('records')
-        return exp, mp, tc, tp
+        return exp, mp, tc, tp, is_vol_weight
     except Exception:
-        return None, None, None, None
+        return None, None, None, None, False
 
 
 # ── 섹터 P/E ───────────────────────────────────────────
@@ -457,8 +496,8 @@ def render_company_details(ticker_str: str):
         if price == 0:
             st.warning("⚠️ 현재가를 불러올 수 없습니다. 일부 데이터가 정확하지 않을 수 있습니다.")
 
-        cagr_rev, yr_rev = _calc_cagr_with_years(fin, ['Total Revenue'])
-        cagr_ni,  yr_ni  = _calc_cagr_with_years(fin, ['Net Income'])
+        cagr_rev, yr_rev = _calc_cagr_with_years(fin, REV_ALIASES)
+        cagr_ni,  yr_ni  = _calc_cagr_with_years(fin, NI_ALIASES)
         cagr_eps, yr_eps = _calc_cagr_with_years(fin, ['Basic EPS', 'Diluted EPS'])
 
     # ═══════════════════════════════════════════════════
@@ -610,11 +649,11 @@ def render_company_details(ticker_str: str):
     </div>""", unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 3️⃣ 지금까지 성적
+    # 3️⃣ 지금까지 성적 (🚀 Plotly 차트 적용)
     # ═══════════════════════════════════════════════════
-    rev_stab, rev_cv, stab_c = _stability(fin, ['Total Revenue'])
+    rev_stab, rev_cv, stab_c = _stability(fin, REV_ALIASES)
     mtrend, _, mtrend_c      = _margin_trend(fin)
-    accel, accel_c           = _growth_accel(fin, ['Total Revenue'])
+    accel, accel_c           = _growth_accel(fin, REV_ALIASES)
 
     roe_val = info.get('returnOnEquity')
     if roe_val is not None:
@@ -625,8 +664,8 @@ def render_company_details(ticker_str: str):
     else:
         roe_lbl, roe_c = "N/A", "gray"
 
-    rv, rd = _annual_values(fin, ['Total Revenue'])
-    nv, nd = _annual_values(fin, ['Net Income'])
+    rv, rd = _annual_values(fin, REV_ALIASES)
+    nv, nd = _annual_values(fin, NI_ALIASES)
 
     tbl_rows = ""
     for i in range(min(len(rv), len(nv), 4)):
@@ -638,7 +677,8 @@ def render_company_details(ticker_str: str):
                      f"<td style='color:{nc}'>{_fmt_num(nv[i])}</td>"
                      f"<td style='color:{mc}'>{mg:.1f}%</td></tr>")
 
-    rev_chart = _mini_bar_chart(rv[:4], rd[:4])
+    # 🚀 수정: 미니 차트 대신 Plotly 동적 차트 사용
+    rev_chart = _render_plotly_chart_html(rv[:4] if rv else [], nv[:4] if nv else [], rd[:4] if rd else [])
 
     s3 = sum(1 for c in [stab_c, mtrend_c, accel_c, roe_c] if c == "green")
     if   s3 >= 3: v3_c, v3_t = "green",  "✅ 우수한 트랙 레코드 — 안정 성장 + 높은 ROE"
@@ -657,7 +697,7 @@ def render_company_details(ticker_str: str):
                 {_metric_row("ROE 수준", roe_lbl)}
             </div>
             <div>
-                <div style="font-size:.82rem;color:#6e7681;margin-bottom:4px;font-weight:600">📊 연도별 매출 추이</div>
+                <div style="font-size:.82rem;color:#6e7681;margin-bottom:4px;font-weight:600">📊 연도별 재무 추이</div>
                 {rev_chart}
             </div>
         </div>
@@ -849,7 +889,6 @@ def render_company_details(ticker_str: str):
     w52l = info.get('fiftyTwoWeekLow')
     w52c = info.get('52WeekChange')
 
-    # 🚀 HTML 코드 블록 렌더링 방지를 위해 Flatten 된 문자열 사용
     if price and w52h and w52l and w52h != w52l:
         pos52 = max(0, min(100, (price - w52l) / (w52h - w52l) * 100))
         pos_str = f"{pos52:.1f}%"
@@ -911,7 +950,6 @@ def render_company_details(ticker_str: str):
     pe_visual = ""
     if t_pe and s_pe:
         max_pe = max(t_pe, s_pe) * 1.3
-        # HTML Flattening
         pe_visual = f"<div style='margin:10px 0'><div style='font-size:.78rem;color:#8b949e;margin-bottom:6px'>P/E 비교</div><div style='display:flex;align-items:center;gap:8px;margin:4px 0'><span style='min-width:50px;font-size:.75rem;color:#82aaff'>이 종목</span><div style='flex:1;background:#21262d;border-radius:4px;height:18px;overflow:hidden'><div style='width:{t_pe / max_pe * 100:.1f}%;height:100%;background:#82aaff;border-radius:4px;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;font-size:.7rem;color:#fff;font-weight:600'>{t_pe:.1f}</div></div></div><div style='display:flex;align-items:center;gap:8px;margin:4px 0'><span style='min-width:50px;font-size:.75rem;color:#607D8B'>섹터평균</span><div style='flex:1;background:#21262d;border-radius:4px;height:18px;overflow:hidden'><div style='width:{s_pe / max_pe * 100:.1f}%;height:100%;background:#607D8B;border-radius:4px;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;font-size:.7rem;color:#fff;font-weight:600'>{s_pe:.1f}</div></div></div></div>"
 
     pe_src_lbl = f"평균 P/E ≈ {s_pe:.1f} ({pe_source})" if s_pe else "N/A"
@@ -973,14 +1011,12 @@ def render_company_details(ticker_str: str):
         up_pct, up_str = 0, "N/A"
 
     target_bar = ""
-    # 🚀 수정: 최고-최저 범위가 같아서 0으로 나뉘는 DivisionError 방지 로직 보강
     if t_low and t_high and t_median and price:
         if t_high > t_low:
             rng = t_high - t_low
             curr_pos = max(0, min(100, (price - t_low) / rng * 100))
             med_pos  = max(0, min(100, (t_median - t_low) / rng * 100))
             
-            # HTML Flattening
             target_bar = f"<div style='margin:14px 0'><div style='font-size:.78rem;color:#6e7681;margin-bottom:6px'>목표가 범위</div><div style='display:flex;justify-content:space-between;font-size:.7rem;color:#6e7681;margin-bottom:3px'><span>${t_low:,.0f}</span><span>${t_high:,.0f}</span></div><div style='background:#21262d;border-radius:6px;height:14px;position:relative'><div style='position:absolute;top:-2px;left:{curr_pos:.1f}%;width:18px;height:18px;background:#FF9800;border-radius:50%;transform:translateX(-50%);border:2px solid #fff;z-index:2' title='현재가'></div><div style='position:absolute;top:-1px;left:{med_pos:.1f}%;width:14px;height:16px;background:#00E676;border-radius:3px;transform:translateX(-50%);z-index:1' title='중앙 목표가'></div></div><div style='display:flex;justify-content:center;gap:16px;margin-top:6px;font-size:.7rem'><span style='color:#FF9800'>● 현재가</span><span style='color:#00E676'>● 중앙 목표가</span></div></div>"
         else:
             target_bar = f"<div style='font-size:.8rem;color:#6e7681;margin-top:14px;text-align:center;'>단일 목표가: ${t_median:,.2f}</div>"
@@ -1061,9 +1097,9 @@ def render_company_details(ticker_str: str):
     </div>""", unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 1️⃣1️⃣ 옵션 / Max Pain
+    # 1️⃣1️⃣ 옵션 / Max Pain (🚀 경고 로직 추가)
     # ═══════════════════════════════════════════════════
-    exp, mp, tc, tp = _max_pain(tkr)
+    exp, mp, tc, tp, is_vol_weight = _max_pain(tkr)
 
     mp_val = f"${mp:.2f}" if mp else ""
     mp_html = (f"<span style='font-size:1.3rem;font-weight:800;color:#82aaff'>{mp_val}</span>"
@@ -1089,6 +1125,9 @@ def render_company_details(ticker_str: str):
     ph = "".join([f"<li>${pi['strike']:.1f} <span style='color:#6e7681'>(Vol {int(pi['volume']):,})</span></li>"
                   for pi in (tp or [])]) or "<li>N/A</li>"
     mp_badge = f"Max Pain {mp_val} — {mp_note}" if mp else "옵션 데이터 없음"
+    
+    # 🚀 추가: 거래량 가중치 사용 시 경고 표시
+    vol_warning = "<div style='color:#FFC107; font-size:0.8rem; margin-top:8px;'>⚠️ 미결제약정(OI) 데이터 부족으로 거래량(Volume) 가중치를 사용했습니다. 신뢰도가 낮을 수 있습니다.</div>" if is_vol_weight else ""
 
     st.markdown(f"""
     <div class="s-card">
@@ -1097,6 +1136,7 @@ def render_company_details(ticker_str: str):
             <div style="font-size:.82rem;color:#8b949e;margin-bottom:4px">Max Pain 가격 {exp_html}</div>
             {mp_html}
             <div style="font-size:.85rem;color:#c9d1d9;margin-top:6px">{mp_note}</div>
+            {vol_warning}
         </div>
         <div class="divider"></div>
         <div style="display:flex;gap:16px;flex-wrap:wrap">
@@ -1209,7 +1249,6 @@ def render_company_details(ticker_str: str):
     # ═══════════════════════════════════════════════════
     total, mx = 0, 0
     for _, c in all_verdicts:
-        # 🚀 수정: 데이터가 있는(gray가 아닌) 지표만 분모에 추가하여 공정성 복구
         if c != "gray":
             mx += 2
             if   c == "green":  total += 2
