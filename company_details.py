@@ -21,12 +21,10 @@ def _fmt_num(num, is_currency=True):
     elif a >= 1e3:  return f"{sign}{prefix}{a/1e3:.2f}K"
     return f"{sign}{prefix}{num:,.2f}"
 
-
 def _fmt_pct(num):
     if pd.isna(num) or num is None:
         return "N/A"
     return f"{num * 100:.2f}%"
-
 
 def _safe(val, fallback="N/A"):
     if val is None:
@@ -35,10 +33,8 @@ def _safe(val, fallback="N/A"):
         return fallback
     return val
 
-
 def _esc(text):
     return html_module.escape(str(text)) if text else ""
-
 
 def _get_row(df, candidates, col_idx=0):
     if df is None:
@@ -53,7 +49,6 @@ def _get_row(df, candidates, col_idx=0):
                 pass
     return None
 
-
 def _get_row_series(df, candidates):
     if df is None:
         return pd.Series(dtype=float)
@@ -64,7 +59,6 @@ def _get_row_series(df, candidates):
             except Exception:
                 pass
     return pd.Series(dtype=float)
-
 
 def _calc_cagr_with_years(financials, row_candidates):
     try:
@@ -80,7 +74,6 @@ def _calc_cagr_with_years(financials, row_candidates):
         pass
     return None, 0
 
-
 def _annual_values(financials, row_candidates):
     try:
         rc = row_candidates if isinstance(row_candidates, list) else [row_candidates]
@@ -91,7 +84,6 @@ def _annual_values(financials, row_candidates):
     except Exception:
         pass
     return [], []
-
 
 # ── 시각 요소 빌더 ─────────────────────────────────────
 
@@ -107,11 +99,9 @@ def _verdict_badge(color, emoji, text):
             f'<span style="font-size:1.05rem;font-weight:700;'
             f'color:{bdr.get(color, bdr["gray"])}">{emoji} {text}</span></div>')
 
-
 def _metric_row(label, value, value_class="m-value"):
     return (f'<div class="m-row"><span class="m-label">{label}</span>'
             f'<span class="{value_class}">{value}</span></div>')
-
 
 def _gauge_bar(pct, color="#00E676", height=8):
     pct = max(0, min(100, pct))
@@ -119,7 +109,6 @@ def _gauge_bar(pct, color="#00E676", height=8):
             f'height:{height}px;overflow:hidden;margin:6px 0">'
             f'<div style="width:{pct:.1f}%;height:100%;background:{color};'
             f'border-radius:{height}px;transition:width .8s"></div></div>')
-
 
 def _mini_bar_chart(values, dates, color_pos="#00E676", color_neg="#FF1744"):
     if not values:
@@ -140,11 +129,9 @@ def _mini_bar_chart(values, dates, color_pos="#00E676", color_neg="#FF1744"):
                  f'font-size:.7rem;color:#fff;font-weight:600">{_fmt_num(v)}</div></div></div>')
     return f'<div style="margin:10px 0">{rows}</div>'
 
-
 def _traffic_light(status):
     m = {"green": "🟢", "yellow": "🟡", "red": "🔴", "blue": "🔵", "gray": "⚪"}
     return m.get(status, "⚪")
-
 
 def _score_dot_row(items):
     cells = ""
@@ -156,7 +143,6 @@ def _score_dot_row(items):
                   f'<span style="font-size:.65rem;color:#8b949e;margin-top:2px;'
                   f'text-align:center;line-height:1.2">{name}</span></div>')
     return f'<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:2px;margin:10px 0">{cells}</div>'
-
 
 # ── 분석 함수들 ─────────────────────────────────────────
 
@@ -187,70 +173,44 @@ def _growth_stage(info, fin, bs, cf):
         pass
 
     stages = {
-        1: ("🌱 1단계 : 스타트업 / 개발",
-            "매출 미미·R&D 집중. 시장 검증 전, 높은 리스크·높은 잠재력."),
-        2: ("🚀 2단계 : 초기 고성장",
-            "매출 폭발적 증가, 아직 적자. 시장점유율 확대에 올인하는 단계."),
-        3: ("📈 3단계 : 고성장 흑자전환",
-            "높은 매출 성장 + 이익 창출 시작. 성장·수익 균형점 진입."),
-        4: ("💪 4단계 : 성숙한 성장",
-            "안정적 매출 성장 + 높은 수익성. 우량 성장주의 전형."),
-        5: ("💰 5단계 : 캐시카우",
-            "성장 둔화, 현금 창출 극대화. 배당·자사주매입 등 주주환원 활발."),
-        6: ("⏸️ 6단계 : 정체기",
-            "매출 성장 멈춤, 이익 유지. 새 성장 동력이 필요한 시점."),
-        7: ("📉 7단계 : 쇠퇴기",
-            "매출·이익 동반 하락. 구조적 변화 없이는 위험 증가."),
-        8: ("🔧 8단계 : 구조조정 / 턴어라운드",
-            "적극적 사업 재편·회생 시도. 성공 시 큰 반등 가능."),
+        1: ("🌱 1단계 : 스타트업 / 개발", "매출 미미·R&D 집중. 시장 검증 전, 높은 리스크·높은 잠재력."),
+        2: ("🚀 2단계 : 초기 고성장", "매출 폭발적 증가, 아직 적자. 시장점유율 확대에 올인하는 단계."),
+        3: ("📈 3단계 : 고성장 흑자전환", "높은 매출 성장 + 이익 창출 시작. 성장·수익 균형점 진입."),
+        4: ("💪 4단계 : 성숙한 성장", "안정적 매출 성장 + 높은 수익성. 우량 성장주의 전형."),
+        5: ("💰 5단계 : 캐시카우", "성장 둔화, 현금 창출 극대화. 배당·자사주매입 등 주주환원 활발."),
+        6: ("⏸️ 6단계 : 정체기", "매출 성장 멈춤, 이익 유지. 새 성장 동력이 필요한 시점."),
+        7: ("📉 7단계 : 쇠퇴기", "매출·이익 동반 하락. 구조적 변화 없이는 위험 증가."),
+        8: ("🔧 8단계 : 구조조정 / 턴어라운드", "적극적 사업 재편·회생 시도. 성공 시 큰 반등 가능."),
     }
     colors = {1: "#9C27B0", 2: "#FF5722", 3: "#FF9800", 4: "#4CAF50",
               5: "#2196F3", 6: "#607D8B", 7: "#F44336", 8: "#795548"}
 
-    if rev < 1e8 and margin < -0.20:
-        s = 1
-    elif rev_g > 0.30 and margin < 0:
-        s = 2
-    elif rev_g > 0.20 and margin > 0:
-        s = 3
-    elif rev_g > 0.05 and margin > 0.10:
-        s = 4
-    elif 0 <= rev_g <= 0.05 and margin > 0.10 and (div_y > 0.01 or op_cf > rev * 0.1):
-        s = 5
-    elif -0.05 <= rev_g <= 0.02 and margin > 0:
-        s = 6
-    elif rev_declining and margin < 0:
-        s = 7
-    elif rev_g < -0.05 and margin <= 0:
-        s = 8
-    elif rev_g < 0 and margin <= 0:
-        s = 8
-    elif rev_g > 0.30:
-        s = 2
-    elif margin > 0.15 and rev_g > 0.05:
-        s = 4
-    elif margin > 0.15:
-        s = 5
-    elif margin > 0:
-        s = 6
-    elif margin < -0.10:
-        s = 8
-    else:
-        s = 6
+    if rev < 1e8 and margin < -0.20: s = 1
+    elif rev_g > 0.30 and margin < 0: s = 2
+    elif rev_g > 0.20 and margin > 0: s = 3
+    elif rev_g > 0.05 and margin > 0.10: s = 4
+    elif 0 <= rev_g <= 0.05 and margin > 0.10 and (div_y > 0.01 or op_cf > rev * 0.1): s = 5
+    elif -0.05 <= rev_g <= 0.02 and margin > 0: s = 6
+    elif rev_declining and margin < 0: s = 7
+    elif rev_g < -0.05 and margin <= 0: s = 8
+    elif rev_g < 0 and margin <= 0: s = 8
+    elif rev_g > 0.30: s = 2
+    elif margin > 0.15 and rev_g > 0.05: s = 4
+    elif margin > 0.15: s = 5
+    elif margin > 0: s = 6
+    elif margin < -0.10: s = 8
+    else: s = 6
     return s, stages[s][0], stages[s][1], colors[s]
-
 
 def _stability(financials, rc):
     vals, _ = _annual_values(financials, rc)
     arr = np.array([v for v in vals if v is not None and not np.isnan(v)])
-    if len(arr) < 2 or np.mean(arr) == 0:
-        return "데이터 부족", "", "gray"
+    if len(arr) < 2 or np.mean(arr) == 0: return "데이터 부족", "", "gray"
     cv = np.std(arr) / abs(np.mean(arr))
     if   cv < 0.10: return "매우 안정적 ✅", f"CV {cv:.3f}", "green"
     elif cv < 0.25: return "안정적 ✅",     f"CV {cv:.3f}", "green"
     elif cv < 0.50: return "보통 ⚠️",       f"CV {cv:.3f}", "yellow"
     else:           return "불안정 ❌",      f"CV {cv:.3f}", "red"
-
 
 def _margin_trend(fin):
     try:
@@ -258,36 +218,27 @@ def _margin_trend(fin):
         ns = _get_row_series(fin, ['Net Income'])
         idx = rs.index.intersection(ns.index).sort_values()
         margins = [(i, ns[i] / rs[i]) for i in idx if rs[i] != 0]
-        if len(margins) < 2:
-            return "N/A", [], "gray"
+        if len(margins) < 2: return "N/A", [], "gray"
         f_m, l_m = margins[0][1], margins[-1][1]
-        if l_m > f_m + 0.02:
-            return f"증가 추세 📈 ({f_m * 100:.1f}% → {l_m * 100:.1f}%)", margins, "green"
-        if l_m < f_m - 0.02:
-            return f"감소 추세 📉 ({f_m * 100:.1f}% → {l_m * 100:.1f}%)", margins, "red"
+        if l_m > f_m + 0.02: return f"증가 추세 📈 ({f_m * 100:.1f}% → {l_m * 100:.1f}%)", margins, "green"
+        if l_m < f_m - 0.02: return f"감소 추세 📉 ({f_m * 100:.1f}% → {l_m * 100:.1f}%)", margins, "red"
         return f"유지 ➡️ ({l_m * 100:.1f}%)", margins, "yellow"
     except Exception:
         return "N/A", [], "gray"
 
-
 def _growth_accel(fin, rc):
     vals, _ = _annual_values(fin, rc)
-    if len(vals) < 3:
-        return "N/A", "gray"
+    if len(vals) < 3: return "N/A", "gray"
     g = []
     for i in range(len(vals) - 1):
         if vals[i + 1] and vals[i + 1] != 0:
             g.append((vals[i] - vals[i + 1]) / abs(vals[i + 1]))
-    if len(g) < 2:
-        return "N/A", "gray"
-    if g[0] > g[1]:
-        return f"가속화 🚀 (최근 {g[0] * 100:.1f}% vs 이전 {g[1] * 100:.1f}%)", "green"
+    if len(g) < 2: return "N/A", "gray"
+    if g[0] > g[1]: return f"가속화 🚀 (최근 {g[0] * 100:.1f}% vs 이전 {g[1] * 100:.1f}%)", "green"
     return f"감속 🐌 (최근 {g[0] * 100:.1f}% vs 이전 {g[1] * 100:.1f}%)", "yellow"
 
-
 def _debt_trend(bs):
-    for nc in [['Total Debt'], ['Long Term Debt'],
-               ['Total Liabilities Net Minority Interest']]:
+    for nc in [['Total Debt'], ['Long Term Debt'], ['Total Liabilities Net Minority Interest']]:
         series = _get_row_series(bs, nc)
         if len(series) >= 2:
             series = series.sort_index(ascending=False)
@@ -299,8 +250,6 @@ def _debt_trend(bs):
                 else:             return f"안정 유지 ➡️ ({chg * 100:.1f}%)", "yellow"
     return "데이터 부족", "gray"
 
-
-# 🚀 수정 1: 이자보상배율 적자 엣지케이스(Negative EBIT) 완벽 방어
 def _interest_burden(fin, info):
     ebit = _get_row(fin, ['EBIT', 'Operating Income'])
     interest = _get_row(fin, ['Interest Expense', 'Interest Expense Non Operating'])
@@ -308,7 +257,6 @@ def _interest_burden(fin, info):
     if ebit is not None and interest is not None and abs(interest) > 0:
         if ebit < 0:
             return "위험 ❌ (영업적자로 이자 지급 불가)", "red"
-        
         icr = abs(ebit / interest)
         src = "SEC 실제"
         if   icr > 10: return f"매우 낮음 ✅ (ICR {icr:.1f}x, {src})", "green"
@@ -321,7 +269,6 @@ def _interest_burden(fin, info):
     if ebitda is not None and debt is not None and debt > 0:
         if ebitda < 0:
             return "위험 ❌ (EBITDA 적자)", "red"
-            
         est_rate = 0.05
         cov = ebitda / (debt * est_rate)
         src = f"추정, 이자율 {est_rate * 100:.0f}% 가정"
@@ -329,15 +276,12 @@ def _interest_burden(fin, info):
         elif cov >  5: return f"낮음 ✅ ({cov:.1f}x, {src})", "green"
         elif cov >  2: return f"보통 ⚠️ ({cov:.1f}x, {src})", "yellow"
         else:          return f"높음 ❌ ({cov:.1f}x, {src})", "red"
-        
     return "N/A", "gray"
-
 
 def _vol_trend(info):
     vol   = info.get('volume', 0) or 0
     avg3m = info.get('averageVolume', 0) or 0
-    if avg3m == 0:
-        return "데이터 부족", "gray"
+    if avg3m == 0: return "데이터 부족", "gray"
     r = vol / avg3m
     if   r > 1.5: return f"급증 🔥 ({r:.1f}배)", "yellow"
     elif r > 1.1: return f"증가 📈 ({r:.1f}배)", "yellow"
@@ -345,57 +289,51 @@ def _vol_trend(info):
     elif r > 0.5: return f"감소 📉 ({r:.1f}배)", "yellow"
     else:         return f"급감 ⚠️ ({r:.1f}배)", "red"
 
-
+# 🚀 수정: 데이터 불균형 방어 로직 추가
 def _max_pain(tkr):
-    """옵션 Max-Pain 계산 (데이터 누락 방어 로직 탑재)"""
     try:
         dates = tkr.options
-        if not dates:
-            return None, None, None, None
-            
-        exp = dates[0]  # 가장 가까운 만기일
+        if not dates: return None, None, None, None
+        exp = dates[0]
         o = tkr.option_chain(exp)
         c, p = o.calls.copy(), o.puts.copy()
         
-        # 1. 컬럼이 없거나 NaN인 경우 0으로 초기화
         for col in ['openInterest', 'volume']:
-            if col not in c.columns:
-                c[col] = 0
-            if col not in p.columns:
-                p[col] = 0
+            if col not in c.columns: c[col] = 0
+            if col not in p.columns: p[col] = 0
             c[col] = c[col].fillna(0)
             p[col] = p[col].fillna(0)
-
-        # 🚀 2. 핵심 방어 로직: Open Interest가 통째로 누락되었는지 확인
-        total_oi = c['openInterest'].sum() + p['openInterest'].sum()
+            
+        c_oi_sum = c['openInterest'].sum()
+        p_oi_sum = p['openInterest'].sum()
         
-        # 미결제약정 총합이 너무 적으면(야후 API 오류 시), 차선책으로 '거래량(volume)'을 사용
-        weight_col = 'volume' if total_oi < 10 else 'openInterest'
-        
-        # 대체 후에도 가중치 데이터가 아예 없으면 계산 포기
-        if c[weight_col].sum() + p[weight_col].sum() == 0:
-            return exp, None, [], []
+        # 야후 API 데이터 누락 방어: 한쪽이 비정상적으로 적으면(2% 미만) 거래량 가중치 사용
+        if c_oi_sum == 0 or p_oi_sum == 0 or (c_oi_sum / max(p_oi_sum, 1) < 0.02) or (p_oi_sum / max(c_oi_sum, 1) < 0.02):
+            weight_c = c['volume']
+            weight_p = p['volume']
+            if weight_c.sum() == 0 and weight_p.sum() == 0:
+                return exp, None, [], [] # 데이터 완전히 없음
+        else:
+            weight_c = c['openInterest']
+            weight_p = p['openInterest']
 
-        # 3. Max Pain 계산 루프 (월스트리트 표준)
         strikes = sorted(set(c['strike']).union(set(p['strike'])))
         pain = {}
         for s in strikes:
-            # 가상 만기 주가가 s일 때, 옵션 매도자의 고통(손실액) 합산
-            call_pain = np.sum(c[weight_col] * np.maximum(0, s - c['strike']))
-            put_pain  = np.sum(p[weight_col] * np.maximum(0, p['strike'] - s))
-            pain[s] = call_pain + put_pain
-
-        # 4. 고통이 가장 작은 가격 추출
-        mp = min(pain, key=pain.get) if pain else None
-
-        # 5. 거래량 Top 3 추출
+            pain[s] = (np.sum(weight_c * np.maximum(0, s - c['strike']))
+                       + np.sum(weight_p * np.maximum(0, p['strike'] - s)))
+                       
+        if not pain or max(pain.values()) == 0:
+            mp = None
+        else:
+            mp = min(pain, key=pain.get)
+            
         tc = c.nlargest(3, 'volume')[['strike', 'volume']].to_dict('records')
         tp = p.nlargest(3, 'volume')[['strike', 'volume']].to_dict('records')
-        
         return exp, mp, tc, tp
-        
     except Exception:
         return None, None, None, None
+
 
 # ── 섹터 P/E ───────────────────────────────────────────
 
@@ -413,7 +351,6 @@ SECTOR_PE_FALLBACK = {
     "Industrials": 20, "Energy": 12, "Basic Materials": 15,
     "Real Estate": 35, "Utilities": 18,
 }
-
 
 def _sector_pe_live(sector):
     etf = SECTOR_ETF.get(sector)
@@ -483,7 +420,6 @@ CSS = """
 </style>
 """
 
-
 # ═══════════════════════════════════════════════════════════════
 # 🏗️ 메인 렌더링
 # ═══════════════════════════════════════════════════════════════
@@ -503,18 +439,12 @@ def render_company_details(ticker_str: str):
             st.error("❌ 유효하지 않은 종목이거나 데이터가 없습니다.")
             return
 
-        try:
-            fin = tkr.financials
-        except Exception:
-            fin = None
-        try:
-            bs = tkr.balance_sheet
-        except Exception:
-            bs = None
-        try:
-            cf = tkr.cashflow
-        except Exception:
-            cf = None
+        try: fin = tkr.financials
+        except Exception: fin = None
+        try: bs = tkr.balance_sheet
+        except Exception: bs = None
+        try: cf = tkr.cashflow
+        except Exception: cf = None
 
         sector   = info.get('sector', 'N/A')
         industry = info.get('industry', 'N/A')
@@ -576,14 +506,10 @@ def render_company_details(ticker_str: str):
 
     v1_c = "green" if sn in [3, 4] else ("blue" if sn == 5 else ("yellow" if sn in [1, 2, 6] else "red"))
     v1_map = {
-        1: "초기 — 높은 리스크·높은 잠재력",
-        2: "폭풍 성장 중 — 적자이지만 매출 급증",
-        3: "성장+이익 = 최적 타이밍 가능",
-        4: "안정 성장 우량주 — 핵심 보유 후보",
-        5: "현금 창출 극대화 — 배당·안정성",
-        6: "새 성장 동력 필요",
-        7: "위험 — 구조적 하락 주의",
-        8: "턴어라운드 성공 여부가 핵심",
+        1: "초기 — 높은 리스크·높은 잠재력", 2: "폭풍 성장 중 — 적자이지만 매출 급증",
+        3: "성장+이익 = 최적 타이밍 가능", 4: "안정 성장 우량주 — 핵심 보유 후보",
+        5: "현금 창출 극대화 — 배당·안정성", 6: "새 성장 동력 필요",
+        7: "위험 — 구조적 하락 주의", 8: "턴어라운드 성공 여부가 핵심",
     }
     all_verdicts.append(("성장사이클", v1_c))
 
@@ -625,11 +551,8 @@ def render_company_details(ticker_str: str):
     ttm_ni  = info.get('netIncomeToCommon')
 
     ps = sum(1 for x in [
-        gross_m and gross_m > 0.4,
-        net_m and net_m > 0.1,
-        cagr_rev and cagr_rev > 0.05,
-        cagr_ni and cagr_ni > 0.05,
-        ttm_ni and ttm_ni > 0,
+        gross_m and gross_m > 0.4, net_m and net_m > 0.1,
+        cagr_rev and cagr_rev > 0.05, cagr_ni and cagr_ni > 0.05, ttm_ni and ttm_ni > 0,
     ] if x)
     if   ps >= 4: v2_c, v2_t = "green",  "💰 매우 우수 — 높은 마진 + 지속 성장"
     elif ps >= 3: v2_c, v2_t = "green",  "✅ 양호 — 수익성과 성장 겸비"
@@ -786,8 +709,8 @@ def render_company_details(ticker_str: str):
                 {_metric_row("지속가능 성장률 (g = ROE × 유보율)", _fmt_pct(sust_g),
                              "m-green" if sust_g and sust_g > 0.1 else "m-value")}
                 <div class="note-box">
-                    💡 <b>지속가능 성장률(g)</b>: 외부 자금 없이 내부 유보만으로 달성 가능한 성장률.<br>
-                    PEG &lt; 1.5 면 성장 대비 저평가 가능성.
+                    💡 <b>지속가능 성장률(g)</b>: 외부 자금 없이 내부 유보만으로 달성 가능한 이론적 최대 성장률.<br>
+                    PEG &lt; 1.5 면 이익 성장률 대비 현재 주가가 저평가되어 있을 가능성이 높습니다.
                 </div>
             </div>
         </div>
@@ -821,7 +744,7 @@ def render_company_details(ticker_str: str):
         dl, dl_c = "N/A", "gray"
 
     hs = sum(1 for x in [dl_c == "green", dt_c == "green", ib_c == "green",
-                         cash > tl * 0.2 if tl else False] if x)
+                          cash > tl * 0.2 if tl else False] if x)
     if   hs >= 3: v5_c, v5_t = "green",  "💪 재무 건전 — 낮은 부채, 충분한 현금"
     elif hs >= 2: v5_c, v5_t = "yellow", "⚠️ 보통 — 부채 관리 모니터링 필요"
     else:         v5_c, v5_t = "red",    "❌ 주의 — 부채 높거나 현금 부족"
@@ -859,7 +782,7 @@ def render_company_details(ticker_str: str):
                     <div class="p-bar" style="width:{li_pct:.1f}%;background:#FF5722">{'부채 ' + str(round(li_pct)) + '%' if li_pct > 15 else ''}</div>
                 </div>
                 <div class="note-box">
-                    ※ 순자산(자산-부채)과 자본(주주지분)은 회계상 유사하나, 비지배지분 포함 여부에 따라 차이가 날 수 있습니다.
+                    ※ 순자산(총자산-총부채)과 자본(주주지분)은 이론상 같으나, 비지배지분(Minority Interest) 등에 의해 차이가 날 수 있습니다.
                 </div>
             </div>
         </div>
@@ -926,17 +849,11 @@ def render_company_details(ticker_str: str):
     w52l = info.get('fiftyTwoWeekLow')
     w52c = info.get('52WeekChange')
 
+    # 🚀 HTML 코드 블록 렌더링 방지를 위해 Flatten 된 문자열 사용
     if price and w52h and w52l and w52h != w52l:
         pos52 = max(0, min(100, (price - w52l) / (w52h - w52l) * 100))
         pos_str = f"{pos52:.1f}%"
-        pos_bar = (
-            f'<div style="margin:14px 0">'
-            f'<div style="display:flex;justify-content:space-between;font-size:.73rem;color:#6e7681;margin-bottom:4px">'
-            f'<span>저 ${w52l:,.2f}</span><span style="color:#82aaff;font-weight:600">현재 ${price:,.2f}</span><span>고 ${w52h:,.2f}</span></div>'
-            f'<div style="background:#21262d;border-radius:6px;height:12px;position:relative">'
-            f'<div style="background:linear-gradient(90deg,#FF1744 0%,#FFC107 50%,#00E676 100%);width:100%;height:100%;border-radius:6px;opacity:0.25"></div>'
-            f'<div style="position:absolute;top:-3px;left:{pos52:.1f}%;width:18px;height:18px;background:#82aaff;border-radius:50%;transform:translateX(-50%);border:2px solid #fff;box-shadow:0 0 8px #82aaff88"></div>'
-            f'</div></div>')
+        pos_bar = f"<div style='margin:14px 0'><div style='display:flex;justify-content:space-between;font-size:.73rem;color:#6e7681;margin-bottom:4px'><span>저 ${w52l:,.2f}</span><span style='color:#82aaff;font-weight:600'>현재 ${price:,.2f}</span><span>고 ${w52h:,.2f}</span></div><div style='background:#21262d;border-radius:6px;height:12px;position:relative'><div style='background:linear-gradient(90deg,#FF1744 0%,#FFC107 50%,#00E676 100%);width:100%;height:100%;border-radius:6px;opacity:0.25'></div><div style='position:absolute;top:-3px;left:{pos52:.1f}%;width:18px;height:18px;background:#82aaff;border-radius:50%;transform:translateX(-50%);border:2px solid #fff;box-shadow:0 0 8px #82aaff88'></div></div></div>"
     else:
         pos_str, pos_bar = "N/A", ""
 
@@ -958,7 +875,7 @@ def render_company_details(ticker_str: str):
                 {pos_bar}
                 <div class="note-box">
                     💡 베타 &lt; 1 = 시장(S&amp;P500) 대비 안정적<br>
-                    베타 &gt; 1 = 시장보다 변동성 큼
+                    베타 &gt; 1 = 시장보다 변동성이 큽니다.
                 </div>
             </div>
         </div>
@@ -994,20 +911,8 @@ def render_company_details(ticker_str: str):
     pe_visual = ""
     if t_pe and s_pe:
         max_pe = max(t_pe, s_pe) * 1.3
-        pe_visual = (
-            f'<div style="margin:10px 0">'
-            f'<div style="font-size:.78rem;color:#8b949e;margin-bottom:6px">P/E 비교</div>'
-            f'<div style="display:flex;align-items:center;gap:8px;margin:4px 0">'
-            f'<span style="min-width:50px;font-size:.75rem;color:#82aaff">이 종목</span>'
-            f'<div style="flex:1;background:#21262d;border-radius:4px;height:18px;overflow:hidden">'
-            f'<div style="width:{t_pe / max_pe * 100:.1f}%;height:100%;background:#82aaff;border-radius:4px;'
-            f'display:flex;align-items:center;justify-content:flex-end;padding-right:6px;font-size:.7rem;color:#fff;font-weight:600">{t_pe:.1f}</div></div></div>'
-            f'<div style="display:flex;align-items:center;gap:8px;margin:4px 0">'
-            f'<span style="min-width:50px;font-size:.75rem;color:#607D8B">섹터평균</span>'
-            f'<div style="flex:1;background:#21262d;border-radius:4px;height:18px;overflow:hidden">'
-            f'<div style="width:{s_pe / max_pe * 100:.1f}%;height:100%;background:#607D8B;border-radius:4px;'
-            f'display:flex;align-items:center;justify-content:flex-end;padding-right:6px;font-size:.7rem;color:#fff;font-weight:600">{s_pe:.1f}</div></div></div>'
-            f'</div>')
+        # HTML Flattening
+        pe_visual = f"<div style='margin:10px 0'><div style='font-size:.78rem;color:#8b949e;margin-bottom:6px'>P/E 비교</div><div style='display:flex;align-items:center;gap:8px;margin:4px 0'><span style='min-width:50px;font-size:.75rem;color:#82aaff'>이 종목</span><div style='flex:1;background:#21262d;border-radius:4px;height:18px;overflow:hidden'><div style='width:{t_pe / max_pe * 100:.1f}%;height:100%;background:#82aaff;border-radius:4px;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;font-size:.7rem;color:#fff;font-weight:600'>{t_pe:.1f}</div></div></div><div style='display:flex;align-items:center;gap:8px;margin:4px 0'><span style='min-width:50px;font-size:.75rem;color:#607D8B'>섹터평균</span><div style='flex:1;background:#21262d;border-radius:4px;height:18px;overflow:hidden'><div style='width:{s_pe / max_pe * 100:.1f}%;height:100%;background:#607D8B;border-radius:4px;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;font-size:.7rem;color:#fff;font-weight:600'>{s_pe:.1f}</div></div></div></div>"
 
     pe_src_lbl = f"평균 P/E ≈ {s_pe:.1f} ({pe_source})" if s_pe else "N/A"
 
@@ -1016,7 +921,7 @@ def render_company_details(ticker_str: str):
         <div class="s-title"><span class="s-num">08</span> 이 종목 비싼가요? <span style="font-size:.75rem;color:#6e7681">Yahoo</span></div>
         <div class="two-col">
             <div>
-                {_metric_row("Trailing P/E (주가수익비율)", f"{t_pe:.2f}" if isinstance(t_pe, (int, float)) else "N/A")}
+                {_metric_row("Trailing P/E", f"{t_pe:.2f}" if isinstance(t_pe, (int, float)) else "N/A")}
                 {_metric_row("Forward P/E", f"{f_pe:.2f}" if isinstance(f_pe, (int, float)) else "N/A")}
                 {_metric_row("P/S (TTM)", f"{p_s:.2f}" if isinstance(p_s, (int, float)) else "N/A")}
                 {_metric_row("P/B", f"{p_b:.2f}" if isinstance(p_b, (int, float)) else "N/A")}
@@ -1068,22 +973,17 @@ def render_company_details(ticker_str: str):
         up_pct, up_str = 0, "N/A"
 
     target_bar = ""
-    # 🚀 수정 3: 최고/최저 목표가가 같은 경우 Division Error 방지
-    if t_low and t_high and t_median and price and t_high > t_low:
-        rng = t_high - t_low
-        curr_pos = max(0, min(100, (price - t_low) / rng * 100))
-        med_pos  = max(0, min(100, (t_median - t_low) / rng * 100))
-        target_bar = (
-            f'<div style="margin:14px 0">'
-            f'<div style="font-size:.78rem;color:#6e7681;margin-bottom:6px">목표가 범위</div>'
-            f'<div style="display:flex;justify-content:space-between;font-size:.7rem;color:#6e7681;margin-bottom:3px">'
-            f'<span>${t_low:,.0f}</span><span>${t_high:,.0f}</span></div>'
-            f'<div style="background:#21262d;border-radius:6px;height:14px;position:relative">'
-            f'<div style="position:absolute;top:-2px;left:{curr_pos:.1f}%;width:18px;height:18px;background:#FF9800;border-radius:50%;transform:translateX(-50%);border:2px solid #fff;z-index:2" title="현재가"></div>'
-            f'<div style="position:absolute;top:-1px;left:{med_pos:.1f}%;width:14px;height:16px;background:#00E676;border-radius:3px;transform:translateX(-50%);z-index:1" title="중앙 목표가"></div>'
-            f'</div>'
-            f'<div style="display:flex;justify-content:center;gap:16px;margin-top:6px;font-size:.7rem">'
-            f'<span style="color:#FF9800">● 현재가</span><span style="color:#00E676">● 중앙 목표가</span></div></div>')
+    # 🚀 수정: 최고-최저 범위가 같아서 0으로 나뉘는 DivisionError 방지 로직 보강
+    if t_low and t_high and t_median and price:
+        if t_high > t_low:
+            rng = t_high - t_low
+            curr_pos = max(0, min(100, (price - t_low) / rng * 100))
+            med_pos  = max(0, min(100, (t_median - t_low) / rng * 100))
+            
+            # HTML Flattening
+            target_bar = f"<div style='margin:14px 0'><div style='font-size:.78rem;color:#6e7681;margin-bottom:6px'>목표가 범위</div><div style='display:flex;justify-content:space-between;font-size:.7rem;color:#6e7681;margin-bottom:3px'><span>${t_low:,.0f}</span><span>${t_high:,.0f}</span></div><div style='background:#21262d;border-radius:6px;height:14px;position:relative'><div style='position:absolute;top:-2px;left:{curr_pos:.1f}%;width:18px;height:18px;background:#FF9800;border-radius:50%;transform:translateX(-50%);border:2px solid #fff;z-index:2' title='현재가'></div><div style='position:absolute;top:-1px;left:{med_pos:.1f}%;width:14px;height:16px;background:#00E676;border-radius:3px;transform:translateX(-50%);z-index:1' title='중앙 목표가'></div></div><div style='display:flex;justify-content:center;gap:16px;margin-top:6px;font-size:.7rem'><span style='color:#FF9800'>● 현재가</span><span style='color:#00E676'>● 중앙 목표가</span></div></div>"
+        else:
+            target_bar = f"<div style='font-size:.8rem;color:#6e7681;margin-top:14px;text-align:center;'>단일 목표가: ${t_median:,.2f}</div>"
 
     v9_t = f"애널리스트 {n_ana}명 {rk} (목표가 {up_str})"
 
@@ -1305,11 +1205,11 @@ def render_company_details(ticker_str: str):
         </div>""", unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 🚀 📋 종합 점수 (오류 수정 완벽 패치)
+    # 📋 종합 점수
     # ═══════════════════════════════════════════════════
     total, mx = 0, 0
     for _, c in all_verdicts:
-        # 🚀 수정 2: 데이터가 없는 경우("gray")는 아예 분모(mx)에서 뺌!
+        # 🚀 수정: 데이터가 있는(gray가 아닌) 지표만 분모에 추가하여 공정성 복구
         if c != "gray":
             mx += 2
             if   c == "green":  total += 2
@@ -1337,7 +1237,7 @@ def render_company_details(ticker_str: str):
         </div>
         <div style="margin-top:18px">{dots}</div>
         <div class="note-box" style="margin-top:12px;text-align:center">
-            12개 분석 항목(🟢=2점, 🔵=1.5점, 🟡=1점, 🔴=0점) 기반 종합 점수입니다. (데이터 누락 항목 제외)
+            수집 가능한 분석 항목들(🟢=2점, 🔵=1.5점, 🟡=1점, 🔴=0점)만을 취합한 종합 점수입니다. (데이터 누락 항목은 제외됨)
         </div>
     </div>""", unsafe_allow_html=True)
 
