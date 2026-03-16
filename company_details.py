@@ -231,23 +231,46 @@ def render_company_details(ticker_str):
     </div>
     """, unsafe_allow_html=True)
 
-    # 13. 관련 최신 뉴스 (🚀 에러 패치 부분: 안전하게 데이터 가져오기)
+    # ─────────────────────────────────────────
+    # 🚀 13. 관련 최신 뉴스 (무적의 에러 핸들링 탑재)
+    # ─────────────────────────────────────────
     st.markdown("""<div class="info-card"><div class="info-title">13. 관련 최신 뉴스</div>""", unsafe_allow_html=True)
-    news = tkr.news
-    if news:
-        for n in news[:3]:
-            title = n.get('title', '제목 없음')
-            link = n.get('link', '#')
-            
-            # providerPublishTime이 없을 경우 대비
-            pub_ts = n.get('providerPublishTime') or n.get('publishTime')
-            if pub_ts:
-                pub_date = datetime.fromtimestamp(pub_ts).strftime('%Y-%m-%d %H:%M')
-                date_str = f"[{pub_date}] "
-            else:
-                date_str = ""
+    
+    try:
+        news = tkr.news
+        if news and isinstance(news, list):
+            valid_news_count = 0
+            for n in news:
+                if valid_news_count >= 3: break # 최대 3개까지만 출력
                 
-            st.markdown(f"<div style='margin-bottom:8px; font-size:0.9rem;'><span style='color:#888'>{date_str}</span> <a href='{link}' style='color:#667eea; text-decoration:none;' target='_blank'><b>{title}</b></a></div>", unsafe_allow_html=True)
-    else:
-        st.write("최신 뉴스를 불러올 수 없습니다.")
+                # 뉴스가 정상적인 딕셔너리 포맷일 때만 처리
+                if isinstance(n, dict):
+                    try:
+                        title = n.get('title', '제목 없음')
+                        link = n.get('link', '#')
+                        
+                        # providerPublishTime이 없을 경우 대비
+                        pub_ts = n.get('providerPublishTime') or n.get('publishTime')
+                        
+                        if pub_ts:
+                            pub_date = datetime.fromtimestamp(pub_ts).strftime('%Y-%m-%d %H:%M')
+                            date_str = f"[{pub_date}] "
+                        else:
+                            date_str = ""
+                            
+                        st.markdown(f"<div style='margin-bottom:8px; font-size:0.9rem;'><span style='color:#888'>{date_str}</span> <a href='{link}' style='color:#667eea; text-decoration:none;' target='_blank'><b>{title}</b></a></div>", unsafe_allow_html=True)
+                        valid_news_count += 1
+                        
+                    except Exception: 
+                        continue # 이 특정 뉴스 아이템 파싱에 실패하면 다음 뉴스 확인
+                        
+            if valid_news_count == 0:
+                st.write("표시할 수 있는 올바른 형식의 뉴스가 없습니다.")
+        else:
+            st.write("최신 뉴스를 불러올 수 없습니다.")
+            
+    except Exception as e:
+        # 뉴스 데이터를 가져오다가 어떤 알 수 없는 오류가 터지더라도 앱은 정상 실행!
+        st.write(f"뉴스 데이터를 불러오는 중 통신 오류가 발생했습니다. 잠시 후 다시 시도해주세요.")
+        
     st.markdown("</div>", unsafe_allow_html=True)
