@@ -3,9 +3,12 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import html as html_module
-import requests
+import logging
 from datetime import datetime
 import plotly.graph_objects as go
+
+# 🚀 로깅 설정 (bare except 방지)
+logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════════════
 # 🛠️ API 변동성 대응을 위한 동의어(Alias) 설정
@@ -15,9 +18,7 @@ NI_ALIASES = ['Net Income', 'Net Income Common Stockholders', 'Net Income Contin
 EPS_ALIASES = ['Basic EPS', 'Diluted EPS', 'Earnings Per Share']
 BS_ASSETS_ALIASES = ['Total Assets', 'Assets', 'TotalAssets']
 BS_LIAB_ALIASES = ['Total Liabilities Net Minority Interest', 'Total Liab', 'Total Liabilities', 'TotalLiabilities']
-# 🚀 'Total Stockholder Equity' 최우선 배치
-EQ_ALIASES = ['Total Stockholder Equity', 'Stockholders Equity', 'Common Stock Equity', 'Total Equity Gross Minority Interest', 'Total Equity', 'Net Tangible Assets']
-DEBT_ALIASES = ['Total Debt', 'TotalDebt']
+EQ_ALIASES = ['Stockholders Equity', 'Total Stockholder Equity', 'Common Stock Equity', 'Total Equity Gross Minority Interest', 'Total Equity', 'Net Tangible Assets']
 
 # ═══════════════════════════════════════════════════════════════
 # 🛠️ 유틸리티 함수
@@ -42,7 +43,8 @@ def _fmt_pct(num):
         return num
     try:
         return f"{float(num) * 100:.2f}%"
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Percentage formatting failed for {num}: {e}")
         return "N/A"
 
 def _safe(val, fallback="N/A"):
@@ -55,16 +57,19 @@ def _safe(val, fallback="N/A"):
 def _esc(text):
     return html_module.escape(str(text)) if text else ""
 
-def _get_row(df, candidates, col_idx=0):
+# 🚀 날짜 기반 추출 명시화 및 로깅 추가
+def _get_row(df, candidates, latest=True):
+    """latest=True면 가장 최근 결산 값, False면 가장 오래된 값"""
     if df is None or df.empty: return None
     for name in candidates:
         if name in df.index:
             try:
                 row = df.loc[name]
                 if isinstance(row, pd.DataFrame): row = row.iloc[0]
-                val = row.dropna()
-                if len(val) > col_idx: return val.iloc[col_idx]
-            except Exception: pass
+                val = row.dropna().sort_index(ascending=not latest)
+                if len(val) > 0: return val.iloc[0]
+            except Exception as e:
+                logger.warning(f"Row extraction failed for {name}: {e}")
     return None
 
 def _get_row_series(df, candidates):
@@ -74,8 +79,10 @@ def _get_row_series(df, candidates):
             try:
                 row = df.loc[name]
                 if isinstance(row, pd.DataFrame): row = row.iloc[0]
-                return row.dropna().sort_index()
-            except Exception: pass
+                # 시계열 순서 보장 (오래된 날짜 -> 최신 날짜)
+                return row.dropna().sort_index(ascending=True)
+            except Exception as e:
+                logger.warning(f"Series extraction failed for {name}: {e}")
     return pd.Series(dtype=float)
 
 def _calc_cagr_with_years(financials, row_candidates):
@@ -83,7 +90,6 @@ def _calc_cagr_with_years(financials, row_candidates):
         rc = row_candidates if isinstance(row_candidates, list) else [row_candidates]
         series = _get_row_series(financials, rc)
         if len(series) >= 2:
-            series = series.sort_index()
             s_val, e_val = series.iloc[0], series.iloc[-1]
             years = len(series) - 1
             if s_val > 0 and e_val > 0:
@@ -93,7 +99,8 @@ def _calc_cagr_with_years(financials, row_candidates):
             elif s_val < 0 and e_val < 0:
                 if e_val > s_val: return "적자축소 📈", years
                 else: return "적자지속 📉", years
-    except Exception: pass
+    except Exception as e:
+        logger.warning(f"CAGR calculation failed: {e}")
     return None, 0
 
 def _fmt_cagr(val):
@@ -106,10 +113,11 @@ def _annual_values(financials, row_candidates):
         rc = row_candidates if isinstance(row_candidates, list) else [row_candidates]
         series = _get_row_series(financials, rc)
         if len(series) > 0:
+            # 최신 날짜가 0번 인덱스로 오도록 역순 정렬
             series = series.sort_index(ascending=False)
             return series.tolist(), series.index.tolist()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Annual values extraction failed: {e}")
     return [], []
 
 # ── 시각 요소 및 Plotly 차트 생성기 ─────────────────────────────────────
@@ -269,7 +277,8 @@ def _growth_stage(info, fin, bs, cf):
                 if n in cf.index:
                     op_cf = cf.loc[n].dropna().iloc[0] or 0
                     break
-    except Exception: pass
+    except Exception as e: 
+        logger.warning(f"Growth stage CF extraction failed: {e}")
 
     rev_declining = False
     try:
@@ -278,7 +287,8 @@ def _growth_stage(info, fin, bs, cf):
             rd = rs.sort_index(ascending=False)
             if sum(1 for i in range(len(rd) - 1) if rd.iloc[i] < rd.iloc[i + 1]) >= 2:
                 rev_declining = True
-    except Exception: pass
+    except Exception as e: 
+        logger.warning(f"Revenue declining check failed: {e}")
 
     stages = {
         1: ("🌱 1단계 : 스타트업 / 개발", "매출 미미·R&D 집중. 시장 검증 전, 높은 리스크·높은 잠재력."),
@@ -331,7 +341,8 @@ def _margin_trend(fin):
         if l_m > f_m + 0.02: return f"증가 추세 📈 ({f_m * 100:.1f}% → {l_m * 100:.1f}%)", margins, "green"
         if l_m < f_m - 0.02: return f"감소 추세 📉 ({f_m * 100:.1f}% → {l_m * 100:.1f}%)", margins, "red"
         return f"유지 ➡️ ({l_m * 100:.1f}%)", margins, "yellow"
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Margin trend calc failed: {e}")
         return "N/A", [], "gray"
 
 def _growth_accel(fin, rc):
@@ -344,7 +355,8 @@ def _growth_accel(fin, rc):
     if len(g) < 2: return "N/A", "gray"
     
     recent_g = g[0]
-    past_g_avg = np.mean(g[1:4]) if len(g) > 2 else g[1]
+    # 🚀 수정: 데이터가 부족할 때 안전하게 평균값 산출
+    past_g_avg = np.mean(g[1:4]) if len(g) > 2 else (g[1] if len(g) > 1 else 0)
     
     if recent_g > past_g_avg + 0.05: return f"가속화 🚀 (최근 {recent_g * 100:.1f}% vs 과거 {past_g_avg * 100:.1f}%)", "green"
     elif recent_g < past_g_avg - 0.05: return f"감속 🐌 (최근 {recent_g * 100:.1f}% vs 과거 {past_g_avg * 100:.1f}%)", "yellow"
@@ -368,7 +380,8 @@ def _interest_burden(fin, info):
     interest = _get_row(fin, ['Interest Expense', 'Interest Expense Non Operating'])
     
     if ebit is not None and interest is not None and abs(interest) > 0:
-        if ebit < 0: return "위험 ❌ (영업적자로 이자 지급 불가)", "red"
+        if ebit < 0:
+            return "위험 ❌ (영업적자로 이자 지급 불가)", "red"
         icr = abs(ebit / interest)
         src = "SEC 실제"
         if   icr > 10: return f"매우 낮음 ✅ (ICR {icr:.1f}x, {src})", "green"
@@ -379,7 +392,8 @@ def _interest_burden(fin, info):
     ebitda = info.get('ebitda', 0) or 0
     debt = info.get('totalDebt', 0) or 0
     if ebitda is not None and debt is not None and debt > 0:
-        if ebitda < 0: return "위험 ❌ (EBITDA 적자)", "red"
+        if ebitda < 0:
+            return "위험 ❌ (EBITDA 적자)", "red"
         est_rate = 0.05
         cov = ebitda / (debt * est_rate)
         src = f"추정, 이자율 {est_rate * 100:.0f}% 가정"
@@ -411,7 +425,8 @@ def _max_pain(tkr):
         for col in ['openInterest', 'volume']:
             if col not in c.columns: c[col] = 0
             if col not in p.columns: p[col] = 0
-            c[col], p[col] = c[col].fillna(0), p[col].fillna(0)
+            c[col] = c[col].fillna(0)
+            p[col] = p[col].fillna(0)
             
         c_oi_sum = c['openInterest'].sum()
         p_oi_sum = p['openInterest'].sum()
@@ -440,8 +455,12 @@ def _max_pain(tkr):
         tc = c.nlargest(3, 'volume')[['strike', 'volume']].to_dict('records')
         tp = p.nlargest(3, 'volume')[['strike', 'volume']].to_dict('records')
         return exp, mp, tc, tp, is_vol_weight
-    except Exception: return None, None, None, None, False
+    except Exception as e:
+        logger.warning(f"Max pain calc failed: {e}")
+        return None, None, None, None, False
 
+# 🚀 캐싱 적용으로 섹터 ETF 호출 속도 대폭 개선
+@st.cache_data(ttl=3600, show_spinner=False)
 def _sector_pe_live(sector):
     etf = {
         "Technology": "XLK", "Financial Services": "XLF",
@@ -544,6 +563,7 @@ def render_company_details(ticker_str: str):
             info = tkr.info or {}
         except Exception as e:
             st.error(f"❌ 데이터를 불러올 수 없습니다 — {e}")
+            logger.error(f"Ticker info failed: {e}")
             return
 
         if not info or 'shortName' not in info:
@@ -734,7 +754,7 @@ def render_company_details(ticker_str: str):
             </div>
             <div>
                 {_metric_row(eps_lbl, _fmt_cagr(cagr_eps), cr_cls(cagr_eps))}
-                <div class="note-box">※ 이익이 적자(-)에서 시작된 경우 수학적 한계로 연평균 비율(%) 대신 방향성 텍스트로 표기됩니다.</div>
+                <div class="note-box">※ 이익이 적자(-)에서 시작된 경우 수학적 한계로 연평균 비율(%) 대신 방향성 텍스트로 대체 표기합니다.</div>
             </div>
         </div>
         {_verdict_badge(v2_c, "📌", v2_t)}
@@ -801,11 +821,10 @@ def render_company_details(ticker_str: str):
         st.markdown(_verdict_badge(v3_c, "📌", v3_t), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 4️⃣ 성장 가능성
+    # 4️⃣ 성장 가능성 
     # ═══════════════════════════════════════════════════
     t_pe = info.get('trailingPE')
     f_pe = info.get('forwardPE')
-    
     payout    = info.get('payoutRatio', 0) or 0
     retention = max(0, 1 - payout)
     roe_v     = info.get('returnOnEquity', 0) or 0
@@ -813,7 +832,7 @@ def render_company_details(ticker_str: str):
     eg        = info.get('earningsGrowth')
     fwd_eps   = info.get('forwardEps')
     
-    # 🚀 PEG 비율 직접 계산 방어 로직 (N/A 원천 봉쇄)
+    # 🚀 PEG 비율 계산 방어 로직 (N/A 원천 봉쇄)
     peg = info.get('pegRatio')
     if peg is None or pd.isna(peg):
         pe_val = f_pe if (f_pe and not pd.isna(f_pe)) else t_pe
@@ -1054,8 +1073,9 @@ def render_company_details(ticker_str: str):
         """, unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
-    # 8️⃣ 밸류에이션 (🚀 들여쓰기 붕괴 방지 마크다운 구조)
+    # 8️⃣ 밸류에이션 
     # ═══════════════════════════════════════════════════
+    # t_pe, f_pe 는 위 섹션 4에서 이미 안전하게 구해졌습니다.
     p_s  = info.get('priceToSalesTrailing12Months')
     p_b  = info.get('priceToBook')
 
@@ -1084,8 +1104,13 @@ def render_company_details(ticker_str: str):
 
     pe_src_lbl = f"평균 P/E ≈ {s_pe:.1f} ({pe_source})" if s_pe else "N/A"
 
+    # 🚨 들여쓰기 붕괴 방지를 위해 HTML 블록 내부는 바짝 붙여씁니다.
     with st.container(border=True):
-        # HTML 렌더링 시 들여쓰기 에러 방지를 위해 좌측 정렬 유지
+        if t_pe and f_pe and f_pe > t_pe * 1.5:
+            pe_warning = "<div class='note-box' style='border-left-color:#FFC107;'>⚠️ <b>주의:</b> Forward P/E가 Trailing P/E보다 비정상적으로 높습니다. 향후 실적 악화 전망이거나 yfinance 추정치 오류일 수 있습니다.</div>"
+        else:
+            pe_warning = ""
+
         st.markdown(f"""
 <div class="s-title"><span class="s-num">08</span> 이 종목 비싼가요? <span style="font-size:.8rem;color:#768390">Yahoo</span></div>
 <div class="two-col">
@@ -1100,8 +1125,9 @@ def render_company_details(ticker_str: str):
     </div>
     <div>
         {pe_visual}
+        {pe_warning}
         <div class="note-box">
-            ※ P/E는 현재가 ÷ EPS로 교차 검증되었습니다.<br>
+            ※ P/E는 현재가 ÷ EPS로 직접 계산 및 교차 검증되었습니다.<br>
             <b>Trailing P/E</b> = 현재가 ÷ 과거 12개월 실적 EPS<br>
             <b>Forward P/E</b> = 현재가 ÷ 향후 12개월 추정 EPS<br>
             섹터 P/E는 실시간 기준입니다.
@@ -1205,6 +1231,12 @@ def render_company_details(ticker_str: str):
 
     fig10 = _get_plotly_donut(['기관', '내부자', '개인/기타'], [inst, ins, pub], ['#2196F3', '#FF9800', '#4CAF50'])
 
+    # 중복 안내 방지 로직
+    if inst + ins > 1:
+        pub_warning = "<br><span style='color:#FFC107;'>※ 기관/내부자 지분 합계가 100%를 초과하여 개인 지분이 0%로 조정되었습니다. (API 중복 집계 오류)</span>"
+    else:
+        pub_warning = ""
+
     with st.container(border=True):
         st.markdown('<div class="s-title"><span class="s-num">10</span> 이 회사 누가 들고 있나요? <span style="font-size:.8rem;color:#768390">Yahoo</span></div>', unsafe_allow_html=True)
         
@@ -1220,7 +1252,7 @@ def render_company_details(ticker_str: str):
                 {_metric_row("👤 개인/기타 (추정)", _fmt_pct(pub))}
                 <div class="note-box">
                     ※ '기관'에는 정부 연기금, 뮤추얼펀드, ETF, 헤지펀드가 포함됩니다.<br>
-                    ※ '개인/기타'는 (100% - 기관 - 내부자)로 추정한 값이며, 실제와 다를 수 있습니다.
+                    ※ '개인/기타'는 (100% - 기관 - 내부자)로 추정한 값이며, 실제와 다를 수 있습니다.{pub_warning}
                 </div>
                 """, unsafe_allow_html=True)
             with col2:
@@ -1234,7 +1266,7 @@ def render_company_details(ticker_str: str):
             {_metric_row("👔 내부자 비율", _fmt_pct(ins))}
             {_metric_row("👤 개인/기타 (추정)", _fmt_pct(pub))}
             <div class="note-box">
-                ※ '기관'에는 정부 연기금, 뮤추얼펀드, ETF, 헤지펀드가 포함됩니다.
+                ※ '기관'에는 정부 연기금, 뮤추얼펀드, ETF, 헤지펀드가 포함됩니다.{pub_warning}
             </div>
             """, unsafe_allow_html=True)
             
@@ -1389,7 +1421,8 @@ def render_company_details(ticker_str: str):
                 """, unsafe_allow_html=True)
         else:
             raise ValueError("No news")
-    except Exception:
+    except Exception as e:
+        logger.warning(f"News fetch failed: {e}")
         with st.container(border=True):
             st.markdown("""
             <div class="s-title"><span class="s-num">13</span> 최신 뉴스</div>
@@ -1406,6 +1439,7 @@ def render_company_details(ticker_str: str):
             if   c == "green":  total += 2
             elif c == "yellow": total += 1
             elif c == "blue":   total += 1.5
+            elif c == "red":    total += 0
 
     pct = (total / mx * 100) if mx > 0 else 0
     if   pct >= 75: oc, oe, ot = "#00E676", "🟢", "매우 양호"
