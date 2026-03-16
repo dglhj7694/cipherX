@@ -7,11 +7,8 @@ from datetime import datetime
 # ═══════════════════════════════════════════════════════════════
 # 🛠️  유틸리티 함수
 # ═══════════════════════════════════════════════════════════════
-
 def _fmt_num(num, is_currency=True):
-    """숫자를 읽기 쉬운 형식으로 변환"""
-    if pd.isna(num) or num is None:
-        return "N/A"
+    if pd.isna(num) or num is None: return "N/A"
     prefix = "$" if is_currency else ""
     sign = "-" if num < 0 else ""
     a = abs(num)
@@ -22,98 +19,62 @@ def _fmt_num(num, is_currency=True):
     return f"{sign}{prefix}{num:,.2f}"
 
 def _fmt_pct(num):
-    """소수를 퍼센트 문자열로 변환"""
-    if pd.isna(num) or num is None:
-        return "N/A"
+    if pd.isna(num) or num is None: return "N/A"
     return f"{num * 100:.2f}%"
 
 def _safe(val, fallback="N/A"):
     return val if val is not None and not (isinstance(val, float) and np.isnan(val)) else fallback
 
 def _get_row(df, candidates, col_idx=0):
-    """DataFrame에서 여러 후보 행 이름 중 존재하는 첫 번째 값 반환"""
-    if df is None:
-        return None
+    if df is None: return None
     for name in candidates:
         if name in df.index:
             try:
                 val = df.loc[name].dropna()
-                if len(val) > col_idx:
-                    return val.iloc[col_idx]
-            except:
-                pass
+                if len(val) > col_idx: return val.iloc[col_idx]
+            except: pass
     return None
 
 def _get_row_series(df, candidates):
-    """DataFrame에서 여러 후보 행 이름 중 시리즈 반환"""
-    if df is None:
-        return pd.Series(dtype=float)
+    if df is None: return pd.Series(dtype=float)
     for name in candidates:
         if name in df.index:
             try:
                 return df.loc[name].dropna().sort_index()
-            except:
-                pass
+            except: pass
     return pd.Series(dtype=float)
 
 def _calc_cagr(financials, row_candidates):
-    """SEC 손익계산서 기반 CAGR (연평균 성장률) 계산"""
     try:
         series = _get_row_series(financials, row_candidates if isinstance(row_candidates, list) else [row_candidates])
         if len(series) >= 2:
             series = series.sort_index()
-            start_val = series.iloc[0]
-            end_val = series.iloc[-1]
+            start_val, end_val = series.iloc[0], series.iloc[-1]
             years = len(series) - 1
-            if start_val > 0 and end_val > 0:
-                return (end_val / start_val) ** (1 / years) - 1
-            elif start_val < 0 and end_val > 0:
-                return None  
-    except Exception:
-        pass
+            if start_val > 0 and end_val > 0: return (end_val / start_val) ** (1 / years) - 1
+            elif start_val < 0 and end_val > 0: return None
+    except Exception: pass
     return None
 
 def _annual_values(financials, row_candidates):
-    """SEC 데이터에서 연간 값과 날짜 목록 반환 (최신→과거)"""
     try:
         series = _get_row_series(financials, row_candidates if isinstance(row_candidates, list) else [row_candidates])
         if len(series) > 0:
             series = series.sort_index(ascending=False)
             return series.tolist(), series.index.tolist()
-    except Exception:
-        pass
+    except Exception: pass
     return [], []
 
-# ─── 상태 뱃지 생성 ─────────────────────────────────────
 def _verdict_badge(color, emoji, text):
-    """섹션 하단 종합 판정 뱃지 HTML"""
-    bg_map = {
-        "green": "rgba(0,230,118,0.1)", "red": "rgba(255,23,68,0.1)",
-        "yellow": "rgba(255,193,7,0.1)", "blue": "rgba(33,150,243,0.1)",
-        "gray": "rgba(96,125,139,0.1)"
-    }
-    border_map = {
-        "green": "#00E676", "red": "#FF1744",
-        "yellow": "#FFC107", "blue": "#2196F3",
-        "gray": "#607D8B"
-    }
-    return f"""
-    <div style="background:{bg_map.get(color,'rgba(96,125,139,0.1)')};
-                border:1px solid {border_map.get(color,'#607D8B')};
-                border-radius:10px;padding:12px 16px;margin-top:14px;
-                text-align:center">
-        <span style="font-size:1.05rem;font-weight:700;color:{border_map.get(color,'#607D8B')}">
-            {emoji} {text}
-        </span>
-    </div>"""
+    bg_map = {"green": "rgba(0,230,118,0.1)", "red": "rgba(255,23,68,0.1)", "yellow": "rgba(255,193,7,0.1)", "blue": "rgba(33,150,243,0.1)", "gray": "rgba(96,125,139,0.1)"}
+    border_map = {"green": "#00E676", "red": "#FF1744", "yellow": "#FFC107", "blue": "#2196F3", "gray": "#607D8B"}
+    return f"""<div style="background:{bg_map.get(color,'rgba(96,125,139,0.1)')};border:1px solid {border_map.get(color,'#607D8B')};border-radius:10px;padding:12px 16px;margin-top:14px;text-align:center"><span style="font-size:1.05rem;font-weight:700;color:{border_map.get(color,'#607D8B')}">{emoji} {text}</span></div>"""
 
-# ─── 8단계 기업 생애주기 판별 ─────────────────────
 def _growth_stage(info, fin, bs, cf):
-    rev_g   = info.get('revenueGrowth', 0) or 0
-    margin  = info.get('profitMargins', 0) or 0
-    rev     = info.get('totalRevenue', 0)  or 0
-    div_y   = info.get('dividendYield', 0) or 0
-
+    rev_g = info.get('revenueGrowth', 0) or 0
+    margin = info.get('profitMargins', 0) or 0
+    rev = info.get('totalRevenue', 0) or 0
+    div_y = info.get('dividendYield', 0) or 0
     op_cf = 0
     try:
         if cf is not None:
@@ -121,8 +82,7 @@ def _growth_stage(info, fin, bs, cf):
                 if name in cf.index:
                     op_cf = cf.loc[name].dropna().iloc[0] or 0
                     break
-    except Exception:
-        pass
+    except: pass
 
     rev_declining = False
     try:
@@ -130,10 +90,8 @@ def _growth_stage(info, fin, bs, cf):
         if len(rev_series) >= 3:
             rev_sorted = rev_series.sort_index(ascending=False)
             declines = sum(1 for i in range(len(rev_sorted)-1) if rev_sorted.iloc[i] < rev_sorted.iloc[i+1])
-            if declines >= 2:
-                rev_declining = True
-    except:
-        pass
+            if declines >= 2: rev_declining = True
+    except: pass
 
     stages = {
         1: ("🌱 1단계 : 스타트업 / 개발", "매출 미미 · R&D 투자 집중 단계입니다. 아직 시장 검증 전이며 높은 리스크를 동반합니다."),
@@ -145,8 +103,7 @@ def _growth_stage(info, fin, bs, cf):
         7: ("📉 7단계 : 쇠퇴기", "매출과 이익이 동반 하락하는 단계입니다. 사업 구조 변화가 없으면 위험할 수 있습니다."),
         8: ("🔧 8단계 : 구조조정/턴어라운드", "적극적인 사업 재편 · 회생을 시도하는 단계입니다. 성공 시 큰 반등이 가능합니다."),
     }
-    colors = {1:"#9C27B0",2:"#FF5722",3:"#FF9800",4:"#4CAF50",
-              5:"#2196F3",6:"#607D8B",7:"#F44336",8:"#795548"}
+    colors = {1:"#9C27B0",2:"#FF5722",3:"#FF9800",4:"#4CAF50",5:"#2196F3",6:"#607D8B",7:"#F44336",8:"#795548"}
 
     if rev < 1e8 and margin < -0.20: s = 1
     elif rev_g > 0.30 and margin < 0: s = 2
@@ -162,7 +119,6 @@ def _growth_stage(info, fin, bs, cf):
     elif margin > 0.15: s = 5
     elif margin > 0: s = 6
     else: s = 6
-
     return s, stages[s][0], stages[s][1], colors[s]
 
 def _stability(financials, row_candidates):
@@ -182,21 +138,16 @@ def _margin_trend(fin):
         idx = r_series.index.intersection(n_series.index).sort_values()
         margins = [(i, n_series[i]/r_series[i]) for i in idx if r_series[i] != 0]
         if len(margins) < 2: return "N/A", [], "gray"
-        first_m = margins[0][1]
-        last_m = margins[-1][1]
+        first_m, last_m = margins[0][1], margins[-1][1]
         if last_m > first_m + 0.02: return f"증가 추세 📈 ({first_m*100:.1f}% → {last_m*100:.1f}%)", margins, "green"
         if last_m < first_m - 0.02: return f"감소 추세 📉 ({first_m*100:.1f}% → {last_m*100:.1f}%)", margins, "red"
         return f"유지 ➡️ ({last_m*100:.1f}%)", margins, "yellow"
-    except Exception:
-        return "N/A", [], "gray"
+    except Exception: return "N/A", [], "gray"
 
 def _growth_accel(fin, row_candidates):
     vals, _ = _annual_values(fin, row_candidates)
     if len(vals) < 3: return "N/A", "gray"
-    g = []
-    for i in range(len(vals)-1):
-        if vals[i+1] and vals[i+1] != 0:
-            g.append((vals[i]-vals[i+1])/abs(vals[i+1]))
+    g = [(vals[i]-vals[i+1])/abs(vals[i+1]) for i in range(len(vals)-1) if vals[i+1] and vals[i+1] != 0]
     if len(g) < 2: return "N/A", "gray"
     if g[0] > g[1]: return f"가속화 🚀 (최근 {g[0]*100:.1f}% vs 이전 {g[1]*100:.1f}%)", "green"
     return f"감속 🐌 (최근 {g[0]*100:.1f}% vs 이전 {g[1]*100:.1f}%)", "yellow"
@@ -217,7 +168,6 @@ def _debt_trend(bs):
 def _interest_burden(fin, info):
     ebit = _get_row(fin, ['EBIT', 'Operating Income'])
     interest = _get_row(fin, ['Interest Expense', 'Interest Expense Non Operating'])
-
     if ebit and interest and abs(interest) > 0:
         icr = abs(ebit / interest)
         if   icr > 10: return f"매우 낮음 ✅ (ICR {icr:.1f}x)", "green"
@@ -225,8 +175,7 @@ def _interest_burden(fin, info):
         elif icr >  2: return f"보통 ⚠️ (ICR {icr:.1f}x)", "yellow"
         else:          return f"높음 ❌ (ICR {icr:.1f}x)", "red"
 
-    ebitda = info.get('ebitda', 0) or 0
-    debt   = info.get('totalDebt', 0) or 0
+    ebitda, debt = info.get('ebitda', 0) or 0, info.get('totalDebt', 0) or 0
     if ebitda > 0 and debt > 0:
         cov = ebitda / (debt * 0.05)
         if   cov > 10: return f"매우 낮음 ✅ ({cov:.1f}x)", "green"
@@ -236,8 +185,7 @@ def _interest_burden(fin, info):
     return "N/A", "gray"
 
 def _vol_trend(info):
-    vol = info.get('volume', 0) or 0
-    avg3m = info.get('averageVolume', 0) or 0
+    vol, avg3m = info.get('volume', 0) or 0, info.get('averageVolume', 0) or 0
     if avg3m == 0: return "데이터 부족", "gray"
     r = vol / avg3m
     if   r > 1.5: return f"급증 🔥 (3개월 평균 대비 {r:.1f}배)", "red"
@@ -253,84 +201,52 @@ def _max_pain(tkr):
         exp = dates[0]
         o = tkr.option_chain(exp)
         c, p = o.calls, o.puts
-
         if 'openInterest' not in c.columns: c['openInterest'] = 0
         if 'openInterest' not in p.columns: p['openInterest'] = 0
-
-        c['openInterest'] = c['openInterest'].fillna(0)
-        p['openInterest'] = p['openInterest'].fillna(0)
+        c['openInterest'], p['openInterest'] = c['openInterest'].fillna(0), p['openInterest'].fillna(0)
 
         strikes = sorted(set(c['strike']).union(set(p['strike'])))
-        pain = {}
-        for s in strikes:
-            call_pain = np.sum(c['openInterest'] * np.maximum(0, s - c['strike']))
-            put_pain  = np.sum(p['openInterest'] * np.maximum(0, p['strike'] - s))
-            pain[s] = call_pain + put_pain
-
+        pain = {s: (np.sum(c['openInterest'] * np.maximum(0, s - c['strike'])) + np.sum(p['openInterest'] * np.maximum(0, p['strike'] - s))) for s in strikes}
         mp = min(pain, key=pain.get) if pain else None
 
-        c['volume'] = c['volume'].fillna(0)
-        p['volume'] = p['volume'].fillna(0)
-
+        c['volume'], p['volume'] = c['volume'].fillna(0), p['volume'].fillna(0)
         tc = c.nlargest(3, 'volume')[['strike','volume']].to_dict('records')
         tp = p.nlargest(3, 'volume')[['strike','volume']].to_dict('records')
         return exp, mp, tc, tp
-    except Exception:
-        return None, None, None, None
+    except: return None, None, None, None
 
 def _sector_pe(sector):
-    SECTOR_PE_APPROX = {
-        "Technology": 30, "Communication Services": 22,
-        "Consumer Cyclical": 25, "Consumer Defensive": 22,
-        "Financial Services": 14, "Healthcare": 22,
-        "Industrials": 20, "Energy": 12,
-        "Basic Materials": 15, "Real Estate": 35, "Utilities": 18,
-    }
+    SECTOR_PE_APPROX = {"Technology": 30, "Communication Services": 22, "Consumer Cyclical": 25, "Consumer Defensive": 22, "Financial Services": 14, "Healthcare": 22, "Industrials": 20, "Energy": 12, "Basic Materials": 15, "Real Estate": 35, "Utilities": 18}
     return SECTOR_PE_APPROX.get(sector, None)
 
-
 # ═══════════════════════════════════════════════════════════════
-# 🎨  CSS 
+# 🎨 CSS
 # ═══════════════════════════════════════════════════════════════
 CSS = """
 <style>
-.info-card{
-    background:#161A22;border:1px solid #2D333B;border-radius:14px;
-    padding:24px 26px;margin-bottom:22px;
-    box-shadow:0 6px 20px rgba(0,0,0,.25);transition:all .25s}
-.info-card:hover{transform:translateY(-3px);border-color:#3e4c59;
-    box-shadow:0 10px 30px rgba(0,0,0,.35)}
-
-.info-title{
-    font-size:1.1rem;font-weight:700;color:#82aaff;
-    margin-bottom:18px;border-bottom:1px solid #2D333B;
-    padding-bottom:12px;display:flex;align-items:center;gap:8px}
-
-.metric-row{display:flex;justify-content:space-between;
-    margin-bottom:10px;font-size:.93rem;align-items:center}
+.info-card{background:#161A22;border:1px solid #2D333B;border-radius:14px;padding:24px 26px;margin-bottom:22px;box-shadow:0 6px 20px rgba(0,0,0,.25);transition:all .25s}
+.info-card:hover{transform:translateY(-3px);border-color:#3e4c59;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.info-title{font-size:1.1rem;font-weight:700;color:#82aaff;margin-bottom:18px;border-bottom:1px solid #2D333B;padding-bottom:12px;display:flex;align-items:center;gap:8px}
+.metric-row{display:flex;justify-content:space-between;margin-bottom:10px;font-size:.93rem;align-items:center}
 .metric-label{color:#8b949e;font-weight:500}
 .metric-value{color:#c9d1d9;font-weight:600;text-align:right;max-width:60%}
 .metric-highlight{color:#00E676 !important;font-weight:700}
 .metric-warn{color:#FF1744 !important;font-weight:700}
-
+.metric-yellow{color:#FFC107 !important;font-weight:700}
 .divider{border-top:1px dashed #2D333B;margin:15px 0}
-
 .opt-box{background:rgba(0,0,0,.2);padding:12px;border-radius:10px;border:1px solid #2D333B}
 .opt-list{margin:6px 0 0;padding-left:18px;font-size:.85rem;color:#c9d1d9;line-height:1.8}
-
 .mini-table{width:100%;border-collapse:collapse;font-size:.85rem}
 .mini-table th{color:#8b949e;text-align:left;padding:7px 8px;border-bottom:1px solid #2D333B;font-weight:500}
 .mini-table td{color:#c9d1d9;padding:7px 8px;border-bottom:1px solid #1c2029}
-
 .progress-container{background:#21262d;border-radius:10px;height:28px;display:flex;overflow:hidden;margin:10px 0}
 .progress-bar{height:100%;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:600;color:#fff;transition:width .6s}
-
 .header-wrap{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px;margin-bottom:6px}
 </style>
 """
 
 # ═══════════════════════════════════════════════════════════════
-# 🏗️  메인 렌더링  (12 섹션 + 뉴스 제거 + 1단 레이아웃)
+# 🏗️ 메인 렌더링
 # ═══════════════════════════════════════════════════════════════
 def render_company_details(ticker_str: str):
     st.markdown(CSS, unsafe_allow_html=True)
@@ -339,20 +255,17 @@ def render_company_details(ticker_str: str):
         try:
             tkr  = yf.Ticker(ticker_str)
             info = tkr.info or {}
-        except Exception as e:
-            st.error(f"❌ 종목 데이터를 불러올 수 없습니다: {e}")
+        except:
+            st.error("❌ 종목 데이터를 불러올 수 없습니다.")
             return
 
         if not info or 'shortName' not in info:
             st.error("❌ 유효하지 않은 종목이거나 데이터가 없습니다.")
             return
 
-        try:    fin = tkr.financials
-        except: fin = None
-        try:    bs = tkr.balance_sheet
-        except: bs = None
-        try:    cf = tkr.cashflow
-        except: cf = None
+        fin = tkr.financials if hasattr(tkr, 'financials') else None
+        bs = tkr.balance_sheet if hasattr(tkr, 'balance_sheet') else None
+        cf = tkr.cashflow if hasattr(tkr, 'cashflow') else None
 
         cagr_rev = _calc_cagr(fin, ['Total Revenue'])
         cagr_ni  = _calc_cagr(fin, ['Net Income'])
@@ -366,7 +279,6 @@ def render_company_details(ticker_str: str):
         chg_color = "#00E676" if day_chg >= 0 else "#FF1744"
         chg_sign = "+" if day_chg >= 0 else ""
 
-    # ──────── 헤더 ────────
     st.markdown(f"""
     <div class="header-wrap">
         <div>
@@ -381,9 +293,7 @@ def render_company_details(ticker_str: str):
     </div>""", unsafe_allow_html=True)
     st.markdown("---")
 
-    # ════ 1. 기업 성장 사이클 ════
     sn, sname, sdesc, scolor = _growth_stage(info, fin, bs, cf)
-
     stage_colors_map = {1:"#9C27B0",2:"#FF5722",3:"#FF9800",4:"#4CAF50",5:"#2196F3",6:"#607D8B",7:"#F44336",8:"#795548"}
     stage_labels = {1:"스타트업",2:"초기성장",3:"고성장",4:"성숙성장",5:"캐시카우",6:"정체",7:"쇠퇴",8:"턴어라운드"}
     bar = ""
@@ -394,17 +304,10 @@ def render_company_details(ticker_str: str):
         brd = f"2px solid {stage_colors_map[i]}" if is_current else "1px solid #2D333B"
         rl  = "border-radius:10px 0 0 10px;" if i==1 else ("border-radius:0 10px 10px 0;" if i==8 else "")
         fw  = "700" if is_current else "400"
-        bar += (f"<div style='flex:1;background:{bg};opacity:{op};text-align:center;"
-                f"padding:10px 2px;font-size:.65rem;color:#fff;border:{brd};{rl};font-weight:{fw}'>"
-                f"{i}<br>{stage_labels[i]}</div>")
+        bar += f"<div style='flex:1;background:{bg};opacity:{op};text-align:center;padding:10px 2px;font-size:.65rem;color:#fff;border:{brd};{rl};font-weight:{fw}'>{i}<br>{stage_labels[i]}</div>"
 
     verdict_1_color = "green" if sn in [3,4] else ("blue" if sn == 5 else ("yellow" if sn in [1,2,6] else "red"))
-    verdict_1_text = {
-        1: "초기 단계 — 높은 리스크, 높은 잠재력", 2: "폭풍 성장 중 — 적자이지만 매출 급증",
-        3: "성장 + 이익 = 투자 최적 시점 가능", 4: "안정 성장 우량주 — 핵심 보유 후보",
-        5: "현금 창출 기계 — 배당·안정성 우선", 6: "새 성장 동력이 필요한 시점",
-        7: "위험 — 구조적 하락 가능성 주의", 8: "턴어라운드 성공 여부가 핵심",
-    }
+    verdict_1_text = {1: "초기 단계 — 높은 리스크, 높은 잠재력", 2: "폭풍 성장 중 — 적자이지만 매출 급증", 3: "성장 + 이익 = 투자 최적 시점 가능", 4: "안정 성장 우량주 — 핵심 보유 후보", 5: "현금 창출 기계 — 배당·안정성 우선", 6: "새 성장 동력이 필요한 시점", 7: "위험 — 구조적 하락 가능성 주의", 8: "턴어라운드 성공 여부가 핵심"}
 
     st.markdown(f"""
     <div class="info-card">
@@ -422,7 +325,6 @@ def render_company_details(ticker_str: str):
         {_verdict_badge(verdict_1_color, "📌", f"종합: {verdict_1_text.get(sn, '')}")}
     </div>""", unsafe_allow_html=True)
 
-    # ════ 2. 돈을 잘 버는 회사인가요? ════
     gross_m = info.get('grossMargins')
     net_m   = info.get('profitMargins')
     mcap    = info.get('marketCap')
@@ -430,7 +332,7 @@ def render_company_details(ticker_str: str):
     ttm_rev = info.get('totalRevenue')
     ttm_ni  = info.get('netIncomeToCommon')
 
-    profit_score = sum([1 for cond in [gross_m and gross_m > 0.4, net_m and net_m > 0.1, cagr_rev and cagr_rev > 0.05, cagr_ni and cagr_ni > 0.05, ttm_ni and ttm_ni > 0] if cond])
+    profit_score = sum([1 for c in [gross_m and gross_m > 0.4, net_m and net_m > 0.1, cagr_rev and cagr_rev > 0.05, cagr_ni and cagr_ni > 0.05, ttm_ni and ttm_ni > 0] if c])
     if   profit_score >= 4: v2_color, v2_text = "green",  "💰 매우 우수 — 높은 마진 + 지속 성장"
     elif profit_score >= 3: v2_color, v2_text = "green",  "✅ 양호 — 수익성과 성장을 겸비"
     elif profit_score >= 2: v2_color, v2_text = "yellow", "⚠️ 보통 — 일부 지표 개선 필요"
@@ -453,7 +355,6 @@ def render_company_details(ticker_str: str):
         {_verdict_badge(v2_color, "📌", v2_text)}
     </div>""", unsafe_allow_html=True)
 
-    # ════ 3. 지금까지 성적 ════
     rev_stab, rev_cv, stab_color = _stability(fin, ['Total Revenue'])
     mtrend, _, mtrend_color = _margin_trend(fin)
     accel, accel_color = _growth_accel(fin, ['Total Revenue'])
@@ -494,7 +395,6 @@ def render_company_details(ticker_str: str):
         {_verdict_badge(v3_color, "📌", v3_text)}
     </div>""", unsafe_allow_html=True)
 
-    # ════ 4. 성장 가능성 ════
     payout    = info.get('payoutRatio', 0) or 0
     retention = max(0, 1 - payout)
     roe_val   = info.get('returnOnEquity', 0) or 0
@@ -504,7 +404,7 @@ def render_company_details(ticker_str: str):
     peg       = info.get('pegRatio')
     fwd_eps   = info.get('forwardEps')
 
-    g_score = sum([1 for cond in [eg and eg > 0.15, rg and rg > 0.10, retention > 0.60, fut_roe and fut_roe > 0.10, peg and 0 < peg < 1.5] if cond])
+    g_score = sum([1 for c in [eg and eg > 0.15, rg and rg > 0.10, retention > 0.60, fut_roe and fut_roe > 0.10, peg and 0 < peg < 1.5] if c])
     if   g_score >= 4: v4_color, v4_text = "green",  "🚀 높은 성장 잠재력 — 수익 재투자 + 고성장"
     elif g_score >= 2: v4_color, v4_text = "yellow", "⚠️ 보통 — 성장 가능성은 있으나 모니터링 필요"
     else:              v4_color, v4_text = "red",    "❌ 성장 둔화 — 새로운 동력 부재"
@@ -516,7 +416,7 @@ def render_company_details(ticker_str: str):
         <div class="metric-row"><span class="metric-label">매출 성장률 (YOY)</span><span class="metric-value {'metric-highlight' if rg and rg>0 else 'metric-warn'}">{_fmt_pct(rg)}</span></div>
         <div class="divider"></div>
         <div class="metric-row"><span class="metric-label">ROE</span><span class="metric-value">{_fmt_pct(roe_val)}</span></div>
-        <div class="metric-row"><span class="metric-label">수익 유보율 (저축률)</span><span class="metric-value">{_fmt_pct(retention)}</span></div>
+        <div class="metric-row"><span class="metric-label">수익 유보율(저축률)</span><span class="metric-value">{_fmt_pct(retention)}</span></div>
         <div class="metric-row"><span class="metric-label">미래 예상 ROE (ROE×유보율)</span><span class="metric-value {'metric-highlight' if fut_roe and fut_roe > 0.1 else 'metric-value'}">{_fmt_pct(fut_roe)}</span></div>
         <div class="divider"></div>
         <div class="metric-row"><span class="metric-label">Forward EPS</span><span class="metric-value">${_safe(fwd_eps)}</span></div>
@@ -524,7 +424,6 @@ def render_company_details(ticker_str: str):
         {_verdict_badge(v4_color, "📌", v4_text)}
     </div>""", unsafe_allow_html=True)
 
-    # ════ 5. 재무 건전성 ════
     try:
         curr_d = _get_row(bs, ['Current Debt', 'Current Portion Of Long Term Debt']) or 0
         lt_d   = _get_row(bs, ['Long Term Debt', 'Long Term Debt And Capital Lease Obligation']) or 0
@@ -532,8 +431,7 @@ def render_company_details(ticker_str: str):
         tl     = _get_row(bs, ['Total Liabilities Net Minority Interest', 'Total Liab']) or 0
         eq     = _get_row(bs, ['Stockholders Equity', 'Total Stockholder Equity']) or 0
         na     = ta - tl
-    except Exception:
-        curr_d = lt_d = ta = tl = eq = na = 0
+    except: curr_d = lt_d = ta = tl = eq = na = 0
 
     dt_trend, dt_color = _debt_trend(bs)
     i_burden, ib_color = _interest_burden(fin, info)
@@ -547,7 +445,7 @@ def render_company_details(ticker_str: str):
         else:           dl, dl_c = "매우 높음 ❌", "red"
     else: dl, dl_c = "N/A", "gray"
 
-    h_score = sum([1 for cond in [dl_c == "green", dt_color == "green", ib_color == "green", cash > tl * 0.2] if cond])
+    h_score = sum([1 for c in [dl_c == "green", dt_color == "green", ib_color == "green", cash > tl * 0.2] if c])
     if   h_score >= 3: v5_color, v5_text = "green",  "💪 재무 건전 — 낮은 부채, 충분한 현금"
     elif h_score >= 2: v5_color, v5_text = "yellow", "⚠️ 보통 — 부채 관리 모니터링 필요"
     else:              v5_color, v5_text = "red",    "❌ 주의 — 부채 수준이 높거나 현금 부족"
@@ -571,7 +469,6 @@ def render_company_details(ticker_str: str):
         {_verdict_badge(v5_color, "📌", v5_text)}
     </div>""", unsafe_allow_html=True)
 
-    # ════ 6. 거래량 ════
     vol   = info.get('volume', 0) or 0
     avg10 = info.get('averageVolume10days', 0) or 0
     avg3m = info.get('averageVolume', 0) or 0
@@ -592,7 +489,6 @@ def render_company_details(ticker_str: str):
         {_verdict_badge(v6_color, "📌", v6_text)}
     </div>""", unsafe_allow_html=True)
 
-    # ════ 7. 변동성 ════
     beta = info.get('beta', None)
     if isinstance(beta, (int, float)):
         if   beta < 0.8: bl, beta_c = "저변동 — 시장보다 안정", "green"
@@ -604,22 +500,14 @@ def render_company_details(ticker_str: str):
     w52h = info.get('fiftyTwoWeekHigh', None)
     w52l = info.get('fiftyTwoWeekLow', None)
     w52_change = info.get('52WeekChange', None)
-    try:
-        if price and w52h and w52l and w52h != w52l:
-            pos52 = (price - w52l) / (w52h - w52l) * 100
-            pos52_str = f"{pos52:.1f}%"
-            pos_bar = f"""
-            <div style="margin:8px 0">
-                <div style="display:flex;justify-content:space-between;font-size:.75rem;color:#6e7681;margin-bottom:3px">
-                    <span>${w52l:.2f}</span><span>현재 ${price:.2f}</span><span>${w52h:.2f}</span>
-                </div>
-                <div style="background:#21262d;border-radius:6px;height:10px;position:relative">
-                    <div style="background:linear-gradient(90deg,#FF1744,#FFC107,#00E676);width:100%;height:100%;border-radius:6px;opacity:0.3"></div>
-                    <div style="position:absolute;top:-2px;left:{pos52:.1f}%;width:14px;height:14px;background:#82aaff;border-radius:50%;transform:translateX(-50%);border:2px solid #fff"></div>
-                </div>
-            </div>"""
-        else: pos52_str, pos_bar = "N/A", ""
-    except: pos52_str, pos_bar = "N/A", ""
+    
+    # 🚀 HTML 코드 블록으로 파싱되는 것을 방지하기 위해 1줄짜리 평탄화(Flatten) 된 문자열 사용
+    if price and w52h and w52l and w52h != w52l:
+        pos52 = (price - w52l) / (w52h - w52l) * 100
+        pos52_str = f"{pos52:.1f}%"
+        pos_bar = f"<div style='margin:8px 0'><div style='display:flex;justify-content:space-between;font-size:.75rem;color:#6e7681;margin-bottom:3px'><span>${w52l:.2f}</span><span>현재 ${price:.2f}</span><span>${w52h:.2f}</span></div><div style='background:#21262d;border-radius:6px;height:10px;position:relative'><div style='background:linear-gradient(90deg,#FF1744,#FFC107,#00E676);width:100%;height:100%;border-radius:6px;opacity:0.3'></div><div style='position:absolute;top:-2px;left:{pos52:.1f}%;width:14px;height:14px;background:#82aaff;border-radius:50%;transform:translateX(-50%);border:2px solid #fff'></div></div></div>"
+    else:
+        pos52_str, pos_bar = "N/A", ""
 
     v7_color = beta_c
     v7_text = f"베타 {beta:.2f} — {bl}" if isinstance(beta, (int,float)) else "변동성 데이터 부족"
@@ -637,7 +525,6 @@ def render_company_details(ticker_str: str):
         {_verdict_badge(v7_color, "📌", v7_text)}
     </div>""", unsafe_allow_html=True)
 
-    # ════ 8. 밸류에이션 ════
     t_pe = info.get('trailingPE')
     f_pe = info.get('forwardPE')
     ps   = info.get('priceToSalesTrailing12Months')
@@ -671,7 +558,6 @@ def render_company_details(ticker_str: str):
         {_verdict_badge(v8_color, "📌", v8_text)}
     </div>""", unsafe_allow_html=True)
 
-    # ════ 9. 전문가 의견 ════
     rm = info.get('recommendationMean', None)
     rk = str(info.get('recommendationKey', 'N/A')).upper()
     if isinstance(rm, (int, float)):
@@ -718,7 +604,6 @@ def render_company_details(ticker_str: str):
         {_verdict_badge(con_c, "📌", v9_text)}
     </div>""", unsafe_allow_html=True)
 
-    # ════ 10. 지분 구조 ════
     inst = info.get('heldPercentInstitutions', 0) or 0
     ins  = info.get('heldPercentInsiders', 0)     or 0
     pub  = max(0, 1 - inst - ins)
@@ -748,10 +633,11 @@ def render_company_details(ticker_str: str):
         {_verdict_badge(v10_color, "📌", v10_text)}
     </div>""", unsafe_allow_html=True)
 
-    # ════ 11. 옵션 (Max Pain) ════
     exp, mp, tc, tp = _max_pain(tkr)
-
-    mp_html = (f"<span class='metric-value' style='font-size:1.15rem;font-weight:800;color:#82aaff'>${mp:.2f}</span>") if mp else "<span class='metric-value'>데이터 없음</span>"
+    
+    # 🚀 버그 수정: ValueError 해결을 위해 f-string 포맷팅 안전 처리
+    mp_val_str = f"${mp:.2f}" if mp else ""
+    mp_html = f"<span class='metric-value' style='font-size:1.15rem;font-weight:800;color:#82aaff'>{mp_val_str}</span>" if mp else "<span class='metric-value'>데이터 없음</span>"
     exp_html = f"(만기일: {exp})" if exp else ""
 
     mp_note = ""
@@ -759,27 +645,25 @@ def render_company_details(ticker_str: str):
     if mp and isinstance(price, (int, float)) and price > 0:
         d = ((mp - price) / price) * 100
         if d > 2:
-            mp_note = f"현재가보다 {d:+.1f}% 위 → 만기까지 상승 압력 가능"
+            mp_note = f"현재가보다 {d:+.1f}% 위 → 상승 압력 가능"
             mp_color = "green"
         elif d < -2:
-            mp_note = f"현재가보다 {d:+.1f}% 아래 → 만기까지 하락 압력 가능"
+            mp_note = f"현재가보다 {d:+.1f}% 아래 → 하락 압력 가능"
             mp_color = "red"
         else:
             mp_note = f"현재가와 유사 ({d:+.1f}%) → 횡보 가능"
             mp_color = "yellow"
 
-    ch = "".join([f"<li>${c_item['strike']:.1f} <span style='color:#6e7681'>(거래량: {int(c_item['volume']):,})</span></li>" for c_item in (tc or [])]) or "<li>N/A</li>"
-    ph = "".join([f"<li>${p_item['strike']:.1f} <span style='color:#6e7681'>(거래량: {int(p_item['volume']):,})</span></li>" for p_item in (tp or [])]) or "<li>N/A</li>"
+    ch = "".join([f"<li>${c_item['strike']:.1f} <span style='color:#6e7681'>(Vol: {int(c_item['volume']):,})</span></li>" for c_item in (tc or [])]) or "<li>N/A</li>"
+    ph = "".join([f"<li>${p_item['strike']:.1f} <span style='color:#6e7681'>(Vol: {int(p_item['volume']):,})</span></li>" for p_item in (tp or [])]) or "<li>N/A</li>"
+    
+    mp_badge_text = f"Max Pain {mp_val_str} — {mp_note}" if mp else "옵션 데이터 없음"
 
     st.markdown(f"""
     <div class="info-card">
         <div class="info-title">🎯 11. 시장은 어떤 가격을 보고 있을까요? (Yahoo 옵션)</div>
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap">
-            <div style="width: 100%">
-                <div class="metric-row"><span class="metric-label">Max Pain 가격 {exp_html}</span><span style="margin-left:12px">{mp_html}</span></div>
-                <div class="metric-row"><span class="metric-label">해석</span><span class="metric-value">{mp_note}</span></div>
-            </div>
-        </div>
+        <div class="metric-row"><span class="metric-label">Max Pain 가격 {exp_html}</span><span style="margin-left:12px">{mp_html}</span></div>
+        <div class="metric-row"><span class="metric-label">해석</span><span class="metric-value">{mp_note}</span></div>
         <div class="divider"></div>
         <div style="display:flex;justify-content:space-between;gap:16px;margin-top:10px;flex-wrap:wrap">
             <div class="opt-box" style="flex:1;min-width:200px">
@@ -791,10 +675,9 @@ def render_company_details(ticker_str: str):
                 <ul class="opt-list">{ph}</ul>
             </div>
         </div>
-        {_verdict_badge(mp_color, "📌", f"Max Pain ${mp:.2f if mp else 0} — {mp_note}" if mp else "옵션 데이터 없음")}
+        {_verdict_badge(mp_color, "📌", mp_badge_text)}
     </div>""", unsafe_allow_html=True)
 
-    # ════ 12. 공매도 비율 ════
     sp = info.get('shortPercentOfFloat')
     shares_short = info.get('sharesShort', 0) or 0
     short_ratio  = info.get('shortRatio')
@@ -822,17 +705,18 @@ def render_company_details(ticker_str: str):
         <div class="metric-row"><span class="metric-label">유통주식 대비 공매도 비율</span><span class="metric-value {'metric-warn' if sl_c == 'red' else 'metric-value'}">{_fmt_pct(sp)}</span></div>
         <div class="metric-row"><span class="metric-label">공매도 수준</span><span class="metric-value">{sl}</span></div>
         <div class="metric-row"><span class="metric-label">공매도 주식수</span><span class="metric-value">{_fmt_num(shares_short, False)} 주</span></div>
-        <div class="metric-row"><span class="metric-label">발행 주식수</span><span class="metric-value">{_fmt_num(shares_out, False)} 주</span></div>
+        <div class="metric-row"><span class="metric-label">발행 주식수</span><span class="metric-value">{_fmt_num(info.get('sharesOutstanding'), False)} 주</span></div>
         <div class="metric-row"><span class="metric-label">숏 커버 일수 (DTC)</span><span class="metric-value">{f'{short_ratio:.2f}' if isinstance(short_ratio,(int,float)) else 'N/A'} 일</span></div>
         {'<div class="metric-row"><span class="metric-label">전월 대비 공매도 추세</span><span class="metric-value">' + short_trend + '</span></div>' if short_trend else ''}
         {_verdict_badge(sl_c, "📌", v12_text)}
     </div>""", unsafe_allow_html=True)
 
     # ════════════════════════════════════════════════════
-    # 📋  종합 점수 요약 (12항목 완벽 매핑)
+    # 📋  종합 점수 요약
     # ════════════════════════════════════════════════════
     total_score = 0
     max_score = 0
+    # 🚀 11번 옵션 항목까지 12개 모두 추가 완료
     score_items = [
         ("성장 사이클", verdict_1_color),
         ("수익성", v2_color),
@@ -844,7 +728,7 @@ def render_company_details(ticker_str: str):
         ("밸류에이션", v8_color),
         ("전문가", con_c),
         ("지분 구조", v10_color),
-        ("옵션/파생", mp_color),
+        ("옵션/파생", mp_color), 
         ("공매도", sl_c),
     ]
     for name, color in score_items:
@@ -871,7 +755,8 @@ def render_company_details(ticker_str: str):
         <div style="text-align:center;margin-bottom:15px">
             <span style="font-size:2rem;font-weight:900;color:{overall_color}">
                 {overall_emoji} {pct_score:.0f}점 / 100점
-            </span><br>
+            </span>
+            <br>
             <span style="font-size:1.1rem;color:{overall_color};font-weight:600">{overall_text}</span>
         </div>
         <div style="background:#21262d;border-radius:10px;height:14px;margin:10px 0;overflow:hidden">
