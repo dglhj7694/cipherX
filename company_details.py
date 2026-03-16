@@ -869,10 +869,10 @@ def render_company_details(ticker_str: str):
         {pe_visual}
         {pe_warning}
         <div class="note-box">
-            ※ P/E는 현재가 ÷ EPS로 교차 검증되었습니다.<br>
+            "'"※ P/E는 현재가 ÷ EPS로 교차 검증되었습니다.<br>
             <b>Trailing P/E</b> = 현재가 ÷ 과거 12개월 실적 EPS<br>
             <b>Forward P/E</b> = 현재가 ÷ 향후 12개월 추정 EPS<br>
-            섹터 P/E는 실시간 기준입니다.
+            섹터 P/E는 실시간 기준입니다."'"
         </div>
     </div>
 </div>
