@@ -741,8 +741,10 @@ def build_chart(dc,ticker,regime,shield):
         else: daily_sig_texts.append("")
 
     fig.add_trace(go.Candlestick(x=dc.index,open=dc['Open'],high=dc['High'],low=dc['Low'],
-        close=dc['Close'],name="Price",increasing_line_color='#26a69a',decreasing_line_color='#ef5350',
-        increasing_fillcolor='#26a69a', decreasing_fillcolor='#ef5350', 
+        close=dc['Close'],name="Price",
+        # 👇 여기 색상을 변경합니다.
+        increasing_line_color='#00E676', decreasing_line_color='#FF1744',
+        increasing_fillcolor='rgba(0, 230, 118, 0.8)', decreasing_fillcolor='rgba(255, 23, 68, 0.8)', 
         customdata=daily_sig_texts, hovertemplate="O: %{open:.2f}<br>H: %{high:.2f}<br>L: %{low:.2f}<br>C: %{close:.2f}%{customdata}<extra></extra>"
     ),row=1,col=1)
 
@@ -775,8 +777,9 @@ def build_chart(dc,ticker,regime,shield):
             name=f"{cfg['icon']} {cfg['label']}", hoverinfo='skip'), row=1, col=1)
 
     br=dc['Close']<dc['Open']
-    fig.add_trace(go.Bar(x=dc.index,y=dc['Volume'],marker_color=np.where(br,'#ef5350','#26a69a').tolist(),
-        name="Volume",opacity=0.7,hovertemplate="%{y:,.0f}"),row=2,col=1)
+    fig.add_trace(go.Bar(x=dc.index,y=dc['Volume'],
+        marker_color=np.where(br,'rgba(255, 23, 68, 0.6)','rgba(0, 230, 118, 0.6)').tolist(),
+        name="Volume",opacity=0.8,hovertemplate="%{y:,.0f}"),row=2,col=1)
     vcm=dc.get('Volume_Climax_Buy',pd.Series(False))|dc.get('Volume_Climax_Sell',pd.Series(False))
     vcd=dc[vcm]
     if not vcd.empty:
@@ -828,26 +831,46 @@ def build_chart(dc,ticker,regime,shield):
         yaxis_title="Price", yaxis2_title="Vol", yaxis3_title="WT",
         yaxis4_title="MF", yaxis5_title="MACD", yaxis6_title="Conf",
         template="plotly_dark",
-        margin=dict(l=2, r=2, t=40, b=2), # ✅ 개선: 모바일 여백 최소화
+        
+        # 👇 배경을 완전히 투명하게 만들어 Streamlit 배경과 일체화
+        paper_bgcolor="rgba(0,0,0,0)", 
+        plot_bgcolor="rgba(0,0,0,0)",
+        
+        margin=dict(l=2, r=2, t=40, b=2),
         height=1200, 
         showlegend=True, hovermode="x unified",
-        hoverlabel=dict(bgcolor="rgba(22,26,34,0.95)", font_size=12, font_family="Pretendard", bordercolor="#2D333B"),
+        hoverlabel=dict(bgcolor="rgba(14,17,23,0.95)", font_size=12, font_family="Pretendard", bordercolor="#2D333B"),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(size=9.5, color='#CCC', family='Pretendard'), bgcolor='rgba(0,0,0,0)', itemsizing='constant'),
     )
 
+    # 👇 그리드(격자) 선을 은은하게 다듬기
     for i in range(1, 7):
         ya = f'yaxis{i}' if i > 1 else 'yaxis'
         fig.update_layout(**{
-            ya: dict(gridcolor='rgba(60,63,70,0.5)', gridwidth=0.5, zerolinecolor='rgba(100,103,110,0.6)', zerolinewidth=0.8, title_font=dict(size=11, color='#888'), tickfont=dict(size=10, color='#999'))
+            ya: dict(
+                gridcolor='rgba(45, 51, 59, 0.5)', # 더 어둡고 세련된 그리드 라인
+                gridwidth=1, 
+                zerolinecolor='rgba(60, 63, 70, 0.6)', 
+                zerolinewidth=1, 
+                title_font=dict(size=11, color='#777'), 
+                tickfont=dict(size=10, color='#888')
+            )
         })
 
     fig.update_xaxes(rangeslider_visible=False)
     has_weekends = dc.index.dayofweek.isin([5, 6]).any()
     rangebreaks_config = [dict(bounds=["sat", "mon"])] if not has_weekends else []
 
-    fig.update_xaxes(showspikes=True, spikecolor="#667eea", spikemode="across", spikethickness=1, spikedash="dot", rangebreaks=rangebreaks_config, gridcolor='rgba(60,63,70,0.3)', gridwidth=0.5, tickfont=dict(size=10, color='#999'))
+    fig.update_xaxes(
+        showspikes=True, spikecolor="#667eea", spikemode="across", spikethickness=1, spikedash="dot", 
+        rangebreaks=rangebreaks_config, 
+        gridcolor='rgba(45, 51, 59, 0.5)', # X축 그리드도 통일
+        gridwidth=1, 
+        tickfont=dict(size=10, color='#888')
+    )
     fig.update_yaxes(showspikes=True, spikecolor="#667eea", spikemode="across", spikethickness=1, spikedash="dot")
     for ann in fig['layout']['annotations']: ann['font'] = dict(size=12, color='#AAA', family='Pretendard')
+    
     return fig
 
 # ──────────────────────────────────────────
@@ -1291,7 +1314,7 @@ def _run_ai():
         pb = st.progress(0, text="퀀트 엔진 로딩 중...")
         try:
             pb.progress(10, text="Gemini 모델 초기화 중...")
-            model = genai.GenerativeModel('gemini-2.5-flash')
+            model = genai.GenerativeModel('gemini-flash-latest')
             pb.progress(20, text="시장 데이터 및 시그널 취합 중...")
 
             collected_chunks = []
