@@ -423,12 +423,36 @@ JUDGMENT_CONFIG = {
 # ──────────────────────────────────────────
 def _recent(s, lb=3): return s.astype(float).rolling(lb+1, min_periods=1).max().fillna(0).astype(bool)
 def _cooldown(sig, bars=5):
-    v = sig.astype(bool).values.copy(); last = -bars-1
+    """쿨다운: 같은 시그널이 bars일 이내 재발생하면 무시"""
+    v = sig.astype(bool).values.copy()
+    last = -bars - 1
     for i in range(len(v)):
         if v[i]:
-            if (i-last)<=bars: v[i]=False
-            else: last=i
+            if (i - last) <= bars:
+                v[i] = False
+            else:
+                last = i
     return pd.Series(v, index=sig.index)
+def _cooldown_directional(df, buy_sig, sell_sig, bars=5):
+    """🆕 방향별 쿨다운: BUY 후 SELL은 쿨다운 없이 허용 (반대 방향은 즉시 유효)"""
+    bv = df[buy_sig].astype(bool).values.copy() if buy_sig in df.columns else np.zeros(len(df), dtype=bool)
+    sv = df[sell_sig].astype(bool).values.copy() if sell_sig in df.columns else np.zeros(len(df), dtype=bool)
+    last_b, last_s = -bars - 1, -bars - 1
+    
+    for i in range(len(df)):
+        if bv[i]:
+            if (i - last_b) <= bars:
+                bv[i] = False
+            else:
+                last_b = i
+        if sv[i]:
+            if (i - last_s) <= bars:
+                sv[i] = False
+            else:
+                last_s = i
+    
+    if buy_sig in df.columns: df[buy_sig] = pd.Series(bv, index=df.index)
+    if sell_sig in df.columns: df[sell_sig] = pd.Series(sv, index=df.index)
 def _volf(vol, ratio=0.5, period=20): return vol >= (vol.rolling(period, min_periods=5).mean() * ratio)
 def _valid_fmt(t): return bool(re.match(r'^[A-Za-z]{1,5}([.\-][A-Za-z]{1,2})?$', t))
 def _cls(val, lo, hi): return 'ind-bullish' if val<lo else ('ind-bearish' if val>hi else 'ind-neutral')
@@ -535,9 +559,39 @@ def detect_volume_climax(c,o,v,wt1,atr,z_thresh=2.5):
     vm=v.rolling(20).mean();vs=v.rolling(20).std();vz=(v-vm)/(vs+1e-10);big=(c-o).abs()>atr*0.5
     ps=(vz.shift(1)>z_thresh)&big.shift(1)
     return ps&(c.shift(1)<o.shift(1))&(wt1.shift(1)<-40)&(c>o),ps&(c.shift(1)>o.shift(1))&(wt1.shift(1)>40)&(c<o)
-def _detect_engulfing_pair(c,o,wt1,wt_t=20):
-    body=(c-o).abs();big=body>body.rolling(20).mean()*0.8;pb=c.shift(1)<o.shift(1);pp=c.shift(1)>o.shift(1)
-    return pb&(c>o)&(o<=c.shift(1))&(c>=o.shift(1))&big&(wt1<-wt_t),pp&(c<o)&(o>=c.shift(1))&(c<=o.shift(1))&big&(wt1>wt_t)
+def _detect_engulfing_pair(c, o, wt1, wt_t=20):
+    """정확한 Engulfing: 당일 실체가 전일 실체를 완전히 감싸야 함"""
+    body = (c - o).abs()
+    body_prev = (c.shift(1) - o.shift(1)).abs()
+    avg_body = body.rolling(20).mean()
+    
+    # 당일 실체가 평균 이상 & 전일 실체보다 커야 함
+    big = (body > avg_body * 0.8) & (body > body_prev)
+    
+    # 전일 실체 범위
+    prev_body_high = pd.concat([c.shift(1), o.shift(1)], axis=1).max(axis=1)
+    prev_body_low = pd.concat([c.shift(1), o.shift(1)], axis=1).min(axis=1)
+    
+    # 당일 실체 범위
+    curr_body_high = pd.concat([c, o], axis=1).max(axis=1)
+    curr_body_low = pd.concat([c, o], axis=1).min(axis=1)
+    
+    prev_bearish = c.shift(1) < o.shift(1)
+    prev_bullish = c.shift(1) > o.shift(1)
+    
+    # Bullish: 전일 음봉 + 당일 양봉 + 당일 실체가 전일 실체를 감쌈
+    bull = (prev_bearish & (c > o) & 
+            (curr_body_low <= prev_body_low) & 
+            (curr_body_high >= prev_body_high) & 
+            big & (wt1 < -wt_t))
+    
+    # Bearish: 전일 양봉 + 당일 음봉 + 당일 실체가 전일 실체를 감쌈
+    bear = (prev_bullish & (c < o) & 
+            (curr_body_low <= prev_body_low) & 
+            (curr_body_high >= prev_body_high) & 
+            big & (wt1 > wt_t))
+    
+    return bull, bear
 def compute_supertrend(h,l,c,period=10,mult=3.0):
     atr=compute_tr(h,l,c).rolling(period).mean();hl2=(h+l)/2
     up=(hl2+mult*atr).values.copy();dn=(hl2-mult*atr).values.copy();cl=c.values;n=len(c)
@@ -569,17 +623,49 @@ def _detect_parabolic_pair(c,o,wt1,bbu,bbl,atr):
     return((wt1<-85)&(wt1>wt1.shift(1))&(c>o)&(c>c.shift(1)))|((c<bbl-atr*1.5)&(c>o)),((wt1>85)&(wt1<wt1.shift(1))&(c<o)&(c<c.shift(1)))|((c>bbu+atr*1.5)&(c<o))
 
 # ── 신규 시그널 탐지 ──
-def detect_candlestick_patterns(c,o,h,l,wt1,atr):
-    body=(c-o).abs();us=h-pd.concat([c,o],axis=1).max(axis=1);ls=pd.concat([c,o],axis=1).min(axis=1)-l
-    fr=h-l+1e-10;ab=body.rolling(20).mean();ism=body<ab*0.8
-    hammer=(ls>=body*2)&(us<=body*0.5)&ism&(wt1<-20)&(c>=o)
-    shooting=(us>=body*2)&(ls<=body*0.5)&ism&(wt1>20)&(c<=o)
-    doji=body<=fr*0.05;db=doji&(wt1<-30)&(wt1>wt1.shift(3));dbe=doji&(wt1>30)&(wt1<wt1.shift(3))
-    d1b=(c.shift(2)<o.shift(2))&(body.shift(2)>ab.shift(2));d2s=body.shift(1)<ab.shift(1)*0.5
-    d3b=(c>o)&(c>(o.shift(2)+c.shift(2))/2);morning=d1b&d2s&d3b&(wt1<-15)
-    d1u=(c.shift(2)>o.shift(2))&(body.shift(2)>ab.shift(2));d3s=(c<o)&(c<(o.shift(2)+c.shift(2))/2)
-    evening=d1u&d2s&d3s&(wt1>15);spin=ism&(us>body*0.5)&(ls>body*0.5)&~doji
-    return hammer,shooting,db,dbe,morning,evening,spin
+def detect_candlestick_patterns(c, o, h, l, wt1, atr):
+    body = (c - o).abs()
+    upper_shadow = h - pd.concat([c, o], axis=1).max(axis=1)
+    lower_shadow = pd.concat([c, o], axis=1).min(axis=1) - l
+    full_range = h - l + 1e-10
+    avg_body = body.rolling(20).mean()
+    is_small = body < avg_body * 0.6  # 🔧 0.8→0.6 (더 엄격)
+
+    # Hammer: 하단꼬리 ≥ 실체×2 + 상단꼬리 짧음 + 범위가 ATR의 50% 이상 (너무 작은 봉 제외)
+    min_range = atr * 0.5
+    hammer = ((lower_shadow >= body * 2) & (upper_shadow <= body * 0.3) &  # 🔧 0.5→0.3
+              is_small & (wt1 < -20) & (c >= o) & (full_range > min_range))
+    
+    # Shooting Star: 상단꼬리 ≥ 실체×2 + 하단꼬리 짧음
+    shooting = ((upper_shadow >= body * 2) & (lower_shadow <= body * 0.3) &  # 🔧
+                is_small & (wt1 > 20) & (c <= o) & (full_range > min_range))
+    
+    # Doji: 실체 ≤ 범위의 5% + 범위가 ATR 30% 이상 (작은 범위 도지 제외)
+    doji = (body <= full_range * 0.05) & (full_range > atr * 0.3)
+    # 🔧 방향 판단 강화: 3일→5일 추세 확인
+    doji_bull = doji & (wt1 < -30) & (wt1 > wt1.shift(1)) & (c.shift(1) < c.shift(3))
+    doji_bear = doji & (wt1 > 30) & (wt1 < wt1.shift(1)) & (c.shift(1) > c.shift(3))
+    
+    # Morning Star: Day1 큰 음봉 + Day2 소형봉(갭다운) + Day3 큰 양봉
+    d1_bearish = (c.shift(2) < o.shift(2)) & (body.shift(2) > avg_body.shift(2))
+    d2_small = body.shift(1) < avg_body.shift(1) * 0.5
+    d2_gap = pd.concat([c.shift(1), o.shift(1)], axis=1).max(axis=1) < o.shift(2)  # 🆕 갭 확인
+    d3_bullish = (c > o) & (c > (o.shift(2) + c.shift(2)) / 2) & (body > avg_body * 0.8)  # 🔧 Day3도 큰 봉
+    morning = d1_bearish & d2_small & d3_bullish & (wt1 < -15)
+    
+    # Evening Star
+    d1_bullish = (c.shift(2) > o.shift(2)) & (body.shift(2) > avg_body.shift(2))
+    d3_bearish = (c < o) & (c < (o.shift(2) + c.shift(2)) / 2) & (body > avg_body * 0.8)  # 🔧
+    evening = d1_bullish & d2_small & d3_bearish & (wt1 > 15)
+    
+    # Spinning Top: 소형 실체 + 양쪽 꼬리 비슷한 길이
+    spin_ratio = (upper_shadow / (lower_shadow + 1e-10))
+    spin = (is_small & 
+            (upper_shadow > body * 0.5) & (lower_shadow > body * 0.5) &
+            (spin_ratio > 0.5) & (spin_ratio < 2.0) &  # 🆕 꼬리 균형
+            ~doji)
+    
+    return hammer, shooting, doji_bull, doji_bear, morning, evening, spin
 def detect_inside_outside_day(h,l,c,o,wt1):
     inside=(h<h.shift(1))&(l>l.shift(1));outside=(h>h.shift(1))&(l<l.shift(1))
     return inside,outside&(c>o)&(c>h.shift(1))&(wt1<30),outside&(c<o)&(c<l.shift(1))&(wt1>-30)
@@ -603,13 +689,19 @@ def detect_gaps(c,o,h,l,atr):
 def detect_nr7(h,l):
     dr=h-l;mn7=dr.rolling(7).min();nr=dr<=mn7;return nr,nr&nr.shift(1).fillna(False)
 def detect_range_bars(h, l, atr):
+    """Wide Range Bar + Calm After Storm (최근 5일 내 wide 존재 + 오늘 narrow)"""
     dr = h - l
     wide = dr > atr * 2.0
     narrow = dr < atr * 0.5
-    calm = wide.shift(1).fillna(False) & narrow
+    # 최근 5일 내 wide가 1개 이상 있었고, 오늘 narrow
+    recent_wide = wide.rolling(5, min_periods=1).max().shift(1).fillna(False).astype(bool)
+    calm = recent_wide & narrow
     return wide, calm
-def detect_52w(c,h,l):
-    return h>=h.rolling(252,min_periods=200).max(),l<=l.rolling(252,min_periods=200).min()
+def detect_52w(c, h, l):
+    """52주 신고가/신저가 — 전일까지의 범위와 비교해야 정확"""
+    h252_prev = h.rolling(252, min_periods=200).max().shift(1)  # 어제까지의 52주 고가
+    l252_prev = l.rolling(252, min_periods=200).min().shift(1)  # 어제까지의 52주 저가
+    return h > h252_prev, l < l252_prev
 def detect_123_pullback(h,l,c,adx,pdi,mdi):
     sb=(adx>30)&(pdi>mdi);ss=(adx>30)&(mdi>pdi);inside=(h<h.shift(1))&(l>l.shift(1))
     ll1=l<l.shift(1);ll2=l.shift(1)<l.shift(2);ll3=l.shift(2)<l.shift(3);tll=ll1&ll2&ll3
@@ -681,103 +773,111 @@ def _sig_pts(df, sig_name, points):
     return 0.0
 
 def compute_trade_judgment(df):
-    """
-    7-Layer 스코어링 + 콤보 탐지 → 최종 BUY/SELL 판단
-
-    Layer 1: 추세 (Trend)              max ~9
-    Layer 2: 모멘텀 (Momentum)         max ~14
-    Layer 3: 캔들스틱 (Candlestick)    max ~6
-    Layer 4: 볼린저밴드 (Bollinger)    max ~6
-    Layer 5: 거래량 (Volume)           max ~6
-    Layer 6: 자금흐름 (Money Flow)     max ~8  ← 🆕
-    Layer 7: 특수 패턴 (Patterns)      max ~8
-    """
     C, O, idx = df['Close'], df['Open'], df.index
     rmfi = df['RSI_MFI']
     vol_ratio = df['Volume'] / (df['Volume'].rolling(50, min_periods=10).mean() + 1e-10)
 
-    # ══════════════ BUY ══════════════
+    # ═══════════ BUY ═══════════
 
-    # ── Layer 1: 추세 (변경 없음) ──
+    # ── Layer 1: 추세 — 🔧 상호 배제 로직 ──
     bt = pd.Series(0.0, index=idx)
-    bt += np.where(C > df['MA200'], 2.0, 0)
-    bt += np.where(C > df['MA50'], 2.0, 0)
-    bt += np.where(C > df['MA20'], 1.0, 0)
-    bt += np.where(df['MA50'] > df['MA200'], 2.0, 0)
+    
+    # 가격 위치 (상호 배제)
+    above_200 = C > df['MA200']
+    above_50 = C > df['MA50']
+    above_20 = C > df['MA20']
+    below_200 = C < df['MA200']
+    below_50 = C < df['MA50']
+    
+    # BUY 추세: 위에 있을수록 점수 (아래에 있으면 0)
+    bt += np.where(above_200 & above_50 & above_20, 5.0,        # 전부 위 = 풀 점수
+          np.where(above_200 & above_50, 4.0,                    # 200+50 위
+          np.where(above_200, 2.5,                                # 200만 위
+          np.where(above_50, 1.5, 0))))                           # 50만 위
+    
+    bt += np.where(df['MA50'] > df['MA200'], 1.5, 0)            # 골든크로스 상태
     bt += np.where(df['Plus_DI'] > df['Minus_DI'], 1.0, 0)
     bt += np.where(df['ST_Direction'] == 1, 1.0, 0)
+    
+    # 🆕 추세 기울기 (MA50 상승 중이면 가점)
+    ma50_rising = df['MA50'] > df['MA50'].shift(5)
+    bt += np.where(above_50 & ma50_rising, 0.5, 0)
+    
     df['BJ_Trend'] = bt
 
-    # ── Layer 2: 모멘텀 (VWAP 추가) ──
+    # ── Layer 2: 모멘텀 ──
     bm = pd.Series(0.0, index=idx)
-    for s, p in [('MACD_Cross_Buy',2),('MACD_Zero_Cross_Buy',2),('StochRSI_Cross_Buy',2),('ADX_Momentum_Buy',2)]:
+    for s, p in [('MACD_Cross_Buy',2),('MACD_Zero_Cross_Buy',2),
+                  ('StochRSI_Cross_Buy',2),('ADX_Momentum_Buy',2),
+                  ('VWAP_Bounce_Buy',1.5)]:
         bm += _sig_pts(df, s, p)
     bm += np.where(df['MACD_Hist'] > 0, 1.0, 0)
-    bm += np.where(df['RSI'] < 30, 2.0, np.where(df['RSI'] < 45, 1.0, 0))
-    bm += np.where(df['StochK'] < 20, 2.0, np.where(df['StochK'] < 35, 1.0, 0))
-    bm += np.where(df['WT1'] < -53, 2.0, np.where(df['WT1'] < -20, 1.0, 0))
-    # 🆕 VWAP
-    bm += np.where(df['VWAP_Osc'] > 0, 1.0, 0)
-    bm += _sig_pts(df, 'VWAP_Bounce_Buy', 1.5)
-    df['BJ_Momentum'] = bm
+    bm += np.where(df['VWAP_Osc'] > 0, 0.5, 0)
+    
+    # 🔧 RSI/StochK — 과매도 반등과 이미 과매수는 구분
+    bm += np.where(df['RSI'] < 30, 2.0,
+          np.where(df['RSI'] < 45, 1.0,
+          np.where(df['RSI'] > 70, -1.0, 0)))  # 🆕 과매수이면 감점
+    bm += np.where(df['StochK'] < 20, 2.0,
+          np.where(df['StochK'] < 35, 1.0,
+          np.where(df['StochK'] > 80, -1.0, 0)))  # 🆕
+    bm += np.where(df['WT1'] < -53, 2.0,
+          np.where(df['WT1'] < -20, 1.0,
+          np.where(df['WT1'] > 53, -1.0, 0)))  # 🆕
+    
+    df['BJ_Momentum'] = bm.clip(lower=0)  # 음수 방지
 
-    # ── Layer 3: 캔들 (변경 없음) ──
+    # ── Layer 3: 캔들 ──
     bc = pd.Series(0.0, index=idx)
-    for s, p in [('Bullish_Engulfing',3),('Morning_Star',3),('Hammer',2),('Doji_Bullish',1),('Outside_Bullish',2)]:
+    for s, p in [('Bullish_Engulfing',3),('Morning_Star',3),('Hammer',2),
+                  ('Doji_Bullish',1),('Outside_Bullish',2)]:
         bc += _sig_pts(df, s, p)
     df['BJ_Candle'] = bc.clip(upper=6.0)
 
-    # ── Layer 4: 볼린저 (변경 없음) ──
+    # ── Layer 4: 볼린저 ──
     bb = pd.Series(0.0, index=idx)
-    for s, p in [('BB_Squeeze_End_Bull',3),('Below_Lower_BB',2),('NR7',1),('NR7_2',2),('Calm_After_Storm',1.5)]:
+    for s, p in [('BB_Squeeze_End_Bull',3),('NR7',1),('NR7_2',2),('Calm_After_Storm',1.5)]:
         bb += _sig_pts(df, s, p)
-    bb += np.where(df['Percent_B'] < 0.2, 1.0, 0)
-    df['BJ_BB'] = bb.clip(upper=6.0)
+    bb += np.where(df['Percent_B'] < 0.05, 2.0,   # 🔧 극단 과매도
+          np.where(df['Percent_B'] < 0.2, 1.0, 0))
+    # 🆕 이미 과매수 상태면 감점
+    bb += np.where(df['Percent_B'] > 0.95, -1.0, 0)
+    df['BJ_BB'] = bb.clip(lower=0, upper=6.0)
 
-    # ── Layer 5: 거래량 (OBV 추가) ──
+    # ── Layer 5: 거래량 ──
     bv = pd.Series(0.0, index=idx)
     bv += _sig_pts(df, 'Volume_Climax_Buy', 3.0)
     bv += _sig_pts(df, 'Pocket_Pivot', 2.0)
-    bv += _sig_pts(df, 'OBV_Div_Buy', 1.5)  # 🆕
+    bv += _sig_pts(df, 'OBV_Div_Buy', 1.5)
     bv += np.where((vol_ratio >= 3.0) & (C > O), 3.0,
            np.where((vol_ratio >= 1.5) & (C > O), 1.0, 0))
-    df['BJ_Volume'] = bv.clip(upper=6.0)
+    # 🆕 거래량 감소 + 하락은 감점
+    bv += np.where((vol_ratio < 0.5) & (C < O), -1.0, 0)
+    df['BJ_Volume'] = bv.clip(lower=0, upper=6.0)
 
-    # ── 🆕 Layer 6: 자금흐름 (Money Flow) ── max ~8
+    # ── Layer 6: 자금흐름 ──
     bmf = pd.Series(0.0, index=idx)
-
-    # MF 레벨 (현재값)
-    bmf += np.where(rmfi < -10, 2.0,      # 강한 자금 유출 = 반등 기대
+    bmf += np.where(rmfi < -10, 2.0,
            np.where(rmfi < -5, 1.0,
-           np.where(rmfi > 5, -0.5, 0)))   # 이미 과열이면 감점
-
-    # 🔥 MF 방향 (핵심 — "MF가 계속 증가" 감지)
+           np.where(rmfi > 10, -0.5, 0)))  # 과열 감점
     if 'MF_Slope_5' in df.columns:
         mf_slope = df['MF_Slope_5']
-        bmf += np.where(mf_slope > 5, 2.0,        # 5일간 5포인트+ 상승 = 강한 자금 유입
-               np.where(mf_slope > 2, 1.5,         # 중간 유입
-               np.where(mf_slope > 0, 0.5, 0)))    # 약한 유입
-
-    # MF 연속 상승
+        bmf += np.where(mf_slope > 5, 2.0,
+               np.where(mf_slope > 2, 1.5,
+               np.where(mf_slope > 0, 0.5,
+               np.where(mf_slope < -5, -1.0, 0))))  # 🆕 MF 급락이면 감점
     if 'MF_Up_Streak' in df.columns:
-        bmf += np.where(df['MF_Up_Streak'] >= 5, 2.0,    # 5일+ 연속 = 강한 매수 압력
-               np.where(df['MF_Up_Streak'] >= 3, 1.0, 0)) # 3일+ = 중간
-
-    # MF 시그널
-    bmf += _sig_pts(df, 'MF_Cross_Bull', 2.0)     # 0선 상향 돌파
-    bmf += _sig_pts(df, 'MF_Bull_Div', 2.0)       # MF 상승 다이버전스
-    bmf += _sig_pts(df, 'MF_Accel_Up', 1.0)       # 가속 상승
-
-    # 🆕 MF + 가격 합류 (MF 상승 + 가격도 상승 = 강한 확인)
-    mf_price_confirm = df.get('MF_Rising', pd.Series(False, index=idx)) & (C > C.shift(1))
-    bmf += np.where(mf_price_confirm, 0.5, 0)
-
-    df['BJ_MF'] = bmf.clip(upper=8.0)
+        bmf += np.where(df['MF_Up_Streak'] >= 5, 2.0,
+               np.where(df['MF_Up_Streak'] >= 3, 1.0, 0))
+    bmf += _sig_pts(df, 'MF_Cross_Bull', 2.0)
+    bmf += _sig_pts(df, 'MF_Bull_Div', 2.0)
+    bmf += _sig_pts(df, 'MF_Accel_Up', 1.0)
+    df['BJ_MF'] = bmf.clip(lower=0, upper=8.0)
 
     # ── Layer 7: 패턴 ──
     bp = pd.Series(0.0, index=idx)
     for s, p in [('Pullback_123_Bull',2),('Setup_180_Bull',2),('Boomer_Buy',2),('Expansion_BO',3),
-                  ('Gilligans_Buy',2),('Lizard_Bull',2),('NonADX_123_Bull',1.5),('Pocket_Pivot',2),
+                  ('Gilligans_Buy',2),('Lizard_Bull',2),('NonADX_123_Bull',1.5),
                   ('EMA_Pullback_Buy',2),('Momentum_Ignition_Buy',3),('SuperTrend_Buy',2),('Golden_Cross',2),
                   ('Cross_Above_50MA',1.5),('Cross_Above_200MA',2),('Gap_Up',1),('Gap_Down_Closed',1),
                   ('New_52W_High',2),('Gold_Dot',3),('Green_Dot_T1',2.5),('Green_Dot_T2',2),
@@ -789,81 +889,83 @@ def compute_trade_judgment(df):
     df['Buy_Total'] = (df['BJ_Trend'] + df['BJ_Momentum'] + df['BJ_Candle'] +
                        df['BJ_BB'] + df['BJ_Volume'] + df['BJ_MF'] + df['BJ_Pattern'])
 
-    # ══════════════ SELL ══════════════
+    # ═══════════ SELL ═══════════
 
-    # ── Layer 1: 추세 ──
+    # ── Layer 1: 추세 — 상호 배제 ──
     st_ = pd.Series(0.0, index=idx)
-    st_ += np.where(C < df['MA200'], 2.0, 0)
-    st_ += np.where(C < df['MA50'], 2.0, 0)
-    st_ += np.where(C < df['MA20'], 1.0, 0)
-    st_ += np.where(df['MA50'] < df['MA200'], 2.0, 0)
+    st_ += np.where(below_200 & below_50 & (C < df['MA20']), 5.0,
+           np.where(below_200 & below_50, 4.0,
+           np.where(below_200, 2.5,
+           np.where(below_50, 1.5, 0))))
+    st_ += np.where(df['MA50'] < df['MA200'], 1.5, 0)
     st_ += np.where(df['Minus_DI'] > df['Plus_DI'], 1.0, 0)
     st_ += np.where(df['ST_Direction'] == -1, 1.0, 0)
+    ma50_falling = df['MA50'] < df['MA50'].shift(5)
+    st_ += np.where(below_50 & ma50_falling, 0.5, 0)
     df['SJ_Trend'] = st_
 
-    # ── Layer 2: 모멘텀 (VWAP 추가) ──
+    # ── Layer 2: 모멘텀 ──
     sm = pd.Series(0.0, index=idx)
-    for s, p in [('MACD_Cross_Sell',2),('MACD_Zero_Cross_Sell',2),('StochRSI_Cross_Sell',2),('ADX_Momentum_Sell',2)]:
+    for s, p in [('MACD_Cross_Sell',2),('MACD_Zero_Cross_Sell',2),
+                  ('StochRSI_Cross_Sell',2),('ADX_Momentum_Sell',2),
+                  ('VWAP_Reject_Sell',1.5)]:
         sm += _sig_pts(df, s, p)
     sm += np.where(df['MACD_Hist'] < 0, 1.0, 0)
-    sm += np.where(df['RSI'] > 70, 2.0, np.where(df['RSI'] > 55, 1.0, 0))
-    sm += np.where(df['StochK'] > 80, 2.0, np.where(df['StochK'] > 65, 1.0, 0))
-    sm += np.where(df['WT1'] > 53, 2.0, np.where(df['WT1'] > 20, 1.0, 0))
-    sm += np.where(df['VWAP_Osc'] < 0, 1.0, 0)
-    sm += _sig_pts(df, 'VWAP_Reject_Sell', 1.5)
-    df['SJ_Momentum'] = sm
+    sm += np.where(df['VWAP_Osc'] < 0, 0.5, 0)
+    sm += np.where(df['RSI'] > 70, 2.0,
+          np.where(df['RSI'] > 55, 1.0,
+          np.where(df['RSI'] < 30, -1.0, 0)))
+    sm += np.where(df['StochK'] > 80, 2.0,
+          np.where(df['StochK'] > 65, 1.0,
+          np.where(df['StochK'] < 20, -1.0, 0)))
+    sm += np.where(df['WT1'] > 53, 2.0,
+          np.where(df['WT1'] > 20, 1.0,
+          np.where(df['WT1'] < -53, -1.0, 0)))
+    df['SJ_Momentum'] = sm.clip(lower=0)
 
     # ── Layer 3: 캔들 ──
     sc = pd.Series(0.0, index=idx)
-    for s, p in [('Bearish_Engulfing',3),('Evening_Star',3),('Shooting_Star',2),('Doji_Bearish',1),('Outside_Bearish',2)]:
+    for s, p in [('Bearish_Engulfing',3),('Evening_Star',3),('Shooting_Star',2),
+                  ('Doji_Bearish',1),('Outside_Bearish',2)]:
         sc += _sig_pts(df, s, p)
     df['SJ_Candle'] = sc.clip(upper=6.0)
 
     # ── Layer 4: 볼린저 ──
     sb_ = pd.Series(0.0, index=idx)
-    for s, p in [('BB_Squeeze_End_Bear',3),('Above_Upper_BB',2),('NR7',1),('NR7_2',2),('Calm_After_Storm',1.5)]:
+    for s, p in [('BB_Squeeze_End_Bear',3),('NR7',1),('NR7_2',2),('Calm_After_Storm',1.5)]:
         sb_ += _sig_pts(df, s, p)
-    sb_ += np.where(df['Percent_B'] > 0.8, 1.0, 0)
-    df['SJ_BB'] = sb_.clip(upper=6.0)
+    sb_ += np.where(df['Percent_B'] > 0.95, 2.0,
+           np.where(df['Percent_B'] > 0.8, 1.0, 0))
+    sb_ += np.where(df['Percent_B'] < 0.05, -1.0, 0)
+    df['SJ_BB'] = sb_.clip(lower=0, upper=6.0)
 
-    # ── Layer 5: 거래량 (OBV 추가) ──
+    # ── Layer 5: 거래량 ──
     sv = pd.Series(0.0, index=idx)
     sv += _sig_pts(df, 'Volume_Climax_Sell', 3.0)
-    sv += _sig_pts(df, 'OBV_Div_Sell', 1.5)  # 🆕
+    sv += _sig_pts(df, 'OBV_Div_Sell', 1.5)
     sv += np.where((vol_ratio >= 3.0) & (C < O), 3.0,
            np.where((vol_ratio >= 1.5) & (C < O), 1.0, 0))
-    df['SJ_Volume'] = sv.clip(upper=6.0)
+    sv += np.where((vol_ratio < 0.5) & (C > O), -1.0, 0)
+    df['SJ_Volume'] = sv.clip(lower=0, upper=6.0)
 
-    # ── 🆕 Layer 6: 자금흐름 (Money Flow) ──
+    # ── Layer 6: 자금흐름 ──
     smf = pd.Series(0.0, index=idx)
-
-    # MF 레벨
-    smf += np.where(rmfi > 10, 2.0,       # 강한 자금 유입 과열
+    smf += np.where(rmfi > 10, 2.0,
            np.where(rmfi > 5, 1.0,
-           np.where(rmfi < -5, -0.5, 0)))  # 이미 유출 중이면 감점
-
-    # MF 방향 (하락)
+           np.where(rmfi < -10, -0.5, 0)))
     if 'MF_Slope_5' in df.columns:
         mf_slope = df['MF_Slope_5']
         smf += np.where(mf_slope < -5, 2.0,
                np.where(mf_slope < -2, 1.5,
-               np.where(mf_slope < 0, 0.5, 0)))
-
-    # MF 연속 하락
+               np.where(mf_slope < 0, 0.5,
+               np.where(mf_slope > 5, -1.0, 0))))
     if 'MF_Dn_Streak' in df.columns:
         smf += np.where(df['MF_Dn_Streak'] >= 5, 2.0,
                np.where(df['MF_Dn_Streak'] >= 3, 1.0, 0))
-
-    # MF 시그널
     smf += _sig_pts(df, 'MF_Cross_Bear', 2.0)
     smf += _sig_pts(df, 'MF_Bear_Div', 2.0)
     smf += _sig_pts(df, 'MF_Accel_Dn', 1.0)
-
-    # MF + 가격 합류 (MF 하락 + 가격 하락)
-    mf_price_confirm_sell = df.get('MF_Falling', pd.Series(False, index=idx)) & (C < C.shift(1))
-    smf += np.where(mf_price_confirm_sell, 0.5, 0)
-
-    df['SJ_MF'] = smf.clip(upper=8.0)
+    df['SJ_MF'] = smf.clip(lower=0, upper=8.0)
 
     # ── Layer 7: 패턴 ──
     sp = pd.Series(0.0, index=idx)
@@ -880,7 +982,7 @@ def compute_trade_judgment(df):
     df['Sell_Total'] = (df['SJ_Trend'] + df['SJ_Momentum'] + df['SJ_Candle'] +
                         df['SJ_BB'] + df['SJ_Volume'] + df['SJ_MF'] + df['SJ_Pattern'])
 
-    # ── 활성 레이어 수 (7개로 변경) ──
+    # ── 활성 레이어 수 ──
     df['Buy_Active_Layers'] = sum(
         (df[f'BJ_{n}'] > 0).astype(int)
         for n in ['Trend','Momentum','Candle','BB','Volume','MF','Pattern'])
@@ -888,21 +990,33 @@ def compute_trade_judgment(df):
         (df[f'SJ_{n}'] > 0).astype(int)
         for n in ['Trend','Momentum','Candle','BB','Volume','MF','Pattern'])
 
-    # ── 최종 판단 (임계값 조정) ──
+    # ── 🔧 최종 판단 (개선) ──
     j = np.full(len(df), 'NEUTRAL', dtype=object)
     bt_v, st_v = df['Buy_Total'].values, df['Sell_Total'].values
     ba, sa = df['Buy_Active_Layers'].values, df['Sell_Active_Layers'].values
+
     for i in range(len(df)):
         b, s, bal, sal = bt_v[i], st_v[i], ba[i], sa[i]
-        if b >= 17 and bal >= 4 and b > s * 1.5:   j[i] = 'STRONG_BUY'
-        elif b >= 11 and bal >= 3 and b > s:        j[i] = 'BUY'
-        elif b >= 6 and bal >= 2 and b > s:         j[i] = 'WATCH_BUY'
-        elif s >= 17 and sal >= 4 and s > b * 1.5:  j[i] = 'STRONG_SELL'
-        elif s >= 11 and sal >= 3 and s > b:        j[i] = 'SELL'
-        elif s >= 6 and sal >= 2 and s > b:         j[i] = 'WATCH_SELL'
-        elif b >= 9 and s >= 9:                     j[i] = 'MIXED'
-    df['Trade_Judgment'] = j
+        diff = b - s
+        ratio = b / (s + 0.01)  # 🆕 비율 기반 판단
 
+        # 🔧 절대 점수 + 비율 + 차이 모두 고려
+        if b >= 17 and bal >= 4 and ratio >= 2.0 and diff >= 10:
+            j[i] = 'STRONG_BUY'
+        elif b >= 11 and bal >= 3 and ratio >= 1.4 and diff >= 5:
+            j[i] = 'BUY'
+        elif b >= 6 and bal >= 2 and diff >= 2:
+            j[i] = 'WATCH_BUY'
+        elif s >= 17 and sal >= 4 and (s / (b + 0.01)) >= 2.0 and (s - b) >= 10:
+            j[i] = 'STRONG_SELL'
+        elif s >= 11 and sal >= 3 and (s / (b + 0.01)) >= 1.4 and (s - b) >= 5:
+            j[i] = 'SELL'
+        elif s >= 6 and sal >= 2 and (s - b) >= 2:
+            j[i] = 'WATCH_SELL'
+        elif b >= 9 and s >= 9 and abs(diff) < 3:  # 🔧 차이가 작을 때만 MIXED
+            j[i] = 'MIXED'
+
+    df['Trade_Judgment'] = j
     detect_combos(df, vol_ratio)
     return df
 
@@ -1113,16 +1227,17 @@ def _build_judgment_hover(row, signals_dict):
     lines = [f"<b style='font-size:13px'>{ico} {judgment}</b>",
              f"<b>BUY</b> {bt:.1f} vs <b>SELL</b> {st_:.1f} (NET: {net:+.1f})", "─" * 26]
 
-    lnames = ['Trend','Momentum','Candle','BB','Volume','Pattern']
-    licons = ['📈','🔥','🕯️','📊','📦','⭐']
+    lnames = ['Trend','Momentum','Candle','BB','Volume','MF','Pattern']
+    licons = ['📈','🔥','🕯️','📊','📦','💰','⭐']
+
     bparts = [f"{ic}{n}:{float(row.get(f'BJ_{n}',0)):.1f}" for ic, n in zip(licons, lnames) if float(row.get(f'BJ_{n}',0)) > 0]
     sparts = [f"{ic}{n}:{float(row.get(f'SJ_{n}',0)):.1f}" for ic, n in zip(licons, lnames) if float(row.get(f'SJ_{n}',0)) > 0]
-    if bparts: lines.append(f"<span style='color:#00E676'><b>▲</b> {' · '.join(bparts)}</span>")
-    if sparts: lines.append(f"<span style='color:#FF1744'><b>▼</b> {' · '.join(sparts)}</span>")
+    if bparts: lines.append(f"<span style='color:#34D399'><b>▲</b> {' · '.join(bparts)}</span>")
+    if sparts: lines.append(f"<span style='color:#F87171'><b>▼</b> {' · '.join(sparts)}</span>")
     lines.append("─" * 26)
 
     combos = [name for col, (name, _) in COMBO_MAP.items() if row.get(col, False)]
-    lines.append(f"<b>🔥 콤보:</b> {' / '.join(combos)}" if combos else "<span style='color:#888'>콤보 없음</span>")
+    lines.append(f"<b>🔥 콤보:</b> {' / '.join(combos)}" if combos else "<span style='color:#64748B'>콤보 없음</span>")
     lines.append("─" * 26)
 
     bsigs, ssigs = [], []
@@ -1132,15 +1247,16 @@ def _build_judgment_hover(row, signals_dict):
             entry = f"{cfg['icon']} {cfg.get('kor', cfg['label'])}"
             (bsigs if cfg['dir'] == 'buy' else ssigs).append(entry)
     if bsigs:
-        lines.append(f"<span style='color:#00E676'><b>▲ 매수({len(bsigs)}):</b></span>")
+        lines.append(f"<span style='color:#34D399'><b>▲ 매수({len(bsigs)}):</b></span>")
         lines.extend(f"  {s}" for s in bsigs[:8])
         if len(bsigs) > 8: lines.append(f"  ...외 {len(bsigs)-8}개")
     if ssigs:
-        lines.append(f"<span style='color:#FF1744'><b>▼ 매도({len(ssigs)}):</b></span>")
+        lines.append(f"<span style='color:#F87171'><b>▼ 매도({len(ssigs)}):</b></span>")
         lines.extend(f"  {s}" for s in ssigs[:8])
         if len(ssigs) > 8: lines.append(f"  ...외 {len(ssigs)-8}개")
-    if not bsigs and not ssigs: lines.append("<span style='color:#888'>지표 점수 기반 판단</span>")
+    if not bsigs and not ssigs: lines.append("<span style='color:#64748B'>지표 점수 기반 판단</span>")
     return "<br>".join(lines)
+
 # ══════════════════════════════════════════════════════════════
 #  CipherX V11.0 — PART 2/3
 #  detect_all_signals + confluence + chart + metadata + prompt
@@ -1283,9 +1399,45 @@ def detect_all_signals(df):
     df['NonADX_123_Bull'], df['NonADX_123_Bear'] = detect_non_adx_123(H, L, C, m50)
     df['Pocket_Pivot'] = detect_pocket_pivot(C, O, V, m50, m200)
 
-    # ═══ 쿨다운 ═══
+    # ═══ 쿨다운 (방향별 + 일반) ═══
+    # 🆕 페어 시그널: BUY 쿨다운 중에도 SELL은 허용 (반대도 마찬가지)
+    PAIRED_COOLDOWNS = {
+        ('MACD_Cross_Buy', 'MACD_Cross_Sell'): 12,
+        ('StochRSI_Cross_Buy', 'StochRSI_Cross_Sell'): 7,
+        ('EMA_Pullback_Buy', 'EMA_Pullback_Sell'): 7,
+        ('Momentum_Ignition_Buy', 'Momentum_Ignition_Sell'): 10,
+        ('VWAP_Bounce_Buy', 'VWAP_Reject_Sell'): 7,
+        ('ADX_Momentum_Buy', 'ADX_Momentum_Sell'): 10,
+        ('Squeeze_Fire_Buy', 'Squeeze_Fire_Sell'): 5,
+        ('Bullish_Engulfing', 'Bearish_Engulfing'): 5,
+        ('Hammer', 'Shooting_Star'): 5,
+        ('Morning_Star', 'Evening_Star'): 7,
+        ('Doji_Bullish', 'Doji_Bearish'): 5,
+        ('Outside_Bullish', 'Outside_Bearish'): 7,
+        ('BB_Squeeze_End_Bull', 'BB_Squeeze_End_Bear'): 7,
+        ('MACD_Zero_Cross_Buy', 'MACD_Zero_Cross_Sell'): 12,
+        ('Pullback_123_Bull', 'Pullback_123_Bear'): 7,
+        ('Setup_180_Bull', 'Setup_180_Bear'): 7,
+        ('Boomer_Buy', 'Boomer_Sell'): 10,
+        ('Expansion_BO', 'Expansion_BD'): 10,
+        ('Gilligans_Buy', 'Gilligans_Sell'): 10,
+        ('Lizard_Bull', 'Lizard_Bear'): 5,
+        ('NonADX_123_Bull', 'NonADX_123_Bear'): 7,
+        ('MF_Cross_Bull', 'MF_Cross_Bear'): 10,
+        ('MF_Bull_Div', 'MF_Bear_Div'): 10,
+    }
+    
+    # 페어 시그널은 방향별 쿨다운 적용
+    paired_handled = set()
+    for (buy_sig, sell_sig), cd in PAIRED_COOLDOWNS.items():
+        _cooldown_directional(df, buy_sig, sell_sig, cd)
+        paired_handled.add(buy_sig)
+        paired_handled.add(sell_sig)
+    
+    # 나머지 시그널은 일반 쿨다운
     for s, cd in COOLDOWN_MAP.items():
-        if s in df.columns: df[s] = _cooldown(df[s], cd)
+        if s in df.columns and s not in paired_handled:
+            df[s] = _cooldown(df[s], cd)
 
     _deduplicate(df)
 
@@ -1364,25 +1516,45 @@ def compute_confluence(df, dw=5, df_=0.75):
 
 def compute_proximity(wt1, wt2, rsi, mfi, rmfi, stk, macd_h, bb_w, sb, sbe):
     bp = pd.Series(0.0, index=wt1.index); sp = pd.Series(0.0, index=wt1.index)
-    gap = (wt1-wt2).abs(); nc = gap < 3
-    cu = (wt1-wt2) > (wt1.shift(1)-wt2.shift(1)); cd = (wt1-wt2) < (wt1.shift(1)-wt2.shift(1))
-    for cond, pts in [((wt1<-40)&nc,30),((wt1<-40)&cu&(gap<8),15),(wt1<OS2,20),
-        ((wt1>=OS2)&(wt1<-40),10),(rsi<35,15),((rsi>=35)&(rsi<45),5),
-        (mfi<35,15),((mfi>=35)&(mfi<45),5),(rmfi<-5,10),((rmfi>=-5)&(rmfi<0),5),
-        (stk<20,10),((stk>=20)&(stk<35),5),(macd_h<0,3),(macd_h<macd_h.shift(1),2)]:
+    gap = (wt1 - wt2).abs(); nc = gap < 3
+    cu = (wt1 - wt2) > (wt1.shift(1) - wt2.shift(1))
+    cd = (wt1 - wt2) < (wt1.shift(1) - wt2.shift(1))
+
+    for cond, pts in [
+        ((wt1 < -40) & nc, 30), ((wt1 < -40) & cu & (gap < 8), 15),
+        (wt1 < OS2, 20), ((wt1 >= OS2) & (wt1 < -40), 10),
+        (rsi < 35, 15), ((rsi >= 35) & (rsi < 45), 5),
+        (mfi < 35, 15), ((mfi >= 35) & (mfi < 45), 5),
+        (rmfi < -5, 10), ((rmfi >= -5) & (rmfi < 0), 5),
+        # 🆕 MF 방향 가점
+        (rmfi > rmfi.shift(1), 5),  # MF 상승 중
+        (rmfi > rmfi.shift(3), 3),  # 3일 전보다 높음
+        (stk < 20, 10), ((stk >= 20) & (stk < 35), 5),
+        (macd_h < 0, 3), (macd_h < macd_h.shift(1), 2),
+    ]:
         bp += np.where(cond, pts, 0)
-    for cond, pts in [((wt1>40)&nc,30),((wt1>40)&cd&(gap<8),15),(wt1>OB1,20),
-        ((wt1<=OB1)&(wt1>40),10),(rsi>65,15),((rsi<=65)&(rsi>55),5),
-        (mfi>65,15),((mfi<=65)&(mfi>55),5),(rmfi>5,10),((rmfi<=5)&(rmfi>0),5),
-        (stk>80,10),((stk<=80)&(stk>65),5),(macd_h>0,3),(macd_h>macd_h.shift(1),2)]:
+
+    for cond, pts in [
+        ((wt1 > 40) & nc, 30), ((wt1 > 40) & cd & (gap < 8), 15),
+        (wt1 > OB1, 20), ((wt1 <= OB1) & (wt1 > 40), 10),
+        (rsi > 65, 15), ((rsi <= 65) & (rsi > 55), 5),
+        (mfi > 65, 15), ((mfi <= 65) & (mfi > 55), 5),
+        (rmfi > 5, 10), ((rmfi <= 5) & (rmfi > 0), 5),
+        # 🆕 MF 방향 가점
+        (rmfi < rmfi.shift(1), 5),
+        (rmfi < rmfi.shift(3), 3),
+        (stk > 80, 10), ((stk <= 80) & (stk > 65), 5),
+        (macd_h > 0, 3), (macd_h > macd_h.shift(1), 2),
+    ]:
         sp += np.where(cond, pts, 0)
+
     bb_narrow = bb_w < bb_w.rolling(50).quantile(0.2)
     bp += np.where(bb_narrow, 5, 0); sp += np.where(bb_narrow, 5, 0)
     bp, sp = bp.clip(upper=100), sp.clip(upper=100)
     net = bp - sp
-    return (pd.Series(np.where(net >= 0, bp, bp*np.where(sbe, .4, .55)), index=wt1.index),
-            pd.Series(np.where(net <= 0, sp, sp*np.where(sb, .4, .55)), index=wt1.index))
 
+    return (pd.Series(np.where(net >= 0, bp, bp * np.where(sbe, .4, .55)), index=wt1.index),
+            pd.Series(np.where(net <= 0, sp, sp * np.where(sb, .4, .55)), index=wt1.index))
 
 def compute_bias(meta, htf1, htf2):
     sc = 0.0
