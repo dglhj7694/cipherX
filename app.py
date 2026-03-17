@@ -246,6 +246,9 @@ COMPOSITE_SIGNALS = {
 }
 ALL_CHART_SIGNALS = {**SIGNAL_REGISTRY, **COMPOSITE_SIGNALS}
 
+NEUTRAL_SIGNALS = {'NR7', 'NR7_2', 'Wide_Range_Bar', 'Calm_After_Storm', 
+                   'Spinning_Top', 'Inside_Day'}
+
 OB1, OB2, OS1, OS2 = 53, 60, -53, -60
 ST_MIN_BAR = 12
 
@@ -581,13 +584,19 @@ def detect_macd_centerline(macd_line):
 
 
 def detect_consecutive_days(c):
-    up = (c > c.shift(1)).astype(int)
-    dn = (c < c.shift(1)).astype(int)
-    u_s = pd.Series(0, index=c.index, dtype=int)
-    d_s = pd.Series(0, index=c.index, dtype=int)
-    for i in range(1, len(c)):
-        u_s.iloc[i] = (u_s.iloc[i-1] + 1) if up.iloc[i] else 0
-        d_s.iloc[i] = (d_s.iloc[i-1] + 1) if dn.iloc[i] else 0
+    up = (c > c.shift(1))
+    dn = (c < c.shift(1))
+
+    # 벡터화: 연속 카운트를 그룹 기반으로 계산
+    def _streak(mask):
+        # 연속 True 그룹에 고유 ID 부여
+        groups = (~mask).cumsum()
+        # 각 그룹 내에서 누적 합계 = 연속 일수
+        return mask.groupby(groups).cumsum().astype(int)
+
+    u_s = _streak(up)
+    d_s = _streak(dn)
+
     return {'Up_3_Days': u_s >= 3, 'Up_5_Days': u_s >= 5,
             'Down_3_Days': d_s >= 3, 'Down_5_Days': d_s >= 5}
 
@@ -628,14 +637,25 @@ def detect_123_pullback(h, l, c, adx, pdi, mdi):
     strong_b = (adx > 30) & (pdi > mdi)
     strong_s = (adx > 30) & (mdi > pdi)
     inside = (h < h.shift(1)) & (l > l.shift(1))
+
     ll1 = l < l.shift(1); ll2 = l.shift(1) < l.shift(2); ll3 = l.shift(2) < l.shift(3)
     three_ll = ll1 & ll2 & ll3
-    two_ll_in = (ll1 & ll2 & inside.shift(2)) | (ll1 & inside.shift(1) & ll2.shift(1)) | (inside & ll1 & ll2)
+    # ✅ 수정: 3가지 조합 모두 논리적으로 가능한 형태로
+    two_ll_in = (
+        (ll1 & ll2 & inside.shift(2)) |          # [Inside, LL, LL] ← 3일전 inside
+        (ll1 & inside.shift(1) & ll3) |           # [LL, Inside, LL] ← 2일전 LL, 1일전 inside, 오늘 LL
+        (inside & ll2 & ll3)                      # [LL, LL, Inside] ← 오늘이 inside, 1~2일전 LL
+    )
+
     hh1 = h > h.shift(1); hh2 = h.shift(1) > h.shift(2); hh3 = h.shift(2) > h.shift(3)
     three_hh = hh1 & hh2 & hh3
-    two_hh_in = (hh1 & hh2 & inside.shift(2)) | (hh1 & inside.shift(1) & hh2.shift(1)) | (inside & hh1 & hh2)
+    # ✅ 수정
+    two_hh_in = (
+        (hh1 & hh2 & inside.shift(2)) |
+        (hh1 & inside.shift(1) & hh3) |
+        (inside & hh2 & hh3)
+    )
     return strong_b & (three_ll | two_ll_in), strong_s & (three_hh | two_hh_in)
-
 
 def detect_180_setup(c, o, h, l, ma10, ma50):
     dr = h - l + 1e-10
@@ -657,18 +677,19 @@ def detect_boomer(h, l, adx, pdi, mdi):
 def detect_expansion(h, l, c):
     dr = h - l
     mr9 = dr.rolling(9).max()
-    h60 = h.rolling(60, min_periods=40).max()
-    l60 = l.rolling(60, min_periods=40).min()
-    xbo = (h >= h60) & (dr >= mr9)
-    xbd = (l <= l60) & (dr >= mr9)
+    # ✅ 수정: 전일까지의 60일 고/저 사용
+    h60 = h.shift(1).rolling(60, min_periods=40).max()
+    l60 = l.shift(1).rolling(60, min_periods=40).min()
+    xbo = (h > h60) & (dr >= mr9)     # h >= → h > (strict new high)
+    xbd = (l < l60) & (dr >= mr9)     # l <= → l < (strict new low)
     return xbo, xbd
-
 
 def detect_gilligans(o, c, h, l):
     dr = h - l + 1e-10
     cp = (c - l) / dr
-    l60 = l.rolling(60, min_periods=40).min()
-    h60 = h.rolling(60, min_periods=40).max()
+    # ✅ 전일까지의 60일 고/저 사용
+    l60 = l.shift(1).rolling(60, min_periods=40).min()
+    h60 = h.shift(1).rolling(60, min_periods=40).max()
     gd = (o <= l60) & (o < l.shift(1))
     gu = (o >= h60) & (o > h.shift(1))
     buy = gd & (cp >= 0.5) & (c >= o)
@@ -689,17 +710,29 @@ def detect_non_adx_123(h, l, c, ma50):
     inside = (h < h.shift(1)) & (l > l.shift(1))
     ll1 = l < l.shift(1); ll2 = l.shift(1) < l.shift(2); ll3 = l.shift(2) < l.shift(3)
     three_ll = ll1 & ll2 & ll3
-    two_ll_in = (ll1 & ll2 & inside.shift(2)) | (ll1 & inside.shift(1) & ll2.shift(1)) | (inside & ll1 & ll2)
+    # ✅ 수정
+    two_ll_in = (
+        (ll1 & ll2 & inside.shift(2)) |
+        (ll1 & inside.shift(1) & ll3) |
+        (inside & ll2 & ll3)
+    )
     hh1 = h > h.shift(1); hh2 = h.shift(1) > h.shift(2); hh3 = h.shift(2) > h.shift(3)
     three_hh = hh1 & hh2 & hh3
-    two_hh_in = (hh1 & hh2 & inside.shift(2)) | (hh1 & inside.shift(1) & hh2.shift(1)) | (inside & hh1 & hh2)
+    # ✅ 수정
+    two_hh_in = (
+        (hh1 & hh2 & inside.shift(2)) |
+        (hh1 & inside.shift(1) & hh3) |
+        (inside & hh2 & hh3)
+    )
     return (c > ma50) & (three_ll | two_ll_in), (c < ma50) & (three_hh | two_hh_in)
 
 
 def detect_pocket_pivot(c, o, v, ma50, ma200):
     dv = v.where(c < c.shift(1), 0)
-    mdv10 = dv.rolling(10).max()
-    return (c > o) & (v > mdv10) & (c > ma50) & (c > c.shift(1))
+    mdv10 = dv.rolling(10, min_periods=5).max()
+    # ✅ 하락일 거래량이 존재할 때만 유효
+    has_down = (dv > 0).rolling(10, min_periods=1).sum() >= 2
+    return (c > o) & (v > mdv10) & (c > ma50) & (c > c.shift(1)) & has_down
 
 
 # ──────────────────────────────────────────
@@ -914,14 +947,14 @@ def detect_all_signals(df):
     df['NonADX_123_Bull'], df['NonADX_123_Bear'] = detect_non_adx_123(H, L, C, m50)
     df['Pocket_Pivot'] = detect_pocket_pivot(C, O, V, m50, m200)
 
+
+    # 시그널 계층 중복 제거
+    _deduplicate(df)
     # ═══════════════════════════════════════
     # 쿨다운 (모든 시그널)
     # ═══════════════════════════════════════
     for s, cd in COOLDOWN_MAP.items():
         if s in df.columns: df[s] = _cooldown(df[s], cd)
-
-    # 시그널 계층 중복 제거
-    _deduplicate(df)
 
     # ═══════════════════════════════════════
     # Confluence & Proximity & 메타
@@ -945,8 +978,10 @@ def detect_all_signals(df):
 # Confluence / Proximity / Bias  (변경 없음)
 # ──────────────────────────────────────────
 def compute_confluence(df, dw=5, df_=0.75):
-    bm={k:v['w'] for k,v in SIGNAL_REGISTRY.items() if v['dir']=='buy'}
-    sm={k:v['w'] for k,v in SIGNAL_REGISTRY.items() if v['dir']=='sell'}
+    bm = {k: v['w'] for k, v in SIGNAL_REGISTRY.items() 
+          if v['dir'] == 'buy' and k not in NEUTRAL_SIGNALS}
+    sm = {k: v['w'] for k, v in SIGNAL_REGISTRY.items() 
+          if v['dir'] == 'sell' and k not in NEUTRAL_SIGNALS}
     dk=np.array([df_**i for i in range(dw+1)]); ones=np.ones(dw+1)
     s=np.zeros(len(df)); bc=np.zeros(len(df)); sc=np.zeros(len(df))
     for col,w in bm.items():
