@@ -734,6 +734,88 @@ def detect_pocket_pivot(c, o, v, ma50, ma200):
     has_down = (dv > 0).rolling(10, min_periods=1).sum() >= 2
     return (c > o) & (v > mdv10) & (c > ma50) & (c > c.shift(1)) & has_down
 
+# ──────────────────────────────────────────
+# 🆕 추세 맥락 기반 시그널 품질 필터
+# ──────────────────────────────────────────
+# w >= 이 값인 시그널은 어떤 상황에서도 억제하지 않음
+TREND_IMMUNE_W = 2.0
+
+def _apply_trend_filter(df):
+    """
+    추세 맥락에 반하는 약한 시그널을 억제하고,
+    같은 날 BUY/SELL 동시 발생 시 약한 쪽을 제거합니다.
+    
+    원칙:
+    - 강한 상승 추세에서 약한 매도 시그널(w<2.0) 억제
+    - 강한 하락 추세에서 약한 매수 시그널(w<2.0) 억제
+    - 같은 날 BUY/SELL 충돌 시, 가중합이 낮은 쪽의 약한 시그널 제거
+    - Gold_Dot, Blood_Diamond, Parabolic 등 w≥2.0 시그널은 항상 생존
+    """
+    C = df['Close']
+
+    # ═══ Step 1: 다중 시간대 추세 점수 (-3 ~ +3) ═══
+    tc = pd.Series(0.0, index=df.index)
+    tc += np.where(C > df['MA50'],  1.0, -1.0)   # 중기 추세
+    tc += np.where(C > df['MA200'], 1.0, -1.0)   # 장기 추세
+    tc += np.where(df['EMA8'] > df['EMA21'], 0.5, -0.5)  # 단기 모멘텀
+    tc += np.where(df['ST_Direction'] == 1, 0.5, -0.5)    # SuperTrend
+    df['_Trend_Context'] = tc
+
+    bullish_trend = tc >= 1.5    # 확실한 상승 추세
+    bearish_trend = tc <= -1.5   # 확실한 하락 추세
+
+    buy_sigs = {k for k, v in SIGNAL_REGISTRY.items()
+                if v['dir'] == 'buy' and k not in NEUTRAL_SIGNALS}
+    sell_sigs = {k for k, v in SIGNAL_REGISTRY.items()
+                if v['dir'] == 'sell'}
+
+    # ═══ Step 2: 역추세 약한 시그널 억제 ═══
+    for s in sell_sigs:
+        if s not in df.columns: continue
+        w = SIGNAL_REGISTRY.get(s, {}).get('w', 0)
+        if w < TREND_IMMUNE_W:
+            # 확실한 상승 추세에서 약한 매도 억제
+            df[s] = df[s] & ~bullish_trend
+
+    for s in buy_sigs:
+        if s not in df.columns: continue
+        w = SIGNAL_REGISTRY.get(s, {}).get('w', 0)
+        if w < TREND_IMMUNE_W:
+            # 확실한 하락 추세에서 약한 매수 억제
+            df[s] = df[s] & ~bearish_trend
+
+    # ═══ Step 3: 같은 날 BUY/SELL 충돌 해소 ═══
+    daily_buy_w = pd.Series(0.0, index=df.index)
+    daily_sell_w = pd.Series(0.0, index=df.index)
+
+    for s in buy_sigs:
+        if s not in df.columns: continue
+        daily_buy_w += df[s].fillna(False).astype(float) * SIGNAL_REGISTRY[s]['w']
+    for s in sell_sigs:
+        if s not in df.columns: continue
+        daily_sell_w += df[s].fillna(False).astype(float) * SIGNAL_REGISTRY[s]['w']
+
+    conflict = (daily_buy_w > 0) & (daily_sell_w > 0)
+    net = daily_buy_w - daily_sell_w
+
+    buy_loses  = conflict & (net < 0)    # 매도가 더 강한 날
+    sell_loses = conflict & (net > 0)    # 매수가 더 강한 날
+    # net == 0 이면 양쪽 다 약한 시그널만 제거 (강한 것만 남김)
+    tie = conflict & (net == 0)
+
+    for s in buy_sigs:
+        if s not in df.columns: continue
+        w = SIGNAL_REGISTRY[s]['w']
+        if w < TREND_IMMUNE_W:
+            df[s] = df[s] & ~buy_loses & ~tie
+
+    for s in sell_sigs:
+        if s not in df.columns: continue
+        w = SIGNAL_REGISTRY[s]['w']
+        if w < TREND_IMMUNE_W:
+            df[s] = df[s] & ~sell_loses & ~tie
+
+    return df
 
 # ──────────────────────────────────────────
 # 지표 통합 계산
@@ -950,6 +1032,8 @@ def detect_all_signals(df):
 
     # 시그널 계층 중복 제거
     _deduplicate(df)
+    # 🆕 추세 맥락 기반 필터 (중복제거 후, 쿨다운 전)
+    _apply_trend_filter(df)
     # ═══════════════════════════════════════
     # 쿨다운 (모든 시그널)
     # ═══════════════════════════════════════
