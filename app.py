@@ -793,20 +793,27 @@ def compute_trade_judgment(df):
 
     # MACD 히스토그램 방향
     macd_h = df['MACD_Hist']
-    macd_h_rising = macd_h > macd_h.shift(1)     # 히스토그램 증가
-    macd_h_falling = macd_h < macd_h.shift(1)    # 히스토그램 감소
+    macd_h_ma3 = macd_h.rolling(3).mean()
+    macd_h_rising = macd_h_ma3 > macd_h_ma3.shift(1)      # 추세적 증가
+    macd_h_falling = macd_h_ma3 < macd_h_ma3.shift(1)     # 추세적 감소
 
     # MACD 갭(Line - Signal) 변화 = 모멘텀 가속/감속
     macd_gap = df['MACD_Line'] - df['MACD_Signal']
-    macd_accel = macd_gap > macd_gap.shift(1)    # 갭 벌어짐 = 가속
-    macd_decel = macd_gap < macd_gap.shift(1)    # 갭 좁아짐 = 감속
+    macd_gap_ma3 = macd_gap.rolling(3).mean()
+    macd_accel = macd_gap_ma3 > macd_gap_ma3.shift(1)
+    macd_decel = macd_gap_ma3 < macd_gap_ma3.shift(1)
 
     # RSI/StochK/WT 방향
-    rsi_rising = df['RSI'] > df['RSI'].shift(1)
-    rsi_falling = df['RSI'] < df['RSI'].shift(1)
-    stk_rising = df['StochK'] > df['StochK'].shift(1)
-    wt_rising = df['WT1'] > df['WT1'].shift(1)
-    wt_falling = df['WT1'] < df['WT1'].shift(1)
+    rsi_ma3 = df['RSI'].rolling(3).mean()
+    rsi_rising = rsi_ma3 > rsi_ma3.shift(1)
+    rsi_falling = rsi_ma3 < rsi_ma3.shift(1)
+    
+    stk_ma3 = df['StochK'].rolling(3).mean()
+    stk_rising = stk_ma3 > stk_ma3.shift(1)
+    
+    wt_ma3 = df['WT1'].rolling(3).mean()
+    wt_rising = wt_ma3 > wt_ma3.shift(1)
+    wt_falling = wt_ma3 < wt_ma3.shift(1)
 
     # OBV 추세
     obv = df['OBV']
@@ -1236,7 +1243,7 @@ def compute_trade_judgment(df):
             sp += np.where(yesterday & ~df[s], decay_pts * 0.5, 0)
             
     df['SJ_Pattern'] = sp.clip(upper=10.0)
-    
+
     df['Sell_Total'] = (df['SJ_Trend'] + df['SJ_Momentum'] + df['SJ_Candle'] +
                         df['SJ_BB'] + df['SJ_Volume'] + df['SJ_MF'] + df['SJ_Pattern'])
 
@@ -1252,13 +1259,16 @@ def compute_trade_judgment(df):
         diff = b - s
         ratio = b / (s + 0.01)
         s_ratio = s / (b + 0.01)
-        if b >= 17 and bal >= 4 and ratio >= 2.0 and diff >= 10:     j[i] = 'STRONG_BUY'
-        elif b >= 11 and bal >= 3 and ratio >= 1.4 and diff >= 5:    j[i] = 'BUY'
-        elif b >= 6 and bal >= 2 and diff >= 2:                       j[i] = 'WATCH_BUY'
-        elif s >= 17 and sal >= 4 and s_ratio >= 2.0 and (s-b) >= 10:j[i] = 'STRONG_SELL'
-        elif s >= 11 and sal >= 3 and s_ratio >= 1.4 and (s-b) >= 5: j[i] = 'SELL'
-        elif s >= 6 and sal >= 2 and (s-b) >= 2:                     j[i] = 'WATCH_SELL'
-        elif b >= 9 and s >= 9 and abs(diff) < 3:                    j[i] = 'MIXED'
+        
+        # 🔧 [수정] 조건 대폭 강화: 차이가 확실할 때만 시그널 발생
+        if b >= 18 and bal >= 4 and ratio >= 2.5 and diff >= 12:     j[i] = 'STRONG_BUY'
+        elif b >= 13 and bal >= 4 and ratio >= 1.5 and diff >= 7:    j[i] = 'BUY'
+        elif b >= 8 and bal >= 3 and diff >= 4:                       j[i] = 'WATCH_BUY'
+        elif s >= 18 and sal >= 4 and s_ratio >= 2.5 and (s-b) >= 12:j[i] = 'STRONG_SELL'
+        elif s >= 13 and sal >= 4 and s_ratio >= 1.5 and (s-b) >= 7: j[i] = 'SELL'
+        elif s >= 8 and sal >= 3 and (s-b) >= 4:                      j[i] = 'WATCH_SELL'
+        # 양쪽 점수가 모두 높고 치열하게 싸우는 구간은 무조건 MIXED (관망)
+        elif b >= 10 and s >= 10 and abs(diff) < 5:                   j[i] = 'MIXED'
     df['Trade_Judgment'] = j
 
     detect_combos(df, vol_ratio)
