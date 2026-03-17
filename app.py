@@ -773,99 +773,232 @@ def _sig_pts(df, sig_name, points):
     return 0.0
 
 def compute_trade_judgment(df):
-    C, O, idx = df['Close'], df['Open'], df.index
+    """
+    7-Layer 스코어링 → 최종 BUY/SELL 판단
+    v3: Momentum/Candle/BB/Volume/Pattern 전면 개선
+    """
+    C, O, H, L, idx = df['Close'], df['Open'], df['High'], df['Low'], df.index
     rmfi = df['RSI_MFI']
     vol_ratio = df['Volume'] / (df['Volume'].rolling(50, min_periods=10).mean() + 1e-10)
+    atr = df['ATR']
 
-    # ═══════════ BUY ═══════════
-
-    # ── Layer 1: 추세 — 🔧 상호 배제 로직 ──
-    bt = pd.Series(0.0, index=idx)
-    
-    # 가격 위치 (상호 배제)
+    # ═══ 공통 계산 ═══
     above_200 = C > df['MA200']
     above_50 = C > df['MA50']
     above_20 = C > df['MA20']
     below_200 = C < df['MA200']
     below_50 = C < df['MA50']
-    
-    # BUY 추세: 위에 있을수록 점수 (아래에 있으면 0)
-    bt += np.where(above_200 & above_50 & above_20, 5.0,        # 전부 위 = 풀 점수
-          np.where(above_200 & above_50, 4.0,                    # 200+50 위
-          np.where(above_200, 2.5,                                # 200만 위
-          np.where(above_50, 1.5, 0))))                           # 50만 위
-    
-    bt += np.where(df['MA50'] > df['MA200'], 1.5, 0)            # 골든크로스 상태
+    ma50_rising = df['MA50'] > df['MA50'].shift(5)
+    ma50_falling = df['MA50'] < df['MA50'].shift(5)
+
+    # MACD 히스토그램 방향
+    macd_h = df['MACD_Hist']
+    macd_h_rising = macd_h > macd_h.shift(1)     # 히스토그램 증가
+    macd_h_falling = macd_h < macd_h.shift(1)    # 히스토그램 감소
+
+    # MACD 갭(Line - Signal) 변화 = 모멘텀 가속/감속
+    macd_gap = df['MACD_Line'] - df['MACD_Signal']
+    macd_accel = macd_gap > macd_gap.shift(1)    # 갭 벌어짐 = 가속
+    macd_decel = macd_gap < macd_gap.shift(1)    # 갭 좁아짐 = 감속
+
+    # RSI/StochK/WT 방향
+    rsi_rising = df['RSI'] > df['RSI'].shift(1)
+    rsi_falling = df['RSI'] < df['RSI'].shift(1)
+    stk_rising = df['StochK'] > df['StochK'].shift(1)
+    wt_rising = df['WT1'] > df['WT1'].shift(1)
+    wt_falling = df['WT1'] < df['WT1'].shift(1)
+
+    # OBV 추세
+    obv = df['OBV']
+    obv_ma20 = obv.rolling(20, min_periods=10).mean()
+    obv_above = obv > obv_ma20    # 축적
+    obv_below = obv < obv_ma20    # 분배
+
+    # 양봉/음봉 거래량 비율
+    bull_vol = df['Volume'].where(C > O, 0)
+    bear_vol = df['Volume'].where(C < O, 0)
+    avg_bull_vol = bull_vol.rolling(10, min_periods=5).mean()
+    avg_bear_vol = bear_vol.rolling(10, min_periods=5).mean()
+    vol_bull_ratio = avg_bull_vol / (avg_bear_vol + 1e-10)   # > 1 = 매수 우세
+
+    # ══════════════ BUY ══════════════
+
+    # ── Layer 1: 추세 ──
+    bt = pd.Series(0.0, index=idx)
+    bt += np.where(above_200 & above_50 & above_20, 5.0,
+          np.where(above_200 & above_50, 4.0,
+          np.where(above_200, 2.5,
+          np.where(above_50, 1.5, 0))))
+    bt += np.where(df['MA50'] > df['MA200'], 1.5, 0)
     bt += np.where(df['Plus_DI'] > df['Minus_DI'], 1.0, 0)
     bt += np.where(df['ST_Direction'] == 1, 1.0, 0)
-    
-    # 🆕 추세 기울기 (MA50 상승 중이면 가점)
-    ma50_rising = df['MA50'] > df['MA50'].shift(5)
     bt += np.where(above_50 & ma50_rising, 0.5, 0)
-    
+    # 🆕 MA 돌파 보너스 (Pattern에서 이동)
+    bt += _sig_pts(df, 'Cross_Above_50MA', 1.0)
+    bt += _sig_pts(df, 'Cross_Above_200MA', 1.5)
+    bt += _sig_pts(df, 'Golden_Cross', 1.5)
     df['BJ_Trend'] = bt
 
-    # ── Layer 2: 모멘텀 ──
+    # ── Layer 2: 모멘텀 (대폭 개선) ──
     bm = pd.Series(0.0, index=idx)
-    for s, p in [('MACD_Cross_Buy',2),('MACD_Zero_Cross_Buy',2),
-                  ('StochRSI_Cross_Buy',2),('ADX_Momentum_Buy',2),
+
+    # 시그널
+    for s, p in [('MACD_Cross_Buy',2.5), ('MACD_Zero_Cross_Buy',2.0),
+                  ('StochRSI_Cross_Buy',2.0), ('ADX_Momentum_Buy',2.0),
                   ('VWAP_Bounce_Buy',1.5)]:
         bm += _sig_pts(df, s, p)
-    bm += np.where(df['MACD_Hist'] > 0, 1.0, 0)
-    bm += np.where(df['VWAP_Osc'] > 0, 0.5, 0)
-    
-    # 🔧 RSI/StochK — 과매도 반등과 이미 과매수는 구분
-    bm += np.where(df['RSI'] < 30, 2.0,
-          np.where(df['RSI'] < 45, 1.0,
-          np.where(df['RSI'] > 70, -1.0, 0)))  # 🆕 과매수이면 감점
-    bm += np.where(df['StochK'] < 20, 2.0,
-          np.where(df['StochK'] < 35, 1.0,
-          np.where(df['StochK'] > 80, -1.0, 0)))  # 🆕
-    bm += np.where(df['WT1'] < -53, 2.0,
-          np.where(df['WT1'] < -20, 1.0,
-          np.where(df['WT1'] > 53, -1.0, 0)))  # 🆕
-    
-    df['BJ_Momentum'] = bm.clip(lower=0)  # 음수 방지
 
-    # ── Layer 3: 캔들 ──
+    # 🔧 MACD 히스토그램: 레벨 + 방향 결합
+    bm += np.where((macd_h > 0) & macd_h_rising, 2.0,        # 양수 + 증가 = 강세 가속
+          np.where((macd_h > 0) & macd_h_falling, 0.5,        # 양수 + 감소 = 약화 중
+          np.where((macd_h < 0) & macd_h_rising, 1.5, 0)))    # 음수 + 증가 = 반등 시작
+
+    # 🔧 MACD 가속/감속
+    bm += np.where((macd_h > 0) & macd_accel, 0.5, 0)
+
+    # 🆕 VWAP: 크기 반영
+    vwap_osc = df['VWAP_Osc']
+    bm += np.where(vwap_osc > 3.0, 1.5,
+          np.where(vwap_osc > 1.0, 1.0,
+          np.where(vwap_osc > 0, 0.5, 0)))
+
+    # 🔧 RSI: 레벨 + 방향 결합
+    bm += np.where((df['RSI'] < 30) & rsi_rising, 3.0,        # 과매도 + 반등 시작 = 최강
+          np.where(df['RSI'] < 30, 1.5,                         # 과매도 (아직 반등 없음)
+          np.where((df['RSI'] < 45) & rsi_rising, 1.0,          # 약세 + 회복 중
+          np.where((df['RSI'] > 70) & rsi_falling, -1.5,        # 🆕 과매수 + 하락 시작 = 감점
+          np.where((df['RSI'] > 70) & rsi_rising, -0.5, 0)))))  # 과매수 + 아직 상승 = 약한 감점
+
+    # 🔧 StochK: 레벨 + 방향
+    bm += np.where((df['StochK'] < 20) & stk_rising, 2.5,
+          np.where(df['StochK'] < 20, 1.0,
+          np.where((df['StochK'] > 80) & ~stk_rising, -1.0, 0)))
+
+    # 🔧 WT: 레벨 + 교차 결합
+    wt_cross_up = df.get('WT_Up', pd.Series(False, index=idx))
+    bm += np.where((df['WT1'] < -53) & (wt_cross_up | wt_rising), 3.0,    # 과매도 + 교차/반등
+          np.where(df['WT1'] < -53, 1.0,                                     # 과매도 (교차 없음)
+          np.where((df['WT1'] < -20) & wt_rising, 1.0,                       # 약세 + 상승 중
+          np.where((df['WT1'] > 53) & wt_falling, -1.5, 0))))               # 과매수 + 하락
+
+    df['BJ_Momentum'] = bm.clip(lower=0)
+
+    # ── Layer 3: 캔들 (대폭 개선) ──
     bc = pd.Series(0.0, index=idx)
-    for s, p in [('Bullish_Engulfing',3),('Morning_Star',3),('Hammer',2),
-                  ('Doji_Bullish',1),('Outside_Bullish',2)]:
-        bc += _sig_pts(df, s, p)
-    df['BJ_Candle'] = bc.clip(upper=6.0)
 
-    # ── Layer 4: 볼린저 ──
+    # 🔧 추세 맥락 가중: 하락 추세에서 강세 캔들 = 높은 점수
+    in_downtrend = below_50 | (df['WT1'] < -20) | (df['RSI'] < 45)
+    in_uptrend = above_50 | (df['WT1'] > 20) | (df['RSI'] > 55)
+
+    # 🔧 실체 크기 대비 가중
+    body = (C - O).abs()
+    body_atr_ratio = body / (atr + 1e-10)
+
+    # Morning Star (3봉 패턴 = 가장 신뢰)
+    ms_pts = np.where(df.get('Morning_Star', pd.Series(False, index=idx)).fillna(False) & in_downtrend, 3.5,
+             np.where(df.get('Morning_Star', pd.Series(False, index=idx)).fillna(False), 2.5, 0))
+
+    # Bullish Engulfing (크기 가중)
+    be_raw = df.get('Bullish_Engulfing', pd.Series(False, index=idx)).fillna(False)
+    be_pts = np.where(be_raw & in_downtrend & (body_atr_ratio > 1.0), 3.5,    # 큰 Engulfing + 하락추세
+             np.where(be_raw & in_downtrend, 3.0,                                # 보통 Engulfing + 하락추세
+             np.where(be_raw & (body_atr_ratio > 1.0), 2.5,                      # 큰 Engulfing
+             np.where(be_raw, 2.0, 0))))
+
+    # Hammer
+    hm_raw = df.get('Hammer', pd.Series(False, index=idx)).fillna(False)
+    hm_pts = np.where(hm_raw & in_downtrend, 2.5,
+             np.where(hm_raw, 1.5, 0))
+
+    # Outside Bullish
+    ob_raw = df.get('Outside_Bullish', pd.Series(False, index=idx)).fillna(False)
+    ob_pts = np.where(ob_raw & in_downtrend, 2.5,
+             np.where(ob_raw, 1.5, 0))
+
+    # Doji — 확인 캔들 필요하므로 낮은 점수
+    dj_pts = np.where(df.get('Doji_Bullish', pd.Series(False, index=idx)).fillna(False) & in_downtrend, 1.0,
+             np.where(df.get('Doji_Bullish', pd.Series(False, index=idx)).fillna(False), 0.5, 0))
+
+    # 🔧 당일 최고 1개 캔들만 (중복 방지)
+    all_candle_pts = np.stack([ms_pts, be_pts, hm_pts, ob_pts, dj_pts])
+    bc = pd.Series(all_candle_pts.max(axis=0), index=idx)
+
+    df['BJ_Candle'] = bc.clip(upper=5.0)
+
+    # ── Layer 4: BB (개선) ──
     bb = pd.Series(0.0, index=idx)
-    for s, p in [('BB_Squeeze_End_Bull',3),('NR7',1),('NR7_2',2),('Calm_After_Storm',1.5)]:
-        bb += _sig_pts(df, s, p)
-    bb += np.where(df['Percent_B'] < 0.05, 2.0,   # 🔧 극단 과매도
-          np.where(df['Percent_B'] < 0.2, 1.0, 0))
-    # 🆕 이미 과매수 상태면 감점
-    bb += np.where(df['Percent_B'] > 0.95, -1.0, 0)
-    df['BJ_BB'] = bb.clip(lower=0, upper=6.0)
 
-    # ── Layer 5: 거래량 ──
+    # 🔧 Squeeze End: 실제 상방 돌파 시에만 높은 점수
+    bb += _sig_pts(df, 'BB_Squeeze_End_Bull', 3.0)
+
+    # NR7/Calm: 아직 돌파 전이면 "예비" 점수만
+    squeeze_on = df.get('Squeeze_On', pd.Series(False, index=idx))
+    nr7_val = _sig_pts(df, 'NR7', 1.0)
+    nr72_val = _sig_pts(df, 'NR7_2', 1.5)
+    calm_val = _sig_pts(df, 'Calm_After_Storm', 1.0)
+
+    # 🔧 스퀴즈 상태 + 상방 필터 = 가점 / 스퀴즈 없으면 낮은 점수
+    squeeze_bonus = np.where(squeeze_on & above_50, 1.0, 0)
+    bb += nr7_val + nr72_val + calm_val + squeeze_bonus
+
+    # 🔧 %B 구간 세분화
+    pct_b = df['Percent_B']
+    bb += np.where(pct_b < 0.05, 2.5,                          # 극단 과매도
+          np.where(pct_b < 0.2, 1.5,                             # 과매도
+          np.where((pct_b >= 0.4) & (pct_b <= 0.6) & above_50, 0.5,  # 🆕 건강한 중간대
+          np.where(pct_b > 0.95, -1.5, 0))))                     # 과매수 감점
+
+    # 🔧 Below_Lower_BB: 추세 맥락 반영
+    blb = df.get('Below_Lower_BB', pd.Series(False, index=idx)).fillna(False)
+    bb += np.where(blb & above_200, 2.0,     # 장기 상승 + BB 하단 = 매수 기회
+          np.where(blb & below_200, -0.5,     # 장기 하락 + BB 하단 = 추가 하락 위험
+          np.where(blb, 1.0, 0)))             # 중립
+
+    df['BJ_BB'] = bb.clip(lower=0, upper=7.0)
+
+    # ── Layer 5: Volume (대폭 개선) ──
     bv = pd.Series(0.0, index=idx)
+
+    # 기존 시그널
     bv += _sig_pts(df, 'Volume_Climax_Buy', 3.0)
     bv += _sig_pts(df, 'Pocket_Pivot', 2.0)
     bv += _sig_pts(df, 'OBV_Div_Buy', 1.5)
-    bv += np.where((vol_ratio >= 3.0) & (C > O), 3.0,
-           np.where((vol_ratio >= 1.5) & (C > O), 1.0, 0))
-    # 🆕 거래량 감소 + 하락은 감점
-    bv += np.where((vol_ratio < 0.5) & (C < O), -1.0, 0)
-    df['BJ_Volume'] = bv.clip(lower=0, upper=6.0)
 
-    # ── Layer 6: 자금흐름 ──
+    # 거래량 급증 + 양봉
+    bv += np.where((vol_ratio >= 3.0) & (C > O), 2.5,
+          np.where((vol_ratio >= 1.5) & (C > O), 1.0, 0))
+
+    # 🆕 OBV 추세: 축적 중이면 가점
+    bv += np.where(obv_above & (obv > obv.shift(5)), 1.5,   # OBV 상승 추세
+          np.where(obv_above, 0.5, 0))
+    bv += np.where(obv_below & (obv < obv.shift(5)), -1.0, 0)  # OBV 하락 = 감점
+
+    # 🆕 양봉/음봉 거래량 비율
+    bv += np.where(vol_bull_ratio > 2.0, 1.5,    # 양봉 거래량 2배 이상
+          np.where(vol_bull_ratio > 1.3, 0.5,
+          np.where(vol_bull_ratio < 0.5, -1.0, 0)))  # 음봉 거래량이 압도
+
+    # 🆕 거래량 건조 (돌파 전 축적 신호)
+    vol_dry = vol_ratio < 0.5
+    vol_dry_streak = vol_dry.astype(int)
+    for i in range(1, len(vol_dry_streak)):
+        if vol_dry.iloc[i]:
+            vol_dry_streak.iloc[i] = vol_dry_streak.iloc[i-1] + 1
+    bv += np.where((vol_dry_streak >= 3) & above_50 & squeeze_on, 1.0, 0)
+
+    df['BJ_Volume'] = bv.clip(lower=0, upper=7.0)
+
+    # ── Layer 6: 자금흐름 (이전 수정 유지) ──
     bmf = pd.Series(0.0, index=idx)
     bmf += np.where(rmfi < -10, 2.0,
            np.where(rmfi < -5, 1.0,
-           np.where(rmfi > 10, -0.5, 0)))  # 과열 감점
+           np.where(rmfi > 10, -0.5, 0)))
     if 'MF_Slope_5' in df.columns:
         mf_slope = df['MF_Slope_5']
         bmf += np.where(mf_slope > 5, 2.0,
                np.where(mf_slope > 2, 1.5,
                np.where(mf_slope > 0, 0.5,
-               np.where(mf_slope < -5, -1.0, 0))))  # 🆕 MF 급락이면 감점
+               np.where(mf_slope < -5, -1.0, 0))))
     if 'MF_Up_Streak' in df.columns:
         bmf += np.where(df['MF_Up_Streak'] >= 5, 2.0,
                np.where(df['MF_Up_Streak'] >= 3, 1.0, 0))
@@ -874,24 +1007,46 @@ def compute_trade_judgment(df):
     bmf += _sig_pts(df, 'MF_Accel_Up', 1.0)
     df['BJ_MF'] = bmf.clip(lower=0, upper=8.0)
 
-    # ── Layer 7: 패턴 ──
+    # ── Layer 7: Pattern (개선) ──
     bp = pd.Series(0.0, index=idx)
-    for s, p in [('Pullback_123_Bull',2),('Setup_180_Bull',2),('Boomer_Buy',2),('Expansion_BO',3),
-                  ('Gilligans_Buy',2),('Lizard_Bull',2),('NonADX_123_Bull',1.5),
-                  ('EMA_Pullback_Buy',2),('Momentum_Ignition_Buy',3),('SuperTrend_Buy',2),('Golden_Cross',2),
-                  ('Cross_Above_50MA',1.5),('Cross_Above_200MA',2),('Gap_Up',1),('Gap_Down_Closed',1),
-                  ('New_52W_High',2),('Gold_Dot',3),('Green_Dot_T1',2.5),('Green_Dot_T2',2),
-                  ('Blue_Diamond',2),('Bull_Divergence',2),('Hidden_Bull_Div',1.5),
-                  ('Squeeze_Fire_Buy',2),('Parabolic_Bottom_Buy',3)]:
+
+    # 🔧 이중 카운팅 방지: Gold_Dot는 Green_Dot + Div를 포함하므로 단독 계산
+    gold = _sig_pts(df, 'Gold_Dot', 4.0)
+    gdt1 = np.where(gold == 0, _sig_pts(df, 'Green_Dot_T1', 2.5), 0)
+    gdt2 = np.where((gold == 0) & (gdt1 == 0), _sig_pts(df, 'Green_Dot_T2', 2.0), 0)
+    bp += gold + gdt1 + gdt2
+
+    blood = _sig_pts(df, 'Blood_Diamond', 0)  # SELL 전용, BUY에서 제외
+    # Bull_Divergence: Gold_Dot과 중복 방지
+    bd_pts = np.where(gold == 0, _sig_pts(df, 'Bull_Divergence', 2.0), 0)
+    bp += bd_pts
+
+    # 나머지 패턴 (MA 교차는 Trend로 이동했으므로 제외)
+    for s, p in [('Pullback_123_Bull',2.5), ('Setup_180_Bull',2.0), ('Boomer_Buy',2.0),
+                  ('Expansion_BO',3.0), ('Gilligans_Buy',2.5), ('Lizard_Bull',2.0),
+                  ('NonADX_123_Bull',1.5), ('EMA_Pullback_Buy',2.0),
+                  ('Momentum_Ignition_Buy',3.0), ('SuperTrend_Buy',2.0),
+                  ('Gap_Up',1.0), ('Gap_Down_Closed',1.0),
+                  ('New_52W_High',2.0), ('Blue_Diamond',2.0),
+                  ('Hidden_Bull_Div',1.5), ('Squeeze_Fire_Buy',2.0),
+                  ('Parabolic_Bottom_Buy',3.0), ('Pocket_Pivot',2.0)]:
         bp += _sig_pts(df, s, p)
-    df['BJ_Pattern'] = bp.clip(upper=8.0)
+
+    # 🆕 패턴 신선도: 어제 발생한 강한 패턴도 감쇠 반영
+    for s, decay_pts in [('Gold_Dot',2.0), ('Green_Dot_T1',1.0), ('Expansion_BO',1.5),
+                          ('Momentum_Ignition_Buy',1.5), ('Parabolic_Bottom_Buy',1.5)]:
+        if s in df.columns:
+            yesterday = df[s].shift(1).fillna(False)
+            bp += np.where(yesterday & ~df[s], decay_pts * 0.5, 0)  # 어제 발생, 오늘 아님 = 절반 점수
+
+    df['BJ_Pattern'] = bp.clip(upper=10.0)  # 🔧 8→10 (차별화 확대)
 
     df['Buy_Total'] = (df['BJ_Trend'] + df['BJ_Momentum'] + df['BJ_Candle'] +
                        df['BJ_BB'] + df['BJ_Volume'] + df['BJ_MF'] + df['BJ_Pattern'])
 
-    # ═══════════ SELL ═══════════
+    # ══════════════ SELL ══════════════
 
-    # ── Layer 1: 추세 — 상호 배제 ──
+    # ── Layer 1: 추세 ──
     st_ = pd.Series(0.0, index=idx)
     st_ += np.where(below_200 & below_50 & (C < df['MA20']), 5.0,
            np.where(below_200 & below_50, 4.0,
@@ -900,55 +1055,88 @@ def compute_trade_judgment(df):
     st_ += np.where(df['MA50'] < df['MA200'], 1.5, 0)
     st_ += np.where(df['Minus_DI'] > df['Plus_DI'], 1.0, 0)
     st_ += np.where(df['ST_Direction'] == -1, 1.0, 0)
-    ma50_falling = df['MA50'] < df['MA50'].shift(5)
     st_ += np.where(below_50 & ma50_falling, 0.5, 0)
+    st_ += _sig_pts(df, 'Fell_Below_50MA', 1.0)
+    st_ += _sig_pts(df, 'Fell_Below_200MA', 1.5)
+    st_ += _sig_pts(df, 'Death_Cross', 1.5)
     df['SJ_Trend'] = st_
 
     # ── Layer 2: 모멘텀 ──
     sm = pd.Series(0.0, index=idx)
-    for s, p in [('MACD_Cross_Sell',2),('MACD_Zero_Cross_Sell',2),
-                  ('StochRSI_Cross_Sell',2),('ADX_Momentum_Sell',2),
+    for s, p in [('MACD_Cross_Sell',2.5), ('MACD_Zero_Cross_Sell',2.0),
+                  ('StochRSI_Cross_Sell',2.0), ('ADX_Momentum_Sell',2.0),
                   ('VWAP_Reject_Sell',1.5)]:
         sm += _sig_pts(df, s, p)
-    sm += np.where(df['MACD_Hist'] < 0, 1.0, 0)
-    sm += np.where(df['VWAP_Osc'] < 0, 0.5, 0)
-    sm += np.where(df['RSI'] > 70, 2.0,
-          np.where(df['RSI'] > 55, 1.0,
-          np.where(df['RSI'] < 30, -1.0, 0)))
-    sm += np.where(df['StochK'] > 80, 2.0,
-          np.where(df['StochK'] > 65, 1.0,
-          np.where(df['StochK'] < 20, -1.0, 0)))
-    sm += np.where(df['WT1'] > 53, 2.0,
-          np.where(df['WT1'] > 20, 1.0,
-          np.where(df['WT1'] < -53, -1.0, 0)))
+    sm += np.where((macd_h < 0) & macd_h_falling, 2.0,
+          np.where((macd_h < 0) & macd_h_rising, 0.5,
+          np.where((macd_h > 0) & macd_h_falling, 1.5, 0)))
+    sm += np.where((macd_h < 0) & macd_decel, 0.5, 0)
+    sm += np.where(vwap_osc < -3.0, 1.5,
+          np.where(vwap_osc < -1.0, 1.0,
+          np.where(vwap_osc < 0, 0.5, 0)))
+    sm += np.where((df['RSI'] > 70) & rsi_falling, 3.0,
+          np.where(df['RSI'] > 70, 1.5,
+          np.where((df['RSI'] > 55) & rsi_falling, 1.0,
+          np.where((df['RSI'] < 30) & rsi_rising, -1.5, 0))))
+    sm += np.where((df['StochK'] > 80) & ~stk_rising, 2.5,
+          np.where(df['StochK'] > 80, 1.0,
+          np.where((df['StochK'] < 20) & stk_rising, -1.0, 0)))
+    wt_cross_dn = df.get('WT_Down', pd.Series(False, index=idx))
+    sm += np.where((df['WT1'] > 53) & (wt_cross_dn | wt_falling), 3.0,
+          np.where(df['WT1'] > 53, 1.0,
+          np.where((df['WT1'] > 20) & wt_falling, 1.0,
+          np.where((df['WT1'] < -53) & wt_rising, -1.5, 0))))
     df['SJ_Momentum'] = sm.clip(lower=0)
 
     # ── Layer 3: 캔들 ──
     sc = pd.Series(0.0, index=idx)
-    for s, p in [('Bearish_Engulfing',3),('Evening_Star',3),('Shooting_Star',2),
-                  ('Doji_Bearish',1),('Outside_Bearish',2)]:
-        sc += _sig_pts(df, s, p)
-    df['SJ_Candle'] = sc.clip(upper=6.0)
+    es_raw = df.get('Evening_Star', pd.Series(False, index=idx)).fillna(False)
+    es_pts = np.where(es_raw & in_uptrend, 3.5, np.where(es_raw, 2.5, 0))
+    be2_raw = df.get('Bearish_Engulfing', pd.Series(False, index=idx)).fillna(False)
+    be2_pts = np.where(be2_raw & in_uptrend & (body_atr_ratio > 1.0), 3.5,
+              np.where(be2_raw & in_uptrend, 3.0,
+              np.where(be2_raw & (body_atr_ratio > 1.0), 2.5,
+              np.where(be2_raw, 2.0, 0))))
+    ss_raw = df.get('Shooting_Star', pd.Series(False, index=idx)).fillna(False)
+    ss_pts = np.where(ss_raw & in_uptrend, 2.5, np.where(ss_raw, 1.5, 0))
+    ob2_raw = df.get('Outside_Bearish', pd.Series(False, index=idx)).fillna(False)
+    ob2_pts = np.where(ob2_raw & in_uptrend, 2.5, np.where(ob2_raw, 1.5, 0))
+    dj2_pts = np.where(df.get('Doji_Bearish', pd.Series(False, index=idx)).fillna(False) & in_uptrend, 1.0,
+              np.where(df.get('Doji_Bearish', pd.Series(False, index=idx)).fillna(False), 0.5, 0))
+    all_sell_candle = np.stack([es_pts, be2_pts, ss_pts, ob2_pts, dj2_pts])
+    sc = pd.Series(all_sell_candle.max(axis=0), index=idx)
+    df['SJ_Candle'] = sc.clip(upper=5.0)
 
-    # ── Layer 4: 볼린저 ──
+    # ── Layer 4: BB ──
     sb_ = pd.Series(0.0, index=idx)
-    for s, p in [('BB_Squeeze_End_Bear',3),('NR7',1),('NR7_2',2),('Calm_After_Storm',1.5)]:
-        sb_ += _sig_pts(df, s, p)
-    sb_ += np.where(df['Percent_B'] > 0.95, 2.0,
-           np.where(df['Percent_B'] > 0.8, 1.0, 0))
-    sb_ += np.where(df['Percent_B'] < 0.05, -1.0, 0)
-    df['SJ_BB'] = sb_.clip(lower=0, upper=6.0)
+    sb_ += _sig_pts(df, 'BB_Squeeze_End_Bear', 3.0)
+    sb_ += nr7_val + nr72_val + calm_val
+    sb_ += np.where(squeeze_on & below_50, 1.0, 0)
+    sb_ += np.where(pct_b > 0.95, 2.5,
+           np.where(pct_b > 0.8, 1.5,
+           np.where((pct_b >= 0.4) & (pct_b <= 0.6) & below_50, 0.5,
+           np.where(pct_b < 0.05, -1.5, 0))))
+    aub = df.get('Above_Upper_BB', pd.Series(False, index=idx)).fillna(False)
+    sb_ += np.where(aub & below_200, 2.0,
+           np.where(aub & above_200, -0.5,
+           np.where(aub, 1.0, 0)))
+    df['SJ_BB'] = sb_.clip(lower=0, upper=7.0)
 
-    # ── Layer 5: 거래량 ──
+    # ── Layer 5: Volume ──
     sv = pd.Series(0.0, index=idx)
     sv += _sig_pts(df, 'Volume_Climax_Sell', 3.0)
     sv += _sig_pts(df, 'OBV_Div_Sell', 1.5)
-    sv += np.where((vol_ratio >= 3.0) & (C < O), 3.0,
-           np.where((vol_ratio >= 1.5) & (C < O), 1.0, 0))
-    sv += np.where((vol_ratio < 0.5) & (C > O), -1.0, 0)
-    df['SJ_Volume'] = sv.clip(lower=0, upper=6.0)
+    sv += np.where((vol_ratio >= 3.0) & (C < O), 2.5,
+          np.where((vol_ratio >= 1.5) & (C < O), 1.0, 0))
+    sv += np.where(obv_below & (obv < obv.shift(5)), 1.5,
+          np.where(obv_below, 0.5, 0))
+    sv += np.where(obv_above & (obv > obv.shift(5)), -1.0, 0)
+    sv += np.where(vol_bull_ratio < 0.5, 1.5,
+          np.where(vol_bull_ratio < 0.7, 0.5,
+          np.where(vol_bull_ratio > 2.0, -1.0, 0)))
+    df['SJ_Volume'] = sv.clip(lower=0, upper=7.0)
 
-    # ── Layer 6: 자금흐름 ──
+    # ── Layer 6: 자금흐름 (이전 수정 유지) ──
     smf = pd.Series(0.0, index=idx)
     smf += np.where(rmfi > 10, 2.0,
            np.where(rmfi > 5, 1.0,
@@ -967,56 +1155,54 @@ def compute_trade_judgment(df):
     smf += _sig_pts(df, 'MF_Accel_Dn', 1.0)
     df['SJ_MF'] = smf.clip(lower=0, upper=8.0)
 
-    # ── Layer 7: 패턴 ──
+    # ── Layer 7: Pattern ──
     sp = pd.Series(0.0, index=idx)
-    for s, p in [('Pullback_123_Bear',2),('Setup_180_Bear',2),('Boomer_Sell',2),('Expansion_BD',3),
-                  ('Gilligans_Sell',2),('Lizard_Bear',2),('NonADX_123_Bear',1.5),
-                  ('EMA_Pullback_Sell',2),('Momentum_Ignition_Sell',3),('SuperTrend_Sell',2),('Death_Cross',2),
-                  ('Fell_Below_50MA',1.5),('Fell_Below_200MA',2),('Gap_Down',1),('Gap_Up_Closed',1),
-                  ('New_52W_Low',2),('Blood_Diamond',3),('Red_Dot_T1',2.5),('Red_Dot_T2',2),
-                  ('Red_Diamond',2),('Bear_Divergence',2),('Hidden_Bear_Div',1.5),
-                  ('Squeeze_Fire_Sell',2),('Parabolic_Top_Sell',3)]:
+    blood = _sig_pts(df, 'Blood_Diamond', 4.0)
+    rdt1 = np.where(blood == 0, _sig_pts(df, 'Red_Dot_T1', 2.5), 0)
+    rdt2 = np.where((blood == 0) & (rdt1 == 0), _sig_pts(df, 'Red_Dot_T2', 2.0), 0)
+    sp += blood + rdt1 + rdt2
+    brd_pts = np.where(blood == 0, _sig_pts(df, 'Bear_Divergence', 2.0), 0)
+    sp += brd_pts
+    for s, p in [('Pullback_123_Bear',2.5), ('Setup_180_Bear',2.0), ('Boomer_Sell',2.0),
+                  ('Expansion_BD',3.0), ('Gilligans_Sell',2.5), ('Lizard_Bear',2.0),
+                  ('NonADX_123_Bear',1.5), ('EMA_Pullback_Sell',2.0),
+                  ('Momentum_Ignition_Sell',3.0), ('SuperTrend_Sell',2.0),
+                  ('Gap_Down',1.0), ('Gap_Up_Closed',1.0),
+                  ('New_52W_Low',2.0), ('Red_Diamond',2.0),
+                  ('Hidden_Bear_Div',1.5), ('Squeeze_Fire_Sell',2.0),
+                  ('Parabolic_Top_Sell',3.0)]:
         sp += _sig_pts(df, s, p)
-    df['SJ_Pattern'] = sp.clip(upper=8.0)
+    for s, decay_pts in [('Blood_Diamond',2.0), ('Red_Dot_T1',1.0), ('Expansion_BD',1.5),
+                          ('Momentum_Ignition_Sell',1.5), ('Parabolic_Top_Sell',1.5)]:
+        if s in df.columns:
+            yesterday = df[s].shift(1).fillna(False)
+            sp += np.where(yesterday & ~df[s], decay_pts * 0.5, 0)
+    df['SJ_Pattern'] = sp.clip(upper=10.0)
 
     df['Sell_Total'] = (df['SJ_Trend'] + df['SJ_Momentum'] + df['SJ_Candle'] +
                         df['SJ_BB'] + df['SJ_Volume'] + df['SJ_MF'] + df['SJ_Pattern'])
 
-    # ── 활성 레이어 수 ──
-    df['Buy_Active_Layers'] = sum(
-        (df[f'BJ_{n}'] > 0).astype(int)
-        for n in ['Trend','Momentum','Candle','BB','Volume','MF','Pattern'])
-    df['Sell_Active_Layers'] = sum(
-        (df[f'SJ_{n}'] > 0).astype(int)
-        for n in ['Trend','Momentum','Candle','BB','Volume','MF','Pattern'])
+    # ── 활성 레이어 + 판단 ──
+    df['Buy_Active_Layers'] = sum((df[f'BJ_{n}'] > 0).astype(int) for n in ['Trend','Momentum','Candle','BB','Volume','MF','Pattern'])
+    df['Sell_Active_Layers'] = sum((df[f'SJ_{n}'] > 0).astype(int) for n in ['Trend','Momentum','Candle','BB','Volume','MF','Pattern'])
 
-    # ── 🔧 최종 판단 (개선) ──
     j = np.full(len(df), 'NEUTRAL', dtype=object)
     bt_v, st_v = df['Buy_Total'].values, df['Sell_Total'].values
     ba, sa = df['Buy_Active_Layers'].values, df['Sell_Active_Layers'].values
-
     for i in range(len(df)):
         b, s, bal, sal = bt_v[i], st_v[i], ba[i], sa[i]
         diff = b - s
-        ratio = b / (s + 0.01)  # 🆕 비율 기반 판단
-
-        # 🔧 절대 점수 + 비율 + 차이 모두 고려
-        if b >= 17 and bal >= 4 and ratio >= 2.0 and diff >= 10:
-            j[i] = 'STRONG_BUY'
-        elif b >= 11 and bal >= 3 and ratio >= 1.4 and diff >= 5:
-            j[i] = 'BUY'
-        elif b >= 6 and bal >= 2 and diff >= 2:
-            j[i] = 'WATCH_BUY'
-        elif s >= 17 and sal >= 4 and (s / (b + 0.01)) >= 2.0 and (s - b) >= 10:
-            j[i] = 'STRONG_SELL'
-        elif s >= 11 and sal >= 3 and (s / (b + 0.01)) >= 1.4 and (s - b) >= 5:
-            j[i] = 'SELL'
-        elif s >= 6 and sal >= 2 and (s - b) >= 2:
-            j[i] = 'WATCH_SELL'
-        elif b >= 9 and s >= 9 and abs(diff) < 3:  # 🔧 차이가 작을 때만 MIXED
-            j[i] = 'MIXED'
-
+        ratio = b / (s + 0.01)
+        s_ratio = s / (b + 0.01)
+        if b >= 17 and bal >= 4 and ratio >= 2.0 and diff >= 10:     j[i] = 'STRONG_BUY'
+        elif b >= 11 and bal >= 3 and ratio >= 1.4 and diff >= 5:    j[i] = 'BUY'
+        elif b >= 6 and bal >= 2 and diff >= 2:                       j[i] = 'WATCH_BUY'
+        elif s >= 17 and sal >= 4 and s_ratio >= 2.0 and (s-b) >= 10:j[i] = 'STRONG_SELL'
+        elif s >= 11 and sal >= 3 and s_ratio >= 1.4 and (s-b) >= 5: j[i] = 'SELL'
+        elif s >= 6 and sal >= 2 and (s-b) >= 2:                     j[i] = 'WATCH_SELL'
+        elif b >= 9 and s >= 9 and abs(diff) < 3:                    j[i] = 'MIXED'
     df['Trade_Judgment'] = j
+
     detect_combos(df, vol_ratio)
     return df
 
