@@ -823,7 +823,7 @@ def compute_trade_judgment(df):
 
     # ══════════════ BUY ══════════════
 
-    # ── Layer 1: 추세 (BUY) ──
+    # ── Layer 1: 추세 ──
     bt = pd.Series(0.0, index=idx)
     bt += np.where(above_200 & above_50 & above_20, 5.0,
           np.where(above_200 & above_50, 4.0,
@@ -832,9 +832,11 @@ def compute_trade_judgment(df):
     bt += np.where(df['MA50'] > df['MA200'], 1.5, 0)
     bt += np.where(df['Plus_DI'] > df['Minus_DI'], 1.0, 0)
     bt += np.where(df['ST_Direction'] == 1, 1.0, 0)
-    # 🔧 기울기 가점 강화: 단순 상승이 아닌 ADX(추세강도)와 결합
-    bt += np.where(above_50 & ma50_rising & (df['ADX'] > 20), 1.0, 
-          np.where(above_50 & ma50_rising, 0.5, 0))
+    bt += np.where(above_50 & ma50_rising, 0.5, 0)
+    # 🆕 MA 돌파 보너스 (Pattern에서 이동)
+    bt += _sig_pts(df, 'Cross_Above_50MA', 1.0)
+    bt += _sig_pts(df, 'Cross_Above_200MA', 1.5)
+    bt += _sig_pts(df, 'Golden_Cross', 1.5)
     df['BJ_Trend'] = bt
 
     # ── Layer 2: 모멘텀 (대폭 개선) ──
@@ -1019,30 +1021,26 @@ def compute_trade_judgment(df):
 
     df['BJ_Volume'] = bv.clip(lower=0, upper=7.0)
 
-    # ── Layer 6: 자금흐름 (BUY) ──
+    # ── Layer 6: 자금흐름 (이전 수정 유지) ──
     bmf = pd.Series(0.0, index=idx)
-    mf_slope = df.get('MF_Slope_5', pd.Series(0, index=idx))
-    
-    # 🔧 극단적 과매도 상태라도, 자금이 다시 들어오기 시작(Slope > 0)해야만 가점
-    bmf += np.where((rmfi < -10) & (mf_slope > 0), 2.5,     # 완벽한 바닥 턴어라운드
-           np.where((rmfi < -10) & (mf_slope <= 0), 0.0,    # ⚠️ 떨어지는 칼날 (가점 없음)
-           np.where((rmfi < -5) & (mf_slope > 0), 1.0,
-           np.where(rmfi > 10, -1.0, 0))))                  # ⚠️ 자금 과열 구간 (추격매수 패널티)
-           
-    bmf += np.where(mf_slope > 5, 2.0,
-           np.where(mf_slope > 2, 1.0,
-           np.where(mf_slope < -5, -1.0, 0)))               # 강한 유출 시 감점
-           
+    bmf += np.where(rmfi < -10, 2.0,
+           np.where(rmfi < -5, 1.0,
+           np.where(rmfi > 10, -0.5, 0)))
+    if 'MF_Slope_5' in df.columns:
+        mf_slope = df['MF_Slope_5']
+        bmf += np.where(mf_slope > 5, 2.0,
+               np.where(mf_slope > 2, 1.5,
+               np.where(mf_slope > 0, 0.5,
+               np.where(mf_slope < -5, -1.0, 0))))
     if 'MF_Up_Streak' in df.columns:
-        bmf += np.where(df['MF_Up_Streak'] >= 5, 1.5,
-               np.where(df['MF_Up_Streak'] >= 3, 0.5, 0))
-               
+        bmf += np.where(df['MF_Up_Streak'] >= 5, 2.0,
+               np.where(df['MF_Up_Streak'] >= 3, 1.0, 0))
     bmf += _sig_pts(df, 'MF_Cross_Bull', 2.0)
     bmf += _sig_pts(df, 'MF_Bull_Div', 2.0)
     bmf += _sig_pts(df, 'MF_Accel_Up', 1.0)
     df['BJ_MF'] = bmf.clip(lower=0, upper=8.0)
 
-# ── Layer 7: Pattern (BUY) ──
+    # ── Layer 7: Pattern (개선) ──
     bp = pd.Series(0.0, index=idx)
 
     # 🔧 이중 카운팅 방지: Gold_Dot는 Green_Dot + Div를 포함하므로 단독 계산
@@ -1052,32 +1050,29 @@ def compute_trade_judgment(df):
     bp += gold + gdt1 + gdt2
 
     blood = _sig_pts(df, 'Blood_Diamond', 0)  # SELL 전용, BUY에서 제외
+    # Bull_Divergence: Gold_Dot과 중복 방지
     bd_pts = np.where(gold == 0, _sig_pts(df, 'Bull_Divergence', 2.0), 0)
     bp += bd_pts
 
-    # 🔧 MA 돌파 시그널 추가 (Trend에서 Pattern으로 이동)
+    # 나머지 패턴 (MA 교차는 Trend로 이동했으므로 제외)
     for s, p in [('Pullback_123_Bull',2.5), ('Setup_180_Bull',2.0), ('Boomer_Buy',2.0),
-                 ('Expansion_BO',3.0), ('Gilligans_Buy',2.5), ('Lizard_Bull',2.0),
-                 ('NonADX_123_Bull',1.5), ('EMA_Pullback_Buy',2.0),
-                 ('Momentum_Ignition_Buy',3.0), ('SuperTrend_Buy',2.0),
-                 ('Gap_Up',1.0), ('Gap_Down_Closed',1.0),
-                 ('New_52W_High',2.0), ('Blue_Diamond',2.0),
-                 ('Hidden_Bull_Div',1.5), ('Squeeze_Fire_Buy',2.0),
-                 ('Parabolic_Bottom_Buy',3.0), ('Pocket_Pivot',2.0),
-                 # 👇 새로 추가된 부분
-                 ('Cross_Above_50MA', 1.5), ('Cross_Above_200MA', 2.0), ('Golden_Cross', 2.0)]:
+                  ('Expansion_BO',3.0), ('Gilligans_Buy',2.5), ('Lizard_Bull',2.0),
+                  ('NonADX_123_Bull',1.5), ('EMA_Pullback_Buy',2.0),
+                  ('Momentum_Ignition_Buy',3.0), ('SuperTrend_Buy',2.0),
+                  ('Gap_Up',1.0), ('Gap_Down_Closed',1.0),
+                  ('New_52W_High',2.0), ('Blue_Diamond',2.0),
+                  ('Hidden_Bull_Div',1.5), ('Squeeze_Fire_Buy',2.0),
+                  ('Parabolic_Bottom_Buy',3.0), ('Pocket_Pivot',2.0)]:
         bp += _sig_pts(df, s, p)
 
-    # 🆕 패턴 신선도 (MA 돌파 포함)
+    # 🆕 패턴 신선도: 어제 발생한 강한 패턴도 감쇠 반영
     for s, decay_pts in [('Gold_Dot',2.0), ('Green_Dot_T1',1.0), ('Expansion_BO',1.5),
-                         ('Momentum_Ignition_Buy',1.5), ('Parabolic_Bottom_Buy',1.5),
-                         # 👇 새로 추가된 부분
-                         ('Cross_Above_50MA', 1.5), ('Cross_Above_200MA', 2.0), ('Golden_Cross', 2.0)]:
+                          ('Momentum_Ignition_Buy',1.5), ('Parabolic_Bottom_Buy',1.5)]:
         if s in df.columns:
             yesterday = df[s].shift(1).fillna(False)
-            bp += np.where(yesterday & ~df[s], decay_pts * 0.5, 0)
+            bp += np.where(yesterday & ~df[s], decay_pts * 0.5, 0)  # 어제 발생, 오늘 아님 = 절반 점수
 
-    df['BJ_Pattern'] = bp.clip(upper=10.0)
+    df['BJ_Pattern'] = bp.clip(upper=10.0)  # 🔧 8→10 (차별화 확대)
 
     df['Buy_Total'] = (df['BJ_Trend'] + df['BJ_Momentum'] + df['BJ_Candle'] +
                        df['BJ_BB'] + df['BJ_Volume'] + df['BJ_MF'] + df['BJ_Pattern'])
@@ -1085,7 +1080,6 @@ def compute_trade_judgment(df):
     # ══════════════ SELL ══════════════
 
     # ── Layer 1: 추세 ──
-    # ... (SELL 레이어의 Trend도 동일한 논리로 Cross_Below 점수를 빼고 ADX 하락 강도 가점을 추가)
     st_ = pd.Series(0.0, index=idx)
     st_ += np.where(below_200 & below_50 & (C < df['MA20']), 5.0,
            np.where(below_200 & below_50, 4.0,
@@ -1094,8 +1088,10 @@ def compute_trade_judgment(df):
     st_ += np.where(df['MA50'] < df['MA200'], 1.5, 0)
     st_ += np.where(df['Minus_DI'] > df['Plus_DI'], 1.0, 0)
     st_ += np.where(df['ST_Direction'] == -1, 1.0, 0)
-    st_ += np.where(below_50 & ma50_falling & (df['ADX'] > 20), 1.0, 
-           np.where(below_50 & ma50_falling, 0.5, 0))
+    st_ += np.where(below_50 & ma50_falling, 0.5, 0)
+    st_ += _sig_pts(df, 'Fell_Below_50MA', 1.0)
+    st_ += _sig_pts(df, 'Fell_Below_200MA', 1.5)
+    st_ += _sig_pts(df, 'Death_Cross', 1.5)
     df['SJ_Trend'] = st_
 
     # ── Layer 2: 모멘텀 ──
@@ -1181,62 +1177,49 @@ def compute_trade_judgment(df):
           np.where(vol_bull_ratio > 2.0, -1.0, 0)))
     df['SJ_Volume'] = sv.clip(lower=0, upper=7.0)
 
-    # ── Layer 6: 자금흐름 (SELL) ──
+    # ── Layer 6: 자금흐름 (이전 수정 유지) ──
     smf = pd.Series(0.0, index=idx)
-    
-    # 🔧 극단적 과매수 상태에서, 자금이 빠지기 시작(Slope < 0)해야만 가점
-    smf += np.where((rmfi > 10) & (mf_slope < 0), 2.5,      # 완벽한 고점 턴어라운드
-           np.where((rmfi > 10) & (mf_slope >= 0), 0.0,     # ⚠️ 달리는 기차 (가점 없음)
-           np.where((rmfi > 5) & (mf_slope < 0), 1.0,
-           np.where(rmfi < -10, -1.0, 0))))                 # ⚠️ 자금 고갈 구간 (추격매도 패널티)
-           
-    smf += np.where(mf_slope < -5, 2.0,
-           np.where(mf_slope < -2, 1.0,
-           np.where(mf_slope > 5, -1.0, 0)))                # 강한 유입 시 감점
-           
+    smf += np.where(rmfi > 10, 2.0,
+           np.where(rmfi > 5, 1.0,
+           np.where(rmfi < -10, -0.5, 0)))
+    if 'MF_Slope_5' in df.columns:
+        mf_slope = df['MF_Slope_5']
+        smf += np.where(mf_slope < -5, 2.0,
+               np.where(mf_slope < -2, 1.5,
+               np.where(mf_slope < 0, 0.5,
+               np.where(mf_slope > 5, -1.0, 0))))
     if 'MF_Dn_Streak' in df.columns:
-        smf += np.where(df['MF_Dn_Streak'] >= 5, 1.5,
-               np.where(df['MF_Dn_Streak'] >= 3, 0.5, 0))
-               
+        smf += np.where(df['MF_Dn_Streak'] >= 5, 2.0,
+               np.where(df['MF_Dn_Streak'] >= 3, 1.0, 0))
     smf += _sig_pts(df, 'MF_Cross_Bear', 2.0)
     smf += _sig_pts(df, 'MF_Bear_Div', 2.0)
     smf += _sig_pts(df, 'MF_Accel_Dn', 1.0)
     df['SJ_MF'] = smf.clip(lower=0, upper=8.0)
 
-# ── Layer 7: Pattern (SELL) ──
+    # ── Layer 7: Pattern ──
     sp = pd.Series(0.0, index=idx)
     blood = _sig_pts(df, 'Blood_Diamond', 4.0)
     rdt1 = np.where(blood == 0, _sig_pts(df, 'Red_Dot_T1', 2.5), 0)
     rdt2 = np.where((blood == 0) & (rdt1 == 0), _sig_pts(df, 'Red_Dot_T2', 2.0), 0)
     sp += blood + rdt1 + rdt2
-    
     brd_pts = np.where(blood == 0, _sig_pts(df, 'Bear_Divergence', 2.0), 0)
     sp += brd_pts
-    
-    # 🔧 MA 이탈 시그널 추가
     for s, p in [('Pullback_123_Bear',2.5), ('Setup_180_Bear',2.0), ('Boomer_Sell',2.0),
-                 ('Expansion_BD',3.0), ('Gilligans_Sell',2.5), ('Lizard_Bear',2.0),
-                 ('NonADX_123_Bear',1.5), ('EMA_Pullback_Sell',2.0),
-                 ('Momentum_Ignition_Sell',3.0), ('SuperTrend_Sell',2.0),
-                 ('Gap_Down',1.0), ('Gap_Up_Closed',1.0),
-                 ('New_52W_Low',2.0), ('Red_Diamond',2.0),
-                 ('Hidden_Bear_Div',1.5), ('Squeeze_Fire_Sell',2.0),
-                 ('Parabolic_Top_Sell',3.0),
-                 # 👇 새로 추가된 부분
-                 ('Fell_Below_50MA', 1.5), ('Fell_Below_200MA', 2.0), ('Death_Cross', 2.0)]:
+                  ('Expansion_BD',3.0), ('Gilligans_Sell',2.5), ('Lizard_Bear',2.0),
+                  ('NonADX_123_Bear',1.5), ('EMA_Pullback_Sell',2.0),
+                  ('Momentum_Ignition_Sell',3.0), ('SuperTrend_Sell',2.0),
+                  ('Gap_Down',1.0), ('Gap_Up_Closed',1.0),
+                  ('New_52W_Low',2.0), ('Red_Diamond',2.0),
+                  ('Hidden_Bear_Div',1.5), ('Squeeze_Fire_Sell',2.0),
+                  ('Parabolic_Top_Sell',3.0)]:
         sp += _sig_pts(df, s, p)
-        
-    # 🆕 패턴 신선도 (MA 이탈 포함)
     for s, decay_pts in [('Blood_Diamond',2.0), ('Red_Dot_T1',1.0), ('Expansion_BD',1.5),
-                         ('Momentum_Ignition_Sell',1.5), ('Parabolic_Top_Sell',1.5),
-                         # 👇 새로 추가된 부분
-                         ('Fell_Below_50MA', 1.5), ('Fell_Below_200MA', 2.0), ('Death_Cross', 2.0)]:
+                          ('Momentum_Ignition_Sell',1.5), ('Parabolic_Top_Sell',1.5)]:
         if s in df.columns:
             yesterday = df[s].shift(1).fillna(False)
             sp += np.where(yesterday & ~df[s], decay_pts * 0.5, 0)
-            
     df['SJ_Pattern'] = sp.clip(upper=10.0)
-    
+
     df['Sell_Total'] = (df['SJ_Trend'] + df['SJ_Momentum'] + df['SJ_Candle'] +
                         df['SJ_BB'] + df['SJ_Volume'] + df['SJ_MF'] + df['SJ_Pattern'])
 
