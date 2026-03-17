@@ -766,7 +766,7 @@ def _deduplicate(df):
     return df
 
 # ──────────────────────────────────────────
-# 🆕 6-Layer 판단 엔진
+# 🆕 7-Layer 판단 엔진
 # ──────────────────────────────────────────
 def _sig_pts(df, sig_name, points):
     if sig_name in df.columns: return np.where(df[sig_name].fillna(False), points, 0.0)
@@ -1477,7 +1477,7 @@ def detect_all_signals(df):
     df['MF_Up_Streak'] = mf_sigs['MF_Up_Streak']
     df['MF_Dn_Streak'] = mf_sigs['MF_Dn_Streak']
 
-    # ═══ 🆕 6-Layer 판단 엔진 ═══
+    # ═══ 🆕 7-Layer 판단 엔진 ═══
     compute_trade_judgment(df)
 
     return df
@@ -1956,7 +1956,7 @@ def build_ai_prompt(ticker, phist, fundamentals):
    - 스윙 롱 손절가 = 현재가 - (ATR * 1.5) / 1차 목표가 = 현재가 + (ATR * 2.0)
 3. 🌊 추세 맞춤형 전략 (Trend Regime): STRONG BULL, STRONG BEAR, NEUTRAL 에 맞는 전략을 제시하세요.
 4. 📈 데이터 활용: 백테스트 승률(Winrate), VWAP_Osc, ADX, Squeeze 상태 등을 분석의 근거로 포함하세요.
-5. 🎯 멀티 시그널 판단: [멀티 시그널 매매 판단] 섹션의 6-Layer 점수, 콤보, 최종 판단을 핵심 근거로 활용하세요.
+5. 🎯 멀티 시그널 판단: [멀티 시그널 매매 판단] 섹션의 7-Layer 점수, 콤보, 최종 판단을 핵심 근거로 활용하세요.
 
 ---
 ━━━━━━━━━━━━━
@@ -1986,7 +1986,7 @@ def build_ai_prompt(ticker, phist, fundamentals):
 ### 🎯 멀티 시그널 매매 판단
 * 최종 판단: [STRONG BUY / BUY / WATCH / NEUTRAL / SELL / STRONG SELL]
 * BUY 점수: [점수] (활성 [N]/6 레이어) — SELL 점수: [점수] (활성 [N]/6 레이어)
-* 6-Layer 분해: [추세/모멘텀/캔들/볼린저/거래량/패턴 각 점수]
+* 7-Layer 분해: [추세/모멘텀/캔들/볼린저/거래량/패턴 각 점수]
 * 활성 콤보: [콤보명]
 * 최근 5일 판단 추이: [이력]
 > 🚦 판단 해석: [이 판단이 의미하는 바를 구체적으로 2~3문장]
@@ -2184,8 +2184,8 @@ def render_judgment(meta):
 
     st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
-    # ── 6-Layer 점수 ──
-    st.markdown("#### 📊 6-Layer 스코어 분석")
+    # ── 7-Layer 점수 ──
+    st.markdown("#### 📊 7-Layer 스코어 분석")
     col_b, col_s = st.columns(2)
     with col_b:
         st.markdown("<p style='color:#34D399;font-weight:700;font-size:.85rem;margin-bottom:8px;"
@@ -2658,7 +2658,7 @@ def process_ticker(tv, refresh=False):
             fundamentals = fetch_fundamentals(tv)
 
             st.write("📊 기술적 데이터 계산 및 시그널 엔진 검증 중...")
-            st.write("🎯 6-Layer 매매 판단 엔진 가동 중...")
+            st.write("🎯 7-Layer 매매 판단 엔진 가동 중...")
             fig, phist, meta = analyze(tv, chart_days, refresh)
 
             if fig:
