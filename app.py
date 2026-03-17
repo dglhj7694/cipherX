@@ -895,43 +895,40 @@ def compute_trade_judgment(df):
           np.where((df['WT1'] < -20) & wt_rising, 1.0,                       # 약세 + 상승 중
           np.where((df['WT1'] > 53) & wt_falling, -1.5, 0))))               # 과매수 + 하락
 
-# ── Layer 2: 모멘텀 (BUY) 리팩토링 ──
-    bm = pd.Series(0.0, index=idx)
-
+    # ── Layer 2: 모멘텀 (BUY) 개선 ──
+    bm_cross = pd.Series(0.0, index=idx)
+    
+    # 1. 턴어라운드 시그널 (유사한 성격의 지표들)
     for s, p in [('MACD_Cross_Buy',2.5), ('MACD_Zero_Cross_Buy',2.0),
                  ('StochRSI_Cross_Buy',2.0), ('ADX_Momentum_Buy',2.0),
                  ('VWAP_Bounce_Buy',1.5)]:
-        bm += _sig_pts(df, s, p)
+        bm_cross += _sig_pts(df, s, p)
 
-    # MACD 히스토그램: np.select 적용
-    macd_cond = [
+    # 🔧 [핵심 개선] 중복 시그널 폭주 방지: 크로스오버 계열 점수는 최대 4.0점으로 캡(Cap)
+    bm = bm_cross.clip(upper=4.0)
+
+    # 2. 연속형 모멘텀 가속 (MACD 히스토그램, VWAP 등 기존 로직 유지)
+    bm += np.select([
         (macd_h > 0) & macd_h_rising,
         (macd_h > 0) & macd_h_falling,
         (macd_h < 0) & macd_h_rising
-    ]
-    macd_choice = [2.0, 0.5, 1.5]
-    bm += np.select(macd_cond, macd_choice, default=0.0)
+    ], [2.0, 0.5, 1.5], default=0.0)
+    
     bm += np.where((macd_h > 0) & macd_accel, 0.5, 0)
     
-    # VWAP 크기 반영
-    vwap_cond = [vwap_osc > 3.0, vwap_osc > 1.0, vwap_osc > 0]
-    vwap_choice = [1.5, 1.0, 0.5]
-    bm += np.select(vwap_cond, vwap_choice, default=0.0)
+    bm += np.select([vwap_osc > 3.0, vwap_osc > 1.0, vwap_osc > 0], 
+                    [1.5, 1.0, 0.5], default=0.0)
 
-    # 추격매수 방지 및 상승 모멘텀: np.select 적용
-    rsi_cond = [df['RSI'] > 80, df['RSI'] >= 60, df['RSI'] >= 50]
-    rsi_choice = [-1.0, 2.0, 1.0]
-    bm += np.select(rsi_cond, rsi_choice, default=0.0)
+    # 3. 추격매수 방지 및 상승 모멘텀
+    bm += np.select([df['RSI'] > 80, df['RSI'] >= 60, df['RSI'] >= 50], 
+                    [-1.0, 2.0, 1.0], default=0.0)
+    bm += np.select([df['StochK'] > 85, df['StochK'] >= 60, df['StochK'] >= 50], 
+                    [-1.0, 2.0, 1.0], default=0.0)
+    bm += np.select([df['WT1'] > 60, df['WT1'] >= 20, df['WT1'] >= 0], 
+                    [-1.0, 2.0, 1.0], default=0.0)
 
-    stoch_cond = [df['StochK'] > 85, df['StochK'] >= 60, df['StochK'] >= 50]
-    stoch_choice = [-1.0, 2.0, 1.0]
-    bm += np.select(stoch_cond, stoch_choice, default=0.0)
-
-    wt1_cond = [df['WT1'] > 60, df['WT1'] >= 20, df['WT1'] >= 0]
-    wt1_choice = [-1.0, 2.0, 1.0]
-    bm += np.select(wt1_cond, wt1_choice, default=0.0)
-
-    df['BJ_Momentum'] = bm.clip(lower=0)
+    # 🔧 총 모멘텀 레이어 점수도 최대 10점으로 제한하여 균형 유지
+    df['BJ_Momentum'] = bm.clip(lower=0, upper=10.0)
 
     # ── Layer 3: 캔들 (대폭 개선) ──
     bc = pd.Series(0.0, index=idx)
@@ -1112,13 +1109,16 @@ def compute_trade_judgment(df):
     df['SJ_Trend'] = st_
 
     # ── Layer 2: 모멘텀 ──
-# ── Layer 2: 모멘텀 (SELL) 리팩토링 ──
+    # ── Layer 2: 모멘텀 (SELL) 리팩토링 ──
     sm = pd.Series(0.0, index=idx)
     
     for s, p in [('MACD_Cross_Sell',2.5), ('MACD_Zero_Cross_Sell',2.0),
                  ('StochRSI_Cross_Sell',2.0), ('ADX_Momentum_Sell',2.0),
                  ('VWAP_Reject_Sell',1.5)]:
         sm += _sig_pts(df, s, p)
+
+    # 🔧 [핵심 개선] 중복 시그널 폭주 방지: 크로스오버 계열 점수는 최대 4.0점으로 캡(Cap)
+    sm = sm.clip(upper=4.0)
 
     # SELL MACD
     macd_s_cond = [
@@ -1148,7 +1148,7 @@ def compute_trade_judgment(df):
     wt1_s_choice = [-1.0, 2.0, 1.0]
     sm += np.select(wt1_s_cond, wt1_s_choice, default=0.0)
 
-    df['SJ_Momentum'] = sm.clip(lower=0)
+    df['SJ_Momentum'] = sm.clip(lower=0, upper=10.0)
 
     # ── Layer 3: 캔들 ──
     sc = pd.Series(0.0, index=idx)
@@ -1244,28 +1244,69 @@ def compute_trade_judgment(df):
     df['Sell_Total'] = (df['SJ_Trend'] + df['SJ_Momentum'] + df['SJ_Candle'] +
                         df['SJ_BB'] + df['SJ_Volume'] + df['SJ_MF'] + df['SJ_Pattern'])
 
-    # ── 활성 레이어 + 판단 ──
+    # 판단 전에 콤보를 먼저 찾아내어 최종 점수에 보너스를 줍니다.
+    detect_combos(df, vol_ratio)
+    
+    buy_combo_bonus = pd.Series(0.0, index=idx)
+    sell_combo_bonus = pd.Series(0.0, index=idx)
+    
+    for col in df.columns:
+        if col.startswith('Combo_'):
+            if 'Buy' in col:
+                buy_combo_bonus += np.where(df[col], 3.0, 0.0) # 핵심 매수 콤보 발생 시 +3점
+            elif 'Sell' in col:
+                sell_combo_bonus += np.where(df[col], 3.0, 0.0) # 핵심 매도 콤보 발생 시 +3점
+
+    df['Buy_Total'] += buy_combo_bonus
+    df['Sell_Total'] += sell_combo_bonus
+
+    # ── 활성 레이어 계산 ──
     df['Buy_Active_Layers'] = sum((df[f'BJ_{n}'] > 0).astype(int) for n in ['Trend','Momentum','Candle','BB','Volume','MF','Pattern'])
     df['Sell_Active_Layers'] = sum((df[f'SJ_{n}'] > 0).astype(int) for n in ['Trend','Momentum','Candle','BB','Volume','MF','Pattern'])
 
+    # ── 🔧 [핵심 개선 2 & 3] 비대칭 & 동적 임계값 기반 최종 판단 ──
     j = np.full(len(df), 'NEUTRAL', dtype=object)
     bt_v, st_v = df['Buy_Total'].values, df['Sell_Total'].values
     ba, sa = df['Buy_Active_Layers'].values, df['Sell_Active_Layers'].values
+    
+    # 종목별 변동성(ATR 비율) 계산: 변동성이 작으면 점수 커트라인을 낮춰주기 위함
+    atr_pct = (df['ATR'] / df['Close'] * 100).values
+
     for i in range(len(df)):
         b, s, bal, sal = bt_v[i], st_v[i], ba[i], sa[i]
         diff = b - s
         ratio = b / (s + 0.01)
         s_ratio = s / (b + 0.01)
-        if b >= 17 and bal >= 4 and ratio >= 2.0 and diff >= 10:     j[i] = 'STRONG_BUY'
-        elif b >= 11 and bal >= 3 and ratio >= 1.4 and diff >= 5:    j[i] = 'BUY'
-        elif b >= 6 and bal >= 2 and diff >= 2:                       j[i] = 'WATCH_BUY'
-        elif s >= 17 and sal >= 4 and s_ratio >= 2.0 and (s-b) >= 10:j[i] = 'STRONG_SELL'
-        elif s >= 11 and sal >= 3 and s_ratio >= 1.4 and (s-b) >= 5: j[i] = 'SELL'
-        elif s >= 6 and sal >= 2 and (s-b) >= 2:                     j[i] = 'WATCH_SELL'
-        elif b >= 9 and s >= 9 and abs(diff) < 3:                    j[i] = 'MIXED'
-    df['Trade_Judgment'] = j
+        vol = atr_pct[i]
 
-    detect_combos(df, vol_ratio)
+        # 동적 스케일링: 변동성 2% 미만의 무거운 주식(우량주/ETF 등)은 17점이 안 나와도 시그널이 발생하도록 15% 하향조정
+        scale = 0.85 if vol < 2.0 else 1.0
+
+        # 매수(Buy) 기준선
+        b_st, b_nm, b_wt = 17.0 * scale, 11.0 * scale, 6.0 * scale
+        
+        # 매도(Sell) 기준선 (비대칭성: 시장은 하락할 때 더 빠르므로, 매도 시그널은 매수보다 15% 더 예민하게 반응)
+        s_st, s_nm, s_wt = 17.0 * 0.85 * scale, 11.0 * 0.85 * scale, 6.0 * 0.85 * scale
+
+        if b >= b_st and bal >= 4 and ratio >= 2.0 and diff >= (10 * scale):
+            j[i] = 'STRONG_BUY'
+        elif b >= b_nm and bal >= 3 and ratio >= 1.4 and diff >= (5 * scale):
+            j[i] = 'BUY'
+        elif b >= b_wt and bal >= 2 and diff >= (2 * scale):
+            j[i] = 'WATCH_BUY'
+        
+        # 매도 판단 조건 완화 (s_ratio 2.0 -> 1.5, 차이 10 -> 8)
+        elif s >= s_st and sal >= 4 and s_ratio >= 1.5 and (s-b) >= (8 * scale):
+            j[i] = 'STRONG_SELL'
+        elif s >= s_nm and sal >= 3 and s_ratio >= 1.2 and (s-b) >= (4 * scale):
+            j[i] = 'SELL'
+        elif s >= s_wt and sal >= 2 and (s-b) >= (1.5 * scale):
+            j[i] = 'WATCH_SELL'
+        
+        elif b >= (9 * scale) and s >= (9 * scale) and abs(diff) < (3 * scale):
+            j[i] = 'MIXED'
+
+    df['Trade_Judgment'] = j
     return df
 
 def detect_combos(df, vol_ratio):
