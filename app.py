@@ -740,16 +740,18 @@ def detect_pocket_pivot(c, o, v, ma50, ma200):
 # w >= 이 값인 시그널은 어떤 상황에서도 억제하지 않음
 TREND_IMMUNE_W = 2.0
 
+# ──────────────────────────────────────────
+# 🚀 🆕 초강력 추세 맥락 기반 시그널 품질 필터 (스나이퍼 모드)
+# ──────────────────────────────────────────
+# 추세를 거스를 수 있는 시그널의 최소 가중치 (3.0으로 상향하여 극단적 반전만 허용)
+TREND_IMMUNE_W = 3.0 
+
 def _apply_trend_filter(df):
     """
-    추세 맥락에 반하는 약한 시그널을 억제하고,
-    같은 날 BUY/SELL 동시 발생 시 약한 쪽을 제거합니다.
-    
-    원칙:
-    - 강한 상승 추세에서 약한 매도 시그널(w<2.0) 억제
-    - 강한 하락 추세에서 약한 매수 시그널(w<2.0) 억제
-    - 같은 날 BUY/SELL 충돌 시, 가중합이 낮은 쪽의 약한 시그널 제거
-    - Gold_Dot, Blood_Diamond, Parabolic 등 w≥2.0 시그널은 항상 생존
+    [초강력 노이즈 필터링]
+    1. 절대 원칙: 같은 날 매수/매도 시그널 동시 발생 절대 불가 (무조건 한 방향만 승리)
+    2. 추세 원칙: 강한 추세에서는 역방향 시그널 완전 차단 (단, w>=3.0 극단적 반전 제외)
+    3. 동점 원칙: 매수/매도 에너지가 동일하게 충돌하면 모두 지우고 관망
     """
     C = df['Close']
 
@@ -767,52 +769,50 @@ def _apply_trend_filter(df):
     buy_sigs = {k for k, v in SIGNAL_REGISTRY.items()
                 if v['dir'] == 'buy' and k not in NEUTRAL_SIGNALS}
     sell_sigs = {k for k, v in SIGNAL_REGISTRY.items()
-                if v['dir'] == 'sell'}
+                if v['dir'] == 'sell' and k not in NEUTRAL_SIGNALS}
 
-    # ═══ Step 2: 역추세 약한 시그널 억제 ═══
+    # ═══ Step 2: 강력한 추세 방패 (역추세 잔챙이 시그널 학살) ═══
     for s in sell_sigs:
         if s not in df.columns: continue
         w = SIGNAL_REGISTRY.get(s, {}).get('w', 0)
         if w < TREND_IMMUNE_W:
-            # 확실한 상승 추세에서 약한 매도 억제
+            # 확실한 상승장에서는 w가 3.0 미만인 모든 매도 시그널 삭제
             df[s] = df[s] & ~bullish_trend
 
     for s in buy_sigs:
         if s not in df.columns: continue
         w = SIGNAL_REGISTRY.get(s, {}).get('w', 0)
         if w < TREND_IMMUNE_W:
-            # 확실한 하락 추세에서 약한 매수 억제
+            # 확실한 하락장에서는 w가 3.0 미만인 모든 매수 시그널 삭제
             df[s] = df[s] & ~bearish_trend
 
-    # ═══ Step 3: 같은 날 BUY/SELL 충돌 해소 ═══
+    # ═══ Step 3: 하이랜더 룰 (하루엔 오직 한 방향만 살아남는다) ═══
     daily_buy_w = pd.Series(0.0, index=df.index)
     daily_sell_w = pd.Series(0.0, index=df.index)
 
     for s in buy_sigs:
-        if s not in df.columns: continue
-        daily_buy_w += df[s].fillna(False).astype(float) * SIGNAL_REGISTRY[s]['w']
+        if s in df.columns: 
+            daily_buy_w += df[s].fillna(False).astype(float) * SIGNAL_REGISTRY[s]['w']
     for s in sell_sigs:
-        if s not in df.columns: continue
-        daily_sell_w += df[s].fillna(False).astype(float) * SIGNAL_REGISTRY[s]['w']
+        if s in df.columns: 
+            daily_sell_w += df[s].fillna(False).astype(float) * SIGNAL_REGISTRY[s]['w']
 
     conflict = (daily_buy_w > 0) & (daily_sell_w > 0)
     net = daily_buy_w - daily_sell_w
 
     buy_loses  = conflict & (net < 0)    # 매도가 더 강한 날
     sell_loses = conflict & (net > 0)    # 매수가 더 강한 날
-    # net == 0 이면 양쪽 다 약한 시그널만 제거 (강한 것만 남김)
-    tie = conflict & (net == 0)
+    tie        = conflict & (net == 0)   # 에너지가 완벽히 동일하게 대립하는 날
 
+    # 면역 가중치(w)와 상관없이 승패 판정에 따라 반대 시그널은 차트에서 절대적 삭제
     for s in buy_sigs:
-        if s not in df.columns: continue
-        w = SIGNAL_REGISTRY[s]['w']
-        if w < TREND_IMMUNE_W:
+        if s in df.columns:
+            # 매도가 이기거나 비기면 매수 시그널 전부 삭제
             df[s] = df[s] & ~buy_loses & ~tie
 
     for s in sell_sigs:
-        if s not in df.columns: continue
-        w = SIGNAL_REGISTRY[s]['w']
-        if w < TREND_IMMUNE_W:
+        if s in df.columns:
+            # 매수가 이기거나 비기면 매도 시그널 전부 삭제
             df[s] = df[s] & ~sell_loses & ~tie
 
     return df
