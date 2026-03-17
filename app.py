@@ -793,28 +793,25 @@ def compute_trade_judgment(df):
 
     # MACD 히스토그램 방향
     macd_h = df['MACD_Hist']
-    macd_h_ma3 = macd_h.rolling(3).mean()
-    macd_h_rising = macd_h_ma3 > macd_h_ma3.shift(1)      # 추세적 증가
-    macd_h_falling = macd_h_ma3 < macd_h_ma3.shift(1)     # 추세적 감소
-
+    macd_h_ema = macd_h.ewm(span=3, adjust=False).mean()
+    macd_h_rising = macd_h_ema > macd_h_ema.shift(1)      # 즉각적 + 노이즈 필터링된 증가
+    macd_h_falling = macd_h_ema < macd_h_ema.shift(1)     # 즉각적 + 노이즈 필터링된 감소
     # MACD 갭(Line - Signal) 변화 = 모멘텀 가속/감속
     macd_gap = df['MACD_Line'] - df['MACD_Signal']
-    macd_gap_ma3 = macd_gap.rolling(3).mean()
-    macd_accel = macd_gap_ma3 > macd_gap_ma3.shift(1)
-    macd_decel = macd_gap_ma3 < macd_gap_ma3.shift(1)
-
+    macd_gap_ema = macd_gap.ewm(span=3, adjust=False).mean()
+    macd_accel = macd_gap_ema > macd_gap_ema.shift(1)
+    macd_decel = macd_gap_ema < macd_gap_ema.shift(1)
     # RSI/StochK/WT 방향
-    rsi_ma3 = df['RSI'].rolling(3).mean()
-    rsi_rising = rsi_ma3 > rsi_ma3.shift(1)
-    rsi_falling = rsi_ma3 < rsi_ma3.shift(1)
+    rsi_ema = df['RSI'].ewm(span=3, adjust=False).mean()
+    rsi_rising = rsi_ema > rsi_ema.shift(1)
+    rsi_falling = rsi_ema < rsi_ema.shift(1)
     
-    stk_ma3 = df['StochK'].rolling(3).mean()
-    stk_rising = stk_ma3 > stk_ma3.shift(1)
+    stk_ema = df['StochK'].ewm(span=3, adjust=False).mean()
+    stk_rising = stk_ema > stk_ema.shift(1)
     
-    wt_ma3 = df['WT1'].rolling(3).mean()
-    wt_rising = wt_ma3 > wt_ma3.shift(1)
-    wt_falling = wt_ma3 < wt_ma3.shift(1)
-
+    wt_ema = df['WT1'].ewm(span=3, adjust=False).mean()
+    wt_rising = wt_ema > wt_ema.shift(1)
+    wt_falling = wt_ema < wt_ema.shift(1)
     # OBV 추세
     obv = df['OBV']
     obv_ma20 = obv.rolling(20, min_periods=10).mean()
