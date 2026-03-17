@@ -945,19 +945,22 @@ with st.sidebar:
     chart_period=st.radio("표시 기간",['3개월','6개월','1년','2년'],index=0,horizontal=True)
     chart_days={'3개월':63,'6개월':126,'1년':252,'2년':504}[chart_period]
     st.markdown("---")
-    with st.expander("🎛️ 시그널 활성화 필터",expanded=False):
-        _sb=st.checkbox("🟢 매수 시그널",value=True,key="sb")
-        _ss=st.checkbox("🔴 매도 시그널",value=True,key="ss")
-        _sc=st.checkbox("⭐ 복합 시그널",value=True,key="sc")
+    
+    # 🚀 에러 수정 완료 및 10대 국면에 맞춘 필터 UI 적용
+    with st.expander("🎛️ 국면(Regime) 활성화 필터",expanded=False):
+        _sb=st.checkbox("🟢 매수 국면 표시",value=True,key="sb")
+        _ss=st.checkbox("🔴 매도 국면 표시",value=True,key="ss")
+        _sn=st.checkbox("⚪ 중립/횡보 국면 표시",value=True,key="sn")
         _mw=st.slider("최소 가중치 필터",0.0,3.0,0.0,0.5,key="mw")
         enabled=set()
         for k,v in ALL_CHART_SIGNALS.items():
             if v['dir']=='buy' and not _sb: continue
             if v['dir']=='sell' and not _ss: continue
-            if k in COMPOSITE_SIGNALS and not _sc: continue
-            if v['w']<_mw and k not in COMPOSITE_SIGNALS: continue
+            if v['dir']=='neutral' and not _sn: continue
+            if v['w'] < _mw: continue
             enabled.add(k)
         st.session_state['enabled_signals']=enabled
+        
     st.markdown("---")
     if st.button("🗑️ 대화 내역 지우기",use_container_width=True,type="secondary"):
         for key in ['messages','pending_ai_ticker','pending_ai_prompt','last_ticker']:
