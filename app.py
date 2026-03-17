@@ -2547,7 +2547,7 @@ def build_metadata(dc, dv, ticker):
         'atr': float(lat['ATR']), 'atr_pct': float(lat['ATR']) / float(lat['Close']) * 100,
         'adx': float(lat['ADX']), 'plus_di': float(lat['Plus_DI']), 'minus_di': float(lat['Minus_DI']),
         'overall_bias': bias, 'bias_score': bsc, 'confluence_score': cf,
-        'recent_signals': recent, 'all_signal_stats': compute_all_stats(dv),
+        'recent_signals': recent, # 백테스트 통계 키 삭제됨
         'last_date': dc.index[-1].strftime('%Y-%m-%d'),
         'buy_proximity': float(lat['Buy_Proximity']),
         'sell_proximity': float(lat['Sell_Proximity']),
@@ -2562,12 +2562,10 @@ def build_metadata(dc, dv, ticker):
         'macd_signal': float(lat.get('MACD_Signal', 0)),
         'macd_hist': float(lat.get('MACD_Hist', 0)),
         'judgment_detail': jd, 'judgment_history': judgment_history,
-        # 🆕 Ichimoku / CMF
         'cmf': float(lat.get('CMF', 0)),
         'ichimoku_tenkan': float(lat.get('Ichimoku_Tenkan', 0)),
         'ichimoku_kijun': float(lat.get('Ichimoku_Kijun', 0)),
     }, regime, shield_str
-
 
 # ──────────────────────────────────────────
 # 프롬프트 빌더 (🆕 Ichimoku/CMF 데이터 포함)
@@ -2593,7 +2591,6 @@ def build_prompt_text(dc, meta):
            else f"BEAR▼({meta['supertrend_val']:.2f})")
     shd = f"Shield:{meta['shield_status']}" if meta['shield_status'] else "Shield:NONE"
 
-    # 🆕 Ichimoku/CMF 정보 추가
     ichi_str = (f"Ichimoku=[Tenkan:{meta.get('ichimoku_tenkan',0):.2f}/"
                 f"Kijun:{meta.get('ichimoku_kijun',0):.2f}]")
     cmf_str = f"CMF={meta.get('cmf',0):.3f}"
@@ -2609,17 +2606,6 @@ def build_prompt_text(dc, meta):
         f"{ichi_str},{cmf_str},"
         f"Conf={meta['confluence_score']:.1f},Bias={meta['overall_bias']}({meta['bias_score']:.1f}),"
         f"Trend={meta['trend_regime']},{shd},{prox},{sq}")
-
-    stats = meta.get('all_signal_stats', {})
-    st_txt = ""
-    if stats:
-        lines = []
-        for sn, sv in sorted(stats.items(), key=lambda x: x[1]['count'], reverse=True)[:15]:
-            wr = sv.get('2d_winrate')
-            avg = sv.get('2d_avg')
-            if wr is not None:
-                lines.append(f"  {sn}:{sv['count']}회,2일승률{wr:.0f}%,평균{avg:+.1f}%")
-        if lines: st_txt = "\n📌 [백테스트(2년,상위15)]\n" + "\n".join(lines)
 
     jd = meta.get('judgment_detail', {})
     j_txt = ""
@@ -2641,14 +2627,13 @@ def build_prompt_text(dc, meta):
                 f"{d['date']}:{d['judgment']}(B{d['buy_total']:.0f}/S{d['sell_total']:.0f})"
                 for d in jh) + "\n"
 
-    return f"{ps}\n\n📌 [지표 요약]\n{inds}\n\n📌 [최근 시그널]\n{st_text}{st_txt}{j_txt}"
-
+    return f"{ps}\n\n📌 [지표 요약]\n{inds}\n\n📌 [최근 시그널]\n{st_text}{j_txt}"
 
 def build_ai_prompt(ticker, phist, fundamentals):
     return f"""━━━━━━━━━━━━━
 【 🎯 Role & Persona 】
 ━━━━━━━━━━━━━
-당신은 월스트리트 20년+ 경력 베테랑 주식 애널리스트이자 펀드 매니저입니다.
+당신은 월스트리트 20년+ 경력 베테랑 주식 애널리스트이자 퀀트(Quant) 펀드 매니저입니다.
 기술적 분석과 시장 심리 파악에 탁월하며, Market Cipher B 지표 해석 및 ATR 변동성 기반의 철저한 리스크 관리에 정통합니다.
 
 ---
@@ -2661,10 +2646,8 @@ def build_ai_prompt(ticker, phist, fundamentals):
 2. 🧮 기계적 리스크 관리 (ATR 활용): 손절가와 목표가는 반드시 **ATR** 데이터를 기반으로 산출하세요.
    - 스윙 롱 손절가 = 현재가 - (ATR * 1.5) / 1차 목표가 = 현재가 + (ATR * 2.0)
 3. 🌊 추세 맞춤형 전략 (Trend Regime): STRONG BULL, STRONG BEAR, NEUTRAL 에 맞는 전략을 제시하세요.
-4. 📈 데이터 활용: 백테스트 승률(Winrate), VWAP_Osc, ADX, Squeeze 상태 등을 분석의 근거로 포함하세요.
-5. 🎯 멀티 시그널 판단: [멀티 시그널 매매 판단] 섹션의 7-Layer 점수, 콤보, 최종 판단을 핵심 근거로 활용하세요.
-6. ☁️ 일목균형표: Ichimoku Cloud 데이터가 있으면 구름 위/아래 위치, 전환-기준선 관계를 해석에 포함하세요.
-7. 🌀 CMF: Chaikin Money Flow가 양수/음수인지, 추세와 일치하는지 해석하세요.
+4. 🎯 멀티 시그널 판단: [멀티 시그널 매매 판단] 섹션의 7-Layer 점수, 콤보, 최종 판단을 핵심 근거로 활용하세요.
+5. ☁️ 일목균형표 & CMF: Ichimoku Cloud 데이터의 구름 위/아래 위치, 전환-기준선 관계 및 Chaikin Money Flow 방향을 해석하세요.
 
 ---
 ━━━━━━━━━━━━━
@@ -2696,16 +2679,12 @@ def build_ai_prompt(ticker, phist, fundamentals):
 * BUY 점수: [점수] (활성 [N]/{NUM_LAYERS} 레이어) — SELL 점수: [점수] (활성 [N]/{NUM_LAYERS} 레이어)
 * 7-Layer 분해: [추세/모멘텀/캔들/볼린저/거래량/자금흐름/패턴 각 점수]
 * 활성 콤보: [콤보명]
-* 최근 5일 판단 추이: [이력]
 > 🚦 판단 해석: [이 판단이 의미하는 바를 구체적으로 2~3문장]
 
 ---
-### 🚦 마켓 사이퍼 B+ 시그널 분석
-* WaveTrend: [WT1/WT2 값, 상태]
-* Money Flow: [MF_Area 값, 방향]
-* 🔥 Confluence Score: [점수, 판정]
-* ⚠️ Signal Proximity: [매수/매도 임박 여부]
-* 최근 시그널: [주요 시그널 요약]
+### 🚦 시그널 & 보조지표 분석
+* WaveTrend & MF: [WT1/WT2 상태, MF_Area 방향]
+* 최근 포착 시그널: [주요 시그널 요약 및 방향성 평가]
 > 🚦 해석: [1~2문장]
 
 ---
@@ -2717,23 +2696,12 @@ def build_ai_prompt(ticker, phist, fundamentals):
 > 종합 해석: [🔵/🔴/🟠] [판단]
 
 ---
-### 장중 기술적 지표
-[패턴 이름]
-* 상태: [설명. ATR 기반 변동]
-* 지표 요약: ATR [값], ADX [값], TTM Squeeze [ON/OFF], MACD [상태]
-
----
-### 지지선 및 저항선
-* 지지선: [가격1], [가격2], [가격3]
-* 저항선: [가격1], [가격2], [가격3]
-
----
-### 파생 심리 및 공매도 현황
+### 파생 심리 및 숏 현황
 * 공매도 및 숏스퀴즈 가능성: [분석]
 > [긍정:🔵/부정:🔴/중간:🟠] 해석
 
 ---
-### 🔮 종합해석 및 시나리오
+### 🔮 종합해석 및 실전 시나리오
 * 🔵 **긍정적 시나리오:** [조건] → [목표가]. 확률: __%
 * 🟠 **베이스 시나리오:** [시나리오]. 확률: __%
 * 🔴 **리스크 시나리오:** [조건] → [하락 목표가]. 확률: __%
@@ -2742,19 +2710,14 @@ def build_ai_prompt(ticker, phist, fundamentals):
 * **리스크/리워드 비율:** 1:__
 * **공격적 매수 구간:** [가격대]
 * **보수적 진입 시점:** [확인 매매 가격대]
-* **손절(Stop-loss):** [가격]
+* **손절(Stop-loss):** [가격] (ATR 고려)
 * **분할 매도:** 1차 [가격] __%, 2차 [가격] __%
-* **트레일링 스탑:** [Chandelier Exit 활용]
 
 ---
-### 결론
-[🔵/🔴/🟠] [2~3문장 결론]
-
-### 주가 예측 (다음 거래일)
-[🔵/🔴/🟠] 예상: [방향] · 근거: [...]
+### 결론 및 주가 예측 (다음 거래일)
+[🔵/🔴/🟠] 1~2문장 결론 및 [방향] 예측.
 [GRADE/Score]: [최종 등급]
 """
-
 
 # ──────────────────────────────────────────
 # 분석 통합 로직
@@ -3186,7 +3149,7 @@ def render_signals(m):
     dg = OrderedDict()
     for icon, lbl, ds, side in sigs:
         dg.setdefault(ds, []).append((icon, lbl, side))
-    alls = m.get('all_signal_stats', {})
+        
     for ds in reversed(dg):
         group = dg[ds]
         bc_cnt = sum(1 for _, _, s in group if s == 'buy')
@@ -3196,13 +3159,8 @@ def render_signals(m):
         parts = []
         for i, l, s in group:
             cn = "ind-bullish" if s == "buy" else "ind-bearish"
-            sh = ""
-            for sn, sv in alls.items():
-                if ALL_CHART_SIGNALS.get(sn, {}).get('label') == l:
-                    wr = sv.get('2d_winrate')
-                    if wr is not None: sh = f" {wr:.0f}%"
-                    break
-            parts.append(f'<span class="indicator-mini {cn}">{i} {l}{sh}</span>')
+            parts.append(f'<span class="indicator-mini {cn}">{i} {l}</span>')
+        
         date_color = '#34D399' if bc_cnt > sc_cnt else ('#F87171' if sc_cnt > bc_cnt else '#FCD34D')
         st.markdown(f"""<div class="signal-card {ct}">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -3211,7 +3169,6 @@ def render_signals(m):
                     padding:2px 8px;border-radius:6px;background:rgba(255,255,255,0.04)">{len(group)}개 시그널</span></div>
             <div style="display:flex;gap:5px;flex-wrap:wrap">{" ".join(parts)}</div></div>""",
                     unsafe_allow_html=True)
-
 
 def render_stats(m):
     with st.expander("📊 시그널 백테스트 (2년 데이터 기반)", expanded=True):
@@ -3310,10 +3267,10 @@ def render_analysis(msg):
         render_speedometer(m)
         render_alerts(m)
     if m or fig:
-        t0, t1, t2, t3, t4 = st.tabs([
+        # 백테스트 탭 삭제
+        t0, t1, t2, t3 = st.tabs([
             "🎯 매매 판단",
             "📊 차트",
-            "📈 백테스트",
             "🔔 시그널 이력",
             "🏢 기업 상세",
         ])
@@ -3329,12 +3286,9 @@ def render_analysis(msg):
                 st.plotly_chart(fig, use_container_width=True, theme=None,
                                 config=plotly_config)
         with t2:
-            if m: render_stats(m)
-        with t3:
             if m: render_signals(m)
-        with t4:
+        with t3:
             if m: render_company_details(m['ticker'])
-
 
 # ──────────────────────────────────────────
 # 사이드바 (🆕 st.query_params 지원)
