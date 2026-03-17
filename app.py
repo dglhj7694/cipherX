@@ -881,39 +881,6 @@ def compute_trade_judgment(df):
           np.where((df['WT1'] < -20) & wt_rising, 1.0,                       # 약세 + 상승 중
           np.where((df['WT1'] > 53) & wt_falling, -1.5, 0))))               # 과매수 + 하락
 
-# ── Layer 2: 모멘텀 (BUY) ──
-    bm = pd.Series(0.0, index=idx)
-
-    # 1. 모멘텀 턴어라운드 시그널
-    for s, p in [('MACD_Cross_Buy',2.5), ('MACD_Zero_Cross_Buy',2.0),
-                 ('StochRSI_Cross_Buy',2.0), ('ADX_Momentum_Buy',2.0),
-                 ('VWAP_Bounce_Buy',1.5)]:
-        bm += _sig_pts(df, s, p)
-
-    # 2. MACD 가속 및 VWAP (기존 유지)
-    bm += np.where((macd_h > 0) & macd_h_rising, 2.0,
-          np.where((macd_h > 0) & macd_h_falling, 0.5,
-          np.where((macd_h < 0) & macd_h_rising, 1.5, 0)))
-    bm += np.where((macd_h > 0) & macd_accel, 0.5, 0)
-    
-    vwap_osc = df['VWAP_Osc']
-    bm += np.where(vwap_osc > 3.0, 1.5,
-          np.where(vwap_osc > 1.0, 1.0,
-          np.where(vwap_osc > 0, 0.5, 0)))
-
-    # 3. 🔧 [핵심 수정] 진정한 상승 모멘텀 추종 + 고점 추격매수 방지
-    bm += np.where(df['RSI'] > 80, -1.0,            # 패널티: 극단적 과매수 (추격 매수 금지)
-          np.where(df['RSI'] >= 60, 2.0,            # 가점: 강한 상승 모멘텀 (달리는 말 탑승)
-          np.where(df['RSI'] >= 50, 1.0, 0)))       # 약가점: 상승세 진입
-
-    bm += np.where(df['StochK'] > 85, -1.0,         # 패널티: 극단적 과매수
-          np.where(df['StochK'] >= 60, 2.0,         # 가점: 상승 가속
-          np.where(df['StochK'] >= 50, 1.0, 0)))
-
-    bm += np.where(df['WT1'] > 60, -1.0,            # 패널티: 파동 과열
-          np.where(df['WT1'] >= 20, 2.0,            # 가점: 상승 파동 확정
-          np.where(df['WT1'] >= 0, 1.0, 0)))
-
     df['BJ_Momentum'] = bm.clip(lower=0)
 
     # ── Layer 3: 캔들 (대폭 개선) ──
@@ -1095,38 +1062,30 @@ def compute_trade_judgment(df):
     df['SJ_Trend'] = st_
 
     # ── Layer 2: 모멘텀 ──
-# ── Layer 2: 모멘텀 (SELL) ──
     sm = pd.Series(0.0, index=idx)
-    
-    # 1. 모멘텀 턴어라운드 시그널
     for s, p in [('MACD_Cross_Sell',2.5), ('MACD_Zero_Cross_Sell',2.0),
-                 ('StochRSI_Cross_Sell',2.0), ('ADX_Momentum_Sell',2.0),
-                 ('VWAP_Reject_Sell',1.5)]:
+                  ('StochRSI_Cross_Sell',2.0), ('ADX_Momentum_Sell',2.0),
+                  ('VWAP_Reject_Sell',1.5)]:
         sm += _sig_pts(df, s, p)
-
-    # 2. MACD 가속 및 VWAP (기존 유지)
     sm += np.where((macd_h < 0) & macd_h_falling, 2.0,
           np.where((macd_h < 0) & macd_h_rising, 0.5,
           np.where((macd_h > 0) & macd_h_falling, 1.5, 0)))
     sm += np.where((macd_h < 0) & macd_decel, 0.5, 0)
-
     sm += np.where(vwap_osc < -3.0, 1.5,
           np.where(vwap_osc < -1.0, 1.0,
           np.where(vwap_osc < 0, 0.5, 0)))
-
-    # 3. 🔧 [핵심 수정] 진정한 하락 모멘텀 추종 + 바닥 추격매도 방지
-    sm += np.where(df['RSI'] < 20, -1.0,            # 패널티: 극단적 과매도 (지하에서 숏 금지)
-          np.where(df['RSI'] <= 40, 2.0,            # 가점: 강한 하락 모멘텀 (투매 동참 구간)
-          np.where(df['RSI'] <= 50, 1.0, 0)))       # 약가점: 하락세 진입
-
-    sm += np.where(df['StochK'] < 15, -1.0,         # 패널티: 극단적 과매도
-          np.where(df['StochK'] <= 40, 2.0,         # 가점: 하락 가속
-          np.where(df['StochK'] <= 50, 1.0, 0)))
-
-    sm += np.where(df['WT1'] < -60, -1.0,           # 패널티: 파동 극바닥
-          np.where(df['WT1'] <= -20, 2.0,           # 가점: 하락 파동 확정
-          np.where(df['WT1'] <= 0, 1.0, 0)))
-
+    sm += np.where((df['RSI'] > 70) & rsi_falling, 3.0,
+          np.where(df['RSI'] > 70, 1.5,
+          np.where((df['RSI'] > 55) & rsi_falling, 1.0,
+          np.where((df['RSI'] < 30) & rsi_rising, -1.5, 0))))
+    sm += np.where((df['StochK'] > 80) & ~stk_rising, 2.5,
+          np.where(df['StochK'] > 80, 1.0,
+          np.where((df['StochK'] < 20) & stk_rising, -1.0, 0)))
+    wt_cross_dn = df.get('WT_Down', pd.Series(False, index=idx))
+    sm += np.where((df['WT1'] > 53) & (wt_cross_dn | wt_falling), 3.0,
+          np.where(df['WT1'] > 53, 1.0,
+          np.where((df['WT1'] > 20) & wt_falling, 1.0,
+          np.where((df['WT1'] < -53) & wt_rising, -1.5, 0))))
     df['SJ_Momentum'] = sm.clip(lower=0)
 
     # ── Layer 3: 캔들 ──
