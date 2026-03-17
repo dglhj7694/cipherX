@@ -327,6 +327,13 @@ SIGNAL_REGISTRY = {
     'NonADX_123_Bull':      _sig(1.8,_B,'📐','nADX123▲','triangle-up',11,'#69F0AE','Low',-1.5,'비ADX풀백매수','주가>50MA+3일저점↓→매수'),
     'NonADX_123_Bear':      _sig(1.8,_S,'📐','nADX123▼','triangle-down',11,'#FF5252','High',1.5,'비ADX풀백매도','주가<50MA+3일고점↑→매도'),
     'Pocket_Pivot':         _sig(1.5,_B,'🧲','PocketPvt','triangle-up',11,'#7C4DFF','Low',-1.5,'포켓피봇','양봉+거래량>10일하락거래량최대+MA위'),
+    # Money Flow 시그널 (6개)
+    'MF_Cross_Bull':        _sig(1.5,_B,'💰','MF 0▲','triangle-up',11,'#00E676','Low',-1.2,'MF 강세전환','자금흐름 음→양 전환'),
+    'MF_Cross_Bear':        _sig(1.5,_S,'💸','MF 0▼','triangle-down',11,'#FF1744','High',1.2,'MF 약세전환','자금흐름 양→음 전환'),
+    'MF_Bull_Div':          _sig(1.8,_B,'💹','MF Bull Div','triangle-up',11,'#7C4DFF','Low',-1.5,'MF 상승 다이버전스','가격↓ vs MF↑'),
+    'MF_Bear_Div':          _sig(1.8,_S,'💹','MF Bear Div','triangle-down',11,'#E040FB','High',1.5,'MF 하락 다이버전스','가격↑ vs MF↓'),
+    'MF_Accel_Up':          _sig(1.0,_B,'📈','MF Accel▲','arrow-up',9,'#69F0AE','Low',-0.8,'MF 가속상승','5일+연속 MF 상승'),
+    'MF_Accel_Dn':          _sig(1.0,_S,'📉','MF Accel▼','arrow-down',9,'#FF5252','High',0.8,'MF 가속하락','5일+연속 MF 하락'),
 }
 
 COMPOSITE_SIGNALS = {
@@ -373,6 +380,9 @@ COOLDOWN_MAP = {
     'Lizard_Bull':5,'Lizard_Bear':5,
     'NonADX_123_Bull':7,'NonADX_123_Bear':7,
     'Pocket_Pivot':10,
+    'MF_Cross_Bull':10, 'MF_Cross_Bear':10,
+    'MF_Bull_Div':10, 'MF_Bear_Div':10,
+    'MF_Accel_Up':5, 'MF_Accel_Dn':5,
 }
 
 SIGNAL_HIERARCHY = {
@@ -671,10 +681,24 @@ def _sig_pts(df, sig_name, points):
     return 0.0
 
 def compute_trade_judgment(df):
-    C, idx = df['Close'], df.index
+    """
+    7-Layer 스코어링 + 콤보 탐지 → 최종 BUY/SELL 판단
+
+    Layer 1: 추세 (Trend)              max ~9
+    Layer 2: 모멘텀 (Momentum)         max ~14
+    Layer 3: 캔들스틱 (Candlestick)    max ~6
+    Layer 4: 볼린저밴드 (Bollinger)    max ~6
+    Layer 5: 거래량 (Volume)           max ~6
+    Layer 6: 자금흐름 (Money Flow)     max ~8  ← 🆕
+    Layer 7: 특수 패턴 (Patterns)      max ~8
+    """
+    C, O, idx = df['Close'], df['Open'], df.index
+    rmfi = df['RSI_MFI']
     vol_ratio = df['Volume'] / (df['Volume'].rolling(50, min_periods=10).mean() + 1e-10)
 
-    # ── BUY Layer 1: 추세 ──
+    # ══════════════ BUY ══════════════
+
+    # ── Layer 1: 추세 (변경 없음) ──
     bt = pd.Series(0.0, index=idx)
     bt += np.where(C > df['MA200'], 2.0, 0)
     bt += np.where(C > df['MA50'], 2.0, 0)
@@ -683,7 +707,8 @@ def compute_trade_judgment(df):
     bt += np.where(df['Plus_DI'] > df['Minus_DI'], 1.0, 0)
     bt += np.where(df['ST_Direction'] == 1, 1.0, 0)
     df['BJ_Trend'] = bt
-    # ── BUY Layer 2: 모멘텀 ──
+
+    # ── Layer 2: 모멘텀 (VWAP 추가) ──
     bm = pd.Series(0.0, index=idx)
     for s, p in [('MACD_Cross_Buy',2),('MACD_Zero_Cross_Buy',2),('StochRSI_Cross_Buy',2),('ADX_Momentum_Buy',2)]:
         bm += _sig_pts(df, s, p)
@@ -691,25 +716,65 @@ def compute_trade_judgment(df):
     bm += np.where(df['RSI'] < 30, 2.0, np.where(df['RSI'] < 45, 1.0, 0))
     bm += np.where(df['StochK'] < 20, 2.0, np.where(df['StochK'] < 35, 1.0, 0))
     bm += np.where(df['WT1'] < -53, 2.0, np.where(df['WT1'] < -20, 1.0, 0))
+    # 🆕 VWAP
+    bm += np.where(df['VWAP_Osc'] > 0, 1.0, 0)
+    bm += _sig_pts(df, 'VWAP_Bounce_Buy', 1.5)
     df['BJ_Momentum'] = bm
-    # ── BUY Layer 3: 캔들 ──
+
+    # ── Layer 3: 캔들 (변경 없음) ──
     bc = pd.Series(0.0, index=idx)
     for s, p in [('Bullish_Engulfing',3),('Morning_Star',3),('Hammer',2),('Doji_Bullish',1),('Outside_Bullish',2)]:
         bc += _sig_pts(df, s, p)
     df['BJ_Candle'] = bc.clip(upper=6.0)
-    # ── BUY Layer 4: 볼린저 ──
+
+    # ── Layer 4: 볼린저 (변경 없음) ──
     bb = pd.Series(0.0, index=idx)
     for s, p in [('BB_Squeeze_End_Bull',3),('Below_Lower_BB',2),('NR7',1),('NR7_2',2),('Calm_After_Storm',1.5)]:
         bb += _sig_pts(df, s, p)
     bb += np.where(df['Percent_B'] < 0.2, 1.0, 0)
     df['BJ_BB'] = bb.clip(upper=6.0)
-    # ── BUY Layer 5: 거래량 ──
+
+    # ── Layer 5: 거래량 (OBV 추가) ──
     bv = pd.Series(0.0, index=idx)
     bv += _sig_pts(df, 'Volume_Climax_Buy', 3.0)
     bv += _sig_pts(df, 'Pocket_Pivot', 2.0)
-    bv += np.where((vol_ratio >= 3.0) & (C > df['Open']), 3.0, np.where((vol_ratio >= 1.5) & (C > df['Open']), 1.0, 0))
+    bv += _sig_pts(df, 'OBV_Div_Buy', 1.5)  # 🆕
+    bv += np.where((vol_ratio >= 3.0) & (C > O), 3.0,
+           np.where((vol_ratio >= 1.5) & (C > O), 1.0, 0))
     df['BJ_Volume'] = bv.clip(upper=6.0)
-    # ── BUY Layer 6: 패턴 ──
+
+    # ── 🆕 Layer 6: 자금흐름 (Money Flow) ── max ~8
+    bmf = pd.Series(0.0, index=idx)
+
+    # MF 레벨 (현재값)
+    bmf += np.where(rmfi < -10, 2.0,      # 강한 자금 유출 = 반등 기대
+           np.where(rmfi < -5, 1.0,
+           np.where(rmfi > 5, -0.5, 0)))   # 이미 과열이면 감점
+
+    # 🔥 MF 방향 (핵심 — "MF가 계속 증가" 감지)
+    if 'MF_Slope_5' in df.columns:
+        mf_slope = df['MF_Slope_5']
+        bmf += np.where(mf_slope > 5, 2.0,        # 5일간 5포인트+ 상승 = 강한 자금 유입
+               np.where(mf_slope > 2, 1.5,         # 중간 유입
+               np.where(mf_slope > 0, 0.5, 0)))    # 약한 유입
+
+    # MF 연속 상승
+    if 'MF_Up_Streak' in df.columns:
+        bmf += np.where(df['MF_Up_Streak'] >= 5, 2.0,    # 5일+ 연속 = 강한 매수 압력
+               np.where(df['MF_Up_Streak'] >= 3, 1.0, 0)) # 3일+ = 중간
+
+    # MF 시그널
+    bmf += _sig_pts(df, 'MF_Cross_Bull', 2.0)     # 0선 상향 돌파
+    bmf += _sig_pts(df, 'MF_Bull_Div', 2.0)       # MF 상승 다이버전스
+    bmf += _sig_pts(df, 'MF_Accel_Up', 1.0)       # 가속 상승
+
+    # 🆕 MF + 가격 합류 (MF 상승 + 가격도 상승 = 강한 확인)
+    mf_price_confirm = df.get('MF_Rising', pd.Series(False, index=idx)) & (C > C.shift(1))
+    bmf += np.where(mf_price_confirm, 0.5, 0)
+
+    df['BJ_MF'] = bmf.clip(upper=8.0)
+
+    # ── Layer 7: 패턴 ──
     bp = pd.Series(0.0, index=idx)
     for s, p in [('Pullback_123_Bull',2),('Setup_180_Bull',2),('Boomer_Buy',2),('Expansion_BO',3),
                   ('Gilligans_Buy',2),('Lizard_Bull',2),('NonADX_123_Bull',1.5),('Pocket_Pivot',2),
@@ -721,9 +786,12 @@ def compute_trade_judgment(df):
         bp += _sig_pts(df, s, p)
     df['BJ_Pattern'] = bp.clip(upper=8.0)
 
-    df['Buy_Total'] = df['BJ_Trend'] + df['BJ_Momentum'] + df['BJ_Candle'] + df['BJ_BB'] + df['BJ_Volume'] + df['BJ_Pattern']
+    df['Buy_Total'] = (df['BJ_Trend'] + df['BJ_Momentum'] + df['BJ_Candle'] +
+                       df['BJ_BB'] + df['BJ_Volume'] + df['BJ_MF'] + df['BJ_Pattern'])
 
-    # ── SELL Layer 1: 추세 ──
+    # ══════════════ SELL ══════════════
+
+    # ── Layer 1: 추세 ──
     st_ = pd.Series(0.0, index=idx)
     st_ += np.where(C < df['MA200'], 2.0, 0)
     st_ += np.where(C < df['MA50'], 2.0, 0)
@@ -732,7 +800,8 @@ def compute_trade_judgment(df):
     st_ += np.where(df['Minus_DI'] > df['Plus_DI'], 1.0, 0)
     st_ += np.where(df['ST_Direction'] == -1, 1.0, 0)
     df['SJ_Trend'] = st_
-    # ── SELL Layer 2: 모멘텀 ──
+
+    # ── Layer 2: 모멘텀 (VWAP 추가) ──
     sm = pd.Series(0.0, index=idx)
     for s, p in [('MACD_Cross_Sell',2),('MACD_Zero_Cross_Sell',2),('StochRSI_Cross_Sell',2),('ADX_Momentum_Sell',2)]:
         sm += _sig_pts(df, s, p)
@@ -740,24 +809,63 @@ def compute_trade_judgment(df):
     sm += np.where(df['RSI'] > 70, 2.0, np.where(df['RSI'] > 55, 1.0, 0))
     sm += np.where(df['StochK'] > 80, 2.0, np.where(df['StochK'] > 65, 1.0, 0))
     sm += np.where(df['WT1'] > 53, 2.0, np.where(df['WT1'] > 20, 1.0, 0))
+    sm += np.where(df['VWAP_Osc'] < 0, 1.0, 0)
+    sm += _sig_pts(df, 'VWAP_Reject_Sell', 1.5)
     df['SJ_Momentum'] = sm
-    # ── SELL Layer 3: 캔들 ──
+
+    # ── Layer 3: 캔들 ──
     sc = pd.Series(0.0, index=idx)
     for s, p in [('Bearish_Engulfing',3),('Evening_Star',3),('Shooting_Star',2),('Doji_Bearish',1),('Outside_Bearish',2)]:
         sc += _sig_pts(df, s, p)
     df['SJ_Candle'] = sc.clip(upper=6.0)
-    # ── SELL Layer 4: 볼린저 ──
+
+    # ── Layer 4: 볼린저 ──
     sb_ = pd.Series(0.0, index=idx)
     for s, p in [('BB_Squeeze_End_Bear',3),('Above_Upper_BB',2),('NR7',1),('NR7_2',2),('Calm_After_Storm',1.5)]:
         sb_ += _sig_pts(df, s, p)
     sb_ += np.where(df['Percent_B'] > 0.8, 1.0, 0)
     df['SJ_BB'] = sb_.clip(upper=6.0)
-    # ── SELL Layer 5: 거래량 ──
+
+    # ── Layer 5: 거래량 (OBV 추가) ──
     sv = pd.Series(0.0, index=idx)
     sv += _sig_pts(df, 'Volume_Climax_Sell', 3.0)
-    sv += np.where((vol_ratio >= 3.0) & (C < df['Open']), 3.0, np.where((vol_ratio >= 1.5) & (C < df['Open']), 1.0, 0))
+    sv += _sig_pts(df, 'OBV_Div_Sell', 1.5)  # 🆕
+    sv += np.where((vol_ratio >= 3.0) & (C < O), 3.0,
+           np.where((vol_ratio >= 1.5) & (C < O), 1.0, 0))
     df['SJ_Volume'] = sv.clip(upper=6.0)
-    # ── SELL Layer 6: 패턴 ──
+
+    # ── 🆕 Layer 6: 자금흐름 (Money Flow) ──
+    smf = pd.Series(0.0, index=idx)
+
+    # MF 레벨
+    smf += np.where(rmfi > 10, 2.0,       # 강한 자금 유입 과열
+           np.where(rmfi > 5, 1.0,
+           np.where(rmfi < -5, -0.5, 0)))  # 이미 유출 중이면 감점
+
+    # MF 방향 (하락)
+    if 'MF_Slope_5' in df.columns:
+        mf_slope = df['MF_Slope_5']
+        smf += np.where(mf_slope < -5, 2.0,
+               np.where(mf_slope < -2, 1.5,
+               np.where(mf_slope < 0, 0.5, 0)))
+
+    # MF 연속 하락
+    if 'MF_Dn_Streak' in df.columns:
+        smf += np.where(df['MF_Dn_Streak'] >= 5, 2.0,
+               np.where(df['MF_Dn_Streak'] >= 3, 1.0, 0))
+
+    # MF 시그널
+    smf += _sig_pts(df, 'MF_Cross_Bear', 2.0)
+    smf += _sig_pts(df, 'MF_Bear_Div', 2.0)
+    smf += _sig_pts(df, 'MF_Accel_Dn', 1.0)
+
+    # MF + 가격 합류 (MF 하락 + 가격 하락)
+    mf_price_confirm_sell = df.get('MF_Falling', pd.Series(False, index=idx)) & (C < C.shift(1))
+    smf += np.where(mf_price_confirm_sell, 0.5, 0)
+
+    df['SJ_MF'] = smf.clip(upper=8.0)
+
+    # ── Layer 7: 패턴 ──
     sp = pd.Series(0.0, index=idx)
     for s, p in [('Pullback_123_Bear',2),('Setup_180_Bear',2),('Boomer_Sell',2),('Expansion_BD',3),
                   ('Gilligans_Sell',2),('Lizard_Bear',2),('NonADX_123_Bear',1.5),
@@ -769,31 +877,34 @@ def compute_trade_judgment(df):
         sp += _sig_pts(df, s, p)
     df['SJ_Pattern'] = sp.clip(upper=8.0)
 
-    df['Sell_Total'] = df['SJ_Trend'] + df['SJ_Momentum'] + df['SJ_Candle'] + df['SJ_BB'] + df['SJ_Volume'] + df['SJ_Pattern']
+    df['Sell_Total'] = (df['SJ_Trend'] + df['SJ_Momentum'] + df['SJ_Candle'] +
+                        df['SJ_BB'] + df['SJ_Volume'] + df['SJ_MF'] + df['SJ_Pattern'])
 
-    # ── 활성 레이어 수 ──
-    df['Buy_Active_Layers'] = sum((df[f'BJ_{n}'] > 0).astype(int) for n in ['Trend','Momentum','Candle','BB','Volume','Pattern'])
-    df['Sell_Active_Layers'] = sum((df[f'SJ_{n}'] > 0).astype(int) for n in ['Trend','Momentum','Candle','BB','Volume','Pattern'])
+    # ── 활성 레이어 수 (7개로 변경) ──
+    df['Buy_Active_Layers'] = sum(
+        (df[f'BJ_{n}'] > 0).astype(int)
+        for n in ['Trend','Momentum','Candle','BB','Volume','MF','Pattern'])
+    df['Sell_Active_Layers'] = sum(
+        (df[f'SJ_{n}'] > 0).astype(int)
+        for n in ['Trend','Momentum','Candle','BB','Volume','MF','Pattern'])
 
-    # ── 최종 판단 ──
+    # ── 최종 판단 (임계값 조정) ──
     j = np.full(len(df), 'NEUTRAL', dtype=object)
     bt_v, st_v = df['Buy_Total'].values, df['Sell_Total'].values
     ba, sa = df['Buy_Active_Layers'].values, df['Sell_Active_Layers'].values
     for i in range(len(df)):
         b, s, bal, sal = bt_v[i], st_v[i], ba[i], sa[i]
-        if b >= 15 and bal >= 3 and b > s * 1.5: j[i] = 'STRONG_BUY'
-        elif b >= 10 and bal >= 3 and b > s: j[i] = 'BUY'
-        elif b >= 5 and bal >= 2 and b > s: j[i] = 'WATCH_BUY'
-        elif s >= 15 and sal >= 3 and s > b * 1.5: j[i] = 'STRONG_SELL'
-        elif s >= 10 and sal >= 3 and s > b: j[i] = 'SELL'
-        elif s >= 5 and sal >= 2 and s > b: j[i] = 'WATCH_SELL'
-        elif b >= 8 and s >= 8: j[i] = 'MIXED'
+        if b >= 17 and bal >= 4 and b > s * 1.5:   j[i] = 'STRONG_BUY'
+        elif b >= 11 and bal >= 3 and b > s:        j[i] = 'BUY'
+        elif b >= 6 and bal >= 2 and b > s:         j[i] = 'WATCH_BUY'
+        elif s >= 17 and sal >= 4 and s > b * 1.5:  j[i] = 'STRONG_SELL'
+        elif s >= 11 and sal >= 3 and s > b:        j[i] = 'SELL'
+        elif s >= 6 and sal >= 2 and s > b:         j[i] = 'WATCH_SELL'
+        elif b >= 9 and s >= 9:                     j[i] = 'MIXED'
     df['Trade_Judgment'] = j
 
-    # ── 콤보 탐지 ──
     detect_combos(df, vol_ratio)
     return df
-
 
 def detect_combos(df, vol_ratio):
     C, idx = df['Close'], df.index
@@ -808,50 +919,186 @@ def detect_combos(df, vol_ratio):
     vol_confirm = vol_ratio >= 1.5
     squeeze_state = F('NR7') | F('NR7_2') | F('Inside_Day') | F('Calm_After_Storm') | (df['BB_Width'] <= df['BB_Width'].rolling(120, min_periods=20).quantile(0.1))
 
-    # BUY 콤보
-    ma_support = ((C - df['MA50']).abs() <= df['ATR'] * 1.5) | ((C - df['MA20']).abs() <= df['ATR'] * 1.0)
-    df['Combo_TrendPullback_Buy'] = trend_up & (C < df['MA20']) & ma_support & (candle_bull | timing_bull) & (df['BJ_Trend'] >= 5)
-    df['Combo_VolSqueeze_Buy'] = squeeze_state.shift(1).fillna(False) & (C > df['MA50']) & (F('BB_Squeeze_End_Bull') | (F('Wide_Range_Bar') & (C > df['Open']))) & vol_confirm
-    oversold_ext = (((df['StochK'] < 20) & (df['StochD'] < 20)).astype(int) + (df['RSI'] < 30).astype(int) + (df['WT1'] < -53).astype(int)) >= 2
-    df['Combo_Reversal_Buy'] = oversold_ext & ((C > df['MA200']) | (df['MA50'] > df['MA200'])) & (candle_bull | F('Gold_Dot') | F('Green_Dot_T1') | F('Lizard_Bull') | F('Gilligans_Buy'))
-    df['Combo_Momentum_Buy'] = (F('New_52W_High') | F('Expansion_BO')) & (vol_confirm | F('Pocket_Pivot') | F('Momentum_Ignition_Buy')) & (df['ADX'] > 25) & (df['Plus_DI'] > df['Minus_DI'])
-    df['Combo_MAConfluence_Buy'] = (df['MA50'] > df['MA200']) & (C > df['MA200']) & (F('Cross_Above_20MA') | F('Cross_Above_50MA')) & (F('MACD_Cross_Buy') | F('StochRSI_Cross_Buy') | F('NonADX_123_Bull'))
+    # 🆕 MF 조건
+    mf_bull = (df['RSI_MFI'] > df['RSI_MFI'].shift(1)) | (df['RSI_MFI'] > 0)   # MF 상승 중이거나 양수
+    mf_bear = (df['RSI_MFI'] < df['RSI_MFI'].shift(1)) | (df['RSI_MFI'] < 0)   # MF 하락 중이거나 음수
+    mf_strong_bull = F('MF_Strong_Up') | (df.get('MF_Slope_5', pd.Series(0, index=idx)) > 3)
+    mf_strong_bear = F('MF_Strong_Dn') | (df.get('MF_Slope_5', pd.Series(0, index=idx)) < -3)
 
-    # SELL 콤보
-    df['Combo_TrendRejection_Sell'] = trend_dn & (C > df['MA20']) & (candle_bear | timing_bear) & (df['SJ_Trend'] >= 5)
+    # ═══ BUY 콤보 (MF 조건 추가) ═══
+    ma_support = ((C - df['MA50']).abs() <= df['ATR'] * 1.5) | ((C - df['MA20']).abs() <= df['ATR'] * 1.0)
+    df['Combo_TrendPullback_Buy'] = (
+        trend_up & (C < df['MA20']) & ma_support &
+        (candle_bull | timing_bull) &
+        mf_bull &                                    # 🆕 MF도 상승/양수
+        (df['BJ_Trend'] >= 5))
+
+    df['Combo_VolSqueeze_Buy'] = (
+        squeeze_state.shift(1).fillna(False) &
+        (C > df['MA50']) &
+        (F('BB_Squeeze_End_Bull') | (F('Wide_Range_Bar') & (C > df['Open']))) &
+        vol_confirm &
+        mf_bull)                                     # 🆕
+
+    oversold_ext = (((df['StochK'] < 20) & (df['StochD'] < 20)).astype(int) + (df['RSI'] < 30).astype(int) + (df['WT1'] < -53).astype(int)) >= 2
+    df['Combo_Reversal_Buy'] = (
+        oversold_ext &
+        ((C > df['MA200']) | (df['MA50'] > df['MA200'])) &
+        (candle_bull | F('Gold_Dot') | F('Green_Dot_T1') | F('Lizard_Bull') | F('Gilligans_Buy')))
+        # 반전은 MF 제외 (과매도에서 MF가 아직 음수일 수 있음)
+
+    df['Combo_Momentum_Buy'] = (
+        (F('New_52W_High') | F('Expansion_BO')) &
+        (vol_confirm | F('Pocket_Pivot') | F('Momentum_Ignition_Buy')) &
+        (df['ADX'] > 25) & (df['Plus_DI'] > df['Minus_DI']) &
+        mf_strong_bull)                               # 🆕 MF 강한 상승
+
+    df['Combo_MAConfluence_Buy'] = (
+        (df['MA50'] > df['MA200']) & (C > df['MA200']) &
+        (F('Cross_Above_20MA') | F('Cross_Above_50MA')) &
+        (F('MACD_Cross_Buy') | F('StochRSI_Cross_Buy') | F('NonADX_123_Bull')) &
+        mf_bull)                                      # 🆕
+
+    # 🆕 새 콤보: MF 추세 전환 매수
+    df['Combo_MF_Reversal_Buy'] = (
+        F('MF_Cross_Bull') &                          # MF 0선 돌파
+        (df['WT1'] < 20) &                            # 아직 과매수 아님
+        (C > df['MA50']) &                            # 중기 추세 상승
+        (candle_bull | timing_bull | vol_confirm))
+
+    # ═══ SELL 콤보 (MF 조건 추가) ═══
+    df['Combo_TrendRejection_Sell'] = (
+        trend_dn & (C > df['MA20']) &
+        (candle_bear | timing_bear) &
+        mf_bear &                                     # 🆕
+        (df['SJ_Trend'] >= 5))
+
     overbought_ext = (((df['StochK'] > 80) & (df['StochD'] > 80)).astype(int) + (df['RSI'] > 70).astype(int) + (df['WT1'] > 53).astype(int)) >= 2
-    df['Combo_Exhaustion_Sell'] = overbought_ext & (candle_bear | F('Gilligans_Sell') | F('Blood_Diamond') | F('Red_Dot_T1') | F('Parabolic_Top_Sell'))
+    df['Combo_Exhaustion_Sell'] = (
+        overbought_ext &
+        (candle_bear | F('Gilligans_Sell') | F('Blood_Diamond') | F('Red_Dot_T1') | F('Parabolic_Top_Sell')))
+
     ma_break = (F('Fell_Below_20MA').astype(int) + F('Fell_Below_50MA').astype(int) + F('Fell_Below_200MA').astype(int) + F('Death_Cross').astype(int)) >= 1
-    df['Combo_MABreakdown_Sell'] = ma_break & (vol_confirm | F('MACD_Zero_Cross_Sell') | (F('Wide_Range_Bar') & (C < df['Open']))) & (df['SJ_Trend'] >= 3)
-    df['Combo_VolSqueeze_Sell'] = squeeze_state.shift(1).fillna(False) & (C < df['MA50']) & (F('BB_Squeeze_End_Bear') | (F('Wide_Range_Bar') & (C < df['Open']))) & vol_confirm
+    df['Combo_MABreakdown_Sell'] = (
+        ma_break &
+        (vol_confirm | F('MACD_Zero_Cross_Sell') | (F('Wide_Range_Bar') & (C < df['Open']))) &
+        mf_bear &                                     # 🆕
+        (df['SJ_Trend'] >= 3))
+
+    df['Combo_VolSqueeze_Sell'] = (
+        squeeze_state.shift(1).fillna(False) &
+        (C < df['MA50']) &
+        (F('BB_Squeeze_End_Bear') | (F('Wide_Range_Bar') & (C < df['Open']))) &
+        vol_confirm & mf_bear)                        # 🆕
+
     gap_up_fail = F('Gap_Up').shift(1).fillna(False) & (C < df['Open']) & (candle_bear | F('Gilligans_Sell'))
     df['Combo_GapFailure_Sell'] = gap_up_fail | (F('Gap_Down') & vol_confirm & (F('Fell_Below_50MA') | F('Fell_Below_200MA')))
 
-
+    # 🆕 새 콤보: MF 추세 전환 매도
+    df['Combo_MF_Reversal_Sell'] = (
+        F('MF_Cross_Bear') &
+        (df['WT1'] > -20) &
+        (C < df['MA50']) &
+        (candle_bear | timing_bear | vol_confirm))
+    
 COMBO_MAP = {
     'Combo_TrendPullback_Buy':  ('🎯 추세 눌림목 매수', 'buy'),
     'Combo_VolSqueeze_Buy':     ('💥 변동성 수축 돌파', 'buy'),
     'Combo_Reversal_Buy':       ('🔄 반전 매수', 'buy'),
     'Combo_Momentum_Buy':       ('🚀 모멘텀 돌파', 'buy'),
     'Combo_MAConfluence_Buy':   ('📊 MA 합류 매수', 'buy'),
+    'Combo_MF_Reversal_Buy':    ('💰 자금흐름 전환 매수', 'buy'),      # 🆕
     'Combo_TrendRejection_Sell':('🎯 추세 반등 실패', 'sell'),
     'Combo_Exhaustion_Sell':    ('🌡️ 고점 소진', 'sell'),
     'Combo_MABreakdown_Sell':   ('📉 MA 붕괴', 'sell'),
     'Combo_VolSqueeze_Sell':    ('💨 변동성 수축 붕괴', 'sell'),
     'Combo_GapFailure_Sell':    ('⏬ 갭 실패', 'sell'),
+    'Combo_MF_Reversal_Sell':   ('💸 자금흐름 전환 매도', 'sell'),      # 🆕
 }
 
 
 def get_judgment_detail(row):
-    bl = {n: float(row.get(f'BJ_{n}', 0)) for n in ['Trend','Momentum','Candle','BB','Volume','Pattern']}
-    sl = {n: float(row.get(f'SJ_{n}', 0)) for n in ['Trend','Momentum','Candle','BB','Volume','Pattern']}
+    # 7개 레이어로 변경
+    bl = {n: float(row.get(f'BJ_{n}', 0)) for n in ['Trend','Momentum','Candle','BB','Volume','MF','Pattern']}
+    sl = {n: float(row.get(f'SJ_{n}', 0)) for n in ['Trend','Momentum','Candle','BB','Volume','MF','Pattern']}
     combos = [{'name': name, 'dir': d} for col, (name, d) in COMBO_MAP.items() if row.get(col, False)]
     return {
         'judgment': str(row.get('Trade_Judgment', 'NEUTRAL')),
-        'buy_total': float(row.get('Buy_Total', 0)), 'sell_total': float(row.get('Sell_Total', 0)),
+        'buy_total': float(row.get('Buy_Total', 0)),
+        'sell_total': float(row.get('Sell_Total', 0)),
         'buy_layers': bl, 'sell_layers': sl,
-        'buy_active': int(row.get('Buy_Active_Layers', 0)), 'sell_active': int(row.get('Sell_Active_Layers', 0)),
-        'active_combos': combos, 'net': float(row.get('Buy_Total', 0)) - float(row.get('Sell_Total', 0)),
+        'buy_active': int(row.get('Buy_Active_Layers', 0)),
+        'sell_active': int(row.get('Sell_Active_Layers', 0)),
+        'active_combos': combos,
+        'net': float(row.get('Buy_Total', 0)) - float(row.get('Sell_Total', 0)),
+    }
+# ──────────────────────────────────────────
+# 🆕 Money Flow 확장 시그널
+# ──────────────────────────────────────────
+
+def detect_mf_signals(c, rmfi):
+    """
+    Money Flow 기반 시그널 탐지
+    - MF 0선 교차
+    - MF 추세 (5일 연속 상승/하락)
+    - MF 가속 (기울기 증가)
+    - MF-가격 다이버전스
+    """
+    # ── MF 0선 교차 ──
+    mf_cross_bull = (rmfi > 0) & (rmfi.shift(1) <= 0)   # 음→양
+    mf_cross_bear = (rmfi < 0) & (rmfi.shift(1) >= 0)   # 양→음
+
+    # ── MF 추세 (방향) ──
+    mf_rising = rmfi > rmfi.shift(1)   # 오늘 > 어제
+    mf_falling = rmfi < rmfi.shift(1)
+
+    # 연속 상승/하락 카운트
+    mf_up_streak = pd.Series(0, index=c.index, dtype=int)
+    mf_dn_streak = pd.Series(0, index=c.index, dtype=int)
+    for i in range(1, len(c)):
+        if mf_rising.iloc[i]:
+            mf_up_streak.iloc[i] = mf_up_streak.iloc[i-1] + 1
+        else:
+            mf_up_streak.iloc[i] = 0
+        if mf_falling.iloc[i]:
+            mf_dn_streak.iloc[i] = mf_dn_streak.iloc[i-1] + 1
+        else:
+            mf_dn_streak.iloc[i] = 0
+
+    mf_strong_up = mf_up_streak >= 3       # 3일+ 연속 MF 상승
+    mf_strong_dn = mf_dn_streak >= 3       # 3일+ 연속 MF 하락
+    mf_accel_up = mf_up_streak >= 5        # 5일+ 연속 = 가속
+    mf_accel_dn = mf_dn_streak >= 5
+
+    # ── MF 기울기 (5일 변화량) ──
+    mf_slope_5 = rmfi - rmfi.shift(5)      # 5일간 변화
+    mf_slope_10 = rmfi - rmfi.shift(10)    # 10일간 변화
+
+    # ── MF-가격 다이버전스 (간소화 버전) ──
+    # 가격은 5일 저점 갱신인데 MF는 5일 전보다 높음 = 강세 다이버전스
+    price_lower = c < c.rolling(5).min().shift(1)
+    mf_higher = rmfi > rmfi.rolling(5).min().shift(1)
+    mf_bull_div = price_lower & mf_higher & (rmfi < 0)
+
+    price_higher = c > c.rolling(5).max().shift(1)
+    mf_lower = rmfi < rmfi.rolling(5).max().shift(1)
+    mf_bear_div = price_higher & mf_lower & (rmfi > 0)
+
+    return {
+        'MF_Cross_Bull': mf_cross_bull,
+        'MF_Cross_Bear': mf_cross_bear,
+        'MF_Strong_Up': mf_strong_up,
+        'MF_Strong_Dn': mf_strong_dn,
+        'MF_Accel_Up': mf_accel_up,
+        'MF_Accel_Dn': mf_accel_dn,
+        'MF_Slope_5': mf_slope_5,
+        'MF_Slope_10': mf_slope_10,
+        'MF_Bull_Div': mf_bull_div,
+        'MF_Bear_Div': mf_bear_div,
+        'MF_Rising': mf_rising,
+        'MF_Falling': mf_falling,
+        'MF_Up_Streak': mf_up_streak,
+        'MF_Dn_Streak': mf_dn_streak,
     }
 
 
@@ -1058,6 +1305,25 @@ def detect_all_signals(df):
     df['Sell_Shield_Overridden'] = para_top | st_bo
     df['Buy_Shield_Overridden'] = para_bot | st_bu
     df['_HTF1_Bull'], df['_HTF2_Bull'] = htf1, htf2
+
+    # ═══ 🆕 Money Flow 확장 시그널 ═══
+    mf_sigs = detect_mf_signals(C, df['RSI_MFI'])
+    df['MF_Cross_Bull'] = mf_sigs['MF_Cross_Bull'] & (~bsb) & vok
+    df['MF_Cross_Bear'] = mf_sigs['MF_Cross_Bear'] & (~ssb) & vok
+    df['MF_Bull_Div'] = mf_sigs['MF_Bull_Div'] & (~bsb) & vok
+    df['MF_Bear_Div'] = mf_sigs['MF_Bear_Div'] & (~ssb) & vok
+    df['MF_Accel_Up'] = mf_sigs['MF_Accel_Up']
+    df['MF_Accel_Dn'] = mf_sigs['MF_Accel_Dn']
+
+    # MF 내부 데이터 저장 (판단 엔진용)
+    df['MF_Slope_5'] = mf_sigs['MF_Slope_5']
+    df['MF_Slope_10'] = mf_sigs['MF_Slope_10']
+    df['MF_Rising'] = mf_sigs['MF_Rising']
+    df['MF_Falling'] = mf_sigs['MF_Falling']
+    df['MF_Strong_Up'] = mf_sigs['MF_Strong_Up']
+    df['MF_Strong_Dn'] = mf_sigs['MF_Strong_Dn']
+    df['MF_Up_Streak'] = mf_sigs['MF_Up_Streak']
+    df['MF_Dn_Streak'] = mf_sigs['MF_Dn_Streak']
 
     # ═══ 🆕 6-Layer 판단 엔진 ═══
     compute_trade_judgment(df)
@@ -1764,14 +2030,14 @@ def render_judgment(meta):
     with st.expander("📐 판단 기준 상세", expanded=False):
         rows_html = ""
         criteria = [
-            ('STRONG_BUY','🟢🟢🟢 STRONG BUY','BUY ≥ 15 + 3층↑ + BUY > SELL×1.5'),
-            ('BUY','🟢🟢 BUY','BUY ≥ 10 + 3층↑ + BUY > SELL'),
-            ('WATCH_BUY','🟡🟢 WATCH BUY','BUY ≥ 5 + 2층↑'),
+            ('STRONG_BUY','🟢🟢🟢 STRONG BUY','BUY ≥ 17 + 4층↑ + BUY > SELL×1.5'),
+            ('BUY','🟢🟢 BUY','BUY ≥ 11 + 3층↑ + BUY > SELL'),
+            ('WATCH_BUY','🟡🟢 WATCH BUY','BUY ≥ 6 + 2층↑'),
             ('NEUTRAL','⚪ NEUTRAL','기준 미달'),
-            ('MIXED','🟠 MIXED','BUY ≥ 8 & SELL ≥ 8'),
-            ('WATCH_SELL','🟡🔴 WATCH SELL','SELL ≥ 5 + 2층↑'),
-            ('SELL','🔴🔴 SELL','SELL ≥ 10 + 3층↑ + SELL > BUY'),
-            ('STRONG_SELL','🔴🔴🔴 STRONG SELL','SELL ≥ 15 + 3층↑ + SELL > BUY×1.5'),
+            ('MIXED','🟠 MIXED','BUY ≥ 9 & SELL ≥ 9'),
+            ('WATCH_SELL','🟡🔴 WATCH SELL','SELL ≥ 6 + 2층↑'),
+            ('SELL','🔴🔴 SELL','SELL ≥ 11 + 3층↑ + SELL > BUY'),
+            ('STRONG_SELL','🔴🔴🔴 STRONG SELL','SELL ≥ 17 + 4층↑ + SELL > BUY×1.5'),
         ]
         for key, label, cond in criteria:
             is_active = judgment == key
@@ -1817,7 +2083,8 @@ def render_judgment(meta):
 
 
 def _render_layer_bars(layers, side, active_count):
-    icons = {'Trend':'📈','Momentum':'🔥','Candle':'🕯️','BB':'📊','Volume':'📦','Pattern':'⭐'}
+    icons = {'Trend':'📈','Momentum':'🔥','Candle':'🕯️','BB':'📊',
+             'Volume':'📦','MF':'💰','Pattern':'⭐'}  
     max_per = 9.0
     fill_cls = 'layer-bar-fill-buy' if side == 'buy' else 'layer-bar-fill-sell'
     score_color = '#34D399' if side == 'buy' else '#F87171'
