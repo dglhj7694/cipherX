@@ -488,9 +488,13 @@ def fetch_history(ticker, _ts=None): return yf.Ticker(ticker).history(period="2y
 @st.cache_data(ttl=600, show_spinner=False)
 def validate_ticker(ticker):
     try:
-        info = yf.Ticker(ticker).info
-        return info.get('regularMarketPrice') is not None or info.get('currentPrice') is not None
-    except: return False
+        # 불안정한 info() 대신 최근 5일치 history 데이터 존재 여부로 확실하게 검증
+        hist = yf.Ticker(ticker).history(period="5d")
+        return not hist.empty
+    except Exception as e:
+        import logging
+        logging.warning(f"Ticker validation failed for {ticker}: {e}")
+        return False
 
 @st.cache_data(ttl=300, show_spinner=False)
 def compute_and_cache(ticker, _ts=None):
