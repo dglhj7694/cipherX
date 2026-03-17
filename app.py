@@ -1271,7 +1271,70 @@ def compute_trade_judgment(df):
         elif b >= 10 and s >= 10 and abs(diff) < 5:                   j[i] = 'MIXED'
     df['Trade_Judgment'] = j
 
+# ──────────────────────────────────────────
+    # 🔧 [수정] 콤보를 먼저 계산하여 최종 타점 판단에 융합
+    # ──────────────────────────────────────────
+    # 1. 콤보 선행 탐지 (BJ_Trend 등이 이미 계산되었으므로 가능)
     detect_combos(df, vol_ratio)
+
+    # 2. 콤보 발생 여부를 배열로 추출
+    buy_combo_cols = [c for c in df.columns if c.startswith('Combo_') and c.endswith('_Buy')]
+    sell_combo_cols = [c for c in df.columns if c.startswith('Combo_') and c.endswith('_Sell')]
+    
+    has_buy_combo = df[buy_combo_cols].any(axis=1).values
+    has_sell_combo = df[sell_combo_cols].any(axis=1).values
+
+    # 3. 최종 판단 엔진: 스코어(기상도) + 콤보(타점)의 결합
+    j = np.full(len(df), 'NEUTRAL', dtype=object)
+    bt_v, st_v = df['Buy_Total'].values, df['Sell_Total'].values
+    ba, sa = df['Buy_Active_Layers'].values, df['Sell_Active_Layers'].values
+    
+    for i in range(len(df)):
+        b, s, bal, sal = bt_v[i], st_v[i], ba[i], sa[i]
+        diff = b - s
+        ratio = b / (s + 0.01)
+        s_ratio = s / (b + 0.01)
+        
+        combo_b = has_buy_combo[i]
+        combo_s = has_sell_combo[i]
+
+        # 🟢 매수 로직 (롱)
+        if b >= 15 and bal >= 4 and ratio >= 2.0:
+            if combo_b:
+                # 완벽한 기상도 + 콤보 타점 발생 = 스나이퍼 매수
+                j[i] = 'STRONG_BUY'
+            else:
+                # 기상도는 완벽하나 아직 트리거가 없음 = 진입 대기 (레이더망)
+                j[i] = 'WATCH_BUY'
+                
+        elif b >= 10 and bal >= 3 and ratio >= 1.4:
+            if combo_b:
+                # 기상도는 보통이나 훌륭한 타점 발생 = 일반 매수
+                j[i] = 'BUY'
+            else:
+                # 기상도는 보통, 타점도 없음 = 중립에 가까운 관망
+                j[i] = 'NEUTRAL'
+
+        # 🔴 매도 로직 (숏)
+        elif s >= 15 and sal >= 4 and s_ratio >= 2.0:
+            if combo_s:
+                # 완벽한 하락 기상도 + 콤보 타점 발생 = 스나이퍼 숏
+                j[i] = 'STRONG_SELL'
+            else:
+                # 폭락 환경이나 아직 트리거 없음 = 매도/숏 대기
+                j[i] = 'WATCH_SELL'
+                
+        elif s >= 10 and sal >= 3 and s_ratio >= 1.4:
+            if combo_s:
+                j[i] = 'SELL'
+            else:
+                j[i] = 'NEUTRAL'
+                
+        # 🟠 혼조세
+        elif b >= 10 and s >= 10 and abs(diff) < 5:
+            j[i] = 'MIXED'
+
+    df['Trade_Judgment'] = j
     return df
 
 def detect_combos(df, vol_ratio):
