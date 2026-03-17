@@ -9,6 +9,7 @@ import yfinance as yf
 import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
+pd.set_option('future.no_silent_downcasting', True)
 from plotly.subplots import make_subplots
 from collections import OrderedDict
 from company_details import render_company_details
