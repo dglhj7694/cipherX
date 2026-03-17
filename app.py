@@ -3219,37 +3219,82 @@ def render_stats(m):
         if not alls:
             st.caption("충분한 통계 데이터가 없습니다.")
             return
+            
         st.markdown("<p style='color:#64748B;font-size:.8rem;margin-bottom:16px'>"
-                    "진입: 시그널 다음날 시가 · 청산: 2일 후 종가</p>", unsafe_allow_html=True)
+                    "진입: 시그널 다음날 시가 · 청산: 2일 후 종가 (공매도 수익률은 양수로 정규화됨)</p>", 
+                    unsafe_allow_html=True)
 
         def _side(title, data, is_sell=False):
             st.markdown(f"<p style='color:{'#F87171' if is_sell else '#34D399'};font-weight:700;"
                         f"font-size:.85rem;text-transform:uppercase;letter-spacing:1px;"
                         f"margin-bottom:10px'>{title}</p>", unsafe_allow_html=True)
+                        
             for sn, sv in sorted(data.items(), key=lambda x: x[1]['count'], reverse=True):
                 wr = sv.get('2d_winrate')
                 av = sv.get('2d_avg')
-                if wr is None: continue
+                
+                # 새로운 퀄리티 지표 가져오기
+                mdd = sv.get('2d_mdd')
+                pf = sv.get('2d_profit_factor')
+                sharpe = sv.get('2d_sharpe')
+                
+                if wr is None or mdd is None: continue
+                
                 kor_label = ALL_CHART_SIGNALS.get(sn, {}).get('kor', sn)
                 ic = ALL_CHART_SIGNALS.get(sn, {}).get('icon', '')
+                
+                # 승률 색상
                 if wr >= 60: wr_c = '#34D399'
                 elif wr >= 50: wr_c = '#6EE7B7'
                 elif wr >= 40: wr_c = '#FCD34D'
                 else: wr_c = '#F87171'
-                if is_sell: av_c = '#34D399' if av < 0 else '#F87171'
-                else: av_c = '#34D399' if av > 0 else '#F87171'
+                
+                # 평균 수익률 색상 (업데이트된 엔진에서는 매도/매수 상관없이 양수면 수익)
+                av_c = '#34D399' if av > 0 else '#F87171'
                 wr_bar = min(wr, 100)
-                st.markdown(f"""<div style="padding:8px 12px;margin:4px 0;border-radius:8px;
-                    background:rgba(255,255,255,0.015);border:1px solid rgba(255,255,255,0.03)">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-                        <span style="color:#CBD5E1;font-weight:600;font-size:.85rem">{ic} {kor_label}
-                            <span style="color:#475569;font-size:.75rem;font-weight:400">({sv['count']}회)</span></span>
-                        <span style="color:{av_c};font-weight:700;font-size:.85rem">{av:+.1f}%</span>
+                
+                # 🛡️ 퀄리티 지표 색상 로직
+                # MDD: 0에 가까울수록(절대값이 작을수록) 좋음. -2% 이내면 훌륭, -5% 이상이면 위험
+                mdd_c = '#34D399' if abs(mdd) <= 2.0 else ('#FCD34D' if abs(mdd) <= 5.0 else '#F87171')
+                # Profit Factor: 1.5 이상 훌륭, 1.0 이하면 손실 우위
+                pf_c = '#34D399' if pf >= 1.5 else ('#FCD34D' if pf >= 1.0 else '#F87171')
+                # Sharpe Ratio: 1.0 이상 훌륭, 0.5 이하면 변동성 대비 보상 낮음
+                shp_c = '#34D399' if sharpe >= 1.0 else ('#FCD34D' if sharpe >= 0.5 else '#F87171')
+
+                # UI HTML 구성
+                st.markdown(f"""<div style="padding:10px 14px;margin:6px 0;border-radius:10px;
+                    background:rgba(255,255,255,0.015);border:1px solid rgba(255,255,255,0.04);transition:background .2s ease;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                        <span style="color:#CBD5E1;font-weight:700;font-size:.85rem">{ic} {kor_label}
+                            <span style="color:#475569;font-size:.75rem;font-weight:500;margin-left:4px">({sv['count']}회)</span>
+                        </span>
+                        <span style="color:{av_c};font-weight:800;font-size:.95rem">{av:+.1f}%</span>
                     </div>
-                    <div style="display:flex;align-items:center;gap:8px">
-                        <div style="flex:1;height:4px;background:#151921;border-radius:2px;overflow:hidden">
-                            <div style="width:{wr_bar}%;height:4px;background:{wr_c};border-radius:2px"></div></div>
-                        <span style="color:{wr_c};font-size:.75rem;font-weight:700;width:38px;text-align:right">{wr:.0f}%</span>
+                    
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+                        <div style="flex:1;height:5px;background:#151921;border-radius:3px;overflow:hidden">
+                            <div style="width:{wr_bar}%;height:5px;background:{wr_c};border-radius:3px"></div>
+                        </div>
+                        <span style="color:{wr_c};font-size:.8rem;font-weight:800;width:40px;text-align:right">{wr:.0f}%</span>
+                    </div>
+                    
+                    <div style="display:flex;justify-content:space-between;align-items:center;
+                        padding-top:6px;border-top:1px dashed rgba(255,255,255,0.05);">
+                        
+                        <div style="display:flex;flex-direction:column;align-items:flex-start">
+                            <span style="color:#64748B;font-size:.65rem;text-transform:uppercase;letter-spacing:0.5px">Max DD</span>
+                            <span style="color:{mdd_c};font-size:.8rem;font-weight:700">{mdd:.1f}%</span>
+                        </div>
+                        
+                        <div style="display:flex;flex-direction:column;align-items:center">
+                            <span style="color:#64748B;font-size:.65rem;text-transform:uppercase;letter-spacing:0.5px">Profit Factor</span>
+                            <span style="color:{pf_c};font-size:.8rem;font-weight:700">{pf:.2f}</span>
+                        </div>
+                        
+                        <div style="display:flex;flex-direction:column;align-items:flex-end">
+                            <span style="color:#64748B;font-size:.65rem;text-transform:uppercase;letter-spacing:0.5px">Sharpe</span>
+                            <span style="color:{shp_c};font-size:.8rem;font-weight:700">{sharpe:.2f}</span>
+                        </div>
                     </div>
                 </div>""", unsafe_allow_html=True)
 
@@ -3260,7 +3305,6 @@ def render_stats(m):
         with c2:
             _side("▼ SELL 전략 (숏)",
                   {k: v for k, v in alls.items() if v['direction'] == 'sell'}, is_sell=True)
-
 
 # ──────────────────────────────────────────
 # 메인 분석 렌더
