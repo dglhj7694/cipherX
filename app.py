@@ -471,8 +471,12 @@ def detect_gaps(c,o,h,l,atr):
     return gu,gd,gu.shift(1).fillna(False)&(l<=h.shift(2)),gd.shift(1).fillna(False)&(h>=l.shift(2))
 def detect_nr7(h,l):
     dr=h-l;mn7=dr.rolling(7).min();nr=dr<=mn7;return nr,nr&nr.shift(1).fillna(False)
-def detect_range_bars(h,l,atr):
-    dr=h-l;return dr>atr*2.0,dr.shift(1).fillna(False)>(atr.shift(1)*2.0)&(dr<atr*0.5)  # wide, calm
+def detect_range_bars(h, l, atr):
+    dr = h - l
+    wide = dr > atr * 2.0
+    narrow = dr < atr * 0.5
+    calm = wide.shift(1).fillna(False) & narrow
+    return wide, calm
 def detect_52w(c,h,l):
     return h>=h.rolling(252,min_periods=200).max(),l<=l.rolling(252,min_periods=200).min()
 def detect_123_pullback(h,l,c,adx,pdi,mdi):
@@ -769,7 +773,6 @@ def _build_judgment_hover(row, signals_dict):
         if len(ssigs) > 8: lines.append(f"  ...외 {len(ssigs)-8}개")
     if not bsigs and not ssigs: lines.append("<span style='color:#888'>지표 점수 기반 판단</span>")
     return "<br>".join(lines)
-
 # ══════════════════════════════════════════════════════════════
 #  CipherX V11.0 — PART 2/3
 #  detect_all_signals + confluence + chart + metadata + prompt
@@ -1491,15 +1494,20 @@ def analyze(ticker, chart_days=252, refresh=False):
     try:
         ts = int(time.time()) if refresh else None
         df = compute_and_cache(ticker, ts)
-        if df is None or df.empty: return None, "주가 데이터 없음", None
-        dv = df.dropna(subset=['WT1','WT2']); dc = dv.tail(chart_days).copy()
-        if dc.empty: return None, "차트 데이터 부족", None
+        if df is None or df.empty:
+            return None, "주가 데이터 없음", None
+        dv = df.dropna(subset=['WT1','WT2'])
+        dc = dv.tail(chart_days).copy()
+        if dc.empty:
+            return None, "차트 데이터 부족", None
         meta, regime, shield = build_metadata(dc, dv, ticker)
         fig = build_chart(dc, ticker, regime, shield)
         return fig, build_prompt_text(dc, meta), meta
     except Exception as e:
-        return None, f"로딩 실패:{e}", None
-
+        import traceback
+        err_detail = traceback.format_exc()
+        print(f"[CipherX ERROR] {ticker}: {err_detail}")
+        return None, f"로딩 실패: {type(e).__name__}: {e}", None
 
 # ──────────────────────────────────────────
 # 스피도미터 게이지
@@ -1537,7 +1545,6 @@ def build_speedometer_gauges(meta):
     fig.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         height=230, margin=dict(l=20, r=20, t=50, b=10), font=dict(family="Pretendard"))
     return fig
-
 # ══════════════════════════════════════════════════════════════
 #  CipherX V11.0 — PART 3/3
 #  UI 렌더 함수 + 사이드바 + 챗 인터페이스
@@ -2016,8 +2023,10 @@ def process_ticker(tv, refresh=False):
             st.session_state.pending_ai_prompt = prompt
             st.rerun()
         else:
+            # phist에 실제 에러 메시지가 들어있음
+            err_msg = phist if phist else "데이터 부족"
             st.session_state.messages.append({"role":"assistant","type":"text",
-                "content":f"⚠️ **{tv}** 차트 렌더링에 실패했습니다. (데이터 부족)"})
+                "content":f"⚠️ **{tv}** 분석 실패: {err_msg}"})
             st.rerun()
 
 
