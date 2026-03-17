@@ -26,645 +26,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-
-# ──────────────────────────────────────────
-# [NEW] 상수 추가
-# ──────────────────────────────────────────
-MIN_BACKTEST_SAMPLES = 15       # 🔧 5→15: 통계적 최소 유의 샘플
-SLIPPAGE_PCT = 0.05             # 편도 0.05% 슬리피지
-COMMISSION_PCT = 0.01           # 편도 수수료
-HIGH_CONFIDENCE_WINRATE = 55    # 고신뢰 시그널 최소 승률
-HIGH_CONFIDENCE_MIN_COUNT = 20  # 고신뢰 최소 발생 횟수
-
-# 시그널 분류: 선행(Setup) vs 확인(Confirmation) vs 후행(Lagging)
-SIGNAL_TIMING = {
-    # ═══ 선행 (Setup) — 아직 돌파 전, 에너지 축적 중 ═══
-    'NR7': 'leading', 'NR7_2': 'leading', 'Calm_After_Storm': 'leading',
-    'Inside_Day': 'leading', 'Squeeze_On': 'leading',
-    'BB_Squeeze_End_Bull': 'leading', 'BB_Squeeze_End_Bear': 'leading',
-    'Boomer_Buy': 'leading', 'Boomer_Sell': 'leading',
-    'Below_Lower_BB': 'leading', 'Above_Upper_BB': 'leading',
-    # MF 선행
-    'MF_Cross_Bull': 'leading', 'MF_Cross_Bear': 'leading',
-    'MF_Bull_Div': 'leading', 'MF_Bear_Div': 'leading',
-    'CMF_Bull': 'leading', 'CMF_Bear': 'leading',
-    # 다이버전스 = 선행
-    'Bull_Divergence': 'leading', 'Bear_Divergence': 'leading',
-    'RSI_Bull_Divergence': 'leading', 'RSI_Bear_Divergence': 'leading',
-    'Hidden_Bull_Div': 'leading', 'Hidden_Bear_Div': 'leading',
-    'OBV_Div_Buy': 'leading', 'OBV_Div_Sell': 'leading',
-    # 거래량 이상 = 선행
-    'Volume_Climax_Buy': 'leading', 'Volume_Climax_Sell': 'leading',
-    'Pocket_Pivot': 'leading',
-
-    # ═══ 동시 (Coincident) — 돌파/전환 시점 ═══
-    'Gold_Dot': 'coincident', 'Blood_Diamond': 'coincident',
-    'Green_Dot_T1': 'coincident', 'Red_Dot_T1': 'coincident',
-    'Green_Dot_T2': 'coincident', 'Red_Dot_T2': 'coincident',
-    'Kumo_Breakout_Bull': 'coincident', 'Kumo_Breakout_Bear': 'coincident',
-    'Momentum_Ignition_Buy': 'coincident', 'Momentum_Ignition_Sell': 'coincident',
-    'Expansion_BO': 'coincident', 'Expansion_BD': 'coincident',
-    'SuperTrend_Buy': 'coincident', 'SuperTrend_Sell': 'coincident',
-    'Bullish_Engulfing': 'coincident', 'Bearish_Engulfing': 'coincident',
-    'Morning_Star': 'coincident', 'Evening_Star': 'coincident',
-    'Hammer': 'coincident', 'Shooting_Star': 'coincident',
-    'Setup_180_Bull': 'coincident', 'Setup_180_Bear': 'coincident',
-    'Gilligans_Buy': 'coincident', 'Gilligans_Sell': 'coincident',
-
-    # ═══ 후행 (Lagging) — 이미 움직인 후 확인 ═══
-    'Golden_Cross': 'lagging', 'Death_Cross': 'lagging',
-    'Cross_Above_200MA': 'lagging', 'Fell_Below_200MA': 'lagging',
-    'Cross_Above_50MA': 'lagging', 'Fell_Below_50MA': 'lagging',
-    'Cross_Above_20MA': 'lagging', 'Fell_Below_20MA': 'lagging',
-    'Up_3_Days': 'lagging', 'Up_5_Days': 'lagging',
-    'Down_3_Days': 'lagging', 'Down_5_Days': 'lagging',
-    'New_52W_High': 'lagging', 'New_52W_Low': 'lagging',
-    'MACD_Zero_Cross_Buy': 'lagging', 'MACD_Zero_Cross_Sell': 'lagging',
-}
-
-# 선행/동시/후행 가중치 (판단 엔진에서 사용)
-TIMING_WEIGHT = {'leading': 1.3, 'coincident': 1.0, 'lagging': 0.7}
-
-
-# ──────────────────────────────────────────
-# [NEW] 강화된 백테스트 엔진
-# ──────────────────────────────────────────
-class EnhancedBacktest:
-    """
-    개선된 백테스트:
-    - 슬리피지/수수료 반영
-    - 벤치마크(B&H) 대비 초과수익 계산
-    - 신뢰구간 (부트스트랩)
-    - 조건부 청산 (손절/익절)
-    - 최소 샘플 강화 (15회)
-    """
-
-    @staticmethod
-    def compute_signal_stats(
-        df: pd.DataFrame,
-        col: str,
-        direction: str,
-        fwd: tuple = (2, 3, 5),
-        min_samples: int = MIN_BACKTEST_SAMPLES,
-        atr_stop: float = 1.5,
-        atr_target: float = 2.0,
-    ) -> Optional[Dict]:
-        if col not in df.columns:
-            return None
-        mask = df[col].fillna(False).values.astype(bool)
-        total_fires = int(mask.sum())
-        if total_fires < min_samples:
-            return None
-
-        entry_price = df['Open'].shift(-1)
-        atr = df['ATR']
-        close = df['Close']
-
-        result = {
-            'count': total_fires,
-            'direction': direction,
-        }
-
-        # ── 기본 N일 성과 (슬리피지/수수료 반영) ──
-        total_cost = (SLIPPAGE_PCT + COMMISSION_PCT) * 2 / 100  # 왕복
-
-        for n in fwd:
-            exit_price = df['Close'].shift(-(n + 1))
-            if direction == 'buy':
-                pct = (exit_price - entry_price) / entry_price * 100 - total_cost * 100
-            else:
-                pct = (entry_price - exit_price) / entry_price * 100 - total_cost * 100
-
-            vr = pct[mask].dropna()
-            if len(vr) < min_samples:
-                result[f'{n}d_avg'] = None
-                result[f'{n}d_winrate'] = None
-                result[f'{n}d_sharpe'] = None
-                continue
-
-            wins = (vr > 0).sum()
-            wr = wins / len(vr) * 100
-
-            # 벤치마크: 같은 기간 B&H 수익률
-            bh_pct = (df['Close'].shift(-(n + 1)) - df['Close']) / df['Close'] * 100
-            if direction == 'sell':
-                bh_pct = -bh_pct
-            bh_vr = bh_pct[mask].dropna()
-            alpha = float(vr.mean() - bh_vr.mean()) if len(bh_vr) > 0 else 0
-
-            # 샤프 비율 (일간 → 연환산 근사)
-            sharpe = float(vr.mean() / (vr.std() + 1e-10) * np.sqrt(252 / n))
-
-            # 부트스트랩 95% 신뢰구간 (빠른 버전)
-            ci_low, ci_high = EnhancedBacktest._bootstrap_ci(vr.values, n_boot=500)
-
-            result[f'{n}d_avg'] = float(vr.mean())
-            result[f'{n}d_median'] = float(vr.median())
-            result[f'{n}d_winrate'] = float(wr)
-            result[f'{n}d_sharpe'] = sharpe
-            result[f'{n}d_alpha'] = alpha
-            result[f'{n}d_ci'] = (ci_low, ci_high)
-            result[f'{n}d_max_win'] = float(vr.max())
-            result[f'{n}d_max_loss'] = float(vr.min())
-            result[f'{n}d_samples'] = len(vr)
-
-        # ── ATR 기반 조건부 청산 성과 ──
-        atr_result = EnhancedBacktest._atr_exit_stats(
-            df, mask, entry_price, atr, direction, atr_stop, atr_target)
-        result.update(atr_result)
-
-        # ── 신뢰 등급 ──
-        result['confidence'] = EnhancedBacktest._compute_confidence(result)
-
-        return result
-
-    @staticmethod
-    def _bootstrap_ci(data: np.ndarray, n_boot: int = 500,
-                      ci: float = 0.95) -> Tuple[float, float]:
-        """빠른 부트스트랩 신뢰구간"""
-        if len(data) < 5:
-            return (float(data.min()), float(data.max()))
-        rng = np.random.default_rng(42)
-        means = np.array([
-            rng.choice(data, size=len(data), replace=True).mean()
-            for _ in range(n_boot)
-        ])
-        alpha = (1 - ci) / 2
-        return (float(np.quantile(means, alpha)),
-                float(np.quantile(means, 1 - alpha)))
-
-    @staticmethod
-    def _atr_exit_stats(df, mask, entry_price, atr, direction,
-                        stop_mult, target_mult, max_hold=20):
-        """ATR 기반 손절/익절 시뮬레이션"""
-        entries = np.where(mask)[0]
-        wins, losses, holds = 0, 0, 0
-        returns = []
-
-        for idx in entries:
-            if idx + 1 >= len(df):
-                continue
-            ep = entry_price.iloc[idx]
-            a = atr.iloc[idx]
-            if pd.isna(ep) or pd.isna(a) or ep <= 0:
-                continue
-
-            stop = ep - a * stop_mult if direction == 'buy' else ep + a * stop_mult
-            target = ep + a * target_mult if direction == 'buy' else ep - a * target_mult
-
-            exited = False
-            for d in range(1, min(max_hold + 1, len(df) - idx)):
-                h = df['High'].iloc[idx + d]
-                l = df['Low'].iloc[idx + d]
-                c = df['Close'].iloc[idx + d]
-
-                if direction == 'buy':
-                    if l <= stop:
-                        ret = (stop - ep) / ep * 100
-                        losses += 1
-                        returns.append(ret)
-                        exited = True
-                        break
-                    elif h >= target:
-                        ret = (target - ep) / ep * 100
-                        wins += 1
-                        returns.append(ret)
-                        exited = True
-                        break
-                else:
-                    if h >= stop:
-                        ret = (ep - stop) / ep * 100
-                        losses += 1
-                        returns.append(ret)
-                        exited = True
-                        break
-                    elif l <= target:
-                        ret = (ep - target) / ep * 100
-                        wins += 1
-                        returns.append(ret)
-                        exited = True
-                        break
-
-            if not exited and idx + max_hold < len(df):
-                final = df['Close'].iloc[idx + max_hold]
-                ret = ((final - ep) / ep * 100 if direction == 'buy'
-                       else (ep - final) / ep * 100)
-                returns.append(ret)
-                holds += 1
-
-        total = wins + losses + holds
-        if total < MIN_BACKTEST_SAMPLES:
-            return {'atr_exit_winrate': None, 'atr_exit_avg': None}
-
-        return {
-            'atr_exit_winrate': float(wins / total * 100),
-            'atr_exit_avg': float(np.mean(returns)) if returns else None,
-            'atr_exit_wins': wins,
-            'atr_exit_losses': losses,
-            'atr_exit_holds': holds,
-            'atr_exit_rr': float(stop_mult),
-            'atr_exit_target': float(target_mult),
-            'atr_exit_count': total,
-        }
-
-    @staticmethod
-    def _compute_confidence(stats: Dict) -> str:
-        """시그널 신뢰 등급: A/B/C/D"""
-        wr2 = stats.get('2d_winrate')
-        wr5 = stats.get('5d_winrate')
-        cnt = stats.get('count', 0)
-        sharpe = stats.get('2d_sharpe')
-        alpha = stats.get('2d_alpha')
-        atr_wr = stats.get('atr_exit_winrate')
-
-        score = 0
-        # 승률
-        if wr2 is not None:
-            if wr2 >= 65: score += 3
-            elif wr2 >= 55: score += 2
-            elif wr2 >= 50: score += 1
-        # 샘플 수
-        if cnt >= 50: score += 2
-        elif cnt >= 30: score += 1
-        # 샤프
-        if sharpe is not None and sharpe > 1.0: score += 2
-        elif sharpe is not None and sharpe > 0.5: score += 1
-        # 알파
-        if alpha is not None and alpha > 0.5: score += 1
-        # ATR 청산
-        if atr_wr is not None and atr_wr >= 50: score += 1
-
-        if score >= 8: return 'A'
-        elif score >= 5: return 'B'
-        elif score >= 3: return 'C'
-        else: return 'D'
-
-
-def compute_all_stats_enhanced(dv: pd.DataFrame) -> Dict:
-    """[REPLACE] compute_all_stats → 강화 버전"""
-    tgt = {k: v['dir'] for k, v in SIGNAL_REGISTRY.items()}
-    tgt.update({
-        'Ultra_Buy': 'buy', 'Strong_Buy': 'buy',
-        'Ultra_Sell': 'sell', 'Strong_Sell': 'sell',
-    })
-    results = {}
-    for s, d in tgt.items():
-        r = EnhancedBacktest.compute_signal_stats(dv, s, d)
-        if r and r['count'] >= MIN_BACKTEST_SAMPLES:
-            results[s] = r
-    return results
-
-
-# ──────────────────────────────────────────
-# [NEW] 고신뢰 시그널 시스템
-# ──────────────────────────────────────────
-def compute_high_confidence_signals(df: pd.DataFrame,
-                                     stats: Dict) -> pd.DataFrame:
-    """
-    백테스트 결과 기반으로 고신뢰 시그널만 필터링하여
-    차트에 독립적으로 표시할 수 있도록 마킹.
-    
-    조건:
-    - 승률 ≥ HIGH_CONFIDENCE_WINRATE (55%)
-    - 발생 ≥ HIGH_CONFIDENCE_MIN_COUNT (20회)
-    - 신뢰등급 A 또는 B
-    """
-    hc_buy = pd.Series(False, index=df.index)
-    hc_sell = pd.Series(False, index=df.index)
-    hc_details = pd.Series('', index=df.index, dtype=object)
-
-    for sig_name, sig_stats in stats.items():
-        conf = sig_stats.get('confidence', 'D')
-        if conf not in ('A', 'B'):
-            continue
-        wr = sig_stats.get('2d_winrate')
-        cnt = sig_stats.get('count', 0)
-        if wr is None or wr < HIGH_CONFIDENCE_WINRATE or cnt < HIGH_CONFIDENCE_MIN_COUNT:
-            continue
-        if sig_name not in df.columns:
-            continue
-
-        mask = df[sig_name].fillna(False)
-        direction = sig_stats.get('direction', 'buy')
-
-        if direction == 'buy':
-            hc_buy |= mask
-        else:
-            hc_sell |= mask
-
-        # 상세 정보 축적
-        for idx_val in df.index[mask]:
-            existing = hc_details.at[idx_val]
-            icon = ALL_CHART_SIGNALS.get(sig_name, {}).get('icon', '⭐')
-            kor = ALL_CHART_SIGNALS.get(sig_name, {}).get('kor', sig_name)
-            new_entry = f"{icon}{kor}({wr:.0f}%/{conf})"
-            hc_details.at[idx_val] = (
-                f"{existing} · {new_entry}" if existing else new_entry)
-
-    df['HC_Buy'] = hc_buy
-    df['HC_Sell'] = hc_sell
-    df['HC_Details'] = hc_details
-
-    return df
-
-
-# ──────────────────────────────────────────
-# [NEW] 고신뢰 조합 시그널 (셋업 감지)
-# ──────────────────────────────────────────
-def detect_setup_zones(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    "돌파 임박" 셋업 존을 감지하여 차트에 배경색으로 표시.
-    이 존은 아직 시그널이 발생하지 않았지만,
-    여러 선행지표가 축적되어 돌파가 임박한 구간.
-    
-    매수 셋업 조건 (3개 이상 충족):
-    - BB Squeeze ON
-    - NR7 또는 NR7-2
-    - WT 과매도 접근 (-40 이하)
-    - RSI < 40 & 상승 전환
-    - MF 상승 전환 (음→양 or 기울기 상승)
-    - OBV 상승 (축적)
-    - 가격이 주요 지지선 부근 (MA50/MA200 ±ATR)
-    - CMF > 0 (자금 유입)
-    - Ichimoku 구름 접근
-    """
-    idx = df.index
-    C, H, L = df['Close'], df['High'], df['Low']
-    atr = df['ATR']
-
-    # 매수 셋업 조건들
-    conds_buy = []
-    conds_buy.append(df.get('Squeeze_On', pd.Series(False, index=idx)))
-    conds_buy.append(df.get('NR7', pd.Series(False, index=idx)) |
-                     df.get('NR7_2', pd.Series(False, index=idx)))
-    conds_buy.append(df['WT1'] < -40)
-    conds_buy.append((df['RSI'] < 40) & (df['RSI'] > df['RSI'].shift(1)))
-    conds_buy.append(
-        df.get('MF_Rising', pd.Series(False, index=idx)) &
-        (df['RSI_MFI'] > df['RSI_MFI'].shift(3)))
-    conds_buy.append(df['OBV'] > df['OBV'].rolling(10).mean())
-    conds_buy.append(
-        ((C - df['MA50']).abs() <= atr * 1.5) |
-        ((C - df['MA200']).abs() <= atr * 1.5))
-    if 'CMF' in df.columns:
-        conds_buy.append(df['CMF'] > 0)
-    if 'Ichimoku_SenkouA' in df.columns:
-        kumo_top = pd.concat([df['Ichimoku_SenkouA'], df['Ichimoku_SenkouB']], axis=1).max(axis=1)
-        conds_buy.append((C < kumo_top) & (C > kumo_top - atr * 2))
-
-    buy_score = sum(c.astype(int) for c in conds_buy)
-    df['Setup_Buy_Zone'] = buy_score >= 3
-
-    # 매도 셋업 조건들
-    conds_sell = []
-    conds_sell.append(df.get('Squeeze_On', pd.Series(False, index=idx)))
-    conds_sell.append(df.get('NR7', pd.Series(False, index=idx)) |
-                      df.get('NR7_2', pd.Series(False, index=idx)))
-    conds_sell.append(df['WT1'] > 40)
-    conds_sell.append((df['RSI'] > 60) & (df['RSI'] < df['RSI'].shift(1)))
-    conds_sell.append(
-        df.get('MF_Falling', pd.Series(False, index=idx)) &
-        (df['RSI_MFI'] < df['RSI_MFI'].shift(3)))
-    conds_sell.append(df['OBV'] < df['OBV'].rolling(10).mean())
-    conds_sell.append(
-        ((C - df['MA50']).abs() <= atr * 1.5) |
-        ((C - df['MA200']).abs() <= atr * 1.5))
-    if 'CMF' in df.columns:
-        conds_sell.append(df['CMF'] < 0)
-    if 'Ichimoku_SenkouA' in df.columns:
-        kumo_bot = pd.concat([df['Ichimoku_SenkouA'], df['Ichimoku_SenkouB']], axis=1).min(axis=1)
-        conds_sell.append((C > kumo_bot) & (C < kumo_bot + atr * 2))
-
-    sell_score = sum(c.astype(int) for c in conds_sell)
-    df['Setup_Sell_Zone'] = sell_score >= 3
-
-    df['Setup_Buy_Score'] = buy_score
-    df['Setup_Sell_Score'] = sell_score
-
-    return df
-
-
-# ──────────────────────────────────────────
-# [NEW] 외부 데이터 통합
-# ──────────────────────────────────────────
-@st.cache_data(ttl=1800, show_spinner=False)
-def fetch_external_signals(ticker: str) -> Dict[str, Any]:
-    """
-    yfinance에서 뉴스, 내부자 거래, 기관 보유 등
-    차트/지표로 알 수 없는 정보 수집
-    """
-    result = {
-        'news': [],
-        'insider_trades': [],
-        'institutional_change': None,
-        'earnings_date': None,
-        'recommendation': None,
-        'target_price': None,
-        'external_score': 0,    # -5 ~ +5
-        'external_summary': '',
-    }
-
-    try:
-        tk = yf.Ticker(ticker)
-
-        # ── 뉴스 (최근 10개) ──
-        try:
-            news = tk.news
-            if news:
-                for article in news[:10]:
-                    result['news'].append({
-                        'title': article.get('title', ''),
-                        'publisher': article.get('publisher', ''),
-                        'link': article.get('link', ''),
-                        'published': article.get('providerPublishTime', 0),
-                    })
-        except Exception:
-            pass
-
-        # ── 내부자 거래 ──
-        try:
-            insider = tk.insider_transactions
-            if insider is not None and not insider.empty:
-                recent = insider.head(10)
-                net_insider = 0
-                for _, row in recent.iterrows():
-                    text = str(row.get('Text', '')).lower()
-                    shares = row.get('Shares', 0)
-                    if pd.isna(shares):
-                        shares = 0
-                    if 'sale' in text or 'sold' in text:
-                        net_insider -= abs(shares)
-                    elif 'purchase' in text or 'buy' in text:
-                        net_insider += abs(shares)
-                    result['insider_trades'].append({
-                        'text': str(row.get('Text', '')),
-                        'shares': int(shares),
-                        'date': str(row.get('Start Date', '')),
-                    })
-                # 점수화
-                if net_insider > 10000:
-                    result['external_score'] += 2
-                elif net_insider > 0:
-                    result['external_score'] += 1
-                elif net_insider < -50000:
-                    result['external_score'] -= 2
-                elif net_insider < 0:
-                    result['external_score'] -= 1
-        except Exception:
-            pass
-
-        # ── 애널리스트 추천 ──
-        try:
-            info = tk.info
-            rec = info.get('recommendationKey', '')
-            target = info.get('targetMeanPrice')
-            current = info.get('currentPrice') or info.get('regularMarketPrice')
-
-            result['recommendation'] = rec
-            result['target_price'] = target
-
-            if rec in ('strong_buy', 'buy'):
-                result['external_score'] += 1
-            elif rec in ('sell', 'strong_sell'):
-                result['external_score'] -= 1
-
-            if target and current and current > 0:
-                upside = (target - current) / current * 100
-                if upside > 20:
-                    result['external_score'] += 1
-                elif upside < -10:
-                    result['external_score'] -= 1
-
-            # 어닝 날짜
-            try:
-                cal = tk.calendar
-                if cal is not None and not cal.empty:
-                    earn_dates = cal.get('Earnings Date')
-                    if earn_dates is not None and len(earn_dates) > 0:
-                        result['earnings_date'] = str(earn_dates.iloc[0])
-                        # 어닝 7일 이내면 경고
-            except Exception:
-                pass
-
-        except Exception:
-            pass
-
-        # ── 요약 텍스트 생성 ──
-        es = result['external_score']
-        if es >= 3:
-            result['external_summary'] = '🟢 외부 시그널 강세 (내부자 매수/애널리스트 긍정)'
-        elif es >= 1:
-            result['external_summary'] = '🟢 외부 시그널 약간 긍정'
-        elif es <= -3:
-            result['external_summary'] = '🔴 외부 시그널 약세 (내부자 매도/애널리스트 부정)'
-        elif es <= -1:
-            result['external_summary'] = '🔴 외부 시그널 약간 부정'
-        else:
-            result['external_summary'] = '⚪ 외부 시그널 중립'
-
-    except Exception:
-        result['external_summary'] = '⚠️ 외부 데이터 조회 실패'
-
-    return result
-
-
-# ──────────────────────────────────────────
-# [NEW] 예측 스코어 (Predictive Score)
-# ──────────────────────────────────────────
-def compute_predictive_score(df: pd.DataFrame,
-                              external: Dict) -> pd.DataFrame:
-    """
-    기존 7-Layer는 "현재 상태 확인"에 가까움.
-    Predictive Score는 "향후 N일 방향" 예측에 집중.
-    
-    핵심 차이:
-    - 선행 지표에 높은 가중치 (다이버전스, 스퀴즈, MF 전환)
-    - 후행 지표에 낮은 가중치 (MA 크로스, 연속일수)
-    - 셋업 존 점수 반영
-    - 외부 데이터 반영
-    - "모멘텀 가속/감속" 방향 측정
-    """
-    idx = df.index
-    pred_buy = pd.Series(0.0, index=idx)
-    pred_sell = pd.Series(0.0, index=idx)
-
-    # ── 1. 선행 시그널 가중 적용 ──
-    for sig_name, timing in SIGNAL_TIMING.items():
-        if sig_name not in df.columns:
-            continue
-        w = TIMING_WEIGHT.get(timing, 1.0)
-        sig_cfg = SIGNAL_REGISTRY.get(sig_name)
-        if sig_cfg is None:
-            continue
-        base_pts = sig_cfg['w'] * w  # 기존 가중치 × 타이밍 가중치
-
-        mask = df[sig_name].fillna(False)
-        if sig_cfg['dir'] == 'buy':
-            pred_buy += np.where(mask, base_pts, 0)
-        else:
-            pred_sell += np.where(mask, base_pts, 0)
-
-    # ── 2. 모멘텀 "가속/감속" 측정 ──
-    # RSI 가속: RSI의 변화율의 변화율 (2차 미분)
-    rsi_vel = df['RSI'] - df['RSI'].shift(1)         # 속도
-    rsi_accel = rsi_vel - rsi_vel.shift(1)            # 가속도
-    pred_buy += np.where(rsi_accel > 2, 1.5, np.where(rsi_accel > 0, 0.5, 0))
-    pred_sell += np.where(rsi_accel < -2, 1.5, np.where(rsi_accel < 0, 0.5, 0))
-
-    # WT 가속
-    wt_vel = df['WT1'] - df['WT1'].shift(1)
-    wt_accel = wt_vel - wt_vel.shift(1)
-    pred_buy += np.where((wt_accel > 3) & (df['WT1'] < 0), 2.0, 0)
-    pred_sell += np.where((wt_accel < -3) & (df['WT1'] > 0), 2.0, 0)
-
-    # MACD 히스토그램 가속
-    mh = df['MACD_Hist']
-    mh_vel = mh - mh.shift(1)
-    mh_accel = mh_vel - mh_vel.shift(1)
-    pred_buy += np.where((mh_accel > 0) & (mh < 0), 1.5, 0)  # 음수에서 가속 = 반등 예고
-    pred_sell += np.where((mh_accel < 0) & (mh > 0), 1.5, 0)
-
-    # ── 3. 셋업 존 점수 ──
-    if 'Setup_Buy_Score' in df.columns:
-        pred_buy += df['Setup_Buy_Score'].clip(0, 5) * 0.8
-    if 'Setup_Sell_Score' in df.columns:
-        pred_sell += df['Setup_Sell_Score'].clip(0, 5) * 0.8
-
-    # ── 4. MF 방향 + 가속 (선행) ──
-    if 'MF_Slope_5' in df.columns:
-        mf_slope = df['MF_Slope_5']
-        mf_accel = mf_slope - mf_slope.shift(3)
-        pred_buy += np.where((mf_accel > 2) & (df['RSI_MFI'] < 0), 2.0, 0)
-        pred_sell += np.where((mf_accel < -2) & (df['RSI_MFI'] > 0), 2.0, 0)
-
-    # ── 5. 외부 데이터 점수 ──
-    ext_score = external.get('external_score', 0)
-    # 외부 점수는 전체 기간에 동일하게 적용 (최근 데이터이므로)
-    pred_buy += max(ext_score, 0) * 0.5
-    pred_sell += max(-ext_score, 0) * 0.5
-
-    # ── 최종 ──
-    df['Pred_Buy_Score'] = pred_buy.clip(lower=0)
-    df['Pred_Sell_Score'] = pred_sell.clip(lower=0)
-    df['Pred_Net'] = pred_buy - pred_sell
-
-    # 예측 방향 판단
-    pred_j = np.full(len(df), 'FLAT', dtype=object)
-    net = (pred_buy - pred_sell).values
-    for i in range(len(df)):
-        if net[i] >= 8: pred_j[i] = 'STRONG_UP'
-        elif net[i] >= 4: pred_j[i] = 'UP'
-        elif net[i] >= 2: pred_j[i] = 'LEAN_UP'
-        elif net[i] <= -8: pred_j[i] = 'STRONG_DOWN'
-        elif net[i] <= -4: pred_j[i] = 'DOWN'
-        elif net[i] <= -2: pred_j[i] = 'LEAN_DOWN'
-    df['Pred_Direction'] = pred_j
-
-    return df
-
-# 선행/동시/후행 가중치 (판단 엔진에서 사용)
-TIMING_WEIGHT = {'leading': 1.3, 'coincident': 1.0, 'lagging': 0.7}
-
 # ──────────────────────────────────────────
 # 🎨 CSS (🧹 변경 없음 — 기존과 동일)
 # ──────────────────────────────────────────
@@ -2889,26 +2250,21 @@ def _hl(fig, mask, idx, fill, txt=None, row=1):
 # ──────────────────────────────────────────
 # 차트 빌더 (🧹 리팩토링)
 # ──────────────────────────────────────────
-def build_chart_v12(dc, ticker, regime, shield, stats):
-    """V11.1 build_chart 대체 — Row 7 예측스코어 추가 + 셋업존 + HC마커"""
+def build_chart(dc, ticker, regime, shield):
     mac = {5: "#ff9900", 10: "#ffb74d", 20: '#f1c40f', 50: '#e74c3c',
            100: '#9b59b6', 125: '#3498db', 200: '#2ecc71'}
 
     fig = make_subplots(
-        rows=7, cols=1, shared_xaxes=True, vertical_spacing=0.03,
-        row_heights=[.32, .06, .12, .10, .12, .12, .10],
-        subplot_titles=("", "Volume", "WaveTrend",
-                        "Money Flow", "MACD", "Judgment",
-                        "🔮 Predictive Score"))  # 🆕 Row 7
+        rows=6, cols=1, shared_xaxes=True, vertical_spacing=0.035,
+        row_heights=[.36, .07, .15, .12, .15, .15],
+        subplot_titles=("", "Volume", "WaveTrend Oscillator",
+                        "Money Flow", "MACD (12, 26, 9)", "BUY / SELL Judgment"))
 
-    # ═══ Row 1: 캔들스틱 (기존과 동일) ═══
+    # ═══ Row 1: 캔들스틱 ═══
     fig.add_trace(go.Candlestick(
-        x=dc.index, open=dc['Open'], high=dc['High'],
-        low=dc['Low'], close=dc['Close'],
-        name="Price",
-        increasing_line_color='#00E676', decreasing_line_color='#FF1744',
-        increasing_fillcolor='rgba(0,230,118,0.8)',
-        decreasing_fillcolor='rgba(255,23,68,0.8)',
+        x=dc.index, open=dc['Open'], high=dc['High'], low=dc['Low'], close=dc['Close'],
+        name="Price", increasing_line_color='#00E676', decreasing_line_color='#FF1744',
+        increasing_fillcolor='rgba(0,230,118,0.8)', decreasing_fillcolor='rgba(255,23,68,0.8)',
         hovertemplate="O:%{open:.2f} H:%{high:.2f}<br>L:%{low:.2f} C:%{close:.2f}<extra></extra>"),
         row=1, col=1)
 
@@ -2929,58 +2285,29 @@ def build_chart_v12(dc, ticker, regime, shield, stats):
             line=dict(color=clr, width=2), name=nm, connectgaps=False,
             hovertemplate="%{y:.2f}"), row=1, col=1)
 
-    # Ichimoku Cloud
+    # 🆕 Ichimoku Cloud 표시
     if 'Ichimoku_SenkouA' in dc.columns:
-        fig.add_trace(go.Scatter(x=dc.index, y=dc['Ichimoku_SenkouA'],
-            line=dict(color='rgba(0,230,118,0.3)', width=0.5),
+        sa = dc['Ichimoku_SenkouA']
+        sb_ichi = dc['Ichimoku_SenkouB']
+        fig.add_trace(go.Scatter(x=dc.index, y=sa, line=dict(color='rgba(0,230,118,0.3)', width=0.5),
             name='Senkou A', showlegend=False, hoverinfo='skip'), row=1, col=1)
-        fig.add_trace(go.Scatter(x=dc.index, y=dc['Ichimoku_SenkouB'],
-            line=dict(color='rgba(255,23,68,0.3)', width=0.5),
+        fig.add_trace(go.Scatter(x=dc.index, y=sb_ichi, line=dict(color='rgba(255,23,68,0.3)', width=0.5),
             name='Senkou B', fill='tonexty', fillcolor='rgba(99,102,241,0.04)',
             showlegend=False, hoverinfo='skip'), row=1, col=1)
 
-    # BB
-    fig.add_trace(go.Scatter(x=dc.index, y=dc['BB_Up'],
-        line=dict(color='gray', width=1, dash='dot'),
+    fig.add_trace(go.Scatter(x=dc.index, y=dc['BB_Up'], line=dict(color='gray', width=1, dash='dot'),
         name='BB↑', hovertemplate="%{y:.2f}"), row=1, col=1)
-    fig.add_trace(go.Scatter(x=dc.index, y=dc['BB_Low'],
-        line=dict(color='gray', width=1, dash='dot'),
+    fig.add_trace(go.Scatter(x=dc.index, y=dc['BB_Low'], line=dict(color='gray', width=1, dash='dot'),
         name='BB↓', fill='tonexty', fillcolor='rgba(128,128,128,0.07)',
         hovertemplate="%{y:.2f}"), row=1, col=1)
 
-    # 🆕 셋업 존 배경
-    if 'Setup_Buy_Zone' in dc.columns:
-        _hl(fig, dc['Setup_Buy_Zone'], dc.index, 'rgba(0,230,118,0.03)', None, 1)
-    if 'Setup_Sell_Zone' in dc.columns:
-        _hl(fig, dc['Setup_Sell_Zone'], dc.index, 'rgba(255,23,68,0.03)', None, 1)
-
-    # Shield 배경
     for col_name, clr, txt in [('Sell_Shield_Overridden', 'rgba(255,0,0,0.04)', '🔓Sell OFF'),
                                  ('Buy_Shield_Overridden', 'rgba(0,255,0,0.04)', '🔓Buy OFF')]:
         om = dc.get(col_name, pd.Series(False, index=dc.index))
-        if om.any(): _hl(fig, om, dc.index, clr, txt, 1)
+        if om.any():
+            _hl(fig, om, dc.index, clr, txt, 1)
 
-    # 🆕 고신뢰 시그널 마커 (판단과 독립)
-    for hc_col, hc_color, hc_name, hc_sym, base_col, atr_mult in [
-        ('HC_Buy', '#00FF88', '⭐ HC Buy', 'star-diamond', 'Low', -1.5),
-        ('HC_Sell', '#FF4488', '⭐ HC Sell', 'star-diamond', 'High', 1.5),
-    ]:
-        if hc_col in dc.columns:
-            hc_mask = dc[hc_col].fillna(False)
-            if hc_mask.any():
-                hc_rows = dc[hc_mask]
-                hc_y = hc_rows[base_col] + hc_rows['ATR'] * atr_mult
-                hc_texts = dc.loc[hc_mask.values, 'HC_Details'].values if 'HC_Details' in dc.columns else [''] * len(hc_rows)
-                fig.add_trace(go.Scatter(
-                    x=hc_rows.index, y=hc_y, mode='markers',
-                    marker=dict(symbol=hc_sym, size=12, color=hc_color,
-                        line=dict(width=1.5, color='#FFFFFF'), opacity=0.85),
-                    name=hc_name, text=hc_texts,
-                    hovertemplate="<b>고신뢰 시그널</b><br>%{text}<extra></extra>",
-                    hoverlabel=dict(bgcolor='rgba(14,17,23,0.97)', bordercolor=hc_color),
-                ), row=1, col=1)
-
-    # 판단 마커 (기존)
+    # ═══ 판단 마커 ═══
     if 'Trade_Judgment' in dc.columns:
         enabled_j = st.session_state.get('enabled_judgments', set(JUDGMENT_MARKERS.keys()))
         for j_grade, j_cfg in JUDGMENT_MARKERS.items():
@@ -2988,71 +2315,82 @@ def build_chart_v12(dc, ticker, regime, shield, stats):
             mask = dc['Trade_Judgment'] == j_grade
             if not mask.any(): continue
             sig_rows = dc[mask]
-            y_vals = (sig_rows['Low'] + sig_rows['ATR'] * j_cfg['atr_mult']
-                      if j_cfg['base'] == 'Low'
-                      else sig_rows['High'] + sig_rows['ATR'] * j_cfg['atr_mult'])
+            if j_cfg['base'] == 'Low':
+                y_vals = sig_rows['Low'] + sig_rows['ATR'] * j_cfg['atr_mult']
+            else:
+                y_vals = sig_rows['High'] + sig_rows['ATR'] * j_cfg['atr_mult']
             hover_texts = [_build_judgment_hover(dc.loc[idx_v], ALL_CHART_SIGNALS)
                            for idx_v in sig_rows.index]
             fig.add_trace(go.Scatter(
                 x=sig_rows.index, y=y_vals, mode='markers',
-                marker=dict(symbol=j_cfg['symbol'], size=j_cfg['size'],
-                    color=j_cfg['color'],
-                    line=dict(width=j_cfg['line_width'], color=j_cfg['line_color']),
-                    opacity=0.95),
+                marker=dict(symbol=j_cfg['symbol'], size=j_cfg['size'], color=j_cfg['color'],
+                    line=dict(width=j_cfg['line_width'], color=j_cfg['line_color']), opacity=0.95),
                 name=j_cfg['label'], text=hover_texts,
                 hovertemplate="%{text}<extra></extra>",
                 hoverlabel=dict(bgcolor='rgba(14,17,23,0.97)', bordercolor=j_cfg['color'],
                     font=dict(size=11, family='Pretendard', color='#FAFAFA'), align='left'),
             ), row=1, col=1)
 
-        for j_name, fill_clr in [('STRONG_BUY', 'rgba(0,230,118,0.05)'),
-                                   ('BUY', 'rgba(0,230,118,0.025)'),
-                                   ('STRONG_SELL', 'rgba(255,23,68,0.05)'),
-                                   ('SELL', 'rgba(255,23,68,0.025)')]:
+        for j_name, fill_clr in [('STRONG_BUY', 'rgba(0,230,118,0.05)'), ('BUY', 'rgba(0,230,118,0.025)'),
+                                   ('STRONG_SELL', 'rgba(255,23,68,0.05)'), ('SELL', 'rgba(255,23,68,0.025)')]:
             jm = dc['Trade_Judgment'] == j_name
-            if jm.any(): _hl(fig, jm, dc.index, fill_clr, None, 1)
+            if jm.any():
+                _hl(fig, jm, dc.index, fill_clr, None, 1)
 
     # ═══ Row 2: 거래량 ═══
     br = dc['Close'] < dc['Open']
     fig.add_trace(go.Bar(x=dc.index, y=dc['Volume'],
         marker_color=np.where(br, 'rgba(255,23,68,0.6)', 'rgba(0,230,118,0.6)').tolist(),
         name="Volume", opacity=0.8, hovertemplate="%{y:,.0f}"), row=2, col=1)
+    vcm = dc.get('Volume_Climax_Buy', pd.Series(False)) | dc.get('Volume_Climax_Sell', pd.Series(False))
+    vcd = dc[vcm]
+    if not vcd.empty:
+        fig.add_trace(go.Bar(x=vcd.index, y=vcd['Volume'], marker_color='#FFD700',
+            name="Vol Climax", opacity=0.9, hovertemplate="%{y:,.0f}"), row=2, col=1)
 
     # ═══ Row 3: WaveTrend ═══
-    fig.add_trace(go.Scatter(x=dc.index, y=dc['WT1'],
-        line=dict(color='#00E676', width=2), name="WT1",
-        hovertemplate="%{y:.1f}"), row=3, col=1)
-    fig.add_trace(go.Scatter(x=dc.index, y=dc['WT2'],
-        line=dict(color='#FF1744', width=1.5, dash='dot'), name="WT2",
-        hovertemplate="%{y:.1f}"), row=3, col=1)
+    fig.add_trace(go.Scatter(x=dc.index, y=dc['WT1'], line=dict(color='#00E676', width=2),
+        name="WT1", hovertemplate="%{y:.1f}"), row=3, col=1)
+    fig.add_trace(go.Scatter(x=dc.index, y=dc['WT2'], line=dict(color='#FF1744', width=1.5, dash='dot'),
+        name="WT2", hovertemplate="%{y:.1f}"), row=3, col=1)
     wd = dc['WT1'] - dc['WT2']
     fig.add_trace(go.Bar(x=dc.index, y=wd,
         marker_color=np.where(wd >= 0, '#00E676', '#FF1744').tolist(),
-        name="WT Hist", opacity=0.3), row=3, col=1)
+        name="WT Hist", opacity=0.3, hovertemplate="%{y:.1f}"), row=3, col=1)
     for lv, cc, d in [(OB2, '#ff3333', 'dash'), (OB1, '#ff3333', 'solid'),
                        (0, 'gray', 'dot'), (OS1, '#00bfff', 'solid'), (OS2, '#00bfff', 'dash')]:
         fig.add_hline(y=lv, line_dash=d, line_color=cc, line_width=1, row=3, col=1)
+    wmx = max(float(dc['WT1'].max()), 100) + 10
+    wmn = min(float(dc['WT1'].min()), -100) - 10
+    fig.add_hrect(y0=OB1, y1=wmx, fillcolor="rgba(255,23,68,0.08)", line_width=0, row=3, col=1)
+    fig.add_hrect(y0=wmn, y1=OS1, fillcolor="rgba(0,191,255,0.08)", line_width=0, row=3, col=1)
+    if 'Squeeze_On' in dc.columns:
+        _hl(fig, dc['Squeeze_On'], dc.index, "rgba(255,255,0,0.05)", None, 3)
 
     # ═══ Row 4: Money Flow ═══
     rmfi = dc['RSI_MFI']
     fig.add_trace(go.Bar(x=dc.index, y=rmfi,
         marker_color=np.where(rmfi >= 0, '#3ee145', '#ff3d2e').tolist(),
-        name="Money Flow", opacity=0.7), row=4, col=1)
-    fig.add_hline(y=0, line_color="gray", line_width=1, row=4, col=1)
+        name="Money Flow", opacity=0.7, hovertemplate="%{y:.1f}"), row=4, col=1)
+    fig.add_hline(y=0, line_dash="solid", line_color="gray", line_width=1, row=4, col=1)
+
+    # 🆕 CMF 오버레이
     if 'CMF' in dc.columns:
-        fig.add_trace(go.Scatter(x=dc.index, y=dc['CMF'] * 50,
+        cmf_scaled = dc['CMF'] * 50  # 스케일링
+        fig.add_trace(go.Scatter(x=dc.index, y=cmf_scaled,
             line=dict(color='#FFD700', width=1, dash='dot'),
-            name="CMF×50", opacity=0.6), row=4, col=1)
+            name="CMF×50", opacity=0.6, hovertemplate="CMF: %{customdata:.3f}",
+            customdata=dc['CMF'].values), row=4, col=1)
 
     # ═══ Row 5: MACD ═══
-    fig.add_trace(go.Scatter(x=dc.index, y=dc['MACD_Line'],
-        line=dict(color='#29B6F6', width=1.5), name="MACD"), row=5, col=1)
-    fig.add_trace(go.Scatter(x=dc.index, y=dc['MACD_Signal'],
-        line=dict(color='#FFA726', width=1.5), name="Signal"), row=5, col=1)
+    fig.add_trace(go.Scatter(x=dc.index, y=dc['MACD_Line'], line=dict(color='#29B6F6', width=1.5),
+        name="MACD", hovertemplate="%{y:.3f}"), row=5, col=1)
+    fig.add_trace(go.Scatter(x=dc.index, y=dc['MACD_Signal'], line=dict(color='#FFA726', width=1.5),
+        name="Signal", hovertemplate="%{y:.3f}"), row=5, col=1)
     mh = dc['MACD_Hist']
     fig.add_trace(go.Bar(x=dc.index, y=mh,
         marker_color=np.where(mh >= 0, '#26A69A', '#EF5350').tolist(),
-        name="Hist", opacity=0.7), row=5, col=1)
+        name="Hist", opacity=0.7, hovertemplate="%{y:.3f}"), row=5, col=1)
     fig.add_hline(y=0, line_color="#444444", line_width=1, row=5, col=1)
 
     # ═══ Row 6: Judgment Score ═══
@@ -3069,71 +2407,52 @@ def build_chart_v12(dc, ticker, regime, shield, stats):
             hovertemplate=("<b>%{customdata[2]}</b><br>BUY: %{customdata[0]:.1f}<br>"
                            "SELL: %{customdata[1]:.1f}<br>NET: %{y:.1f}<extra></extra>")),
             row=6, col=1)
-        fig.add_hline(y=0, line_color="gray", line_width=1, row=6, col=1)
-
-    # ═══ 🆕 Row 7: Predictive Score ═══
-    if 'Pred_Net' in dc.columns:
-        pred_net = dc['Pred_Net']
-        pred_colors = np.where(pred_net >= 5, '#00E676',
-                      np.where(pred_net >= 2, '#69F0AE',
-                      np.where(pred_net <= -5, '#FF1744',
-                      np.where(pred_net <= -2, '#FF5252', '#9E9E9E'))))
-        fig.add_trace(go.Bar(x=dc.index, y=pred_net,
-            marker_color=pred_colors.tolist(), name="Pred NET", opacity=0.75,
-            customdata=dc.get('Pred_Direction', pd.Series('FLAT', index=dc.index)).values,
-            hovertemplate="<b>%{customdata}</b><br>Score: %{y:.1f}<extra></extra>"),
-            row=7, col=1)
-        fig.add_hline(y=0, line_color="gray", line_width=1, row=7, col=1)
-        for lv, cc, d in [(5, '#00E676', 'dot'), (-5, '#FF1744', 'dot')]:
-            fig.add_hline(y=lv, line_dash=d, line_color=cc, line_width=.8, row=7, col=1)
+        for lv, cc, d in [(15, '#00E676', 'dash'), (-15, '#FF1744', 'dash'),
+                           (10, '#00E676', 'dot'), (-10, '#FF1744', 'dot'),
+                           (5, '#69F0AE', 'dot'), (-5, '#FF5252', 'dot'),
+                           (0, 'gray', 'solid')]:
+            fig.add_hline(y=lv, line_dash=d, line_color=cc,
+                         line_width=1 if d == 'solid' else .8, row=6, col=1)
+    else:
+        conf = dc['Confluence_Score']
+        fig.add_trace(go.Bar(x=dc.index, y=conf,
+            marker_color=np.where(conf >= 3.5, '#00E676',
+                         np.where(conf <= -3.5, '#FF1744', '#FFC107')).tolist(),
+            name="Conf Score", opacity=0.8, hovertemplate="%{y:.1f}"), row=6, col=1)
 
     # ═══ 레이아웃 ═══
     fig.update_layout(
         yaxis_title="Price", yaxis2_title="Vol", yaxis3_title="WT",
-        yaxis4_title="MF", yaxis5_title="MACD",
-        yaxis6_title="B−S", yaxis7_title="Pred",
-        template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=2, r=2, t=40, b=2), height=1400,
-        showlegend=True, hovermode="x unified",
+        yaxis4_title="MF", yaxis5_title="MACD", yaxis6_title="BUY−SELL",
+        template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=2, r=2, t=40, b=2), height=1200, showlegend=True, hovermode="x unified",
         hoverlabel=dict(bgcolor="rgba(14,17,23,0.95)", font_size=12,
                         font_family="Pretendard", bordercolor="#2D333B"),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02,
-            xanchor="center", x=0.5,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5,
             font=dict(size=9.5, color='#CCC', family='Pretendard'),
             bgcolor='rgba(0,0,0,0)', itemsizing='constant'))
-
-    for i in range(1, 8):
+    for i in range(1, 7):
         ya = f'yaxis{i}' if i > 1 else 'yaxis'
-        fig.update_layout(**{ya: dict(
-            gridcolor='rgba(45,51,59,0.5)', gridwidth=1,
+        fig.update_layout(**{ya: dict(gridcolor='rgba(45,51,59,0.5)', gridwidth=1,
             zerolinecolor='rgba(60,63,70,0.6)', zerolinewidth=1,
-            title_font=dict(size=11, color='#777'),
-            tickfont=dict(size=10, color='#888'))})
-
+            title_font=dict(size=11, color='#777'), tickfont=dict(size=10, color='#888'))})
     fig.update_xaxes(rangeslider_visible=False)
     has_weekends = dc.index.dayofweek.isin([5, 6]).any()
     rb = [dict(bounds=["sat", "mon"])] if not has_weekends else []
-    fig.update_xaxes(showspikes=True, spikecolor="#667eea",
-        spikemode="across", spikethickness=1, spikedash="dot",
-        rangebreaks=rb, gridcolor='rgba(45,51,59,0.5)',
-        tickfont=dict(size=10, color='#888'))
-    fig.update_yaxes(showspikes=True, spikecolor="#667eea",
-        spikemode="across", spikethickness=1, spikedash="dot")
+    fig.update_xaxes(showspikes=True, spikecolor="#667eea", spikemode="across",
+        spikethickness=1, spikedash="dot", rangebreaks=rb,
+        gridcolor='rgba(45,51,59,0.5)', gridwidth=1, tickfont=dict(size=10, color='#888'))
+    fig.update_yaxes(showspikes=True, spikecolor="#667eea", spikemode="across",
+        spikethickness=1, spikedash="dot")
     for ann in fig['layout']['annotations']:
         ann['font'] = dict(size=12, color='#AAA', family='Pretendard')
     return fig
 
 
-
 # ──────────────────────────────────────────
 # 메타데이터 빌드 (🆕 Ichimoku/CMF 추가)
 # ──────────────────────────────────────────
-# ──────────────────────────────────────────
-# [REPLACE] build_metadata — 외부 + 예측 데이터 추가
-# ──────────────────────────────────────────
-def build_metadata_v12(dc, dv, ticker, external):
-    """V11.1 build_metadata를 대체"""
+def build_metadata(dc, dv, ticker):
     lat, prev = dc.iloc[-1], dc.iloc[-2] if len(dc) >= 2 else dc.iloc[-1]
     pc = lat['Close'] - prev['Close']
     pp = pc / prev['Close'] * 100
@@ -3174,28 +2493,17 @@ def build_metadata_v12(dc, dv, ticker, external):
             'combos': jh['active_combos'],
         })
 
-    # 🆕 강화된 백테스트
-    enhanced_stats = compute_all_stats_enhanced(dv)
-
-    meta = {
-        'ticker': ticker.upper(), 'price': lat['Close'],
-        'price_change': pc, 'price_change_pct': pp,
-        'volume': lat['Volume'],
-        'avg_volume': dc['Volume'].rolling(20).mean().iloc[-1],
+    return {
+        'ticker': ticker.upper(), 'price': lat['Close'], 'price_change': pc, 'price_change_pct': pp,
+        'volume': lat['Volume'], 'avg_volume': dc['Volume'].rolling(20).mean().iloc[-1],
         'wt1': float(lat['WT1']), 'wt2': float(lat['WT2']),
         'rsi': float(lat['RSI']), 'mfi': float(lat['MFI']),
         'stochk': float(lat['StochK']), 'stochd': float(lat['StochD']),
-        'vwap_osc': float(lat['VWAP_Osc']),
-        'mf_area': float(lat['RSI_MFI']),
-        'atr': float(lat['ATR']),
-        'atr_pct': float(lat['ATR']) / float(lat['Close']) * 100,
-        'adx': float(lat['ADX']),
-        'plus_di': float(lat['Plus_DI']),
-        'minus_di': float(lat['Minus_DI']),
-        'overall_bias': bias, 'bias_score': bsc,
-        'confluence_score': cf,
-        'recent_signals': recent,
-        'all_signal_stats': enhanced_stats,     # 🔧 강화 버전
+        'vwap_osc': float(lat['VWAP_Osc']), 'mf_area': float(lat['RSI_MFI']),
+        'atr': float(lat['ATR']), 'atr_pct': float(lat['ATR']) / float(lat['Close']) * 100,
+        'adx': float(lat['ADX']), 'plus_di': float(lat['Plus_DI']), 'minus_di': float(lat['Minus_DI']),
+        'overall_bias': bias, 'bias_score': bsc, 'confluence_score': cf,
+        'recent_signals': recent, 'all_signal_stats': compute_all_stats(dv),
         'last_date': dc.index[-1].strftime('%Y-%m-%d'),
         'buy_proximity': float(lat['Buy_Proximity']),
         'sell_proximity': float(lat['Sell_Proximity']),
@@ -3203,59 +2511,45 @@ def build_metadata_v12(dc, dv, ticker, external):
         'trend_regime': regime, 'shield_status': shield_str,
         'supertrend_dir': int(lat.get('ST_Direction', 0)),
         'supertrend_val': float(lat.get('SuperTrend', 0)),
-        'ema8': float(lat.get('EMA8', 0)),
-        'ema21': float(lat.get('EMA21', 0)),
-        'bb_up': float(lat.get('BB_Up', 0)),
-        'bb_low': float(lat.get('BB_Low', 0)),
-        'ma50': float(lat.get('MA50', 0)),
-        'ma200': float(lat.get('MA200', 0)),
+        'ema8': float(lat.get('EMA8', 0)), 'ema21': float(lat.get('EMA21', 0)),
+        'bb_up': float(lat.get('BB_Up', 0)), 'bb_low': float(lat.get('BB_Low', 0)),
+        'ma50': float(lat.get('MA50', 0)), 'ma200': float(lat.get('MA200', 0)),
         'macd_line': float(lat.get('MACD_Line', 0)),
         'macd_signal': float(lat.get('MACD_Signal', 0)),
         'macd_hist': float(lat.get('MACD_Hist', 0)),
-        'judgment_detail': jd,
-        'judgment_history': judgment_history,
+        'judgment_detail': jd, 'judgment_history': judgment_history,
+        # 🆕 Ichimoku / CMF
         'cmf': float(lat.get('CMF', 0)),
         'ichimoku_tenkan': float(lat.get('Ichimoku_Tenkan', 0)),
         'ichimoku_kijun': float(lat.get('Ichimoku_Kijun', 0)),
-        # 🆕 V12 추가
-        'external': external,
-        'pred_direction': str(lat.get('Pred_Direction', 'FLAT')),
-        'pred_buy_score': float(lat.get('Pred_Buy_Score', 0)),
-        'pred_sell_score': float(lat.get('Pred_Sell_Score', 0)),
-        'setup_buy_active': bool(lat.get('Setup_Buy_Zone', False)),
-        'setup_sell_active': bool(lat.get('Setup_Sell_Zone', False)),
-    }
-    return meta, regime, shield_str
-
+    }, regime, shield_str
 
 
 # ──────────────────────────────────────────
 # 프롬프트 빌더 (🆕 Ichimoku/CMF 데이터 포함)
 # ──────────────────────────────────────────
-def build_prompt_text_v12(dc, meta):
-    """V11.1 대비 추가: 예측스코어, 외부데이터, 시그널 타이밍"""
+def build_prompt_text(dc, meta):
     lat = dc.iloc[-1]
     rd = dc.tail(60)
-    ps = ", ".join([f"'{d.strftime('%Y-%m-%d')}:{r['Close']:.2f}'"
-                    for d, r in rd.iterrows()])
+    ps = ", ".join([f"'{d.strftime('%Y-%m-%d')}:{r['Close']:.2f}'" for d, r in rd.iterrows()])
 
-    # 시그널 (타이밍 정보 포함)
     sl = []
     for ir, row in dc.tail(30).iterrows():
         dd = ir.strftime('%Y-%m-%d')
         for k, v in ALL_CHART_SIGNALS.items():
-            if row.get(k, False):
-                timing = SIGNAL_TIMING.get(k, 'unknown')
-                sl.append(f"{v['icon']} {v['label']} {dd} [{timing}]")
+            if row.get(k, False): sl.append(f"{v['icon']} {v['label']} {dd}")
     st_text = "\n".join(sl) if sl else "최근 30일 내 시그널 없음"
 
     bp, sp = meta['buy_proximity'], meta['sell_proximity']
     prox = f"BuyProx={bp:.0f}%,SellProx={sp:.0f}%"
+    if bp >= 60: prox += " ⚠️매수임박"
+    if sp >= 60: prox += " ⚠️매도임박"
     sq = "SqON" if meta['squeeze_on'] else "SqOFF"
     std = (f"BULL▲({meta['supertrend_val']:.2f})" if meta['supertrend_dir'] == 1
            else f"BEAR▼({meta['supertrend_val']:.2f})")
     shd = f"Shield:{meta['shield_status']}" if meta['shield_status'] else "Shield:NONE"
 
+    # 🆕 Ichimoku/CMF 정보 추가
     ichi_str = (f"Ichimoku=[Tenkan:{meta.get('ichimoku_tenkan',0):.2f}/"
                 f"Kijun:{meta.get('ichimoku_kijun',0):.2f}]")
     cmf_str = f"CMF={meta.get('cmf',0):.3f}"
@@ -3266,38 +2560,30 @@ def build_prompt_text_v12(dc, meta):
         f"E8={lat['EMA8']:.2f},E21={lat['EMA21']:.2f},ST={std},"
         f"BB=[{meta['bb_up']:.2f}/{meta['bb_low']:.2f}],%B={lat.get('Percent_B',0):.2f},"
         f"M50={meta['ma50']:.2f},M200={meta['ma200']:.2f},"
+        f"Chandelier=[L:{lat.get('Chandelier_Long',0):.2f}/S:{lat.get('Chandelier_Short',0):.2f}],"
         f"MACD={meta['macd_line']:.3f}/{meta['macd_signal']:.3f} H={meta['macd_hist']:.3f},"
         f"{ichi_str},{cmf_str},"
         f"Conf={meta['confluence_score']:.1f},Bias={meta['overall_bias']}({meta['bias_score']:.1f}),"
         f"Trend={meta['trend_regime']},{shd},{prox},{sq}")
 
-    # 🆕 백테스트 (고신뢰만)
     stats = meta.get('all_signal_stats', {})
     st_txt = ""
     if stats:
         lines = []
-        for sn, sv in sorted(stats.items(),
-                              key=lambda x: x[1].get('2d_winrate', 0) or 0,
-                              reverse=True)[:15]:
+        for sn, sv in sorted(stats.items(), key=lambda x: x[1]['count'], reverse=True)[:15]:
             wr = sv.get('2d_winrate')
             avg = sv.get('2d_avg')
-            conf = sv.get('confidence', 'D')
-            timing = SIGNAL_TIMING.get(sn, '?')
             if wr is not None:
-                lines.append(f"  [{conf}] {sn}: {sv['count']}회, "
-                             f"승률{wr:.0f}%, 평균{avg:+.2f}%, "
-                             f"타이밍:{timing}")
-        if lines:
-            st_txt = "\n📌 [강화 백테스트(수수료반영,상위15)]\n" + "\n".join(lines)
+                lines.append(f"  {sn}:{sv['count']}회,2일승률{wr:.0f}%,평균{avg:+.1f}%")
+        if lines: st_txt = "\n📌 [백테스트(2년,상위15)]\n" + "\n".join(lines)
 
-    # 판단 데이터
     jd = meta.get('judgment_detail', {})
     j_txt = ""
     if jd:
         j_txt = f"\n\n📌 [멀티 시그널 매매 판단]\n"
         j_txt += f"  최종판단: {jd.get('judgment','NEUTRAL')}\n"
-        j_txt += f"  BUY점수: {jd.get('buy_total',0):.1f} (활성 {jd.get('buy_active',0)}/{NUM_LAYERS})\n"
-        j_txt += f"  SELL점수: {jd.get('sell_total',0):.1f} (활성 {jd.get('sell_active',0)}/{NUM_LAYERS})\n"
+        j_txt += f"  BUY점수: {jd.get('buy_total',0):.1f} (활성 {jd.get('buy_active',0)}/{NUM_LAYERS} 레이어)\n"
+        j_txt += f"  SELL점수: {jd.get('sell_total',0):.1f} (활성 {jd.get('sell_active',0)}/{NUM_LAYERS} 레이어)\n"
         bl = jd.get('buy_layers', {})
         sla = jd.get('sell_layers', {})
         j_txt += f"  BUY레이어: {', '.join(f'{k}={v:.1f}' for k,v in bl.items())}\n"
@@ -3311,31 +2597,7 @@ def build_prompt_text_v12(dc, meta):
                 f"{d['date']}:{d['judgment']}(B{d['buy_total']:.0f}/S{d['sell_total']:.0f})"
                 for d in jh) + "\n"
 
-    # 🆕 예측 스코어
-    pred_txt = f"\n📌 [예측 스코어 (선행지표 기반)]\n"
-    pred_txt += f"  방향: {meta.get('pred_direction','FLAT')}\n"
-    pred_txt += f"  예측BUY: {meta.get('pred_buy_score',0):.1f}, 예측SELL: {meta.get('pred_sell_score',0):.1f}\n"
-    pred_txt += f"  셋업존: BUY={'활성' if meta.get('setup_buy_active') else '비활성'}, "
-    pred_txt += f"SELL={'활성' if meta.get('setup_sell_active') else '비활성'}\n"
-
-    # 🆕 외부 데이터
-    ext = meta.get('external', {})
-    ext_txt = f"\n📌 [외부 시그널]\n"
-    ext_txt += f"  {ext.get('external_summary', 'N/A')}\n"
-    ext_txt += f"  애널리스트: {ext.get('recommendation','N/A')}"
-    if ext.get('target_price'):
-        ext_txt += f", 목표가: ${ext['target_price']:.2f}"
-    ext_txt += f"\n  어닝: {ext.get('earnings_date','N/A')}\n"
-    insider = ext.get('insider_trades', [])
-    if insider:
-        ext_txt += f"  내부자: 최근 {len(insider)}건\n"
-    news = ext.get('news', [])
-    if news:
-        ext_txt += f"  뉴스: {news[0]['title'][:60]}...\n"
-
-    return (f"{ps}\n\n📌 [지표 요약]\n{inds}\n\n"
-            f"📌 [최근 시그널 (타이밍 표시)]\n{st_text}"
-            f"{st_txt}{j_txt}{pred_txt}{ext_txt}")
+    return f"{ps}\n\n📌 [지표 요약]\n{inds}\n\n📌 [최근 시그널]\n{st_text}{st_txt}{j_txt}"
 
 
 def build_ai_prompt(ticker, phist, fundamentals):
@@ -3453,40 +2715,23 @@ def build_ai_prompt(ticker, phist, fundamentals):
 # ──────────────────────────────────────────
 # 분석 통합 로직
 # ──────────────────────────────────────────
-# ──────────────────────────────────────────
-# [REPLACE] analyze — V12 파이프라인
-# ──────────────────────────────────────────
 def analyze(ticker: str, chart_days: int = 252, refresh: bool = False):
     try:
         ts = int(time.time()) if refresh else None
         df = compute_and_cache(ticker, ts)
         if df is None or df.empty:
             return None, "주가 데이터 없음", None
-
-        # 🆕 외부 데이터 수집
-        external = fetch_external_signals(ticker)
-
         dv = df.dropna(subset=['WT1', 'WT2'])
         dc = dv.tail(chart_days).copy()
         if dc.empty:
             return None, "차트 데이터 부족", None
-
-        # 🆕 셋업 존 감지
-        dc = detect_setup_zones(dc)
-
-        # 🆕 예측 스코어 계산
-        dc = compute_predictive_score(dc, external)
-
-        # 🆕 고신뢰 시그널 필터링
-        enhanced_stats = compute_all_stats_enhanced(dv)
-        dc = compute_high_confidence_signals(dc, enhanced_stats)
-
-        meta, regime, shield = build_metadata_v12(dc, dv, ticker, external)
-        fig = build_chart_v12(dc, ticker, regime, shield, enhanced_stats)
-        return fig, build_prompt_text_v12(dc, meta), meta
+        meta, regime, shield = build_metadata(dc, dv, ticker)
+        fig = build_chart(dc, ticker, regime, shield)
+        return fig, build_prompt_text(dc, meta), meta
     except Exception as e:
         import traceback
-        print(f"[CipherX ERROR] {ticker}: {traceback.format_exc()}")
+        err_detail = traceback.format_exc()
+        print(f"[CipherX ERROR] {ticker}: {err_detail}")
         return None, f"로딩 실패: {type(e).__name__}: {e}", None
 
 
@@ -3924,203 +3169,57 @@ def render_signals(m):
                     unsafe_allow_html=True)
 
 
-def render_stats_v12(m):
-    with st.expander("📊 강화 백테스트 (슬리피지/수수료/벤치마크 반영)", expanded=True):
+def render_stats(m):
+    with st.expander("📊 시그널 백테스트 (2년 데이터 기반)", expanded=True):
         alls = m.get('all_signal_stats', {})
         if not alls:
-            st.caption("충분한 통계 데이터가 없습니다 (최소 15회 이상 발생한 시그널만 표시).")
+            st.caption("충분한 통계 데이터가 없습니다.")
             return
+        st.markdown("<p style='color:#64748B;font-size:.8rem;margin-bottom:16px'>"
+                    "진입: 시그널 다음날 시가 · 청산: 2일 후 종가</p>", unsafe_allow_html=True)
 
-        st.markdown(f"""<p style='color:#64748B;font-size:.8rem;margin-bottom:8px'>
-            진입: 시그널 다음날 시가 · 슬리피지: {SLIPPAGE_PCT}% · 수수료: {COMMISSION_PCT}% (편도)<br>
-            ATR 청산: 손절 ×{1.5} / 목표 ×{2.0} · 최소 샘플: {MIN_BACKTEST_SAMPLES}회
-        </p>""", unsafe_allow_html=True)
-
-        # 신뢰 등급 필터
-        grade_filter = st.radio("신뢰 등급 필터", ['전체', 'A+B만', 'A만'],
-                                horizontal=True, key="bt_grade")
-
-        def _render_signal_card(sn, sv, is_sell=False):
-            conf = sv.get('confidence', 'D')
-            if grade_filter == 'A만' and conf != 'A': return
-            if grade_filter == 'A+B만' and conf not in ('A', 'B'): return
-
-            wr = sv.get('2d_winrate')
-            if wr is None: return
-            av = sv.get('2d_avg', 0)
-            sharpe = sv.get('2d_sharpe', 0)
-            alpha = sv.get('2d_alpha', 0)
-            ci = sv.get('2d_ci', (0, 0))
-            atr_wr = sv.get('atr_exit_winrate')
-
-            kor_label = ALL_CHART_SIGNALS.get(sn, {}).get('kor', sn)
-            ic = ALL_CHART_SIGNALS.get(sn, {}).get('icon', '')
-            timing = SIGNAL_TIMING.get(sn, 'unknown')
-            timing_emoji = {'leading': '🟢선행', 'coincident': '🟡동시', 'lagging': '🔴후행'}.get(timing, '⚪')
-
-            # 신뢰 등급 색상
-            conf_clr = {'A': '#00E676', 'B': '#69F0AE', 'C': '#FCD34D', 'D': '#F87171'}[conf]
-            wr_c = '#34D399' if wr >= 55 else ('#FCD34D' if wr >= 50 else '#F87171')
-            av_c = '#34D399' if (av > 0 and not is_sell) or (av < 0 and is_sell) else '#F87171'
-
-            st.markdown(f"""<div style="padding:10px 14px;margin:6px 0;border-radius:10px;
-                background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.04)">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-                    <div style="display:flex;align-items:center;gap:8px">
-                        <span style="color:{conf_clr};font-weight:800;font-size:.9rem;
-                            padding:2px 8px;border-radius:6px;
-                            background:rgba(255,255,255,0.05)">{conf}</span>
-                        <span style="color:#CBD5E1;font-weight:600;font-size:.9rem">
-                            {ic} {kor_label}</span>
-                        <span style="color:#475569;font-size:.7rem">({sv['count']}회)</span>
-                        <span style="font-size:.65rem;padding:1px 6px;border-radius:4px;
-                            background:rgba(255,255,255,0.03);color:#64748B">{timing_emoji}</span>
+        def _side(title, data, is_sell=False):
+            st.markdown(f"<p style='color:{'#F87171' if is_sell else '#34D399'};font-weight:700;"
+                        f"font-size:.85rem;text-transform:uppercase;letter-spacing:1px;"
+                        f"margin-bottom:10px'>{title}</p>", unsafe_allow_html=True)
+            for sn, sv in sorted(data.items(), key=lambda x: x[1]['count'], reverse=True):
+                wr = sv.get('2d_winrate')
+                av = sv.get('2d_avg')
+                if wr is None: continue
+                kor_label = ALL_CHART_SIGNALS.get(sn, {}).get('kor', sn)
+                ic = ALL_CHART_SIGNALS.get(sn, {}).get('icon', '')
+                if wr >= 60: wr_c = '#34D399'
+                elif wr >= 50: wr_c = '#6EE7B7'
+                elif wr >= 40: wr_c = '#FCD34D'
+                else: wr_c = '#F87171'
+                if is_sell: av_c = '#34D399' if av < 0 else '#F87171'
+                else: av_c = '#34D399' if av > 0 else '#F87171'
+                wr_bar = min(wr, 100)
+                st.markdown(f"""<div style="padding:8px 12px;margin:4px 0;border-radius:8px;
+                    background:rgba(255,255,255,0.015);border:1px solid rgba(255,255,255,0.03)">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                        <span style="color:#CBD5E1;font-weight:600;font-size:.85rem">{ic} {kor_label}
+                            <span style="color:#475569;font-size:.75rem;font-weight:400">({sv['count']}회)</span></span>
+                        <span style="color:{av_c};font-weight:700;font-size:.85rem">{av:+.1f}%</span>
                     </div>
-                    <span style="color:{av_c};font-weight:700;font-size:.9rem">{av:+.2f}%</span>
-                </div>
-                <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:.75rem;color:#64748B">
-                    <span>승률: <b style="color:{wr_c}">{wr:.1f}%</b></span>
-                    <span>샤프: <b style="color:#CBD5E1">{sharpe:.2f}</b></span>
-                    <span>알파: <b style="color:{'#34D399' if alpha > 0 else '#F87171'}">{alpha:+.2f}%</b></span>
-                    <span>95%CI: [{ci[0]:.2f}, {ci[1]:.2f}]</span>
-                    {f'<span>ATR청산: <b>{atr_wr:.0f}%</b></span>' if atr_wr is not None else ''}
-                </div>
-            </div>""", unsafe_allow_html=True)
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <div style="flex:1;height:4px;background:#151921;border-radius:2px;overflow:hidden">
+                            <div style="width:{wr_bar}%;height:4px;background:{wr_c};border-radius:2px"></div></div>
+                        <span style="color:{wr_c};font-size:.75rem;font-weight:700;width:38px;text-align:right">{wr:.0f}%</span>
+                    </div>
+                </div>""", unsafe_allow_html=True)
 
         c1, c2 = st.columns(2)
         with c1:
-            st.markdown("<p style='color:#34D399;font-weight:700;font-size:.85rem;"
-                        "text-transform:uppercase'>▲ BUY 시그널</p>", unsafe_allow_html=True)
-            buy_stats = {k: v for k, v in alls.items() if v.get('direction') == 'buy'}
-            for sn, sv in sorted(buy_stats.items(),
-                                  key=lambda x: x[1].get('2d_winrate', 0) or 0,
-                                  reverse=True):
-                _render_signal_card(sn, sv, is_sell=False)
+            _side("▲ BUY 전략 (롱)",
+                  {k: v for k, v in alls.items() if v['direction'] == 'buy'}, is_sell=False)
         with c2:
-            st.markdown("<p style='color:#F87171;font-weight:700;font-size:.85rem;"
-                        "text-transform:uppercase'>▼ SELL 시그널</p>", unsafe_allow_html=True)
-            sell_stats = {k: v for k, v in alls.items() if v.get('direction') == 'sell'}
-            for sn, sv in sorted(sell_stats.items(),
-                                  key=lambda x: x[1].get('2d_winrate', 0) or 0,
-                                  reverse=True):
-                _render_signal_card(sn, sv, is_sell=True)
-
-# ──────────────────────────────────────────
-# [NEW] 외부 시그널 UI
-# ──────────────────────────────────────────
-def render_external_signals(m):
-    ext = m.get('external', {})
-    if not ext:
-        st.info("외부 데이터 없음")
-        return
-
-    # 요약
-    summary = ext.get('external_summary', '')
-    ext_score = ext.get('external_score', 0)
-    sc_clr = '#34D399' if ext_score > 0 else ('#F87171' if ext_score < 0 else '#FCD34D')
-    st.markdown(f"""<div style="background:rgba(99,102,241,.05);border-radius:12px;
-        padding:14px 18px;margin-bottom:12px;border:1px solid rgba(99,102,241,.15)">
-        <span style="color:{sc_clr};font-weight:700;font-size:1rem">{summary}</span>
-        <span style="color:#64748B;font-size:.85rem;margin-left:12px">
-            (점수: {ext_score:+d})</span>
-    </div>""", unsafe_allow_html=True)
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        # 애널리스트
-        rec = ext.get('recommendation', 'N/A')
-        target = ext.get('target_price')
-        earn = ext.get('earnings_date')
-        st.markdown("##### 🏦 애널리스트")
-        rec_clr = '#34D399' if rec in ('strong_buy', 'buy') else (
-            '#F87171' if rec in ('sell', 'strong_sell') else '#FCD34D')
-        st.markdown(f"<span style='color:{rec_clr};font-weight:700'>{rec.upper()}</span>",
-                    unsafe_allow_html=True)
-        if target:
-            upside = (target - m['price']) / m['price'] * 100
-            st.metric("목표가", f"${target:.2f}", delta=f"{upside:+.1f}%")
-        if earn:
-            st.caption(f"📅 다음 어닝: {earn}")
-
-    with col2:
-        # 내부자 거래
-        insiders = ext.get('insider_trades', [])
-        st.markdown("##### 👤 내부자 거래")
-        if insiders:
-            for ins in insiders[:5]:
-                clr = '#34D399' if 'purchase' in ins['text'].lower() else '#F87171'
-                st.markdown(f"<span style='color:{clr};font-size:.8rem'>"
-                            f"{ins['text'][:50]}</span>", unsafe_allow_html=True)
-        else:
-            st.caption("최근 내부자 거래 없음")
-
-    # 뉴스
-    news = ext.get('news', [])
-    if news:
-        st.markdown("##### 📰 최근 뉴스")
-        for article in news[:5]:
-            st.markdown(f"<a href='{article['link']}' target='_blank' "
-                        f"style='color:#A5B4FC;text-decoration:none;font-size:.85rem'>"
-                        f"📄 {article['title'][:80]}</a>"
-                        f"<span style='color:#475569;font-size:.7rem;margin-left:8px'>"
-                        f"{article['publisher']}</span>", unsafe_allow_html=True)
-
-
-# ──────────────────────────────────────────
-# [NEW] 예측 스코어 UI
-# ──────────────────────────────────────────
-def render_prediction(m):
-    pred_dir = m.get('pred_direction', 'FLAT')
-    pred_b = m.get('pred_buy_score', 0)
-    pred_s = m.get('pred_sell_score', 0)
-    setup_buy = m.get('setup_buy_active', False)
-    setup_sell = m.get('setup_sell_active', False)
-
-    dir_config = {
-        'STRONG_UP': ('🟢🟢🟢 강한 상승 예상', '#00E676'),
-        'UP': ('🟢🟢 상승 예상', '#34D399'),
-        'LEAN_UP': ('🟢 약간 상승', '#69F0AE'),
-        'FLAT': ('⚪ 방향 불명', '#9E9E9E'),
-        'LEAN_DOWN': ('🔴 약간 하락', '#FF5252'),
-        'DOWN': ('🔴🔴 하락 예상', '#F87171'),
-        'STRONG_DOWN': ('🔴🔴🔴 강한 하락 예상', '#FF1744'),
-    }
-    label, color = dir_config.get(pred_dir, ('⚪ 불명', '#9E9E9E'))
-
-    st.markdown(f"""<div style="background:rgba(99,102,241,.04);border-radius:14px;
-        padding:18px 24px;margin-bottom:16px;border:1px solid rgba(99,102,241,.12);
-        text-align:center">
-        <p style="color:#94A3B8;font-size:.75rem;margin:0;text-transform:uppercase;
-           letter-spacing:1px">🔮 향후 방향 예측 (선행지표 기반)</p>
-        <p style="color:{color};font-size:1.5rem;font-weight:800;margin:8px 0">{label}</p>
-        <div style="display:flex;justify-content:center;gap:24px;margin-top:8px">
-            <span style="color:#34D399;font-size:.9rem">▲ {pred_b:.1f}</span>
-            <span style="color:#F87171;font-size:.9rem">▼ {pred_s:.1f}</span>
-        </div>
-    </div>""", unsafe_allow_html=True)
-
-    # 셋업 존 알림
-    if setup_buy:
-        st.markdown("""<div class="alert-bar" style="background:rgba(16,185,129,.06)">
-            <span style="color:#34D399;font-weight:700;font-size:.9rem">
-            🟢 매수 셋업 존 활성 — 선행지표 3개+ 축적 중 (돌파 임박 가능성)</span></div>""",
-                    unsafe_allow_html=True)
-    if setup_sell:
-        st.markdown("""<div class="alert-bar" style="background:rgba(239,68,68,.06)">
-            <span style="color:#F87171;font-weight:700;font-size:.9rem">
-            🔴 매도 셋업 존 활성 — 선행지표 3개+ 축적 중 (하락 임박 가능성)</span></div>""",
-                    unsafe_allow_html=True)
-
-    st.caption("⚠️ 예측 스코어는 선행지표와 가속도를 기반으로 한 참고 수치이며, "
-               "투자 판단의 유일한 근거로 사용해서는 안 됩니다.")
+            _side("▼ SELL 전략 (숏)",
+                  {k: v for k, v in alls.items() if v['direction'] == 'sell'}, is_sell=True)
 
 
 # ──────────────────────────────────────────
 # 메인 분석 렌더
-# ──────────────────────────────────────────
-# ──────────────────────────────────────────
-# [REPLACE] render_analysis — V12 탭 구조
 # ──────────────────────────────────────────
 def render_analysis(msg):
     m, fig = msg.get('meta'), msg.get('fig')
@@ -4129,36 +3228,30 @@ def render_analysis(msg):
         render_speedometer(m)
         render_alerts(m)
     if m or fig:
-        tabs = st.tabs([
+        t0, t1, t2, t3, t4 = st.tabs([
             "🎯 매매 판단",
-            "🔮 예측",          # 🆕
             "📊 차트",
             "📈 백테스트",
             "🔔 시그널 이력",
-            "🌐 외부 시그널",   # 🆕
             "🏢 기업 상세",
         ])
-        with tabs[0]:
+        with t0:
             if m: render_judgment(m)
-        with tabs[1]:
-            if m: render_prediction(m)
-        with tabs[2]:
+        with t1:
+            plotly_config = {
+                'displaylogo': False,
+                'modeBarButtonsToRemove': ['lasso2d', 'select2d',
+                    'hoverCompareCartesian', 'hoverClosestCartesian'],
+            }
             if fig:
                 st.plotly_chart(fig, use_container_width=True, theme=None,
-                    config={'displaylogo': False,
-                            'modeBarButtonsToRemove': [
-                                'lasso2d', 'select2d',
-                                'hoverCompareCartesian',
-                                'hoverClosestCartesian']})
-        with tabs[3]:
-            if m: render_stats_v12(m)
-        with tabs[4]:
+                                config=plotly_config)
+        with t2:
+            if m: render_stats(m)
+        with t3:
             if m: render_signals(m)
-        with tabs[5]:
-            if m: render_external_signals(m)
-        with tabs[6]:
+        with t4:
             if m: render_company_details(m['ticker'])
-
 
 
 # ──────────────────────────────────────────
