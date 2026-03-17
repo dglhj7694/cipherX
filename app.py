@@ -2595,7 +2595,14 @@ def build_prompt_text(dc, meta):
                 f"Kijun:{meta.get('ichimoku_kijun',0):.2f}]")
     cmf_str = f"CMF={meta.get('cmf',0):.3f}"
 
-    inds = (f"WT1={lat['WT1']:.1f},WT2={lat['WT2']:.1f},RSI={lat['RSI']:.1f},MFI={lat['MFI']:.1f},"
+    # 💡 🆕 거래량 데이터 문자열 추가 (현재 거래량 및 평균 대비 배수)
+    vol = meta.get('volume', 0)
+    avg_vol = meta.get('avg_volume', 1)  # 0 나누기 방지
+    vol_ratio = vol / avg_vol if avg_vol else 0
+    vol_str = f"Vol={vol:,.0f}(평균대비 {vol_ratio:.1f}x)"
+
+    # 💡 🆕 지표 요약(inds) 맨 앞에 거래량(vol_str) 삽입
+    inds = (f"{vol_str}, WT1={lat['WT1']:.1f},WT2={lat['WT2']:.1f},RSI={lat['RSI']:.1f},MFI={lat['MFI']:.1f},"
         f"StK={lat['StochK']:.1f},StD={lat['StochD']:.1f},VWAP={lat['VWAP_Osc']:.2f},"
         f"MF={lat['RSI_MFI']:.1f},ADX={lat['ADX']:.1f},+DI={lat['Plus_DI']:.1f},-DI={lat['Minus_DI']:.1f},"
         f"E8={lat['EMA8']:.2f},E21={lat['EMA21']:.2f},ST={std},"
@@ -2628,6 +2635,7 @@ def build_prompt_text(dc, meta):
                 for d in jh) + "\n"
 
     return f"{ps}\n\n📌 [지표 요약]\n{inds}\n\n📌 [최근 시그널]\n{st_text}{j_txt}"
+
 
 def build_ai_prompt(ticker, phist, fundamentals):
     return f"""━━━━━━━━━━━━━
@@ -3535,6 +3543,10 @@ def process_ticker(tv: str, refresh: bool = False):
 # 퀵 티커 / URL 파라미터 / 버튼 / 입력
 # ──────────────────────────────────────────
 
+# ──────────────────────────────────────────
+# 퀵 티커 / URL 파라미터 / 버튼 / 입력
+# ──────────────────────────────────────────
+
 # 🆕 URL 쿼리 파라미터 자동 로드 (최초 1회)
 if url_ticker and 'url_loaded' not in st.session_state:
     st.session_state['url_loaded'] = True
@@ -3544,20 +3556,15 @@ if st.session_state.get('quick_ticker'):
     qt = st.session_state.pop('quick_ticker')
     process_ticker(qt)
 
+# 💡 새로고침 버튼(c1, c2 컬럼 분할)을 삭제하고 AI 분석 버튼을 전체 너비로 확장
 if st.session_state.last_ticker:
-    lt = st.session_state.last_ticker
-    c1, c2 = st.columns([3, 1])
-    with c1:
-        if st.session_state.pending_ai_ticker and st.session_state.pending_ai_prompt:
-            if st.button(
-                f"🚀 {st.session_state.pending_ai_ticker.upper()} AI 심층 퀀트 분석 시작",
-                type="primary", use_container_width=True
-            ):
-                _run_ai()
-    with c2:
-        if st.button(f"🔄 {lt} 새로고침", type="secondary",
-                     use_container_width=True, key="re"):
-            process_ticker(lt, refresh=True)
+    if st.session_state.pending_ai_ticker and st.session_state.pending_ai_prompt:
+        if st.button(
+            f"🚀 {st.session_state.pending_ai_ticker.upper()} AI 심층 퀀트 분석 시작",
+            type="primary", use_container_width=True
+        ):
+            _run_ai()
+
 elif st.session_state.pending_ai_ticker and st.session_state.pending_ai_prompt:
     if st.button(
         f"🚀 {st.session_state.pending_ai_ticker.upper()} AI 심층 퀀트 분석 시작",
