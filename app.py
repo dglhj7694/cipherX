@@ -17,7 +17,7 @@ import numpy as np
 from plotly.subplots import make_subplots
 from collections import OrderedDict
 
-# 만약 company_details.py가 같은 폴더에 있다면 아래 임포트를 유지하세요.
+# company_details.py 임포트 (없으면 pass)
 try:
     from company_details import render_company_details
 except ImportError:
@@ -208,7 +208,6 @@ def _sig(w, d, icon, label, sym, sz, clr, base, atr_m, kor, desc):
             'clr': clr, 'base': base, 'atr_m': atr_m, 'kor': kor, 'desc': desc}
 
 SIGNAL_REGISTRY = {
-    # MCB+ 매수 (21)
     'Gold_Dot':              _sig(3.0,_B,'🏆','GOLD DOT','circle',18,'#FFD700','Low',-3.0,'최강 매수','RSI<30+MFI<30+WT1<-60+상승 다이버전스'),
     'Green_Dot_T1':          _sig(2.5,_B,'🟢','BUY T1','circle',16,'#00E676','Low',-2.5,'강한 매수','WT과매도교차+RSI<30+MFI<30+MF<0'),
     'Green_Dot_T2':          _sig(2.0,_B,'🟩','BUY T2','circle',13,'#69F0AE','Low',-2.2,'매수','WT과매도+RSI또는MFI<32'),
@@ -230,7 +229,7 @@ SIGNAL_REGISTRY = {
     'Parabolic_Bottom_Buy':  _sig(3.0,_B,'🧊','Parabolic Bot','diamond',16,'#00FFFF','Low',-3.0,'포물선 바닥','WT1<-85 꺾임+양봉'),
     'MACD_Cross_Buy':        _sig(1.0,_B,'〽️','MACD Cross','triangle-up',9,'#4CAF50','Low',-1.0,'MACD 골든크로스','MACD>시그널(0선 하방)'),
     'StochRSI_Cross_Buy':    _sig(0.8,_B,'🔄','StRSI Cross','circle-open',8,'#81C784','Low',-0.8,'StochRSI 매수교차','StochK>StochD(과매도)'),
-    # MCB+ 매도 (21)
+    
     'Blood_Diamond':         _sig(3.0,_S,'🩸','BLOOD DIA','diamond',18,'#DC143C','High',3.0,'최강 매도','RSI>70+MFI>70+WT1>60+하락 다이버전스'),
     'Red_Dot_T1':            _sig(2.5,_S,'🔴','SELL T1','circle',16,'#FF1744','High',2.5,'강한 매도','WT과매수하락교차+RSI>70+MFI>70'),
     'Red_Dot_T2':            _sig(2.0,_S,'🟥','SELL T2','circle',13,'#FF5252','High',2.2,'매도','WT과매수+RSI또는MFI>68'),
@@ -252,52 +251,52 @@ SIGNAL_REGISTRY = {
     'VWAP_Reject_Sell':      _sig(1.5,_S,'🏛️','VWAP Reject','triangle-down',11,'#FF6E40','High',1.3,'VWAP 저항','VWAP 실패+WT교차'),
     'MACD_Cross_Sell':       _sig(1.0,_S,'〽️','MACD Dead','triangle-down',9,'#E57373','High',1.0,'MACD 데드크로스','MACD<시그널(0선 상방)'),
     'StochRSI_Cross_Sell':   _sig(0.8,_S,'🔄','StRSI Dead','circle-open',8,'#EF9A9A','High',0.8,'StochRSI 매도교차','StochK<StochD(과매수)'),
-    # 캔들스틱 (7)
+    
     'Hammer':               _sig(1.5,_B,'🔨','Hammer','triangle-up',11,'#00E676','Low',-1.5,'해머','긴하단꼬리+소형실체+WT<-20'),
     'Morning_Star':         _sig(2.0,_B,'🌅','MornStar','star',13,'#00E676','Low',-2.0,'모닝스타','큰음봉→소형봉→강한양봉(3봉반전)'),
     'Doji_Bullish':         _sig(0.8,_B,'➕','Doji Bull','cross-thin',9,'#69F0AE','Low',-1.0,'강세 도지','시가≈종가+하락추세후 WT반등'),
     'Shooting_Star':        _sig(1.5,_S,'🌠','ShootStar','triangle-down',11,'#FF1744','High',1.5,'슈팅스타','긴상단꼬리+소형실체+WT>20'),
     'Evening_Star':         _sig(2.0,_S,'🌆','EveStar','star',13,'#FF1744','High',2.0,'이브닝스타','큰양봉→소형봉→강한음봉(3봉반전)'),
     'Doji_Bearish':         _sig(0.8,_S,'➖','Doji Bear','cross-thin',9,'#FF5252','High',1.0,'약세 도지','시가≈종가+상승추세후 WT하락'),
-    # Inside/Outside (3)
+    
     'Inside_Day':           _sig(0.3,_B,'📦','InsideDay','square-open',7,'#FFC107','Low',-0.3,'인사이드데이','고가<전일고&저가>전일저(돌파대기)'),
     'Outside_Bullish':      _sig(1.5,_B,'💪','OutsideBull','square',11,'#00E676','Low',-1.5,'강세 아웃사이드','전일범위포함+양봉마감+WT<30'),
     'Outside_Bearish':      _sig(1.5,_S,'🥊','OutsideBear','square',11,'#FF1744','High',1.5,'약세 아웃사이드','전일범위포함+음봉마감+WT>-30'),
-    # MA 돌파/이탈 (6)
+    
     'Cross_Above_20MA':     _sig(0.8,_B,'📈','X▲20MA','triangle-up',9,'#69F0AE','Low',-0.8,'20MA상향돌파','종가>20MA(전일≤)'),
     'Cross_Above_50MA':     _sig(1.2,_B,'📈','X▲50MA','triangle-up',10,'#00E676','Low',-1.0,'50MA상향돌파','종가>50MA(전일≤)'),
     'Cross_Above_200MA':    _sig(1.5,_B,'📈','X▲200MA','triangle-up',11,'#00BFA5','Low',-1.2,'200MA상향돌파','종가>200MA(전일≤)'),
     'Fell_Below_20MA':      _sig(0.8,_S,'📉','X▼20MA','triangle-down',9,'#FF5252','High',0.8,'20MA하향이탈','종가<20MA(전일≥)'),
     'Fell_Below_50MA':      _sig(1.2,_S,'📉','X▼50MA','triangle-down',10,'#FF1744','High',1.0,'50MA하향이탈','종가<50MA(전일≥)'),
     'Fell_Below_200MA':     _sig(1.5,_S,'📉','X▼200MA','triangle-down',11,'#D50000','High',1.2,'200MA하향이탈','종가<200MA(전일≥)'),
-    # 볼린저 밴드 (4)
+    
     'Above_Upper_BB':       _sig(1.0,_B,'🔝','BB▲Break','diamond-open',10,'#00E5FF','High',1.0,'BB상단돌파','종가>상단BB(강한모멘텀)'),
     'Below_Lower_BB':       _sig(1.0,_S,'⤵️','BB▼Break','diamond-open',10,'#FF6E40','Low',-1.0,'BB하단이탈','종가<하단BB(과매도/붕괴)'),
     'BB_Squeeze_End_Bull':  _sig(1.5,_B,'💥','SqEnd▲','star-diamond',12,'#00FFFF','Low',-1.5,'BB스퀴즈해소↑','BB확장+상승+WT↑'),
     'BB_Squeeze_End_Bear':  _sig(1.5,_S,'💥','SqEnd▼','star-diamond',12,'#FF6600','High',1.5,'BB스퀴즈해소↓','BB확장+하락+WT↓'),
-    # MACD 센터라인 (2)
+    
     'MACD_Zero_Cross_Buy':  _sig(1.2,_B,'⬆️','MACD 0▲','triangle-up',10,'#4CAF50','Low',-1.0,'MACD 0선돌파','MACD>0(전일≤0)'),
     'MACD_Zero_Cross_Sell': _sig(1.2,_S,'⬇️','MACD 0▼','triangle-down',10,'#E57373','High',1.0,'MACD 0선이탈','MACD<0(전일≥0)'),
-    # 연속 (4)
+    
     'Up_3_Days':            _sig(0.5,_B,'📗','Up3D','triangle-up',8,'#69F0AE','High',0.5,'3일연속상승','3거래일연속양봉'),
     'Up_5_Days':            _sig(0.8,_B,'📗','Up5D','triangle-up',9,'#00E676','High',0.8,'5일연속상승','5거래일연속양봉(과매수주의)'),
     'Down_3_Days':          _sig(0.5,_S,'📕','Dn3D','triangle-down',8,'#FF5252','Low',-0.5,'3일연속하락','3거래일연속음봉'),
     'Down_5_Days':          _sig(0.8,_S,'📕','Dn5D','triangle-down',9,'#FF1744','Low',-0.8,'5일연속하락','5거래일연속음봉(과매도주의)'),
-    # 갭 (4)
+    
     'Gap_Up':               _sig(1.0,_B,'⏫','GapUp','arrow-up',10,'#00E676','Low',-1.0,'갭 상승','시가>전일고가(ATR50%↑)'),
     'Gap_Down':             _sig(1.0,_S,'⏬','GapDn','arrow-down',10,'#FF1744','High',1.0,'갭 하락','시가<전일저가(ATR50%↑)'),
     'Gap_Up_Closed':        _sig(0.8,_S,'🔄','GapUp Fill','circle-open',8,'#FFA726','High',0.8,'갭업메움','상승갭메워짐(약세전환)'),
     'Gap_Down_Closed':      _sig(0.8,_B,'🔄','GapDn Fill','circle-open',8,'#4FC3F7','Low',-0.8,'갭다운메움','하락갭메워짐(강세전환)'),
-    # 변동성 (4)
+    
     'NR7':                  _sig(0.3,_B,'🔲','NR7','square-open',7,'#B0BEC5','Low',-0.3,'NR7','7일중최소범위(돌파임박)'),
     'NR7_2':                _sig(0.8,_B,'🔳','NR7-2','square-open',8,'#90A4AE','Low',-0.5,'NR7-2','2일연속NR7(강력돌파임박)'),
     'Calm_After_Storm':     _sig(1.0,_B,'🌤️','CalmStorm','diamond-open',9,'#FFC107','Low',-0.8,'폭풍뒤고요','WideRange후→NarrowRange(돌파임박)'),
     'Wide_Range_Bar':       _sig(0.5,_B,'📊','WideBar','square-open',7,'#FFAB40','Low',-0.4,'넓은범위봉','범위>ATR×2(변동성확장)'),
-    # 52주 / Spinning Top (3)
+    
     'New_52W_High':         _sig(1.5,_B,'🏔️','52W▲','star-triangle-up',12,'#FFD700','High',1.5,'52주신고가','52주최고가갱신(돌파)'),
     'New_52W_Low':          _sig(1.5,_S,'🕳️','52W▼','star-triangle-down',12,'#B71C1C','Low',-1.5,'52주신저가','52주최저가갱신(붕괴)'),
     'Spinning_Top':         _sig(0.3,_B,'🌀','SpinTop','circle-open',7,'#FFC107','Low',-0.3,'팽이형','소형실체+유사꼬리(우유부단)'),
-    # Jeff Cooper (15)
+    
     'Pullback_123_Bull':    _sig(2.0,_B,'🎯','123PB▲','triangle-up',12,'#00E676','Low',-1.8,'1,2,3풀백매수','ADX>30+DI↑+3일저점↓후 되돌림매수'),
     'Pullback_123_Bear':    _sig(2.0,_S,'🎯','123PB▼','triangle-down',12,'#FF1744','High',1.8,'1,2,3풀백매도','ADX>30+DI↓+3일고점↑후 되돌림매도'),
     'Setup_180_Bull':       _sig(2.0,_B,'🔄','180▲','star-diamond',13,'#00E676','Low',-2.0,'180매수셋업','전일하위25%→당일상위25%+MA위'),
@@ -313,7 +312,7 @@ SIGNAL_REGISTRY = {
     'NonADX_123_Bull':      _sig(1.8,_B,'📐','nADX123▲','triangle-up',11,'#69F0AE','Low',-1.5,'비ADX풀백매수','주가>50MA+3일저점↓→매수'),
     'NonADX_123_Bear':      _sig(1.8,_S,'📐','nADX123▼','triangle-down',11,'#FF5252','High',1.5,'비ADX풀백매도','주가<50MA+3일고점↑→매도'),
     'Pocket_Pivot':         _sig(1.5,_B,'🧲','PocketPvt','triangle-up',11,'#7C4DFF','Low',-1.5,'포켓피봇','양봉+거래량>10일하락거래량최대+MA위'),
-    # Money Flow 시그널 (6개)
+    
     'MF_Cross_Bull':        _sig(1.5,_B,'💰','MF 0▲','triangle-up',11,'#00E676','Low',-1.2,'MF 강세전환','자금흐름 음→양 전환'),
     'MF_Cross_Bear':        _sig(1.5,_S,'💸','MF 0▼','triangle-down',11,'#FF1744','High',1.2,'MF 약세전환','자금흐름 양→음 전환'),
     'MF_Bull_Div':          _sig(1.8,_B,'💹','MF Bull Div','triangle-up',11,'#7C4DFF','Low',-1.5,'MF 상승 다이버전스','가격↓ vs MF↑'),
@@ -380,9 +379,6 @@ SIGNAL_HIERARCHY = {
     'cooper_bear': ['Expansion_BD','Pullback_123_Bear','Setup_180_Bear','Boomer_Sell','Gilligans_Sell','Lizard_Bear','NonADX_123_Bear'],
 }
 
-# ──────────────────────────────────────────
-# 🆕 판단 마커 시각 설정
-# ──────────────────────────────────────────
 JUDGMENT_MARKERS = {
     'STRONG_BUY': {'symbol':'star','size':18,'color':'#00E676','label':'🟢🟢🟢 STRONG BUY','short':'S.BUY','line_color':'#FFFFFF','line_width':2,'base':'Low','atr_mult':-3.5},
     'BUY':        {'symbol':'triangle-up','size':14,'color':'#00E676','label':'🟢🟢 BUY','short':'BUY','line_color':'#FFFFFF','line_width':1.5,'base':'Low','atr_mult':-2.5},
@@ -404,9 +400,6 @@ JUDGMENT_CONFIG = {
     'STRONG_SELL': ('🔴🔴🔴 STRONG SELL','#FF1744','rgba(255,23,68,.12)'),
 }
 
-# ──────────────────────────────────────────
-# 유틸리티
-# ──────────────────────────────────────────
 def _recent(s, lb=3): return s.astype(float).rolling(lb+1, min_periods=1).max().fillna(0).astype(bool)
 def _cooldown(sig, bars=5):
     v = sig.astype(bool).values.copy()
@@ -439,9 +432,6 @@ def _volf(vol, ratio=0.5, period=20): return vol >= (vol.rolling(period, min_per
 def _valid_fmt(t): return bool(re.match(r'^[A-Za-z]{1,5}([.\-][A-Za-z]{1,2})?$', t))
 def _cls(val, lo, hi): return 'ind-bullish' if val<lo else ('ind-bearish' if val>hi else 'ind-neutral')
 
-# ──────────────────────────────────────────
-# 데이터 캐싱
-# ──────────────────────────────────────────
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_fundamentals(ticker):
     try:
@@ -484,9 +474,6 @@ def compute_and_cache(ticker, _ts=None):
     if df.empty: return None
     return detect_all_signals(compute_indicators(df))
 
-# ──────────────────────────────────────────
-# 기술 지표 계산 엔진
-# ──────────────────────────────────────────
 def compute_rsi(s,p=14):
     d=s.diff();g,l=d.clip(lower=0),-d.clip(upper=0)
     return 100-(100/(1+g.ewm(alpha=1/p,min_periods=p).mean()/(l.ewm(alpha=1/p,min_periods=p).mean()+1e-10)))
@@ -1820,151 +1807,6 @@ def analyze(ticker, chart_days=252, refresh=False):
         err_detail = traceback.format_exc()
         logging.error(f"[CipherX ERROR] {ticker}: {err_detail}")
         return None, f"로딩 실패: {type(e).__name__}: {e}", None
-
-# ──────────────────────────────────────────
-# 렌더링 - 매매 판단 UI
-# ──────────────────────────────────────────
-def render_judgment(meta):
-    jd = meta.get('judgment_detail')
-    if not jd:
-        st.info("매매 판단 데이터가 없습니다.")
-        return
-
-    judgment = jd['judgment']
-    buy_t = jd['buy_total']
-    sell_t = jd['sell_total']
-    net = buy_t - sell_t
-
-    if 'BUY' in judgment: card_cls = 'judgment-card-buy'
-    elif 'SELL' in judgment: card_cls = 'judgment-card-sell'
-    else: card_cls = 'judgment-card-neutral'
-
-    j_label, j_color, _ = JUDGMENT_CONFIG.get(judgment, ('⚪ NEUTRAL','#64748B',''))
-    net_color = '#34D399' if net > 0 else ('#F87171' if net < 0 else '#FCD34D')
-    
-    rationale_text = jd.get('rationale', '데이터 대기 중...')
-
-    st.markdown(f"""
-    <div class="judgment-card {card_cls}">
-        <p style="font-size:2rem;font-weight:800;color:{j_color};margin:0;
-           text-shadow:0 0 30px {j_color}40">{j_label}</p>
-           
-        <div style="margin-top:16px; padding:12px 16px; background:rgba(255,255,255,0.04); 
-                    border-radius:10px; border-left:4px solid {j_color}; text-align:left;">
-            <p style="color:#94A3B8; font-size:0.75rem; margin:0 0 4px 0; font-weight:700; letter-spacing:1px;">
-                💡 핵심 판단 근거
-            </p>
-            <p style="color:#F8FAFC; font-size:1.05rem; font-weight:700; margin:0; word-break:keep-all;">
-                {rationale_text}
-            </p>
-        </div>
-        
-        <div style="display:flex;justify-content:center;gap:32px;margin-top:20px">
-            <div>
-                <p style="color:#64748B;font-size:.7rem;margin:0;text-transform:uppercase;letter-spacing:1px">BUY Score</p>
-                <p style="color:#34D399;font-size:1.4rem;font-weight:800;margin:2px 0 0 0">{buy_t:.1f}</p>
-            </div>
-            <div style="border-left:1px solid rgba(255,255,255,0.08);padding-left:32px">
-                <p style="color:#64748B;font-size:.7rem;margin:0;text-transform:uppercase;letter-spacing:1px">SELL Score</p>
-                <p style="color:#F87171;font-size:1.4rem;font-weight:800;margin:2px 0 0 0">{sell_t:.1f}</p>
-            </div>
-            <div style="border-left:1px solid rgba(255,255,255,0.08);padding-left:32px">
-                <p style="color:#64748B;font-size:.7rem;margin:0;text-transform:uppercase;letter-spacing:1px">NET</p>
-                <p style="color:{net_color};font-size:1.4rem;font-weight:800;margin:2px 0 0 0">{net:+.1f}</p>
-            </div>
-        </div>
-    </div>""", unsafe_allow_html=True)
-
-    # ── 활성 콤보 ──
-    combos = jd.get('active_combos', [])
-    st.markdown("#### 🔥 활성 매매 콤보")
-    if combos:
-        for cb in combos:
-            cc = 'combo-buy' if cb['dir'] == 'buy' else 'combo-sell'
-            dot_c = '#34D399' if cb['dir'] == 'buy' else '#F87171'
-            side_label = 'BUY' if cb['dir'] == 'buy' else 'SELL'
-            st.markdown(f"""<div class="combo-card {cc}">
-                <div style="display:flex;align-items:center;gap:10px">
-                    <span style="color:{dot_c};font-size:1.2rem">●</span>
-                    <span style="color:#E8ECF1;font-weight:700;font-size:.95rem">{cb['name']}</span>
-                </div>
-                <span style="color:{dot_c};font-size:.75rem;font-weight:600;padding:3px 10px;
-                    border-radius:6px;background:rgba(255,255,255,0.04)">{side_label}</span>
-            </div>""", unsafe_allow_html=True)
-    else:
-        st.markdown("""<div class="combo-card" style="background:rgba(245,158,11,.04);
-            border:1px solid rgba(245,158,11,.15);border-left:3px solid #F59E0B;justify-content:center">
-            <span style="color:#FCD34D;font-weight:600;font-size:.9rem">
-                ⏸️ 활성 콤보 없음 — 관망 구간</span></div>""", unsafe_allow_html=True)
-
-    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
-
-    # ── 7-Layer 점수 ──
-    st.markdown("#### 📊 7-Layer 스코어 분석")
-    col_b, col_s = st.columns(2)
-    with col_b:
-        st.markdown("<p style='color:#34D399;font-weight:700;font-size:.85rem;margin-bottom:8px;"
-                    "text-transform:uppercase;letter-spacing:1px'>▲ BUY LAYERS</p>", unsafe_allow_html=True)
-        _render_layer_bars(jd['buy_layers'], 'buy', jd['buy_active'])
-    with col_s:
-        st.markdown("<p style='color:#F87171;font-weight:700;font-size:.85rem;margin-bottom:8px;"
-                    "text-transform:uppercase;letter-spacing:1px'>▼ SELL LAYERS</p>", unsafe_allow_html=True)
-        _render_layer_bars(jd['sell_layers'], 'sell', jd['sell_active'])
-
-    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
-
-    with st.expander("📐 판단 기준 상세", expanded=False):
-        rows_html = ""
-        criteria = [
-            ('STRONG_BUY','🟢🟢🟢 STRONG BUY','BUY ≥ 15 + 4층↑ + 비율 2.0배↑ + 콤보발생'),
-            ('BUY','🟢🟢 BUY','BUY ≥ 10 + 3층↑ + 비율 1.4배↑ + 콤보발생'),
-            ('WATCH_BUY','🟡🟢 WATCH BUY','조건은 충족하나 확실한 콤보(타점) 부재'),
-            ('NEUTRAL','⚪ NEUTRAL','기준 미달'),
-            ('MIXED','🟠 MIXED','매수와 매도 점수가 모두 높고 팽팽함'),
-            ('WATCH_SELL','🟡🔴 WATCH SELL','조건은 충족하나 확실한 콤보(타점) 부재'),
-            ('SELL','🔴🔴 SELL','SELL ≥ 10 + 3층↑ + 비율 1.4배↑ + 콤보발생'),
-            ('STRONG_SELL','🔴🔴🔴 STRONG SELL','SELL ≥ 15 + 4층↑ + 비율 2.0배↑ + 콤보발생'),
-        ]
-        for key, label, cond in criteria:
-            is_active = judgment == key
-            bg = 'rgba(99,102,241,.1)' if is_active else 'transparent'
-            badge = '<span style="color:#A5B4FC;font-weight:700">✅ 현재</span>' if is_active else ''
-            rows_html += f"""<div style="display:flex;align-items:center;padding:6px 12px;
-                margin:2px 0;border-radius:8px;background:{bg}">
-                <span style="color:#CBD5E1;font-weight:600;width:200px;font-size:.85rem">{label}</span>
-                <span style="color:#64748B;font-size:.8rem;flex:1">{cond}</span>
-                {badge}</div>"""
-        st.markdown(rows_html, unsafe_allow_html=True)
-
-    jh = meta.get('judgment_history', [])
-    if jh:
-        st.markdown("#### 📅 최근 5일 판단 추이")
-        for day in reversed(jh):
-            j_cfg_d = JUDGMENT_CONFIG.get(day['judgment'], ('⚪','#64748B',''))
-            combo_str = ', '.join([c['name'] for c in day['combos']]) if day['combos'] else '—'
-            b_pct = min(day['buy_total'] / 25 * 100, 100)
-            s_pct = min(day['sell_total'] / 25 * 100, 100)
-            st.markdown(f"""<div class="history-row">
-                <span style="color:#64748B;font-size:.85rem;width:45px;font-weight:600">{day['date']}</span>
-                <span style="color:{j_cfg_d[1]};font-weight:700;font-size:.8rem;width:150px">{j_cfg_d[0]}</span>
-                <div style="flex:1;display:flex;align-items:center;gap:6px">
-                    <div style="flex:1">
-                        <div style="display:flex;gap:4px;align-items:center">
-                            <div style="flex:1;height:4px;background:#151921;border-radius:2px;overflow:hidden">
-                                <div style="width:{b_pct}%;height:4px;background:#34D399;border-radius:2px"></div></div>
-                            <span style="color:#34D399;font-size:.7rem;width:28px;text-align:right">{day['buy_total']:.0f}</span>
-                        </div>
-                        <div style="display:flex;gap:4px;align-items:center;margin-top:2px">
-                            <div style="flex:1;height:4px;background:#151921;border-radius:2px;overflow:hidden">
-                                <div style="width:{s_pct}%;height:4px;background:#F87171;border-radius:2px"></div></div>
-                            <span style="color:#F87171;font-size:.7rem;width:28px;text-align:right">{day['sell_total']:.0f}</span>
-                        </div>
-                    </div>
-                </div>
-                <span style="color:#475569;font-size:.7rem;width:140px;text-align:right;overflow:hidden;
-                    text-overflow:ellipsis;white-space:nowrap">{combo_str}</span>
-            </div>""", unsafe_allow_html=True)
-
 
 # ──────────────────────────────────────────
 # 앱 실행부
