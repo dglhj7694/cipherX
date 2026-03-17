@@ -34,62 +34,183 @@ html,body,[class*="css"]{font-family:'Pretendard','Noto Sans KR',sans-serif!impo
 span[class*="material-symbols"],span[class*="material-icons"],
 i[class*="material-icons"],.stIcon,[data-testid="stIconMaterial"]{
     font-family:'Material Symbols Rounded','Material Icons',sans-serif!important}
-.stApp{background-color:#0E1117}
+
+/* ── 전역 배경 ── */
+.stApp{background-color:#0B0E14}
+
+/* ── 텍스트 ── */
 p,div[data-testid="stMarkdownContainer"] p,div[data-testid="stChatMessageContent"] p,
-h1,h2,h3,h4,h5,h6,li{color:#FAFAFA!important}
-div[data-testid="stCodeBlock"],pre,code{background-color:#1A1D24!important;color:#FAFAFA!important}
+li{color:#E8ECF1!important}
+h1{color:#FFFFFF!important;font-weight:800!important;letter-spacing:-0.5px}
+h2{color:#FFFFFF!important;font-weight:700!important}
+h3{color:#F0F4F8!important;font-weight:700!important}
+h4{color:#CBD5E1!important;font-weight:600!important;font-size:1rem!important;
+   margin-top:1.5rem!important;margin-bottom:0.8rem!important;
+   padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.06)}
+h5{color:#94A3B8!important;font-weight:600!important;font-size:.9rem!important;
+   text-transform:uppercase;letter-spacing:1px}
+
+/* ── 코드 블록 ── */
+div[data-testid="stCodeBlock"],pre,code{background-color:#151921!important;color:#E2E8F0!important;
+    border:1px solid #1E2530!important;border-radius:10px!important}
 div[data-testid="stCodeBlock"] span{text-shadow:none!important}
 div[data-testid="stCodeBlock"] span[style*="color: rgb(0, 0, 0)"],
 div[data-testid="stCodeBlock"] span[style*="color: black"],
-div[data-testid="stCodeBlock"] code>span:not([class]){color:#FAFAFA!important}
-div[data-testid="stChatMessage"]:nth-child(even){background-color:#161A22;border-radius:12px;padding:5px 15px}
-.block-container{padding-top:1rem!important;max-width:950px}
-@media (max-width: 768px){
+div[data-testid="stCodeBlock"] code>span:not([class]){color:#E2E8F0!important}
+
+/* ── 채팅 메시지 ── */
+div[data-testid="stChatMessage"]:nth-child(even){background-color:#10141C;border-radius:14px;
+    padding:8px 18px;border:1px solid rgba(255,255,255,0.03)}
+
+/* ── 컨테이너 ── */
+.block-container{padding-top:1rem!important;max-width:960px}
+@media(max-width:768px){
     .block-container{padding-left:.5rem!important;padding-right:.5rem!important}
     .price-big{font-size:1.6rem!important}
     div[data-testid="stPlotlyChart"]{margin-left:-10px!important;margin-right:-10px!important}
 }
-div.stButton>button[kind="primary"]{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%)!important;
-color:white!important;border:none!important;border-radius:12px!important;padding:.6rem 1.5rem!important;
-font-weight:600!important;font-size:1rem!important;transition:all .3s ease!important;width:100%}
-div.stButton>button[kind="primary"]:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(118,75,162,.4)!important}
-div.stButton>button[kind="secondary"]{background-color:#1E2127!important;color:#E2E8F0!important;
-border:1px solid #333842!important;border-radius:12px!important;font-weight:500!important;
-transition:all .2s ease!important;width:100%}
-div.stButton>button[kind="secondary"]:hover{border-color:#667eea!important;color:#667eea!important}
-.streamlit-expanderHeader{background-color:#161A22!important;border-radius:10px!important;font-weight:600!important}
-.streamlit-expanderHeader p{color:#414df2!important}
-div[data-testid="stExpander"]{border:1px solid #2D333B!important;border-radius:10px!important;background-color:#161A22}
+
+/* ── 버튼 ── */
+div.stButton>button[kind="primary"]{
+    background:linear-gradient(135deg,#6366F1 0%,#8B5CF6 50%,#A78BFA 100%)!important;
+    color:white!important;border:none!important;border-radius:12px!important;
+    padding:.65rem 1.5rem!important;font-weight:700!important;font-size:1rem!important;
+    transition:all .3s cubic-bezier(.4,0,.2,1)!important;width:100%;
+    box-shadow:0 4px 14px rgba(99,102,241,.3)!important}
+div.stButton>button[kind="primary"]:hover{
+    transform:translateY(-2px);box-shadow:0 8px 25px rgba(139,92,246,.45)!important;
+    filter:brightness(1.08)}
+div.stButton>button[kind="secondary"]{
+    background-color:#12161F!important;color:#C4CDD8!important;
+    border:1px solid #2A3040!important;border-radius:12px!important;
+    font-weight:600!important;transition:all .2s ease!important;width:100%}
+div.stButton>button[kind="secondary"]:hover{
+    border-color:#6366F1!important;color:#A5B4FC!important;background-color:#161B27!important}
+
+/* ── Expander ── */
+.streamlit-expanderHeader{background-color:#10141C!important;border-radius:12px!important;
+    font-weight:700!important;padding:12px 16px!important}
+.streamlit-expanderHeader p{color:#A5B4FC!important}
+div[data-testid="stExpander"]{border:1px solid #1C2233!important;border-radius:12px!important;
+    background-color:#0D1017;overflow:hidden}
+div[data-testid="stExpanderDetails"]{padding:12px 16px!important}
+div[data-testid="stExpanderDetails"] h1{font-size:1.5rem!important;margin-bottom:.5rem!important;
+    padding-bottom:.3rem!important;border-bottom:1px solid #1C2233}
+div[data-testid="stExpanderDetails"] h2{font-size:1.3rem!important;margin-top:1.2rem!important}
+div[data-testid="stExpanderDetails"] h3{font-size:1.15rem!important;color:#93C5FD!important}
+div[data-testid="stExpanderDetails"] p,div[data-testid="stExpanderDetails"] li{
+    font-size:.95rem!important;line-height:1.7!important;color:#B8C5D3!important}
+div[data-testid="stExpanderDetails"] blockquote{border-left-color:#6366F1!important;color:#94A3B8!important}
+div[data-testid="stExpanderDetails"] table{font-size:.85rem!important;width:100%!important}
+div[data-testid="stExpanderDetails"] th{color:#CBD5E1!important;background:rgba(255,255,255,0.03)!important;
+    padding:.5rem .7rem!important;font-weight:600}
+div[data-testid="stExpanderDetails"] td{padding:.45rem .7rem!important;color:#94A3B8!important;
+    border-color:rgba(255,255,255,0.04)!important}
+
+/* ── 헤더/사이드바 ── */
 header{background-color:transparent!important}
 div[data-testid="collapsedControl"]{display:flex!important;z-index:999999!important}
-section[data-testid="stSidebar"]{background-color:#0A0D12;border-right:1px solid #1E2127}
-section[data-testid="stSidebar"] .stMarkdown p{color:#AAA!important}
+section[data-testid="stSidebar"]{background-color:#080A10;border-right:1px solid #151921}
+section[data-testid="stSidebar"] .stMarkdown p{color:#8896A8!important}
 section[data-testid="stSidebar"] [data-testid="stSidebarCollapsedControl"]{
-    background:rgba(14,17,23,0.9)!important;border:1px solid #2D333B!important;border-radius:8px!important}
-@media (max-width: 768px){
-    section[data-testid="stSidebar"]{z-index:999!important}
-}
-div[data-testid="stExpanderDetails"] h1{font-size:1.5rem!important;margin-bottom:.5rem!important;padding-bottom:.3rem!important;border-bottom:1px solid #2D333B}
-div[data-testid="stExpanderDetails"] h2{font-size:1.3rem!important;margin-top:1.2rem!important;margin-bottom:.5rem!important}
-div[data-testid="stExpanderDetails"] h3{font-size:1.15rem!important;margin-top:1.2rem!important;margin-bottom:.4rem!important;color:#82aaff!important}
-div[data-testid="stExpanderDetails"] p,div[data-testid="stExpanderDetails"] li{font-size:.95rem!important;line-height:1.6!important;color:#D0D7DE!important;margin-bottom:.5rem!important}
-div[data-testid="stExpanderDetails"] blockquote{font-size:.95rem!important;border-left-color:#667eea!important;color:#A0B2C6!important}
-div[data-testid="stExpanderDetails"] table{font-size:.85rem!important;width:100%!important}
-div[data-testid="stExpanderDetails"] th,div[data-testid="stExpanderDetails"] td{padding:.4rem .6rem!important}
-.signal-card{border-radius:12px;padding:16px 20px;margin:6px 0;border:1px solid #2D333B}
-.signal-card-buy{background:linear-gradient(135deg,rgba(0,230,118,.08),rgba(0,191,255,.05));border-left:4px solid #00E676}
-.signal-card-sell{background:linear-gradient(135deg,rgba(255,23,68,.08),rgba(255,82,82,.05));border-left:4px solid #FF1744}
-.signal-card-neutral{background:linear-gradient(135deg,rgba(255,193,7,.08),rgba(255,152,0,.05));border-left:4px solid #FFC107}
-.price-header{background:linear-gradient(135deg,#161A22,#1A1F2E);border:1px solid #2D333B;border-radius:14px;padding:18px 24px;margin-bottom:16px}
-.price-big{font-size:2rem;font-weight:700;margin:0}
-.price-change-up{color:#00E676!important}.price-change-down{color:#FF1744!important}
-.price-label{color:#666!important;font-size:.8rem;margin:0}
-.indicator-mini{display:inline-block;padding:4px 10px;margin:2px;border-radius:6px;font-size:.78rem;font-weight:500}
-.ind-bullish{background:rgba(0,230,118,.15);color:#00E676}
-.ind-bearish{background:rgba(255,23,68,.15);color:#FF1744}
-.ind-neutral{background:rgba(255,193,7,.15);color:#FFC107}
-div[data-testid="stTabs"] button{color:#AAA!important;font-weight:600!important}
-div[data-testid="stTabs"] button[aria-selected="true"]{color:#667eea!important;border-bottom-color:#667eea!important}
+    background:rgba(11,14,20,0.95)!important;border:1px solid #1C2233!important;border-radius:10px!important}
+
+/* ── 시그널 카드 ── */
+.signal-card{border-radius:14px;padding:14px 18px;margin:8px 0;
+    border:1px solid rgba(255,255,255,0.06);backdrop-filter:blur(10px)}
+.signal-card-buy{
+    background:linear-gradient(135deg,rgba(0,230,118,.06) 0%,rgba(16,185,129,.03) 100%);
+    border-left:4px solid #10B981}
+.signal-card-sell{
+    background:linear-gradient(135deg,rgba(239,68,68,.06) 0%,rgba(220,38,38,.03) 100%);
+    border-left:4px solid #EF4444}
+.signal-card-neutral{
+    background:linear-gradient(135deg,rgba(245,158,11,.06) 0%,rgba(217,119,6,.03) 100%);
+    border-left:4px solid #F59E0B}
+
+/* ── 가격 헤더 ── */
+.price-header{
+    background:linear-gradient(160deg,#0F1320 0%,#141926 50%,#111827 100%);
+    border:1px solid #1C2233;border-radius:16px;padding:20px 24px;margin-bottom:18px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.3)}
+.price-big{font-size:2.2rem;font-weight:800;margin:0;letter-spacing:-0.5px}
+.price-change-up{color:#34D399!important}
+.price-change-down{color:#F87171!important}
+.price-label{color:#64748B!important;font-size:.8rem;margin:0;font-weight:500;
+    text-transform:uppercase;letter-spacing:0.5px}
+
+/* ── 미니 인디케이터 ── */
+.indicator-mini{display:inline-block;padding:5px 11px;margin:3px;border-radius:8px;
+    font-size:.78rem;font-weight:600;letter-spacing:0.2px;
+    border:1px solid rgba(255,255,255,0.04)}
+.ind-bullish{background:rgba(16,185,129,.12);color:#6EE7B7;border-color:rgba(16,185,129,.2)}
+.ind-bearish{background:rgba(239,68,68,.12);color:#FCA5A5;border-color:rgba(239,68,68,.2)}
+.ind-neutral{background:rgba(245,158,11,.10);color:#FCD34D;border-color:rgba(245,158,11,.15)}
+
+/* ── 탭 ── */
+div[data-testid="stTabs"] button{color:#64748B!important;font-weight:700!important;
+    font-size:.9rem!important;padding:10px 16px!important;
+    border-bottom:3px solid transparent!important;transition:all .2s ease}
+div[data-testid="stTabs"] button:hover{color:#A5B4FC!important}
+div[data-testid="stTabs"] button[aria-selected="true"]{
+    color:#A5B4FC!important;border-bottom-color:#6366F1!important}
+
+/* ── 판단 카드 (신규) ── */
+.judgment-card{border-radius:16px;padding:24px 28px;margin-bottom:20px;text-align:center;
+    position:relative;overflow:hidden}
+.judgment-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.judgment-card-buy{background:linear-gradient(160deg,#052E16 0%,#0D1B2A 100%);
+    border:1px solid rgba(16,185,129,.25)}
+.judgment-card-buy::before{background:linear-gradient(90deg,#10B981,#34D399)}
+.judgment-card-sell{background:linear-gradient(160deg,#2A0E0E 0%,#1B0D1B 100%);
+    border:1px solid rgba(239,68,68,.25)}
+.judgment-card-sell::before{background:linear-gradient(90deg,#EF4444,#F87171)}
+.judgment-card-neutral{background:linear-gradient(160deg,#1A1608 0%,#1B1A0D 100%);
+    border:1px solid rgba(245,158,11,.2)}
+.judgment-card-neutral::before{background:linear-gradient(90deg,#F59E0B,#FCD34D)}
+
+/* ── 콤보 카드 (신규) ── */
+.combo-card{border-radius:12px;padding:12px 16px;margin:6px 0;display:flex;
+    align-items:center;justify-content:space-between;
+    border:1px solid rgba(255,255,255,0.06);transition:transform .15s ease}
+.combo-card:hover{transform:translateX(4px)}
+.combo-buy{background:linear-gradient(135deg,rgba(16,185,129,.08),rgba(6,78,59,.05));
+    border-left:3px solid #10B981}
+.combo-sell{background:linear-gradient(135deg,rgba(239,68,68,.08),rgba(127,29,29,.05));
+    border-left:3px solid #EF4444}
+
+/* ── 레이어 바 (신규) ── */
+.layer-bar-wrap{padding:4px 0}
+.layer-bar-bg{background:#151921;border-radius:6px;height:10px;overflow:hidden;
+    border:1px solid rgba(255,255,255,0.03)}
+.layer-bar-fill{height:10px;border-radius:6px;transition:width .5s cubic-bezier(.4,0,.2,1)}
+.layer-bar-fill-buy{background:linear-gradient(90deg,#059669,#34D399)}
+.layer-bar-fill-sell{background:linear-gradient(90deg,#DC2626,#F87171)}
+
+/* ── 판단 이력 행 (신규) ── */
+.history-row{display:flex;align-items:center;padding:8px 14px;margin:4px 0;
+    border-radius:10px;background:rgba(255,255,255,0.015);
+    border:1px solid rgba(255,255,255,0.04);transition:background .15s ease}
+.history-row:hover{background:rgba(255,255,255,0.03)}
+
+/* ── 알림 바 (신규) ── */
+.alert-bar{border-radius:10px;padding:10px 16px;margin:5px 0;
+    border:1px solid rgba(255,255,255,0.06);backdrop-filter:blur(8px)}
+.alert-bar-progress{background:#151921;border-radius:4px;height:5px;margin-top:8px;overflow:hidden}
+.alert-bar-fill{height:5px;border-radius:4px;transition:width .4s ease}
+
+/* ── 테이블 개선 ── */
+table{border-collapse:collapse!important;border:none!important}
+th{background:rgba(99,102,241,.08)!important;color:#C4CDD8!important;
+    font-weight:700!important;border:1px solid rgba(255,255,255,0.06)!important}
+td{border:1px solid rgba(255,255,255,0.04)!important;color:#94A3B8!important}
+tr:hover td{background:rgba(255,255,255,0.02)!important}
+
+/* ── 스크롤바 ── */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:#0B0E14}
+::-webkit-scrollbar-thumb{background:#2A3040;border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#3D4A5F}
 </style>""", unsafe_allow_html=True)
 
 # ──────────────────────────────────────────
@@ -1515,33 +1636,42 @@ def analyze(ticker, chart_days=252, refresh=False):
 def build_speedometer_gauges(meta):
     conf_score = meta.get('confluence_score', 0); bias_score = meta.get('bias_score', 0)
     bias_label = meta.get('overall_bias', 'NEUTRAL')
-    if conf_score >= 6.5: cc = "#00E676"
-    elif conf_score >= 3.5: cc = "#69F0AE"
-    elif conf_score <= -6.5: cc = "#FF1744"
-    elif conf_score <= -3.5: cc = "#FF5252"
-    else: cc = "#FFC107"
-    bc_map = {'STRONG BUY':'#00E676','BUY':'#69F0AE','STRONG SELL':'#FF1744','SELL':'#FF5252','NEUTRAL':'#FFC107'}
-    bc = bc_map.get(bias_label, '#FFC107')
+    if conf_score >= 6.5: cc = "#34D399"
+    elif conf_score >= 3.5: cc = "#6EE7B7"
+    elif conf_score <= -6.5: cc = "#F87171"
+    elif conf_score <= -3.5: cc = "#FCA5A5"
+    else: cc = "#FCD34D"
+    bc_map = {'STRONG BUY':'#34D399','BUY':'#6EE7B7','STRONG SELL':'#F87171','SELL':'#FCA5A5','NEUTRAL':'#FCD34D'}
+    bc = bc_map.get(bias_label, '#FCD34D')
 
     fig = make_subplots(rows=1, cols=2, specs=[[{"type":"indicator"},{"type":"indicator"}]], horizontal_spacing=0.08)
-    fig.add_trace(go.Indicator(mode="gauge+number+delta", value=conf_score,
-        number=dict(font=dict(size=28, color="#FAFAFA"), suffix=""),
-        title=dict(text="<b>🔥 Confluence Score</b>", font=dict(size=13, color="#AAA")),
-        gauge=dict(axis=dict(range=[-10,10], tickwidth=2, tickcolor="#555", dtick=2.5, tickfont=dict(size=10, color="#888")),
-            bar=dict(color=cc, thickness=0.3), bgcolor="rgba(30,33,39,0.8)", borderwidth=2, bordercolor="#2D333B",
-            steps=[dict(range=[-10,-6.5],color="rgba(255,23,68,0.25)"),dict(range=[-6.5,-3.5],color="rgba(255,82,82,0.15)"),
-                dict(range=[-3.5,3.5],color="rgba(255,193,7,0.10)"),dict(range=[3.5,6.5],color="rgba(105,240,174,0.15)"),
-                dict(range=[6.5,10],color="rgba(0,230,118,0.25)")],
-            threshold=dict(line=dict(color="white", width=3), thickness=0.8, value=conf_score))), row=1, col=1)
+    fig.add_trace(go.Indicator(mode="gauge+number", value=conf_score,
+        number=dict(font=dict(size=30, color="#F8FAFC", family="Pretendard"), suffix=""),
+        title=dict(text="<b>🔥 Confluence Score</b>", font=dict(size=13, color="#94A3B8")),
+        gauge=dict(axis=dict(range=[-10,10], tickwidth=2, tickcolor="#334155", dtick=2.5,
+                   tickfont=dict(size=10, color="#64748B")),
+            bar=dict(color=cc, thickness=0.3), bgcolor="rgba(15,19,32,0.9)",
+            borderwidth=1, bordercolor="#1E293B",
+            steps=[dict(range=[-10,-6.5],color="rgba(239,68,68,0.15)"),
+                dict(range=[-6.5,-3.5],color="rgba(239,68,68,0.08)"),
+                dict(range=[-3.5,3.5],color="rgba(245,158,11,0.06)"),
+                dict(range=[3.5,6.5],color="rgba(16,185,129,0.08)"),
+                dict(range=[6.5,10],color="rgba(16,185,129,0.15)")],
+            threshold=dict(line=dict(color="#F8FAFC", width=3), thickness=0.8, value=conf_score))), row=1, col=1)
     fig.add_trace(go.Indicator(mode="gauge+number", value=bias_score,
-        number=dict(font=dict(size=28, color="#FAFAFA"), suffix=f"  {bias_label}", valueformat=".1f"),
-        title=dict(text="<b>🧭 Overall Bias</b>", font=dict(size=13, color="#AAA")),
-        gauge=dict(axis=dict(range=[-13,13], tickwidth=2, tickcolor="#555", dtick=3.25, tickfont=dict(size=10, color="#888")),
-            bar=dict(color=bc, thickness=0.3), bgcolor="rgba(30,33,39,0.8)", borderwidth=2, bordercolor="#2D333B",
-            steps=[dict(range=[-13,-9],color="rgba(255,23,68,0.30)"),dict(range=[-9,-3.5],color="rgba(255,82,82,0.15)"),
-                dict(range=[-3.5,3.5],color="rgba(255,193,7,0.10)"),dict(range=[3.5,9],color="rgba(105,240,174,0.15)"),
-                dict(range=[9,13],color="rgba(0,230,118,0.30)")],
-            threshold=dict(line=dict(color="white", width=3), thickness=0.8, value=bias_score))), row=1, col=2)
+        number=dict(font=dict(size=30, color="#F8FAFC", family="Pretendard"),
+                    suffix=f"  {bias_label}", valueformat=".1f"),
+        title=dict(text="<b>🧭 Overall Bias</b>", font=dict(size=13, color="#94A3B8")),
+        gauge=dict(axis=dict(range=[-13,13], tickwidth=2, tickcolor="#334155", dtick=3.25,
+                   tickfont=dict(size=10, color="#64748B")),
+            bar=dict(color=bc, thickness=0.3), bgcolor="rgba(15,19,32,0.9)",
+            borderwidth=1, bordercolor="#1E293B",
+            steps=[dict(range=[-13,-9],color="rgba(239,68,68,0.18)"),
+                dict(range=[-9,-3.5],color="rgba(239,68,68,0.08)"),
+                dict(range=[-3.5,3.5],color="rgba(245,158,11,0.06)"),
+                dict(range=[3.5,9],color="rgba(16,185,129,0.08)"),
+                dict(range=[9,13],color="rgba(16,185,129,0.18)")],
+            threshold=dict(line=dict(color="#F8FAFC", width=3), thickness=0.8, value=bias_score))), row=1, col=2)
     fig.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         height=230, margin=dict(l=20, r=20, t=50, b=10), font=dict(family="Pretendard"))
     return fig
@@ -1562,100 +1692,158 @@ def render_judgment(meta):
     judgment = jd['judgment']
     buy_t = jd['buy_total']
     sell_t = jd['sell_total']
-    j_label, j_color, j_bg = JUDGMENT_CONFIG.get(judgment, ('⚪ NEUTRAL','#888','rgba(128,128,128,.05)'))
+    net = buy_t - sell_t
 
-    # ── 판단 헤더 ──
+    # 카드 스타일 결정
+    if 'BUY' in judgment: card_cls = 'judgment-card-buy'
+    elif 'SELL' in judgment: card_cls = 'judgment-card-sell'
+    else: card_cls = 'judgment-card-neutral'
+
+    j_label, j_color, _ = JUDGMENT_CONFIG.get(judgment, ('⚪ NEUTRAL','#64748B',''))
+    net_color = '#34D399' if net > 0 else ('#F87171' if net < 0 else '#FCD34D')
+
     st.markdown(f"""
-    <div style="background:{j_bg};border:2px solid {j_color};border-radius:14px;
-                padding:20px 24px;margin-bottom:16px;text-align:center">
-        <p style="font-size:1.6rem;font-weight:800;color:{j_color};margin:0">{j_label}</p>
-        <p style="color:#AAA;font-size:.85rem;margin:4px 0 0 0">
-            BUY 점수: <b style="color:#00E676">{buy_t:.1f}</b> &nbsp;|&nbsp;
-            SELL 점수: <b style="color:#FF1744">{sell_t:.1f}</b> &nbsp;|&nbsp;
-            NET: <b style="color:{'#00E676' if buy_t > sell_t else '#FF1744'}">{buy_t - sell_t:+.1f}</b>
-        </p>
+    <div class="judgment-card {card_cls}">
+        <p style="font-size:2rem;font-weight:800;color:{j_color};margin:0;
+           text-shadow:0 0 30px {j_color}40">{j_label}</p>
+        <div style="display:flex;justify-content:center;gap:32px;margin-top:14px">
+            <div>
+                <p style="color:#64748B;font-size:.7rem;margin:0;text-transform:uppercase;letter-spacing:1px">BUY Score</p>
+                <p style="color:#34D399;font-size:1.4rem;font-weight:800;margin:2px 0 0 0">{buy_t:.1f}</p>
+            </div>
+            <div style="border-left:1px solid rgba(255,255,255,0.08);padding-left:32px">
+                <p style="color:#64748B;font-size:.7rem;margin:0;text-transform:uppercase;letter-spacing:1px">SELL Score</p>
+                <p style="color:#F87171;font-size:1.4rem;font-weight:800;margin:2px 0 0 0">{sell_t:.1f}</p>
+            </div>
+            <div style="border-left:1px solid rgba(255,255,255,0.08);padding-left:32px">
+                <p style="color:#64748B;font-size:.7rem;margin:0;text-transform:uppercase;letter-spacing:1px">NET</p>
+                <p style="color:{net_color};font-size:1.4rem;font-weight:800;margin:2px 0 0 0">{net:+.1f}</p>
+            </div>
+        </div>
     </div>""", unsafe_allow_html=True)
 
     # ── 활성 콤보 ──
     combos = jd.get('active_combos', [])
+    st.markdown("#### 🔥 활성 매매 콤보")
     if combos:
-        st.markdown("#### 🔥 활성 매매 콤보")
         for cb in combos:
-            cc = 'signal-card-buy' if cb['dir'] == 'buy' else 'signal-card-sell'
-            dc_c = '#00E676' if cb['dir'] == 'buy' else '#FF1744'
+            cc = 'combo-buy' if cb['dir'] == 'buy' else 'combo-sell'
+            dot_c = '#34D399' if cb['dir'] == 'buy' else '#F87171'
             side_label = 'BUY' if cb['dir'] == 'buy' else 'SELL'
-            st.markdown(f"""<div class="signal-card {cc}">
-                <span style="font-size:1rem;font-weight:700;color:{dc_c}">{cb['name']}</span>
-                <span style="float:right;font-size:.8rem;color:#AAA">{side_label}</span>
+            st.markdown(f"""<div class="combo-card {cc}">
+                <div style="display:flex;align-items:center;gap:10px">
+                    <span style="color:{dot_c};font-size:1.2rem">●</span>
+                    <span style="color:#E8ECF1;font-weight:700;font-size:.95rem">{cb['name']}</span>
+                </div>
+                <span style="color:{dot_c};font-size:.75rem;font-weight:600;padding:3px 10px;
+                    border-radius:6px;background:rgba(255,255,255,0.04)">{side_label}</span>
             </div>""", unsafe_allow_html=True)
     else:
-        st.markdown("""<div class="signal-card signal-card-neutral">
-            <p style="margin:0;color:#FFC107">🟡 현재 활성화된 매매 콤보 없음 — 관망 권장</p>
-        </div>""", unsafe_allow_html=True)
+        st.markdown("""<div class="combo-card" style="background:rgba(245,158,11,.04);
+            border:1px solid rgba(245,158,11,.15);border-left:3px solid #F59E0B;justify-content:center">
+            <span style="color:#FCD34D;font-weight:600;font-size:.9rem">
+                ⏸️ 활성 콤보 없음 — 관망 구간</span></div>""", unsafe_allow_html=True)
 
-    # ── 6-Layer 점수 분해 ──
+    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+
+    # ── 6-Layer 점수 ──
     st.markdown("#### 📊 6-Layer 스코어 분석")
     col_b, col_s = st.columns(2)
     with col_b:
-        st.markdown("##### 🟢 BUY 레이어")
-        _render_layer_bars(jd['buy_layers'], '#00E676', jd['buy_active'])
+        st.markdown("<p style='color:#34D399;font-weight:700;font-size:.85rem;margin-bottom:8px;"
+                    "text-transform:uppercase;letter-spacing:1px'>▲ BUY LAYERS</p>", unsafe_allow_html=True)
+        _render_layer_bars(jd['buy_layers'], 'buy', jd['buy_active'])
     with col_s:
-        st.markdown("##### 🔴 SELL 레이어")
-        _render_layer_bars(jd['sell_layers'], '#FF1744', jd['sell_active'])
+        st.markdown("<p style='color:#F87171;font-weight:700;font-size:.85rem;margin-bottom:8px;"
+                    "text-transform:uppercase;letter-spacing:1px'>▼ SELL LAYERS</p>", unsafe_allow_html=True)
+        _render_layer_bars(jd['sell_layers'], 'sell', jd['sell_active'])
 
-    # ── 판단 기준 표 ──
-    st.markdown("#### 📐 판단 기준")
-    st.markdown(f"""
-| 판단 | 조건 | 현재 |
-|------|------|------|
-| 🟢🟢🟢 **STRONG BUY** | BUY ≥ 15 + 3층↑ + BUY > SELL×1.5 | {'✅' if judgment == 'STRONG_BUY' else '—'} |
-| 🟢🟢 **BUY** | BUY ≥ 10 + 3층↑ + BUY > SELL | {'✅' if judgment == 'BUY' else '—'} |
-| 🟡🟢 **WATCH BUY** | BUY ≥ 5 + 2층↑ | {'✅' if judgment == 'WATCH_BUY' else '—'} |
-| ⚪ **NEUTRAL** | 기준 미달 | {'✅' if judgment == 'NEUTRAL' else '—'} |
-| 🟠 **MIXED** | BUY ≥ 8 & SELL ≥ 8 | {'✅' if judgment == 'MIXED' else '—'} |
-| 🟡🔴 **WATCH SELL** | SELL ≥ 5 + 2층↑ | {'✅' if judgment == 'WATCH_SELL' else '—'} |
-| 🔴🔴 **SELL** | SELL ≥ 10 + 3층↑ + SELL > BUY | {'✅' if judgment == 'SELL' else '—'} |
-| 🔴🔴🔴 **STRONG SELL** | SELL ≥ 15 + 3층↑ + SELL > BUY×1.5 | {'✅' if judgment == 'STRONG_SELL' else '—'} |
-""")
+    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
-    # ── 최근 5일 판단 이력 ──
+    # ── 판단 기준 ──
+    with st.expander("📐 판단 기준 상세", expanded=False):
+        rows_html = ""
+        criteria = [
+            ('STRONG_BUY','🟢🟢🟢 STRONG BUY','BUY ≥ 15 + 3층↑ + BUY > SELL×1.5'),
+            ('BUY','🟢🟢 BUY','BUY ≥ 10 + 3층↑ + BUY > SELL'),
+            ('WATCH_BUY','🟡🟢 WATCH BUY','BUY ≥ 5 + 2층↑'),
+            ('NEUTRAL','⚪ NEUTRAL','기준 미달'),
+            ('MIXED','🟠 MIXED','BUY ≥ 8 & SELL ≥ 8'),
+            ('WATCH_SELL','🟡🔴 WATCH SELL','SELL ≥ 5 + 2층↑'),
+            ('SELL','🔴🔴 SELL','SELL ≥ 10 + 3층↑ + SELL > BUY'),
+            ('STRONG_SELL','🔴🔴🔴 STRONG SELL','SELL ≥ 15 + 3층↑ + SELL > BUY×1.5'),
+        ]
+        for key, label, cond in criteria:
+            is_active = judgment == key
+            bg = 'rgba(99,102,241,.1)' if is_active else 'transparent'
+            badge = '<span style="color:#A5B4FC;font-weight:700">✅ 현재</span>' if is_active else ''
+            rows_html += f"""<div style="display:flex;align-items:center;padding:6px 12px;
+                margin:2px 0;border-radius:8px;background:{bg}">
+                <span style="color:#CBD5E1;font-weight:600;width:200px;font-size:.85rem">{label}</span>
+                <span style="color:#64748B;font-size:.8rem;flex:1">{cond}</span>
+                {badge}</div>"""
+        st.markdown(rows_html, unsafe_allow_html=True)
+
+    # ── 최근 5일 이력 ──
     jh = meta.get('judgment_history', [])
     if jh:
-        st.markdown("#### 📅 최근 5일 판단 이력")
+        st.markdown("#### 📅 최근 5일 판단 추이")
         for day in reversed(jh):
-            j_cfg_d = JUDGMENT_CONFIG.get(day['judgment'], ('⚪','#888',''))
-            combo_str = ' + '.join([c['name'] for c in day['combos']]) if day['combos'] else '—'
-            st.markdown(f"""<div style="display:flex;justify-content:space-between;align-items:center;
-                padding:6px 12px;margin:2px 0;border-radius:8px;background:rgba(255,255,255,.02);
-                border:1px solid #1E2127">
-                <span style="color:#AAA;font-size:.85rem;width:50px">{day['date']}</span>
-                <span style="color:{j_cfg_d[1]};font-weight:700;font-size:.85rem;width:160px">{j_cfg_d[0]}</span>
-                <span style="color:#69F0AE;font-size:.8rem;width:60px">B:{day['buy_total']:.0f}</span>
-                <span style="color:#FF5252;font-size:.8rem;width:60px">S:{day['sell_total']:.0f}</span>
-                <span style="color:#888;font-size:.75rem;flex:1;text-align:right">{combo_str}</span>
+            j_cfg_d = JUDGMENT_CONFIG.get(day['judgment'], ('⚪','#64748B',''))
+            combo_str = ', '.join([c['name'] for c in day['combos']]) if day['combos'] else '—'
+            # 미니 바
+            b_pct = min(day['buy_total'] / 25 * 100, 100)
+            s_pct = min(day['sell_total'] / 25 * 100, 100)
+            st.markdown(f"""<div class="history-row">
+                <span style="color:#64748B;font-size:.85rem;width:45px;font-weight:600">{day['date']}</span>
+                <span style="color:{j_cfg_d[1]};font-weight:700;font-size:.8rem;width:150px">{j_cfg_d[0]}</span>
+                <div style="flex:1;display:flex;align-items:center;gap:6px">
+                    <div style="flex:1">
+                        <div style="display:flex;gap:4px;align-items:center">
+                            <div style="flex:1;height:4px;background:#151921;border-radius:2px;overflow:hidden">
+                                <div style="width:{b_pct}%;height:4px;background:#34D399;border-radius:2px"></div></div>
+                            <span style="color:#34D399;font-size:.7rem;width:28px;text-align:right">{day['buy_total']:.0f}</span>
+                        </div>
+                        <div style="display:flex;gap:4px;align-items:center;margin-top:2px">
+                            <div style="flex:1;height:4px;background:#151921;border-radius:2px;overflow:hidden">
+                                <div style="width:{s_pct}%;height:4px;background:#F87171;border-radius:2px"></div></div>
+                            <span style="color:#F87171;font-size:.7rem;width:28px;text-align:right">{day['sell_total']:.0f}</span>
+                        </div>
+                    </div>
+                </div>
+                <span style="color:#475569;font-size:.7rem;width:140px;text-align:right;overflow:hidden;
+                    text-overflow:ellipsis;white-space:nowrap">{combo_str}</span>
             </div>""", unsafe_allow_html=True)
 
 
-def _render_layer_bars(layers, color, active_count):
-    max_per = 9.0
+def _render_layer_bars(layers, side, active_count):
     icons = {'Trend':'📈','Momentum':'🔥','Candle':'🕯️','BB':'📊','Volume':'📦','Pattern':'⭐'}
+    max_per = 9.0
+    fill_cls = 'layer-bar-fill-buy' if side == 'buy' else 'layer-bar-fill-sell'
+    score_color = '#34D399' if side == 'buy' else '#F87171'
     total = sum(layers.values())
+
     for name, score in layers.items():
         icon = icons.get(name, '•')
         pct = min(score / max_per * 100, 100)
-        active = '✅' if score > 0 else '—'
-        st.markdown(f"""<div style="margin:3px 0">
-            <div style="display:flex;justify-content:space-between;font-size:.8rem">
-                <span style="color:#CCC">{icon} {name}</span>
-                <span style="color:{color};font-weight:600">{score:.1f} {active}</span></div>
-            <div style="background:#1A1D24;border-radius:3px;height:8px;margin-top:2px">
-                <div style="background:{color};width:{pct}%;height:8px;border-radius:3px;
-                     opacity:{'0.9' if score > 0 else '0.15'}"></div></div>
+        opacity = '1' if score > 0 else '0.2'
+        st.markdown(f"""<div class="layer-bar-wrap">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+                <span style="color:#94A3B8;font-size:.8rem;font-weight:500;opacity:{opacity}">{icon} {name}</span>
+                <span style="color:{score_color};font-weight:700;font-size:.8rem;opacity:{opacity}">
+                    {score:.1f}{'  ✓' if score > 0 else ''}</span>
+            </div>
+            <div class="layer-bar-bg">
+                <div class="layer-bar-fill {fill_cls}" style="width:{pct}%;opacity:{opacity}"></div>
+            </div>
         </div>""", unsafe_allow_html=True)
-    st.markdown(f"""<div style="margin-top:8px;padding:6px 10px;border-radius:6px;
-        background:rgba(255,255,255,.03);text-align:center">
-        <span style="color:{color};font-weight:700;font-size:1rem">{total:.1f}점</span>
-        <span style="color:#888;font-size:.8rem"> · 활성 {active_count}/6 레이어</span>
+
+    st.markdown(f"""<div style="margin-top:12px;padding:10px 14px;border-radius:10px;
+        background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.04);text-align:center">
+        <span style="color:{score_color};font-weight:800;font-size:1.15rem">{total:.1f}</span>
+        <span style="color:#475569;font-size:.8rem;font-weight:500"> 점 · 활성 </span>
+        <span style="color:#CBD5E1;font-weight:700;font-size:.85rem">{active_count}</span>
+        <span style="color:#475569;font-size:.8rem">/6</span>
     </div>""", unsafe_allow_html=True)
 
 
@@ -1681,93 +1869,96 @@ def render_price_header(m):
     cv = m.get('confluence_score', 0); sd = m.get('supertrend_dir', 0)
     sh = m.get('shield_status', ''); mh_val = m.get('macd_hist', 0)
 
-    # 🆕 판단 등급도 미니 인디케이터에 추가
     jd = m.get('judgment_detail', {})
-    j_label_short = jd.get('judgment', 'NEUTRAL') if jd else 'N/A'
+    j_short = jd.get('judgment', 'NEUTRAL') if jd else 'N/A'
     j_color_map = {'STRONG_BUY':'ind-bullish','BUY':'ind-bullish','WATCH_BUY':'ind-neutral',
                    'STRONG_SELL':'ind-bearish','SELL':'ind-bearish','WATCH_SELL':'ind-neutral',
                    'MIXED':'ind-neutral','NEUTRAL':'ind-neutral'}
-    j_cls = j_color_map.get(j_label_short, 'ind-neutral')
+    j_cls = j_color_map.get(j_short, 'ind-neutral')
 
     specs = [
-        (j_cls, f"📍{j_label_short}"),
-        (_cls(m['wt1'],-20,20), f"WT:{m['wt1']:.0f} {_il('wt1',m['wt1'])}"),
-        (_cls(m['rsi'],40,60), f"RSI:{m['rsi']:.0f} {_il('rsi',m['rsi'])}"),
-        (_cls(m['mfi'],40,60), f"MFI:{m['mfi']:.0f} {_il('mfi',m['mfi'])}"),
-        ('ind-bullish' if m['mf_area'] < 0 else ('ind-bearish' if m['mf_area'] > 0 else 'ind-neutral'), f"MF:{m['mf_area']:.1f}"),
-        ('ind-bullish' if vr > 1.5 else 'ind-neutral', f"Vol:{vr:.1f}x"),
-        ('ind-bullish' if m['adx'] > 25 else 'ind-neutral', f"ADX:{m['adx']:.0f}"),
-        (_cls(m['stochk'],30,70), f"StK:{m['stochk']:.0f} {_il('stochk',m['stochk'])}"),
-        ('ind-bullish' if cv >= 3.5 else ('ind-bearish' if cv <= -3.5 else 'ind-neutral'), f"Conf:{cv:.1f}"),
-        ('ind-bullish' if sd == 1 else 'ind-bearish', f"ST:{'▲' if sd == 1 else '▼'}"),
-        ('ind-bullish' if mh_val > 0 else ('ind-bearish' if mh_val < 0 else 'ind-neutral'), f"MACD:{mh_val:+.2f}"),
+        (j_cls, f"📍 {j_short}"),
+        (_cls(m['wt1'],-20,20), f"WT {m['wt1']:.0f} {_il('wt1',m['wt1'])}"),
+        (_cls(m['rsi'],40,60), f"RSI {m['rsi']:.0f}"),
+        (_cls(m['mfi'],40,60), f"MFI {m['mfi']:.0f}"),
+        ('ind-bullish' if m['mf_area']<0 else ('ind-bearish' if m['mf_area']>0 else 'ind-neutral'), f"MF {m['mf_area']:.1f}"),
+        ('ind-bullish' if vr>1.5 else 'ind-neutral', f"Vol {vr:.1f}x"),
+        ('ind-bullish' if m['adx']>25 else 'ind-neutral', f"ADX {m['adx']:.0f}"),
+        (_cls(m['stochk'],30,70), f"StK {m['stochk']:.0f}"),
+        ('ind-bullish' if cv>=3.5 else ('ind-bearish' if cv<=-3.5 else 'ind-neutral'), f"Conf {cv:.1f}"),
+        ('ind-bullish' if sd==1 else 'ind-bearish', f"ST {'▲' if sd==1 else '▼'}"),
+        ('ind-bullish' if mh_val>0 else ('ind-bearish' if mh_val<0 else 'ind-neutral'), f"MACD {mh_val:+.2f}"),
     ]
     ih = "".join([f"<span class='indicator-mini {c}'>{l}</span>" for c, l in specs])
     if sh: ih += f"<span class='indicator-mini ind-bearish' style='font-weight:700'>🔓 {sh}</span>"
     tr = m.get('trend_regime', 'NEUTRAL ⚪')
     st.markdown(f"""<div class="price-header">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-            <div><p class="price-label">🚦 {m['ticker']} · {m['last_date']} · <b>{tr}</b></p>
-            <p class="price-big" style="color:#FAFAFA">${m['price']:.2f}
-                <span class="{cc}" style="font-size:1rem;margin-left:8px">
-                    {ci} {abs(chg):.2f} ({abs(cp):.2f}%)</span></p></div>
-            <div style="text-align:right"><p class="price-label">ATR</p>
-            <p style="color:#FFC107;font-size:1.1rem;font-weight:600;margin:0">
-                ${m['atr']:.2f} ({m['atr_pct']:.1f}%)</p></div></div>
-        <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">{ih}</div></div>""", unsafe_allow_html=True)
-
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div>
+                <p class="price-label">🚦 {m['ticker']} · {m['last_date']} · <b style="color:#A5B4FC">{tr}</b></p>
+                <p class="price-big" style="color:#F8FAFC">${m['price']:.2f}
+                    <span class="{cc}" style="font-size:1.1rem;margin-left:10px;font-weight:700">
+                        {ci} {abs(chg):.2f} ({abs(cp):.2f}%)</span></p>
+            </div>
+            <div style="text-align:right;padding-top:4px">
+                <p class="price-label">ATR (14)</p>
+                <p style="color:#FCD34D;font-size:1.2rem;font-weight:700;margin:2px 0 0 0">
+                    ${m['atr']:.2f} <span style="font-size:.85rem;color:#D97706">({m['atr_pct']:.1f}%)</span></p>
+            </div>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:5px;flex-wrap:wrap">{ih}</div>
+    </div>""", unsafe_allow_html=True)
 
 def render_speedometer(m):
     gauge_fig = build_speedometer_gauges(m)
     st.plotly_chart(gauge_fig, use_container_width=True, theme=None, config={'displayModeBar': False})
     bias = m['overall_bias']; sc = m.get('bias_score', 0)
-    styles = {'STRONG BUY':('rgba(0,230,118,.15)','#00E676','🟢🟢'),
-        'BUY':('rgba(0,230,118,.10)','#00E676','🟢'),
-        'STRONG SELL':('rgba(255,23,68,.15)','#FF1744','🔴🔴'),
-        'SELL':('rgba(255,23,68,.10)','#FF1744','🔴')}
-    bg, clr, ico = styles.get(bias, ('rgba(255,193,7,.10)','#FFC107','🟠'))
+    styles = {'STRONG BUY':('rgba(16,185,129,.1)','#34D399','🟢🟢'),
+        'BUY':('rgba(16,185,129,.06)','#34D399','🟢'),
+        'STRONG SELL':('rgba(239,68,68,.1)','#F87171','🔴🔴'),
+        'SELL':('rgba(239,68,68,.06)','#F87171','🔴')}
+    bg, clr, ico = styles.get(bias, ('rgba(245,158,11,.06)','#FCD34D','🟠'))
     bp = m.get('buy_proximity', 0); sp = m.get('sell_proximity', 0)
     prox_txt = ""
-    if bp >= 50: prox_txt = f"<span style='color:#00E676'>매수 임박 {bp:.0f}%</span>"
-    elif sp >= 50: prox_txt = f"<span style='color:#FF1744'>매도 임박 {sp:.0f}%</span>"
-    sq_txt = " · <span style='color:#FFFF00;font-weight:600'>💥 Squeeze ON</span>" if m.get('squeeze_on') else ""
-    st.markdown(f"""<div style="background:{bg};border-radius:10px;padding:10px 16px;text-align:center;margin:4px 0 12px 0">
-        <span style="font-size:1.1rem;font-weight:700;color:{clr}">{ico} 종합 판정: {bias} ({sc:.1f})</span>
+    if bp >= 50: prox_txt = f"<span style='color:#34D399;font-weight:600'>매수 임박 {bp:.0f}%</span>"
+    elif sp >= 50: prox_txt = f"<span style='color:#F87171;font-weight:600'>매도 임박 {sp:.0f}%</span>"
+    sq_txt = " · <span style='color:#FCD34D;font-weight:700'>💥 Squeeze ON</span>" if m.get('squeeze_on') else ""
+    st.markdown(f"""<div style="background:{bg};border-radius:12px;padding:12px 18px;
+        text-align:center;margin:4px 0 14px 0;border:1px solid rgba(255,255,255,0.06)">
+        <span style="font-size:1.05rem;font-weight:700;color:{clr}">{ico} 종합 판정: {bias} ({sc:.1f})</span>
         {f' · {prox_txt}' if prox_txt else ''}{sq_txt}</div>""", unsafe_allow_html=True)
-
 
 def render_alerts(m):
     alerts = []
     bp, sp = m.get('buy_proximity', 0), m.get('sell_proximity', 0)
-    if bp >= 70: alerts.append(('🟢⚡ 매수 매우 임박!','#00E676',bp))
-    elif bp >= 50: alerts.append(('🟢 매수 접근 중','#69F0AE',bp))
-    if sp >= 70: alerts.append(('🔴⚡ 매도 매우 임박!','#FF1744',sp))
-    elif sp >= 50: alerts.append(('🔴 매도 접근 중','#FF5252',sp))
-    if m.get('squeeze_on'): alerts.append(('💥 Squeeze ON','#FFFF00',80))
+    if bp >= 70: alerts.append(('🟢⚡ 매수 매우 임박!','#34D399','rgba(16,185,129,.08)',bp))
+    elif bp >= 50: alerts.append(('🟢 매수 접근 중','#6EE7B7','rgba(16,185,129,.05)',bp))
+    if sp >= 70: alerts.append(('🔴⚡ 매도 매우 임박!','#F87171','rgba(239,68,68,.08)',sp))
+    elif sp >= 50: alerts.append(('🔴 매도 접근 중','#FCA5A5','rgba(239,68,68,.05)',sp))
+    if m.get('squeeze_on'): alerts.append(('💥 TTM Squeeze ON — 돌파 임박','#FCD34D','rgba(245,158,11,.06)',80))
 
-    # 🆕 판단 알림
     jd = m.get('judgment_detail', {})
     j = jd.get('judgment', 'NEUTRAL')
-    if j == 'STRONG_BUY': alerts.insert(0, ('🟢🟢🟢 STRONG BUY 판단!','#00E676',95))
-    elif j == 'BUY': alerts.insert(0, ('🟢🟢 BUY 판단','#00E676',75))
-    elif j == 'STRONG_SELL': alerts.insert(0, ('🔴🔴🔴 STRONG SELL 판단!','#FF1744',95))
-    elif j == 'SELL': alerts.insert(0, ('🔴🔴 SELL 판단','#FF1744',75))
+    if j == 'STRONG_BUY': alerts.insert(0, ('🟢🟢🟢 STRONG BUY 판단 활성!','#34D399','rgba(16,185,129,.1)',95))
+    elif j == 'BUY': alerts.insert(0, ('🟢🟢 BUY 판단 활성','#34D399','rgba(16,185,129,.06)',75))
+    elif j == 'STRONG_SELL': alerts.insert(0, ('🔴🔴🔴 STRONG SELL 판단 활성!','#F87171','rgba(239,68,68,.1)',95))
+    elif j == 'SELL': alerts.insert(0, ('🔴🔴 SELL 판단 활성','#F87171','rgba(239,68,68,.06)',75))
 
-    for txt, clr, pct in alerts:
+    for txt, clr, bg, pct in alerts:
         w = min(pct, 100)
-        st.markdown(f"""<div style="background:rgba(255,255,255,.03);border:1px solid #2D333B;border-radius:8px;padding:8px 14px;margin:4px 0">
+        st.markdown(f"""<div class="alert-bar" style="background:{bg}">
             <div style="display:flex;justify-content:space-between;align-items:center">
-                <span style="color:{clr};font-weight:600;font-size:.9rem">{txt}</span>
-                <span style="color:{clr};font-weight:700;font-size:.85rem">{pct:.0f}%</span></div>
-            <div style="background:#1A1D24;border-radius:3px;height:6px;margin-top:6px">
-                <div style="background:{clr};width:{w}%;height:6px;border-radius:3px"></div></div></div>""", unsafe_allow_html=True)
-
+                <span style="color:{clr};font-weight:700;font-size:.9rem">{txt}</span>
+                <span style="color:{clr};font-weight:800;font-size:.85rem">{pct:.0f}%</span></div>
+            <div class="alert-bar-progress">
+                <div class="alert-bar-fill" style="background:{clr};width:{w}%"></div></div>
+        </div>""", unsafe_allow_html=True)
 
 def render_signals(m):
     sigs = m['recent_signals']
     if not sigs:
-        st.markdown("""<div class="signal-card signal-card-neutral">
-            <p style="margin:0;color:#FFC107;font-weight:600">🟠 최근 15일 내 시그널 없음</p></div>""", unsafe_allow_html=True)
+        st.markdown("""<div class="signal-card signal-card-neutral" style="text-align:center">
+            <p style="margin:0;color:#FCD34D;font-weight:600">⏸️ 최근 15일 내 포착된 시그널 없음</p></div>""", unsafe_allow_html=True)
         return
     dg = OrderedDict()
     for icon, lbl, ds, side in sigs: dg.setdefault(ds, []).append((icon, lbl, side))
@@ -1784,39 +1975,60 @@ def render_signals(m):
             for sn, sv in alls.items():
                 if ALL_CHART_SIGNALS.get(sn, {}).get('label') == l:
                     wr = sv.get('2d_winrate')
-                    if wr is not None: sh = f" ({wr:.0f}%)"
+                    if wr is not None: sh = f" {wr:.0f}%"
                     break
             parts.append(f'<span class="indicator-mini {cn}">{i} {l}{sh}</span>')
+        date_color = '#34D399' if bc_cnt > sc_cnt else ('#F87171' if sc_cnt > bc_cnt else '#FCD34D')
         st.markdown(f"""<div class="signal-card {ct}">
-            <div style="display:flex;justify-content:space-between;align-items:center">
-                <span style="font-weight:700;font-size:.9rem;color:#FAFAFA">📅 {ds}</span>
-                <span style="color:#888;font-size:.75rem">{len(group)}개</span></div>
-            <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">{" ".join(parts)}</div></div>""", unsafe_allow_html=True)
-
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                <span style="font-weight:700;font-size:.9rem;color:#E8ECF1">📅 {ds}</span>
+                <span style="color:{date_color};font-size:.75rem;font-weight:600;
+                    padding:2px 8px;border-radius:6px;background:rgba(255,255,255,0.04)">{len(group)}개 시그널</span></div>
+            <div style="display:flex;gap:5px;flex-wrap:wrap">{" ".join(parts)}</div></div>""", unsafe_allow_html=True)
 
 def render_stats(m):
-    with st.expander("📊 백테스트 (2년, 진입: 시그널 다음날 시가, 청산: 2일 후 종가)", expanded=True):
+    with st.expander("📊 시그널 백테스트 (2년 데이터 기반)", expanded=True):
         alls = m.get('all_signal_stats', {})
-        if not alls: st.caption("통계 없음"); return
+        if not alls: st.caption("충분한 통계 데이터가 없습니다."); return
+        st.markdown("<p style='color:#64748B;font-size:.8rem;margin-bottom:16px'>진입: 시그널 다음날 시가 · 청산: 2일 후 종가</p>", unsafe_allow_html=True)
+
         def _side(title, data, is_sell=False):
-            st.markdown(f"##### {title}")
+            st.markdown(f"<p style='color:{'#F87171' if is_sell else '#34D399'};font-weight:700;font-size:.85rem;"
+                        f"text-transform:uppercase;letter-spacing:1px;margin-bottom:10px'>{title}</p>", unsafe_allow_html=True)
             for sn, sv in sorted(data.items(), key=lambda x: x[1]['count'], reverse=True):
                 wr = sv.get('2d_winrate'); av = sv.get('2d_avg')
                 if wr is None: continue
                 kor_label = ALL_CHART_SIGNALS.get(sn, {}).get('kor', sn)
-                c = '#00E676' if wr > 50 else ('#FFC107' if wr > 40 else '#FF1744')
-                lb = f"승률 <span style='color:{c}'>**{wr:.0f}%**</span>"
-                if is_sell:
-                    av_c = '#00E676' if av < 0 else '#FF1744'
-                    av_text = f"<span style='color:{av_c}'>**{abs(av):.1f}% 하락**</span>" if av < 0 else f"<span style='color:{av_c}'>**{av:+.1f}% (실패)**</span>"
-                else:
-                    av_c = '#00E676' if av > 0 else '#FF1744'
-                    av_text = f"<span style='color:{av_c}'>**{av:+.1f}% 상승**</span>" if av > 0 else f"<span style='color:{av_c}'>**{abs(av):.1f}% (실패)**</span>"
                 ic = ALL_CHART_SIGNALS.get(sn, {}).get('icon', '')
-                st.markdown(f"<span style='font-size:.85rem'>{ic} **{kor_label}** ({sv['count']}회) · {lb} · 평균: {av_text}</span>", unsafe_allow_html=True)
+
+                # 승률 색상
+                if wr >= 60: wr_c = '#34D399'
+                elif wr >= 50: wr_c = '#6EE7B7'
+                elif wr >= 40: wr_c = '#FCD34D'
+                else: wr_c = '#F87171'
+
+                # 수익률 색상
+                if is_sell: av_c = '#34D399' if av < 0 else '#F87171'
+                else: av_c = '#34D399' if av > 0 else '#F87171'
+
+                wr_bar = min(wr, 100)
+                st.markdown(f"""<div style="padding:8px 12px;margin:4px 0;border-radius:8px;
+                    background:rgba(255,255,255,0.015);border:1px solid rgba(255,255,255,0.03)">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                        <span style="color:#CBD5E1;font-weight:600;font-size:.85rem">{ic} {kor_label}
+                            <span style="color:#475569;font-size:.75rem;font-weight:400">({sv['count']}회)</span></span>
+                        <span style="color:{av_c};font-weight:700;font-size:.85rem">{av:+.1f}%</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <div style="flex:1;height:4px;background:#151921;border-radius:2px;overflow:hidden">
+                            <div style="width:{wr_bar}%;height:4px;background:{wr_c};border-radius:2px"></div></div>
+                        <span style="color:{wr_c};font-size:.75rem;font-weight:700;width:38px;text-align:right">{wr:.0f}%</span>
+                    </div>
+                </div>""", unsafe_allow_html=True)
+
         c1, c2 = st.columns(2)
-        with c1: _side("🟢 BUY 전략", {k: v for k, v in alls.items() if v['direction'] == 'buy'}, is_sell=False)
-        with c2: _side("🔴 SELL 전략", {k: v for k, v in alls.items() if v['direction'] == 'sell'}, is_sell=True)
+        with c1: _side("▲ BUY 전략 (롱)", {k: v for k, v in alls.items() if v['direction'] == 'buy'}, is_sell=False)
+        with c2: _side("▼ SELL 전략 (숏)", {k: v for k, v in alls.items() if v['direction'] == 'sell'}, is_sell=True)
 
 
 # ──────────────────────────────────────────
