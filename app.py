@@ -423,36 +423,36 @@ JUDGMENT_CONFIG = {
 # ──────────────────────────────────────────
 def _recent(s, lb=3): return s.astype(float).rolling(lb+1, min_periods=1).max().fillna(0).astype(bool)
 def _cooldown(sig, bars=5):
-    """쿨다운: 같은 시그널이 bars일 이내 재발생하면 무시"""
-    v = sig.astype(bool).values.copy()
+    """단일 시그널 쿨다운 (Numpy 배열 최적화)"""
+    v = sig.fillna(False).values
+    out = np.zeros_like(v, dtype=bool)
     last = -bars - 1
+    
     for i in range(len(v)):
         if v[i]:
-            if (i - last) <= bars:
-                v[i] = False
-            else:
+            if (i - last) > bars:
+                out[i] = True
                 last = i
-    return pd.Series(v, index=sig.index)
+    return pd.Series(out, index=sig.index)
+
 def _cooldown_directional(df, buy_sig, sell_sig, bars=5):
-    """🆕 방향별 쿨다운: BUY 후 SELL은 쿨다운 없이 허용 (반대 방향은 즉시 유효)"""
-    bv = df[buy_sig].astype(bool).values.copy() if buy_sig in df.columns else np.zeros(len(df), dtype=bool)
-    sv = df[sell_sig].astype(bool).values.copy() if sell_sig in df.columns else np.zeros(len(df), dtype=bool)
+    """방향별 쿨다운 (Numpy 배열 최적화)"""
+    bv = df.get(buy_sig, pd.Series(False, index=df.index)).fillna(False).values
+    sv = df.get(sell_sig, pd.Series(False, index=df.index)).fillna(False).values
+    b_out = np.zeros_like(bv, dtype=bool)
+    s_out = np.zeros_like(sv, dtype=bool)
     last_b, last_s = -bars - 1, -bars - 1
     
     for i in range(len(df)):
-        if bv[i]:
-            if (i - last_b) <= bars:
-                bv[i] = False
-            else:
-                last_b = i
-        if sv[i]:
-            if (i - last_s) <= bars:
-                sv[i] = False
-            else:
-                last_s = i
-    
-    if buy_sig in df.columns: df[buy_sig] = pd.Series(bv, index=df.index)
-    if sell_sig in df.columns: df[sell_sig] = pd.Series(sv, index=df.index)
+        if bv[i] and (i - last_b) > bars:
+            b_out[i] = True
+            last_b = i
+        if sv[i] and (i - last_s) > bars:
+            s_out[i] = True
+            last_s = i
+            
+    if buy_sig in df.columns: df[buy_sig] = pd.Series(b_out, index=df.index)
+    if sell_sig in df.columns: df[sell_sig] = pd.Series(s_out, index=df.index)
 def _volf(vol, ratio=0.5, period=20): return vol >= (vol.rolling(period, min_periods=5).mean() * ratio)
 def _valid_fmt(t): return bool(re.match(r'^[A-Za-z]{1,5}([.\-][A-Za-z]{1,2})?$', t))
 def _cls(val, lo, hi): return 'ind-bullish' if val<lo else ('ind-bearish' if val>hi else 'ind-neutral')
@@ -683,10 +683,20 @@ def detect_bb_extra(c,bb_up,bb_low,bb_w,wt1):
     return c>bb_up,c<bb_low,widening&(c>c.shift(1))&(wt1>wt1.shift(1)),widening&(c<c.shift(1))&(wt1<wt1.shift(1))
 def detect_macd_centerline(ml): return(ml>0)&(ml.shift(1)<=0),(ml<0)&(ml.shift(1)>=0)
 def detect_consecutive_days(c):
-    up=(c>c.shift(1)).astype(int);dn=(c<c.shift(1)).astype(int)
-    us=pd.Series(0,index=c.index,dtype=int);ds=pd.Series(0,index=c.index,dtype=int)
-    for i in range(1,len(c)):us.iloc[i]=(us.iloc[i-1]+1)if up.iloc[i]else 0;ds.iloc[i]=(ds.iloc[i-1]+1)if dn.iloc[i]else 0
-    return{'Up_3_Days':us>=3,'Up_5_Days':us>=5,'Down_3_Days':ds>=3,'Down_5_Days':ds>=5}
+    """연속 상승/하락일 계산 (완전 벡터화)"""
+    up = (c > c.shift(1)).astype(int)
+    dn = (c < c.shift(1)).astype(int)
+    
+    # up/dn이 0인 지점을 기준으로 그룹화하여 누적합 계산 (연속 발생 횟수 측정)
+    us = up.groupby((up == 0).cumsum()).cumsum()
+    ds = dn.groupby((dn == 0).cumsum()).cumsum()
+    
+    return {
+        'Up_3_Days': us >= 3, 
+        'Up_5_Days': us >= 5, 
+        'Down_3_Days': ds >= 3, 
+        'Down_5_Days': ds >= 5
+    }
 def detect_gaps(c,o,h,l,atr):
     thr=atr*0.5;gu=(o>h.shift(1))&((o-h.shift(1))>thr);gd=(o<l.shift(1))&((l.shift(1)-o)>thr)
     return gu,gd,gu.shift(1).fillna(False)&(l<=h.shift(2)),gd.shift(1).fillna(False)&(h>=l.shift(2))
@@ -885,38 +895,41 @@ def compute_trade_judgment(df):
           np.where((df['WT1'] < -20) & wt_rising, 1.0,                       # 약세 + 상승 중
           np.where((df['WT1'] > 53) & wt_falling, -1.5, 0))))               # 과매수 + 하락
 
-# ── Layer 2: 모멘텀 (BUY) ──
+# ── Layer 2: 모멘텀 (BUY) 리팩토링 ──
     bm = pd.Series(0.0, index=idx)
 
-    # 1. 모멘텀 턴어라운드 시그널
     for s, p in [('MACD_Cross_Buy',2.5), ('MACD_Zero_Cross_Buy',2.0),
                  ('StochRSI_Cross_Buy',2.0), ('ADX_Momentum_Buy',2.0),
                  ('VWAP_Bounce_Buy',1.5)]:
         bm += _sig_pts(df, s, p)
 
-    # 2. MACD 가속 및 VWAP (기존 유지)
-    bm += np.where((macd_h > 0) & macd_h_rising, 2.0,
-          np.where((macd_h > 0) & macd_h_falling, 0.5,
-          np.where((macd_h < 0) & macd_h_rising, 1.5, 0)))
+    # MACD 히스토그램: np.select 적용
+    macd_cond = [
+        (macd_h > 0) & macd_h_rising,
+        (macd_h > 0) & macd_h_falling,
+        (macd_h < 0) & macd_h_rising
+    ]
+    macd_choice = [2.0, 0.5, 1.5]
+    bm += np.select(macd_cond, macd_choice, default=0.0)
     bm += np.where((macd_h > 0) & macd_accel, 0.5, 0)
     
-    vwap_osc = df['VWAP_Osc']
-    bm += np.where(vwap_osc > 3.0, 1.5,
-          np.where(vwap_osc > 1.0, 1.0,
-          np.where(vwap_osc > 0, 0.5, 0)))
+    # VWAP 크기 반영
+    vwap_cond = [vwap_osc > 3.0, vwap_osc > 1.0, vwap_osc > 0]
+    vwap_choice = [1.5, 1.0, 0.5]
+    bm += np.select(vwap_cond, vwap_choice, default=0.0)
 
-    # 3. 🔧 [핵심 수정] 진정한 상승 모멘텀 추종 + 고점 추격매수 방지
-    bm += np.where(df['RSI'] > 80, -1.0,            # 패널티: 극단적 과매수 (추격 매수 금지)
-          np.where(df['RSI'] >= 60, 2.0,            # 가점: 강한 상승 모멘텀 (달리는 말 탑승)
-          np.where(df['RSI'] >= 50, 1.0, 0)))       # 약가점: 상승세 진입
+    # 추격매수 방지 및 상승 모멘텀: np.select 적용
+    rsi_cond = [df['RSI'] > 80, df['RSI'] >= 60, df['RSI'] >= 50]
+    rsi_choice = [-1.0, 2.0, 1.0]
+    bm += np.select(rsi_cond, rsi_choice, default=0.0)
 
-    bm += np.where(df['StochK'] > 85, -1.0,         # 패널티: 극단적 과매수
-          np.where(df['StochK'] >= 60, 2.0,         # 가점: 상승 가속
-          np.where(df['StochK'] >= 50, 1.0, 0)))
+    stoch_cond = [df['StochK'] > 85, df['StochK'] >= 60, df['StochK'] >= 50]
+    stoch_choice = [-1.0, 2.0, 1.0]
+    bm += np.select(stoch_cond, stoch_choice, default=0.0)
 
-    bm += np.where(df['WT1'] > 60, -1.0,            # 패널티: 파동 과열
-          np.where(df['WT1'] >= 20, 2.0,            # 가점: 상승 파동 확정
-          np.where(df['WT1'] >= 0, 1.0, 0)))
+    wt1_cond = [df['WT1'] > 60, df['WT1'] >= 20, df['WT1'] >= 0]
+    wt1_choice = [-1.0, 2.0, 1.0]
+    bm += np.select(wt1_cond, wt1_choice, default=0.0)
 
     df['BJ_Momentum'] = bm.clip(lower=0)
 
@@ -1099,37 +1112,41 @@ def compute_trade_judgment(df):
     df['SJ_Trend'] = st_
 
     # ── Layer 2: 모멘텀 ──
-# ── Layer 2: 모멘텀 (SELL) ──
+# ── Layer 2: 모멘텀 (SELL) 리팩토링 ──
     sm = pd.Series(0.0, index=idx)
     
-    # 1. 모멘텀 턴어라운드 시그널
     for s, p in [('MACD_Cross_Sell',2.5), ('MACD_Zero_Cross_Sell',2.0),
                  ('StochRSI_Cross_Sell',2.0), ('ADX_Momentum_Sell',2.0),
                  ('VWAP_Reject_Sell',1.5)]:
         sm += _sig_pts(df, s, p)
 
-    # 2. MACD 가속 및 VWAP (기존 유지)
-    sm += np.where((macd_h < 0) & macd_h_falling, 2.0,
-          np.where((macd_h < 0) & macd_h_rising, 0.5,
-          np.where((macd_h > 0) & macd_h_falling, 1.5, 0)))
+    # SELL MACD
+    macd_s_cond = [
+        (macd_h < 0) & macd_h_falling,
+        (macd_h < 0) & macd_h_rising,
+        (macd_h > 0) & macd_h_falling
+    ]
+    macd_s_choice = [2.0, 0.5, 1.5]
+    sm += np.select(macd_s_cond, macd_s_choice, default=0.0)
     sm += np.where((macd_h < 0) & macd_decel, 0.5, 0)
 
-    sm += np.where(vwap_osc < -3.0, 1.5,
-          np.where(vwap_osc < -1.0, 1.0,
-          np.where(vwap_osc < 0, 0.5, 0)))
+    # SELL VWAP
+    vwap_s_cond = [vwap_osc < -3.0, vwap_osc < -1.0, vwap_osc < 0]
+    vwap_s_choice = [1.5, 1.0, 0.5]
+    sm += np.select(vwap_s_cond, vwap_s_choice, default=0.0)
 
-    # 3. 🔧 [핵심 수정] 진정한 하락 모멘텀 추종 + 바닥 추격매도 방지
-    sm += np.where(df['RSI'] < 20, -1.0,            # 패널티: 극단적 과매도 (지하에서 숏 금지)
-          np.where(df['RSI'] <= 40, 2.0,            # 가점: 강한 하락 모멘텀 (투매 동참 구간)
-          np.where(df['RSI'] <= 50, 1.0, 0)))       # 약가점: 하락세 진입
+    # 바닥 추격매도 방지 및 하락 모멘텀
+    rsi_s_cond = [df['RSI'] < 20, df['RSI'] <= 40, df['RSI'] <= 50]
+    rsi_s_choice = [-1.0, 2.0, 1.0]
+    sm += np.select(rsi_s_cond, rsi_s_choice, default=0.0)
 
-    sm += np.where(df['StochK'] < 15, -1.0,         # 패널티: 극단적 과매도
-          np.where(df['StochK'] <= 40, 2.0,         # 가점: 하락 가속
-          np.where(df['StochK'] <= 50, 1.0, 0)))
+    stoch_s_cond = [df['StochK'] < 15, df['StochK'] <= 40, df['StochK'] <= 50]
+    stoch_s_choice = [-1.0, 2.0, 1.0]
+    sm += np.select(stoch_s_cond, stoch_s_choice, default=0.0)
 
-    sm += np.where(df['WT1'] < -60, -1.0,           # 패널티: 파동 극바닥
-          np.where(df['WT1'] <= -20, 2.0,           # 가점: 하락 파동 확정
-          np.where(df['WT1'] <= 0, 1.0, 0)))
+    wt1_s_cond = [df['WT1'] < -60, df['WT1'] <= -20, df['WT1'] <= 0]
+    wt1_s_choice = [-1.0, 2.0, 1.0]
+    sm += np.select(wt1_s_cond, wt1_s_choice, default=0.0)
 
     df['SJ_Momentum'] = sm.clip(lower=0)
 
