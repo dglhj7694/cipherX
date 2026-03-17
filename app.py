@@ -14,8 +14,8 @@ from collections import OrderedDict
 from company_details import render_company_details
 
 st.set_page_config(
-    page_title="CipherX V10.0",
-    page_icon="📈",
+    page_title="CipherX V10.0 Sniper",
+    page_icon="🎯",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
@@ -88,7 +88,7 @@ div[data-testid="stTabs"] button[aria-selected="true"]{color:#667eea!important;b
 </style>""", unsafe_allow_html=True)
 
 # ──────────────────────────────────────────
-# 🔧 시그널 레지스트리  (v10 — 91 signals)
+# 🎯 [스나이퍼 에디션] 20대 핵심 시그널 레지스트리
 # ──────────────────────────────────────────
 _B, _S = 'buy', 'sell'
 def _sig(w,d,icon,label,sym,sz,clr,base,atr_m,kor,desc):
@@ -96,109 +96,42 @@ def _sig(w,d,icon,label,sym,sz,clr,base,atr_m,kor,desc):
             'base':base,'atr_m':atr_m,'kor':kor,'desc':desc}
 
 SIGNAL_REGISTRY = {
-    # ═══════════════════════════════════════════════
-    #  MCB+  매수 시그널 (16개)
-    # ═══════════════════════════════════════════════
-    'Gold_Dot':              _sig(3.0,_B,'🏆','GOLD DOT','circle',18,'#FFD700','Low',-3.0,'최강 매수','RSI<30+MFI<30+WT1<-60+상승 다이버전스'),
-    'Green_Dot_T1':          _sig(2.5,_B,'🟢','BUY T1','circle',16,'#00E676','Low',-2.5,'강한 매수','WT과매도교차+RSI<30+MFI<30+MF<0'),
-    'Green_Dot_T2':          _sig(2.0,_B,'🟩','BUY T2','circle',13,'#69F0AE','Low',-2.2,'매수','WT과매도+RSI또는MFI<32'),
-    'Blue_Diamond':          _sig(2.0,_B,'🔹','BLUE DIA','diamond',14,'#00bfff','Low',-1.8,'추세 매수','WT2≤0 상승교차+HTF강세'),
-    'Bull_Divergence':       _sig(2.0,_B,'📈','Bull Div','triangle-up',12,'#AA00FF','Low',-2.0,'상승 다이버전스','가격 저점↓ vs WT 저점↑'),
-    'RSI_Bull_Divergence':   _sig(1.5,_B,'📊','RSI Bull Div','triangle-up',11,'#CE93D8','Low',-1.8,'RSI 상승 다이버전스','가격↓ vs RSI↑'),
-    'Squeeze_Fire_Buy':      _sig(1.5,_B,'💥','Squeeze BUY','star-diamond',14,'#00FFFF','Low',-1.5,'스퀴즈 매수','TTM Squeeze 해소+모멘텀↑'),
-    'Hidden_Bull_Div':       _sig(1.5,_B,'🔀','Hidden Bull','triangle-up',10,'#E040FB','Low',-1.6,'히든 상승 다이버전스','가격 저점↑ vs WT↓+WT<-25+거래량'),
-    'Volume_Climax_Buy':     _sig(2.0,_B,'🌊','Vol Climax BUY','hexagram',14,'#00BCD4','Low',-2.8,'거래량 클라이맥스','3배 거래량+하락장대봉+WT과매도→반등'),
-    'ADX_Momentum_Buy':      _sig(1.5,_B,'🚀','ADX Ignition','arrow-up',11,'#76FF03','Low',-1.4,'ADX 점화','ADX>20돌파++DI>-DI'),
-    'Bullish_Engulfing':     _sig(1.5,_B,'☀️','Bull Engulf','square',10,'#00E676','Low',-1.3,'상승 장악형','하락캔들 감싸는 상승캔들+WT<-20'),
-    'Golden_Cross':          _sig(1.5,_B,'✨','Golden Cross','cross',12,'#FFD700','Low',-0.8,'골든 크로스','50MA>200MA+ADX>15'),
-    'EMA_Pullback_Buy':      _sig(2.0,_B,'🎯','EMA Pullback','triangle-up',13,'#00BFA5','Low',-1.8,'EMA 눌림목','상승추세 EMA조정후 WT반등'),
-    'Momentum_Ignition_Buy': _sig(2.5,_B,'🔥','Mom. Ignition','star-diamond',15,'#FF6D00','Low',-2.5,'모멘텀 점화','장대양봉>ATR×1.5+거래량>2.5배'),
-    'SuperTrend_Buy':        _sig(2.0,_B,'📈','ST Flip Bull','arrow-up',12,'#00E5FF','Low',-1.5,'슈퍼트렌드 강세','SuperTrend 위로 돌파'),
-    'VWAP_Bounce_Buy':       _sig(1.5,_B,'🏦','VWAP Bounce','triangle-up',11,'#00E5FF','Low',-1.3,'VWAP 반등','VWAP 복귀+WT교차'),
-    'Parabolic_Bottom_Buy':  _sig(3.0,_B,'🧊','Parabolic Bot','diamond',16,'#00FFFF','Low',-3.0,'포물선 바닥','WT1<-85 꺾임+양봉'),
+    # 1. 극단적 반전 (W=3.0 / 2.5) - 스마트머니의 개입
+    'Gold_Dot':              _sig(3.0,_B,'🏆','GOLD DOT','circle',18,'#FFD700','Low',-3.0,'최강 매수','극과매도+상승 다이버전스'),
+    'Blood_Diamond':         _sig(3.0,_S,'🩸','BLOOD DIA','diamond',18,'#DC143C','High',3.0,'최강 매도','극과매수+하락 다이버전스'),
+    'Parabolic_Bottom_Buy':  _sig(3.0,_B,'🧊','Para Bot','diamond',16,'#00FFFF','Low',-3.0,'포물선 바닥','WT1<-85 극단적 꺾임+양봉'),
+    'Parabolic_Top_Sell':    _sig(3.0,_S,'🌡️','Para Top','diamond',16,'#FF0000','High',3.0,'포물선 천장','WT1>85 극단적 꺾임+음봉'),
+    'Volume_Climax_Buy':     _sig(2.5,_B,'🌊','Vol Climax BUY','hexagram',14,'#00BCD4','Low',-2.8,'거래량 바닥','3배 거래량+긴아래꼬리+과매도'),
+    'Volume_Climax_Sell':    _sig(2.5,_S,'🌋','Vol Climax SELL','hexagram',14,'#FF5722','High',2.8,'거래량 상투','3배 거래량+긴윗꼬리+과매수'),
 
-    # ═══════════════════════════════════════════════
-    #  MCB+  매도 시그널 (16개)
-    # ═══════════════════════════════════════════════
-    'Blood_Diamond':         _sig(3.0,_S,'🩸','BLOOD DIA','diamond',18,'#DC143C','High',3.0,'최강 매도','RSI>70+MFI>70+WT1>60+하락 다이버전스'),
-    'Red_Dot_T1':            _sig(2.5,_S,'🔴','SELL T1','circle',16,'#FF1744','High',2.5,'강한 매도','WT과매수하락교차+RSI>70+MFI>70'),
-    'Red_Dot_T2':            _sig(2.0,_S,'🟥','SELL T2','circle',13,'#FF5252','High',2.2,'매도','WT과매수+RSI또는MFI>68'),
-    'Red_Diamond':           _sig(2.0,_S,'🔸','RED DIA','diamond',14,'#ff3333','High',1.8,'추세 매도','WT2≥0 하락교차+HTF약세'),
-    'Bear_Divergence':       _sig(2.0,_S,'📉','Bear Div','triangle-down',12,'#AA00FF','High',2.0,'하락 다이버전스','가격 고점↑ vs WT↓'),
-    'RSI_Bear_Divergence':   _sig(1.5,_S,'📉','RSI Bear Div','triangle-down',11,'#CE93D8','High',1.8,'RSI 하락 다이버전스','가격↑ vs RSI↓'),
-    'Squeeze_Fire_Sell':     _sig(1.5,_S,'🧨','Squeeze SELL','star-diamond',14,'#FF6600','High',1.5,'스퀴즈 매도','TTM Squeeze 해소+모멘텀↓'),
-    'Hidden_Bear_Div':       _sig(1.5,_S,'🔁','Hidden Bear','triangle-down',10,'#E040FB','High',1.6,'히든 하락 다이버전스','가격 고점↓ vs WT↑+WT>25+거래량'),
-    'Volume_Climax_Sell':    _sig(2.0,_S,'🌋','Vol Climax SELL','hexagram',14,'#FF5722','High',2.8,'거래량 클라이맥스','3배 거래량+상승장대봉+WT과매수→하락'),
-    'ADX_Momentum_Sell':     _sig(1.5,_S,'💨','ADX Down','arrow-down',11,'#FF3D00','High',1.4,'ADX 하락 점화','ADX>20돌파+-DI>+DI'),
-    'Bearish_Engulfing':     _sig(1.5,_S,'🌑','Bear Engulf','x',10,'#D50000','High',1.3,'하락 장악형','상승캔들 감싸는 하락캔들+WT>20'),
-    'Death_Cross':           _sig(1.5,_S,'☠️','Death Cross','cross',12,'#FF1744','High',0.8,'데드 크로스','50MA<200MA+ADX>15'),
-    'SuperTrend_Sell':       _sig(2.0,_S,'📉','ST Flip Bear','arrow-down',12,'#FF1744','High',1.5,'슈퍼트렌드 약세','SuperTrend 하단선 하향 돌파'),
-    'Parabolic_Top_Sell':    _sig(3.0,_S,'🌡️','Parabolic Top','diamond',16,'#FF0000','High',3.0,'포물선 천장','WT1>85 꺾임+음봉'),
-    'EMA_Pullback_Sell':     _sig(2.0,_S,'🎯','EMA PB Sell','triangle-down',13,'#FF6E40','High',1.8,'EMA 되돌림 매도','하락추세 EMA반등후 WT재하락'),
-    'Momentum_Ignition_Sell':_sig(2.5,_S,'💣','Mom. Ign Sell','star-diamond',15,'#D50000','High',2.5,'모멘텀 점화 매도','장대음봉>ATR×1.5+거래량>2.5배'),
-    'VWAP_Reject_Sell':      _sig(1.5,_S,'🏛️','VWAP Reject','triangle-down',11,'#FF6E40','High',1.3,'VWAP 저항','VWAP 실패+WT교차'),
-
-    # ═══════════════════════════════════════════════
-    #  캔들스틱 패턴 (4개 — Doji 제거)
-    # ═══════════════════════════════════════════════
-    'Hammer':               _sig(1.5,_B,'🔨','Hammer','triangle-up',11,'#00E676','Low',-1.5,'해머','긴하단꼬리+소형실체+WT<-20'),
-    'Morning_Star':         _sig(2.0,_B,'🌅','MornStar','star',13,'#00E676','Low',-2.0,'모닝스타','큰음봉→소형봉→강한양봉(3봉반전)'),
-    'Shooting_Star':        _sig(1.5,_S,'🌠','ShootStar','triangle-down',11,'#FF1744','High',1.5,'슈팅스타','긴상단꼬리+소형실체+WT>20'),
-    'Evening_Star':         _sig(2.0,_S,'🌆','EveStar','star',13,'#FF1744','High',2.0,'이브닝스타','큰양봉→소형봉→강한음봉(3봉반전)'),
-
-    # ═══════════════════════════════════════════════
-    #  Outside Day (2개 — Inside Day 제거)
-    # ═══════════════════════════════════════════════
-    'Outside_Bullish':      _sig(1.5,_B,'💪','OutsideBull','square',11,'#00E676','Low',-1.5,'강세 아웃사이드','전일범위포함+양봉마감+WT<30'),
-    'Outside_Bearish':      _sig(1.5,_S,'🥊','OutsideBear','square',11,'#FF1744','High',1.5,'약세 아웃사이드','전일범위포함+음봉마감+WT>-30'),
-
-    # ═══════════════════════════════════════════════
-    #  이동평균 (2개 — 200MA만 유지)
-    # ═══════════════════════════════════════════════
-    'Cross_Above_200MA':    _sig(1.5,_B,'📈','X▲200MA','triangle-up',11,'#00BFA5','Low',-1.2,'200MA상향돌파','종가>200MA(전일≤)'),
-    'Fell_Below_200MA':     _sig(1.5,_S,'📉','X▼200MA','triangle-down',11,'#D50000','High',1.2,'200MA하향이탈','종가<200MA(전일≥)'),
-
-    # ═══════════════════════════════════════════════
-    #  볼린저 밴드 (2개 — Squeeze End만 유지)
-    # ═══════════════════════════════════════════════
-    'BB_Squeeze_End_Bull':  _sig(1.5,_B,'💥','SqEnd▲','star-diamond',12,'#00FFFF','Low',-1.5,'BB스퀴즈해소↑','BB확장+상승+WT↑'),
-    'BB_Squeeze_End_Bear':  _sig(1.5,_S,'💥','SqEnd▼','star-diamond',12,'#FF6600','High',1.5,'BB스퀴즈해소↓','BB확장+하락+WT↓'),
-
-    # ═══════════════════════════════════════════════
-    #  52주 고/저 (2개)
-    # ═══════════════════════════════════════════════
-    'New_52W_High':         _sig(1.5,_B,'🏔️','52W▲','star-triangle-up',12,'#FFD700','High',1.5,'52주신고가','52주최고가갱신(돌파)'),
-    'New_52W_Low':          _sig(1.5,_S,'🕳️','52W▼','star-triangle-down',12,'#B71C1C','Low',-1.5,'52주신저가','52주최저가갱신(붕괴)'),
-
-    # ═══════════════════════════════════════════════
-    #  Jeff Cooper Hit & Run (15개)
-    # ═══════════════════════════════════════════════
-    'Pullback_123_Bull':    _sig(2.0,_B,'🎯','123PB▲','triangle-up',12,'#00E676','Low',-1.8,'1,2,3풀백매수','ADX>30+DI↑+3일저점↓후 되돌림매수'),
-    'Pullback_123_Bear':    _sig(2.0,_S,'🎯','123PB▼','triangle-down',12,'#FF1744','High',1.8,'1,2,3풀백매도','ADX>30+DI↓+3일고점↑후 되돌림매도'),
-    'Setup_180_Bull':       _sig(2.0,_B,'🔄','180▲','star-diamond',13,'#00E676','Low',-2.0,'180매수셋업','전일하위25%→당일상위25%+MA위'),
-    'Setup_180_Bear':       _sig(2.0,_S,'🔄','180▼','star-diamond',13,'#FF1744','High',2.0,'180매도셋업','전일상위25%→당일하위25%+MA아래'),
-    'Boomer_Buy':           _sig(2.0,_B,'💣','Boomer▲','star',12,'#00E676','Low',-1.8,'부머매수','ADX>30+DI↑+2일인사이드→돌파매수'),
-    'Boomer_Sell':          _sig(2.0,_S,'💣','Boomer▼','star',12,'#FF1744','High',1.8,'부머매도','ADX>30+DI↓+2일인사이드→하향이탈매도'),
-    'Expansion_BO':         _sig(2.5,_B,'🚀','XBO','star-diamond',14,'#FFD700','Low',-2.5,'확장돌파','2개월신고가+9일최대범위→돌파매수'),
-    'Expansion_BD':         _sig(2.5,_S,'💨','XBD','star-diamond',14,'#FF0000','High',2.5,'확장붕괴','2개월신저가+9일최대범위→공매도'),
-    'Gilligans_Buy':        _sig(2.0,_B,'🏝️','Gilligan▲','hexagon',12,'#00BCD4','Low',-2.0,'길리건매수','갭다운2개월신저가→상위50%마감반전'),
-    'Gilligans_Sell':       _sig(2.0,_S,'🏝️','Gilligan▼','hexagon',12,'#FF5722','High',2.0,'길리건매도','갭업2개월신고가→하위50%마감반전'),
-    'Lizard_Bull':          _sig(1.5,_B,'🦎','Lizard▲','triangle-up',10,'#00E676','Low',-1.5,'리자드매수','시가종가상위25%+10일신저가'),
-    'Lizard_Bear':          _sig(1.5,_S,'🦎','Lizard▼','triangle-down',10,'#FF1744','High',1.5,'리자드매도','시가종가하위25%+10일신고가'),
-    'NonADX_123_Bull':      _sig(1.8,_B,'📐','nADX123▲','triangle-up',11,'#69F0AE','Low',-1.5,'비ADX풀백매수','주가>50MA+3일저점↓→매수'),
-    'NonADX_123_Bear':      _sig(1.8,_S,'📐','nADX123▼','triangle-down',11,'#FF5252','High',1.5,'비ADX풀백매도','주가<50MA+3일고점↑→매도'),
-    'Pocket_Pivot':         _sig(1.5,_B,'🧲','PocketPvt','triangle-up',11,'#7C4DFF','Low',-1.5,'포켓피봇','양봉+거래량>10일하락거래량최대+MA위'),
+    # 2. 강력한 모멘텀 및 돌파 (W=2.5 / 2.0 / 1.5)
+    'Green_Dot_T1':          _sig(2.5,_B,'🟢','BUY T1','circle',16,'#00E676','Low',-2.5,'강한 매수','WT과매도 상향교차+지표바닥'),
+    'Red_Dot_T1':            _sig(2.5,_S,'🔴','SELL T1','circle',16,'#FF1744','High',2.5,'강한 매도','WT과매수 하향교차+지표천장'),
+    'Momentum_Ignition_Buy': _sig(2.5,_B,'🔥','Mom. Ignition','star-diamond',15,'#FF6D00','Low',-2.5,'모멘텀 점화','장대양봉+거래량 폭발+돌파'),
+    'Momentum_Ignition_Sell':_sig(2.5,_S,'💣','Mom. Ign Sell','star-diamond',15,'#D50000','High',2.5,'투매 점화','장대음봉+거래량 폭발+이탈'),
+    'Expansion_BO':          _sig(2.5,_B,'🚀','Expansion BO','star-diamond',14,'#FFD700','Low',-2.2,'확장 돌파','2개월 신고가+최근 9일 최대 변동성'),
+    'Expansion_BD':          _sig(2.5,_S,'💨','Expansion BD','star-diamond',14,'#FF0000','High',2.2,'확장 붕괴','2개월 신저가+최근 9일 최대 변동성'),
+    
+    # 3. 기관급 스윙 타점 & 정통 캔들 (W=2.0 / 1.5)
+    'Pullback_123_Bull':     _sig(2.0,_B,'🎯','123 PB BUY','triangle-up',12,'#00E676','Low',-1.8,'123 풀백 매수','강한 상승장 중 3일 완벽한 눌림목'),
+    'Pullback_123_Bear':     _sig(2.0,_S,'🎯','123 PB SELL','triangle-down',12,'#FF1744','High',1.8,'123 풀백 매도','강한 하락장 중 3일 완벽한 반등'),
+    'Setup_180_Bull':        _sig(2.0,_B,'🔄','180 BUY','star-triangle-up',13,'#00E676','Low',-2.0,'180 강세 셋업','어제 급락을 오늘 갭업 후 전면 장악'),
+    'Setup_180_Bear':        _sig(2.0,_S,'🔄','180 SELL','star-triangle-down',13,'#FF1744','High',2.0,'180 약세 셋업','어제 급등을 오늘 갭다운 후 전면 장악'),
+    'Squeeze_Fire_Buy':      _sig(1.5,_B,'💥','Squeeze BUY','star-square',14,'#00FFFF','Low',-1.5,'스퀴즈 폭발','볼린저밴드 수축 후 상방 폭발'),
+    'Squeeze_Fire_Sell':     _sig(1.5,_S,'🧨','Squeeze SELL','star-square',14,'#FF6600','High',1.5,'스퀴즈 붕괴','볼린저밴드 수축 후 하방 이탈'),
+    'Bullish_Engulfing':     _sig(1.5,_B,'☀️','Bull Engulf','square',11,'#00E676','Low',-1.3,'상승 장악형','전일 음봉을 완전히 감싸는 양봉'),
+    'Bearish_Engulfing':     _sig(1.5,_S,'🌑','Bear Engulf','x',11,'#D50000','High',1.3,'하락 장악형','전일 양봉을 완전히 감싸는 음봉'),
 }
 
 COMPOSITE_SIGNALS = {
-    'Ultra_Buy':  _sig(0,_B,'⚡','ULTRA BUY','star',20,'#FFD700','Low',-3.5,'울트라 매수','Confluence≥6 또는 ≥5+동시3개'),
-    'Strong_Buy': _sig(0,_B,'🔱','STRONG BUY','star',16,'#00E676','Low',-3.2,'스트롱 매수','Confluence 3.5~6'),
-    'Ultra_Sell': _sig(0,_S,'🚨','ULTRA SELL','star',20,'#FF0000','High',3.5,'울트라 매도','Confluence≤-6 또는 ≤-5+동시3개'),
-    'Strong_Sell':_sig(0,_S,'⚠️','STRONG SELL','star',16,'#FF1744','High',3.2,'스트롱 매도','Confluence -6~-3.5'),
+    'Ultra_Buy':  _sig(0,_B,'⚡','ULTRA BUY','star',24,'#FFD700','Low',-3.8,'울트라 매수','복수 시그널의 완벽한 합류 (초강력)'),
+    'Strong_Buy': _sig(0,_B,'🔱','STRONG BUY','star',18,'#00E676','Low',-3.5,'스트롱 매수','복수 시그널의 합류'),
+    'Ultra_Sell': _sig(0,_S,'🚨','ULTRA SELL','star',24,'#FF0000','High',3.8,'울트라 매도','복수 시그널의 완벽한 합류 (초강력)'),
+    'Strong_Sell':_sig(0,_S,'⚠️','STRONG SELL','star',18,'#FF1744','High',3.5,'스트롱 매도','복수 시그널의 합류'),
 }
 ALL_CHART_SIGNALS = {**SIGNAL_REGISTRY, **COMPOSITE_SIGNALS}
 
-NEUTRAL_SIGNALS = {}
+NEUTRAL_SIGNALS = set() # 다이어트 버전에서는 차트에 그리지 않음
 
 OB1, OB2, OS1, OS2 = 53, 60, -53, -60
 ST_MIN_BAR = 12
@@ -207,41 +140,21 @@ GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=GEMINI_API_KEY)
 
 COOLDOWN_MAP = {
-    # MCB+
-    'Squeeze_Fire_Buy':5,'Squeeze_Fire_Sell':5,
-    'Bullish_Engulfing':5,'Bearish_Engulfing':5,
-    'ADX_Momentum_Buy':10,'ADX_Momentum_Sell':10,
-    'EMA_Pullback_Buy':7,'EMA_Pullback_Sell':7,
-    'Momentum_Ignition_Buy':10,'Momentum_Ignition_Sell':10,
-    'Parabolic_Top_Sell':5,'Parabolic_Bottom_Buy':5,
-    'VWAP_Bounce_Buy':7,'VWAP_Reject_Sell':7,
-    'RSI_Bull_Divergence':10,'RSI_Bear_Divergence':10,
-    # 캔들스틱
-    'Hammer':5,'Shooting_Star':5,'Morning_Star':7,'Evening_Star':7,
-    # Outside Day
-    'Outside_Bullish':7,'Outside_Bearish':7,
-    # MA / BB
-    'Cross_Above_200MA':15,'Fell_Below_200MA':15,
-    'BB_Squeeze_End_Bull':7,'BB_Squeeze_End_Bear':7,
-    # 52W
-    'New_52W_High':10,'New_52W_Low':10,
-    # Cooper
-    'Pullback_123_Bull':7,'Pullback_123_Bear':7,
-    'Setup_180_Bull':7,'Setup_180_Bear':7,
-    'Boomer_Buy':10,'Boomer_Sell':10,
-    'Expansion_BO':10,'Expansion_BD':10,
-    'Gilligans_Buy':10,'Gilligans_Sell':10,
-    'Lizard_Bull':5,'Lizard_Bear':5,
-    'NonADX_123_Bull':7,'NonADX_123_Bear':7,
-    'Pocket_Pivot':10,
+    'Gold_Dot':10, 'Blood_Diamond':10,
+    'Squeeze_Fire_Buy':7, 'Squeeze_Fire_Sell':7,
+    'Momentum_Ignition_Buy':10, 'Momentum_Ignition_Sell':10,
+    'Volume_Climax_Buy':7, 'Volume_Climax_Sell':7,
+    'Bullish_Engulfing':5, 'Bearish_Engulfing':5,
+    'Pullback_123_Bull':7, 'Pullback_123_Bear':7,
+    'Setup_180_Bull':7, 'Setup_180_Bear':7,
+    'Expansion_BO':10, 'Expansion_BD':10,
 }
 
-# 시그널 계층 — 같은 카테고리에서 당일 중복 제거
 SIGNAL_HIERARCHY = {
-    'candle_bull': ['Morning_Star','Bullish_Engulfing','Hammer'],
-    'candle_bear': ['Evening_Star','Bearish_Engulfing','Shooting_Star'],
-    'cooper_bull': ['Expansion_BO','Pullback_123_Bull','Setup_180_Bull','Boomer_Buy','Gilligans_Buy','Lizard_Bull','NonADX_123_Bull'],
-    'cooper_bear': ['Expansion_BD','Pullback_123_Bear','Setup_180_Bear','Boomer_Sell','Gilligans_Sell','Lizard_Bear','NonADX_123_Bear'],
+    'reversal_bull': ['Gold_Dot', 'Volume_Climax_Buy', 'Green_Dot_T1', 'Bullish_Engulfing'],
+    'reversal_bear': ['Blood_Diamond', 'Volume_Climax_Sell', 'Red_Dot_T1', 'Bearish_Engulfing'],
+    'cooper_bull': ['Expansion_BO', 'Setup_180_Bull', 'Pullback_123_Bull'],
+    'cooper_bear': ['Expansion_BD', 'Setup_180_Bear', 'Pullback_123_Bear'],
 }
 
 # ──────────────────────────────────────────
@@ -358,7 +271,8 @@ def compute_macd(c, f=12, s=26, sig=9):
     sl=ml.ewm(span=sig,adjust=False).mean()
     return ml,sl,ml-sl
 
-def detect_pivot_div(price,osc,lb=60,pw=5,os_lim=None,ob_lim=None):
+# 🚀 다이버전스 후행성 최소화 (pw=2)
+def detect_pivot_div(price,osc,lb=60,pw=2,os_lim=None,ob_lim=None):
     n=len(price); pv,ov=price.values,osc.values; half=pw
     p_lo,p_hi=[],[]
     for i in range(2*half,n):
@@ -390,13 +304,16 @@ def detect_ttm_squeeze(bbu,bbl,kcu,kcl,c,h,l,kcm):
     mom_dn = momentum < momentum.shift(1)
     return sq, fire & (momentum>0) & mom_up, fire & (momentum<0) & mom_dn
 
-def detect_volume_climax(c,o,v,wt1,atr,z_thresh=2.5):
+# 🚀 꼬리 분석(Wick)이 결합된 거래량 클라이맥스
+def detect_volume_climax(c,o,h,l,v,wt1,atr,z_thresh=2.5):
     v_mean=v.rolling(20).mean(); v_std=v.rolling(20).std()
     v_z=(v-v_mean)/(v_std+1e-10)
-    big=(c-o).abs()>atr*0.5
-    ps=(v_z.shift(1)>z_thresh)&big.shift(1)
-    buy=ps&(c.shift(1)<o.shift(1))&(wt1.shift(1)<-40)&(c>o)
-    sell=ps&(c.shift(1)>o.shift(1))&(wt1.shift(1)>40)&(c<o)
+    body=(c-o).abs()
+    upper_wick=h-np.maximum(o,c)
+    lower_wick=np.minimum(o,c)-l
+    ps=(v_z.shift(1)>z_thresh)
+    buy=ps&(wt1.shift(1)<-40)&(c>o)&(lower_wick>body*1.2)
+    sell=ps&(wt1.shift(1)>40)&(c<o)&(upper_wick>body*1.2)
     return buy,sell
 
 def _detect_engulfing_pair(c,o,wt1,wt_t=20):
@@ -421,24 +338,6 @@ def compute_supertrend(h,l,c,period=10,mult=3.0):
         else: dv[i],sv[i]=(1,dn[i]) if cl[i]>up[i] else (-1,up[i])
     return pd.Series(sv,index=c.index),pd.Series(dv,index=c.index)
 
-def _detect_ema_pullback_pair(c,h,l,v,e8,e21,atr,wt1,wt2):
-    vok=_volf(v,0.5); ar=atr/c
-    results={}
-    for d in ['buy','sell']:
-        slope=e21>e21.shift(5) if d=='buy' else e21<e21.shift(5)
-        trend=((e8>e21) if d=='buy' else (e8<e21))&slope
-        side=(c>e8) if d=='buy' else (c<e8)
-        if d=='buy':
-            t=(l<=e8*(1+ar*0.15))&(l>=e21*(1-ar*0.25))
-            tr=_recent(t,2); b=(c>=e8)&(c>h.shift(1))
-            wok=(wt1>wt1.shift(1))&(wt1>wt2)&(wt1<60)
-        else:
-            t=(h>=e8*(1-ar*0.15))&(h<=e21*(1+ar*0.25))
-            tr=_recent(t,2); b=(c<=e8)&(c<l.shift(1))
-            wok=(wt1<wt1.shift(1))&(wt1<wt2)&(wt1>-60)
-        results[d]=trend&side&tr&b&wok&vok
-    return results['buy'],results['sell']
-
 def _detect_mom_ignition_pair(c,o,v,bbu,bbl,atr,e8,e21,wt1,bb_w):
     body=(c-o).abs(); bb=body>atr*1.5; hv=v>v.rolling(20).mean()*2.0
     compressed=bb_w.shift(1)<bb_w.rolling(20).mean().shift(1)
@@ -446,158 +345,21 @@ def _detect_mom_ignition_pair(c,o,v,bbu,bbl,atr,e8,e21,wt1,bb_w):
     sell=(c<o)&bb&hv&(c<bbl)&(e8<e21)&(wt1>-50)&compressed
     return buy,sell
 
-def _detect_vwap_pair(c,vosc,wt1,wt2,v,atr):
-    vok=_volf(v,0.7); ap=(atr/c*100).clip(0.3,3.0); dt=(ap*0.3).clip(0.3,1.5)
-    buy=(vosc>0)&(vosc.shift(1)<-dt)&(wt1>wt2)&(wt1<30)&vok
-    sell=(vosc<0)&(vosc.shift(1)>dt)&(wt1<wt2)&(wt1>-30)&vok
-    return buy,sell
-
 def _detect_parabolic_pair(c,o,wt1,bbu,bbl,atr):
     bot=((wt1<-85)&(wt1>wt1.shift(1))&(c>o)&(c>c.shift(1)))|((c<bbl-atr*1.5)&(c>o))
     top=((wt1>85)&(wt1<wt1.shift(1))&(c<o)&(c<c.shift(1)))|((c>bbu+atr*1.5)&(c<o))
     return bot,top
 
-# ──────────────────────────────────────────
-# 🆕  신규 시그널 탐지 함수들
-# ──────────────────────────────────────────
-
-def detect_candlestick_patterns(c, o, h, l, wt1, atr):
-    """Hammer, Shooting Star, Morning Star, Evening Star, Doji, Spinning Top"""
-    body = (c - o).abs()
-    upper_shadow = h - pd.concat([c, o], axis=1).max(axis=1)
-    lower_shadow = pd.concat([c, o], axis=1).min(axis=1) - l
-    full_range = h - l + 1e-10
-    avg_body = body.rolling(20).mean()
-    is_small = body < avg_body * 0.8
-
-    # Hammer
-    hammer = (lower_shadow >= body * 2) & (upper_shadow <= body * 0.5) & is_small & (wt1 < -20) & (c >= o)
-    # Shooting Star
-    shooting = (upper_shadow >= body * 2) & (lower_shadow <= body * 0.5) & is_small & (wt1 > 20) & (c <= o)
-    # Doji
-    doji = body <= full_range * 0.05
-    doji_bull = doji & (wt1 < -30) & (wt1 > wt1.shift(3))
-    doji_bear = doji & (wt1 > 30) & (wt1 < wt1.shift(3))
-    # Morning Star
-    d1b = (c.shift(2) < o.shift(2)) & (body.shift(2) > avg_body.shift(2))
-    d2s = body.shift(1) < avg_body.shift(1) * 0.5
-    d3b = (c > o) & (c > (o.shift(2) + c.shift(2)) / 2)
-    morning = d1b & d2s & d3b & (wt1 < -15)
-    # Evening Star
-    d1u = (c.shift(2) > o.shift(2)) & (body.shift(2) > avg_body.shift(2))
-    d3s = (c < o) & (c < (o.shift(2) + c.shift(2)) / 2)
-    evening = d1u & d2s & d3s & (wt1 > 15)
-    # Spinning Top
-    mid_body = is_small & (upper_shadow > body * 0.5) & (lower_shadow > body * 0.5)
-    spin = mid_body & ~doji
-
-    return hammer, shooting, doji_bull, doji_bear, morning, evening, spin
-
-
-def detect_inside_outside_day(h, l, c, o, wt1):
-    inside = (h < h.shift(1)) & (l > l.shift(1))
-    outside = (h > h.shift(1)) & (l < l.shift(1))
-    out_bull = outside & (c > o) & (c > h.shift(1)) & (wt1 < 30)
-    out_bear = outside & (c < o) & (c < l.shift(1)) & (wt1 > -30)
-    return inside, out_bull, out_bear
-
-
-def detect_ma_crossovers(c, ma20, ma50, ma200):
-    sigs = {}
-    for tag, ma in [('20MA', ma20), ('50MA', ma50), ('200MA', ma200)]:
-        sigs[f'Cross_Above_{tag}'] = (c > ma) & (c.shift(1) <= ma.shift(1))
-        sigs[f'Fell_Below_{tag}'] = (c < ma) & (c.shift(1) >= ma.shift(1))
-    return sigs
-
-
-def detect_bb_extra(c, bb_up, bb_low, bb_w, wt1):
-    above = c > bb_up
-    below = c < bb_low
-    bw_m = bb_w.rolling(20).mean()
-    widening = (bb_w > bb_w.shift(1)) & (bb_w.shift(1) < bw_m.shift(1))
-    sq_end_bull = widening & (c > c.shift(1)) & (wt1 > wt1.shift(1))
-    sq_end_bear = widening & (c < c.shift(1)) & (wt1 < wt1.shift(1))
-    return above, below, sq_end_bull, sq_end_bear
-
-
-def detect_macd_centerline(macd_line):
-    cab = (macd_line > 0) & (macd_line.shift(1) <= 0)
-    cbl = (macd_line < 0) & (macd_line.shift(1) >= 0)
-    return cab, cbl
-
-
-def detect_consecutive_days(c):
-    up = (c > c.shift(1))
-    dn = (c < c.shift(1))
-
-    # 벡터화: 연속 카운트를 그룹 기반으로 계산
-    def _streak(mask):
-        # 연속 True 그룹에 고유 ID 부여
-        groups = (~mask).cumsum()
-        # 각 그룹 내에서 누적 합계 = 연속 일수
-        return mask.groupby(groups).cumsum().astype(int)
-
-    u_s = _streak(up)
-    d_s = _streak(dn)
-
-    return {'Up_3_Days': u_s >= 3, 'Up_5_Days': u_s >= 5,
-            'Down_3_Days': d_s >= 3, 'Down_5_Days': d_s >= 5}
-
-
-def detect_gaps(c, o, h, l, atr):
-    thr = atr * 0.5
-    gu = (o > h.shift(1)) & ((o - h.shift(1)) > thr)
-    gd = (o < l.shift(1)) & ((l.shift(1) - o) > thr)
-    gu_c = gu.shift(1).fillna(False) & (l <= h.shift(2))
-    gd_c = gd.shift(1).fillna(False) & (h >= l.shift(2))
-    return gu, gd, gu_c, gd_c
-
-
-def detect_nr7(h, l):
-    dr = h - l
-    mn7 = dr.rolling(7).min()
-    nr = dr <= mn7
-    return nr, nr & nr.shift(1).fillna(False)
-
-
-def detect_range_bars(h, l, atr):
-    dr = h - l
-    wide = dr > atr * 2.0
-    narrow = dr < atr * 0.5
-    calm = wide.shift(1).fillna(False) & narrow
-    return wide, calm
-
-
-def detect_52w(c, h, l):
-    h252 = h.rolling(252, min_periods=200).max()
-    l252 = l.rolling(252, min_periods=200).min()
-    return h >= h252, l <= l252
-
-
-# ─── Jeff Cooper Hit & Run 전략 ───
-
 def detect_123_pullback(h, l, c, adx, pdi, mdi):
     strong_b = (adx > 30) & (pdi > mdi)
     strong_s = (adx > 30) & (mdi > pdi)
     inside = (h < h.shift(1)) & (l > l.shift(1))
-
     ll1 = l < l.shift(1); ll2 = l.shift(1) < l.shift(2); ll3 = l.shift(2) < l.shift(3)
     three_ll = ll1 & ll2 & ll3
-    # ✅ 수정: 3가지 조합 모두 논리적으로 가능한 형태로
-    two_ll_in = (
-        (ll1 & ll2 & inside.shift(2)) |          # [Inside, LL, LL] ← 3일전 inside
-        (ll1 & inside.shift(1) & ll3) |           # [LL, Inside, LL] ← 2일전 LL, 1일전 inside, 오늘 LL
-        (inside & ll2 & ll3)                      # [LL, LL, Inside] ← 오늘이 inside, 1~2일전 LL
-    )
-
+    two_ll_in = ((ll1 & ll2 & inside.shift(2)) | (ll1 & inside.shift(1) & ll3) | (inside & ll2 & ll3))
     hh1 = h > h.shift(1); hh2 = h.shift(1) > h.shift(2); hh3 = h.shift(2) > h.shift(3)
     three_hh = hh1 & hh2 & hh3
-    # ✅ 수정
-    two_hh_in = (
-        (hh1 & hh2 & inside.shift(2)) |
-        (hh1 & inside.shift(1) & hh3) |
-        (inside & hh2 & hh3)
-    )
+    two_hh_in = ((hh1 & hh2 & inside.shift(2)) | (hh1 & inside.shift(1) & hh3) | (inside & hh2 & hh3))
     return strong_b & (three_ll | two_ll_in), strong_s & (three_hh | two_hh_in)
 
 def detect_180_setup(c, o, h, l, ma10, ma50):
@@ -608,155 +370,62 @@ def detect_180_setup(c, o, h, l, ma10, ma50):
     bear = (pp >= 0.75) & (cp <= 0.25) & (c < ma10) & (c < ma50)
     return bull, bear
 
-
-def detect_boomer(h, l, adx, pdi, mdi):
-    inside = (h < h.shift(1)) & (l > l.shift(1))
-    in2 = inside & inside.shift(1)
-    sb = (adx > 30) & (pdi > mdi)
-    ss = (adx > 30) & (mdi > pdi)
-    return in2.shift(1).fillna(False) & sb, in2.shift(1).fillna(False) & ss
-
-
 def detect_expansion(h, l, c):
     dr = h - l
     mr9 = dr.rolling(9).max()
-    # ✅ 수정: 전일까지의 60일 고/저 사용
     h60 = h.shift(1).rolling(60, min_periods=40).max()
     l60 = l.shift(1).rolling(60, min_periods=40).min()
-    xbo = (h > h60) & (dr >= mr9)     # h >= → h > (strict new high)
-    xbd = (l < l60) & (dr >= mr9)     # l <= → l < (strict new low)
+    xbo = (h > h60) & (dr >= mr9)
+    xbd = (l < l60) & (dr >= mr9)
     return xbo, xbd
 
-def detect_gilligans(o, c, h, l):
-    dr = h - l + 1e-10
-    cp = (c - l) / dr
-    # ✅ 전일까지의 60일 고/저 사용
-    l60 = l.shift(1).rolling(60, min_periods=40).min()
-    h60 = h.shift(1).rolling(60, min_periods=40).max()
-    gd = (o <= l60) & (o < l.shift(1))
-    gu = (o >= h60) & (o > h.shift(1))
-    buy = gd & (cp >= 0.5) & (c >= o)
-    sell = gu & (cp <= 0.5) & (c <= o)
-    return buy, sell
-
-
-def detect_lizard(o, c, h, l):
-    dr = h - l + 1e-10
-    cp = (c - l) / dr; op = (o - l) / dr
-    h10 = h.rolling(10).max(); l10 = l.rolling(10).min()
-    bull = (cp >= 0.75) & (op >= 0.75) & (l <= l10)
-    bear = (cp <= 0.25) & (op <= 0.25) & (h >= h10)
-    return bull, bear
-
-
-def detect_non_adx_123(h, l, c, ma50):
-    inside = (h < h.shift(1)) & (l > l.shift(1))
-    ll1 = l < l.shift(1); ll2 = l.shift(1) < l.shift(2); ll3 = l.shift(2) < l.shift(3)
-    three_ll = ll1 & ll2 & ll3
-    # ✅ 수정
-    two_ll_in = (
-        (ll1 & ll2 & inside.shift(2)) |
-        (ll1 & inside.shift(1) & ll3) |
-        (inside & ll2 & ll3)
-    )
-    hh1 = h > h.shift(1); hh2 = h.shift(1) > h.shift(2); hh3 = h.shift(2) > h.shift(3)
-    three_hh = hh1 & hh2 & hh3
-    # ✅ 수정
-    two_hh_in = (
-        (hh1 & hh2 & inside.shift(2)) |
-        (hh1 & inside.shift(1) & hh3) |
-        (inside & hh2 & hh3)
-    )
-    return (c > ma50) & (three_ll | two_ll_in), (c < ma50) & (three_hh | two_hh_in)
-
-
-def detect_pocket_pivot(c, o, v, ma50, ma200):
-    dv = v.where(c < c.shift(1), 0)
-    mdv10 = dv.rolling(10, min_periods=5).max()
-    # ✅ 하락일 거래량이 존재할 때만 유효
-    has_down = (dv > 0).rolling(10, min_periods=1).sum() >= 2
-    return (c > o) & (v > mdv10) & (c > ma50) & (c > c.shift(1)) & has_down
-
 # ──────────────────────────────────────────
-# 🆕 추세 맥락 기반 시그널 품질 필터
+# 🚀 🆕 초강력 추세 맥락 기반 시그널 품질 필터 (Highlander)
 # ──────────────────────────────────────────
-# w >= 이 값인 시그널은 어떤 상황에서도 억제하지 않음
-TREND_IMMUNE_W = 2.0
-
-# ──────────────────────────────────────────
-# 🚀 🆕 초강력 추세 맥락 기반 시그널 품질 필터 (스나이퍼 모드)
-# ──────────────────────────────────────────
-# 추세를 거스를 수 있는 시그널의 최소 가중치 (3.0으로 상향하여 극단적 반전만 허용)
 TREND_IMMUNE_W = 3.0 
-
-def _apply_trend_filter(df):
-    """
-    [초강력 노이즈 필터링]
-    1. 절대 원칙: 같은 날 매수/매도 시그널 동시 발생 절대 불가 (무조건 한 방향만 승리)
-    2. 추세 원칙: 강한 추세에서는 역방향 시그널 완전 차단 (단, w>=3.0 극단적 반전 제외)
-    3. 동점 원칙: 매수/매도 에너지가 동일하게 충돌하면 모두 지우고 관망
-    """
+def _apply_trend_filter(df, sb, sbe):
     C = df['Close']
-
-    # ═══ Step 1: 다중 시간대 추세 점수 (-3 ~ +3) ═══
     tc = pd.Series(0.0, index=df.index)
-    tc += np.where(C > df['MA50'],  1.0, -1.0)   # 중기 추세
-    tc += np.where(C > df['MA200'], 1.0, -1.0)   # 장기 추세
-    tc += np.where(df['EMA8'] > df['EMA21'], 0.5, -0.5)  # 단기 모멘텀
-    tc += np.where(df['ST_Direction'] == 1, 0.5, -0.5)    # SuperTrend
+    tc += np.where(C > df['MA50'],  1.0, -1.0)
+    tc += np.where(C > df['MA200'], 1.0, -1.0)
+    tc += np.where(df['EMA8'] > df['EMA21'], 0.5, -0.5)
+    tc += np.where(df['ST_Direction'] == 1, 0.5, -0.5)
     df['_Trend_Context'] = tc
 
-    bullish_trend = tc >= 1.5    # 확실한 상승 추세
-    bearish_trend = tc <= -1.5   # 확실한 하락 추세
+    bullish_trend = tc >= 1.5
+    bearish_trend = tc <= -1.5
 
-    buy_sigs = {k for k, v in SIGNAL_REGISTRY.items()
-                if v['dir'] == 'buy' and k not in NEUTRAL_SIGNALS}
-    sell_sigs = {k for k, v in SIGNAL_REGISTRY.items()
-                if v['dir'] == 'sell' and k not in NEUTRAL_SIGNALS}
+    buy_sigs = {k for k, v in SIGNAL_REGISTRY.items() if v['dir'] == 'buy'}
+    sell_sigs = {k for k, v in SIGNAL_REGISTRY.items() if v['dir'] == 'sell'}
 
-    # ═══ Step 2: 강력한 추세 방패 (역추세 잔챙이 시그널 학살) ═══
     for s in sell_sigs:
         if s not in df.columns: continue
-        w = SIGNAL_REGISTRY.get(s, {}).get('w', 0)
-        if w < TREND_IMMUNE_W:
-            # 확실한 상승장에서는 w가 3.0 미만인 모든 매도 시그널 삭제
+        if SIGNAL_REGISTRY.get(s, {}).get('w', 0) < TREND_IMMUNE_W:
             df[s] = df[s] & ~bullish_trend
 
     for s in buy_sigs:
         if s not in df.columns: continue
-        w = SIGNAL_REGISTRY.get(s, {}).get('w', 0)
-        if w < TREND_IMMUNE_W:
-            # 확실한 하락장에서는 w가 3.0 미만인 모든 매수 시그널 삭제
+        if SIGNAL_REGISTRY.get(s, {}).get('w', 0) < TREND_IMMUNE_W:
             df[s] = df[s] & ~bearish_trend
 
-    # ═══ Step 3: 하이랜더 룰 (하루엔 오직 한 방향만 살아남는다) ═══
     daily_buy_w = pd.Series(0.0, index=df.index)
     daily_sell_w = pd.Series(0.0, index=df.index)
 
     for s in buy_sigs:
-        if s in df.columns: 
-            daily_buy_w += df[s].fillna(False).astype(float) * SIGNAL_REGISTRY[s]['w']
+        if s in df.columns: daily_buy_w += df[s].fillna(False).astype(float) * SIGNAL_REGISTRY[s]['w']
     for s in sell_sigs:
-        if s in df.columns: 
-            daily_sell_w += df[s].fillna(False).astype(float) * SIGNAL_REGISTRY[s]['w']
+        if s in df.columns: daily_sell_w += df[s].fillna(False).astype(float) * SIGNAL_REGISTRY[s]['w']
 
     conflict = (daily_buy_w > 0) & (daily_sell_w > 0)
     net = daily_buy_w - daily_sell_w
+    buy_loses  = conflict & (net < 0)
+    sell_loses = conflict & (net > 0)
+    tie        = conflict & (net == 0)
 
-    buy_loses  = conflict & (net < 0)    # 매도가 더 강한 날
-    sell_loses = conflict & (net > 0)    # 매수가 더 강한 날
-    tie        = conflict & (net == 0)   # 에너지가 완벽히 동일하게 대립하는 날
-
-    # 면역 가중치(w)와 상관없이 승패 판정에 따라 반대 시그널은 차트에서 절대적 삭제
     for s in buy_sigs:
-        if s in df.columns:
-            # 매도가 이기거나 비기면 매수 시그널 전부 삭제
-            df[s] = df[s] & ~buy_loses & ~tie
-
+        if s in df.columns: df[s] = df[s] & ~buy_loses & ~tie
     for s in sell_sigs:
-        if s in df.columns:
-            # 매수가 이기거나 비기면 매도 시그널 전부 삭제
-            df[s] = df[s] & ~sell_loses & ~tie
+        if s in df.columns: df[s] = df[s] & ~sell_loses & ~tie
 
     return df
 
@@ -791,10 +460,6 @@ def compute_indicators(df):
     df['MACD_Line'],df['MACD_Signal'],df['MACD_Hist']=compute_macd(c)
     return df
 
-
-# ──────────────────────────────────────────
-# 시그널 계층 중복 제거
-# ──────────────────────────────────────────
 def _deduplicate(df):
     for _cat, sigs in SIGNAL_HIERARCHY.items():
         for i, s in enumerate(sigs):
@@ -804,188 +469,72 @@ def _deduplicate(df):
                     df[s] = df[s] & ~df[higher]
     return df
 
-
 # ──────────────────────────────────────────
-# 통합 시그널 탐지 엔진
+# 통합 시그널 탐지 엔진 (다이어트 버전)
 # ──────────────────────────────────────────
 def detect_all_signals(df):
     H,L,C,O,V=df['High'],df['Low'],df['Close'],df['Open'],df['Volume']
-    e8,e21,m10,m20,m50,m200=df['EMA8'],df['EMA21'],df['MA10'],df['MA20'],df['MA50'],df['MA200']
+    e8,e21,m10,m50,m200=df['EMA8'],df['EMA21'],df['MA10'],df['MA50'],df['MA200']
     wt1,wt2,atr=df['WT1'],df['WT2'],df['ATR']
 
     htf1=(e8>e21)&(e21>e21.shift(5)); htf2=(C>m50)&(m50>m50.shift(10))
     wun=_recent(df['WT_Up'],2); wdn=_recent(df['WT_Down'],2)
-    wur=_recent(df['WT_Up'],3); wdr=_recent(df['WT_Down'],3)
     vok=_volf(V,0.5)
 
     sb=(df['ADX']>25)&(df['Plus_DI']>df['Minus_DI'])&(C>m50)
     sbe=(df['ADX']>25)&(df['Minus_DI']>df['Plus_DI'])&(C<m50)
     xb=sb&(C>m200)&(m50>m50.shift(5)); xbe=sbe&(C<m200)&(m50<m50.shift(5))
-    mfb=df['RSI_MFI']>-10; mfs=df['RSI_MFI']<10
 
     para_bot,para_top=_detect_parabolic_pair(C,O,wt1,df['BB_Up'],df['BB_Low'],atr)
-    st_fb=(df['ST_Direction']==-1)&(df['ST_Direction'].shift(1)==1)
-    st_fb.iloc[:ST_MIN_BAR]=False; st_bo=_recent(st_fb,3)
-    st_fb2=(df['ST_Direction']==1)&(df['ST_Direction'].shift(1)==-1)
-    st_fb2.iloc[:ST_MIN_BAR]=False; st_bu=_recent(st_fb2,3)
+    st_fb=(df['ST_Direction']==-1)&(df['ST_Direction'].shift(1)==1); st_fb.iloc[:ST_MIN_BAR]=False; st_bo=_recent(st_fb,3)
+    st_fb2=(df['ST_Direction']==1)&(df['ST_Direction'].shift(1)==-1); st_fb2.iloc[:ST_MIN_BAR]=False; st_bu=_recent(st_fb2,3)
 
     ssb=sb&(~para_top)&(~st_bo); ssx=xb&(~para_top)&(~st_bo)
     bsb=sbe&(~para_bot)&(~st_bu); bsx=xbe&(~para_bot)&(~st_bu)
 
-    # ═══ 기존 MCB+ 시그널 ═══
+    # 1. 반전/모멘텀 베이스 시그널
     df['Green_Dot_T1']=wun&(wt1<=OS1)&(df['RSI']<30)&(df['MFI']<30)&(df['RSI_MFI']<0)&(~bsx)&vok
-    df['Green_Dot_T2']=wun&(wt1<=OS1)&((df['RSI']<32)|(df['MFI']<32))&~df['Green_Dot_T1']&(~bsb)&vok
-    _gd=df['Green_Dot_T1']|df['Green_Dot_T2']
     df['Red_Dot_T1']=wdn&(wt1>=OB1)&(df['RSI']>70)&(df['MFI']>70)&(df['RSI_MFI']>0)&(~ssx)&vok
-    df['Red_Dot_T2']=wdn&(wt1>=OB1)&((df['RSI']>68)|(df['MFI']>68))&~df['Red_Dot_T1']&(~ssb)&vok
-    _rd=df['Red_Dot_T1']|df['Red_Dot_T2']
 
-    df['Blue_Diamond']=(wt2<=0)&wun&htf1&htf2&(~bsb)&mfb&vok
-    df['Red_Diamond']=(wt2>=0)&wdn&~htf1&~htf2&(~ssb)&mfs&vok
-    df['Green_Circle']=wun&(wt1<=OS1)&~_gd&(~bsb)&vok&(df['RSI']<45)
-    df['Red_Circle']=wdn&(wt1>=OB1)&~_rd&(~ssb)&vok&(df['RSI']>55)
-
-    bd,brd,hb,hbr=detect_pivot_div(C,wt1,60,5,OS1,OB1)
+    bd,brd,_,_=detect_pivot_div(C,wt1,60,2,OS1,OB1)
     bdr=_recent(bd,3); brdr=_recent(brd,3)
-    rbd,rbrd,_,_=detect_pivot_div(C,df['RSI'],60,5,35,65)
-    obd,obrd,_,_=detect_pivot_div(C,df['OBV'],60,5)
 
     df['Gold_Dot']=df['Green_Dot_T1']&(wt1<=OS2)&bdr
     df['Blood_Diamond']=df['Red_Dot_T1']&(wt1>=OB2)&brdr
-    df['Bull_Divergence']=bd&wur&~_gd&~df['Gold_Dot']&(~bsb)&vok
-    df['Bear_Divergence']=brd&wdr&~_rd&(~ssb)&vok
-    df['RSI_Bull_Divergence']=rbd&(wt1<-20)&(~bsb)&vok&~bd
-    df['RSI_Bear_Divergence']=rbrd&(wt1>20)&(~ssb)&vok&~brd
-    vol_ok_hidden=_volf(V,0.7)
-    df['Hidden_Bull_Div']=hb&(wt1<-25)&htf2&(~bsx)&vol_ok_hidden
-    df['Hidden_Bear_Div']=hbr&(wt1>25)&~htf2&(~ssx)&vol_ok_hidden
-    df['OBV_Div_Buy']=obd&(wt1<-30)&(~bsx)
-    df['OBV_Div_Sell']=obrd&(wt1>30)&(~ssx)
 
+    # 2. 거래량 & 모멘텀 폭발
+    df['Volume_Climax_Buy'],df['Volume_Climax_Sell']=detect_volume_climax(C,O,H,L,V,wt1,atr)
+    df['Momentum_Ignition_Buy'],df['Momentum_Ignition_Sell']=_detect_mom_ignition_pair(C,O,V,df['BB_Up'],df['BB_Low'],atr,e8,e21,wt1,df['BB_Width'])
+    
     sqo,sqb,sqs=detect_ttm_squeeze(df['BB_Up'],df['BB_Low'],df['KC_Upper'],df['KC_Lower'],C,H,L,df['KC_Mid'])
     df['Squeeze_On']=sqo
     df['Squeeze_Fire_Buy']=sqb&(~bsb)&vok
     df['Squeeze_Fire_Sell']=sqs&(~ssb)&vok
 
-    df['Volume_Climax_Buy'],df['Volume_Climax_Sell']=detect_volume_climax(C,O,V,wt1,atr)
-
-    ax=(df['ADX']>20)&(df['ADX'].shift(1)<=20)
-    df['ADX_Momentum_Buy']=ax&(df['Plus_DI']>df['Minus_DI'])&(wt1>wt2)&vok
-    df['ADX_Momentum_Sell']=ax&(df['Minus_DI']>df['Plus_DI'])&(wt1<wt2)&vok
-
+    # 3. 캔들스틱 & 패턴
     df['Bullish_Engulfing'],df['Bearish_Engulfing']=_detect_engulfing_pair(C,O,wt1)
     df['Bullish_Engulfing']&=(~bsb)&vok; df['Bearish_Engulfing']&=(~ssb)&vok
 
-    gc=(m50>m200)&(m50.shift(1)<=m200.shift(1)); dc=(m50<m200)&(m50.shift(1)>=m200.shift(1))
-    af=df['ADX']>15; vc=_volf(V,0.7)
-    df['Golden_Cross']=gc&af&vc; df['Death_Cross']=dc&af&vc
-
-    df['EMA_Pullback_Buy'],df['EMA_Pullback_Sell']=_detect_ema_pullback_pair(C,H,L,V,e8,e21,atr,wt1,wt2)
-    df['Momentum_Ignition_Buy'],df['Momentum_Ignition_Sell']=_detect_mom_ignition_pair(C,O,V,df['BB_Up'],df['BB_Low'],atr,e8,e21,wt1,df['BB_Width'])
-
-    df['SuperTrend_Buy']=st_fb2; df['SuperTrend_Sell']=st_fb
-
-    vp=_volf(V,1.0)
-    df['Parabolic_Top_Sell']=para_top&((df['WT_Down']|wdr)|((C<O)&(C<C.shift(1))))&vp
-    df['Parabolic_Bottom_Buy']=para_bot&((df['WT_Up']|wur)|((C>O)&(C>C.shift(1))))&vp
-
-    df['VWAP_Bounce_Buy'],df['VWAP_Reject_Sell']=_detect_vwap_pair(C,df['VWAP_Osc'],wt1,wt2,V,atr)
-
-    ml,ms=df['MACD_Line'],df['MACD_Signal']
-    df['MACD_Cross_Buy']=(ml>ms)&(ml.shift(1)<=ms.shift(1))&(ml<0)&(~bsb)&vok
-    df['MACD_Cross_Sell']=(ml<ms)&(ml.shift(1)>=ms.shift(1))&(ml>0)&(~ssb)&vok
-    df['StochRSI_Cross_Buy']=(df['StochK']>df['StochD'])&(df['StochK'].shift(1)<=df['StochD'].shift(1))&(df['StochK']<25)&(~bsb)&vok
-    df['StochRSI_Cross_Sell']=(df['StochK']<df['StochD'])&(df['StochK'].shift(1)>=df['StochD'].shift(1))&(df['StochK']>75)&(~ssb)&vok
-
-    # ═══════════════════════════════════════
-    # 🆕 P1 : 캔들스틱 패턴 (6+1)
-    # ═══════════════════════════════════════
-    (df['Hammer'], df['Shooting_Star'],
-     df['Doji_Bullish'], df['Doji_Bearish'],
-     df['Morning_Star'], df['Evening_Star'],
-     df['Spinning_Top']) = detect_candlestick_patterns(C, O, H, L, wt1, atr)
-
-    # WT/추세 필터 결합
-    df['Hammer'] &= (~bsb) & vok
-    df['Shooting_Star'] &= (~ssb) & vok
-    df['Doji_Bullish'] &= (~bsb) & vok
-    df['Doji_Bearish'] &= (~ssb) & vok
-    df['Morning_Star'] &= (~bsb) & vok
-    df['Evening_Star'] &= (~ssb) & vok
-
-    # ═══════════════════════════════════════
-    # 🆕 P1 : Inside / Outside Day
-    # ═══════════════════════════════════════
-    df['Inside_Day'], df['Outside_Bullish'], df['Outside_Bearish'] = detect_inside_outside_day(H, L, C, O, wt1)
-    df['Outside_Bullish'] &= (~bsb) & vok
-    df['Outside_Bearish'] &= (~ssb) & vok
-
-    # ═══════════════════════════════════════
-    # 🆕 P1 : 이동평균 돌파 / 이탈
-    # ═══════════════════════════════════════
-    ma_sigs = detect_ma_crossovers(C, m20, m50, m200)
-    for k, v in ma_sigs.items():
-        df[k] = v
-
-    # ═══════════════════════════════════════
-    # 🆕 P1 : 볼린저 밴드 확장
-    # ═══════════════════════════════════════
-    (df['Above_Upper_BB'], df['Below_Lower_BB'],
-     df['BB_Squeeze_End_Bull'], df['BB_Squeeze_End_Bear']) = detect_bb_extra(C, df['BB_Up'], df['BB_Low'], df['BB_Width'], wt1)
-
-    # ═══════════════════════════════════════
-    # 🆕 P1 : MACD 센터라인
-    # ═══════════════════════════════════════
-    df['MACD_Zero_Cross_Buy'], df['MACD_Zero_Cross_Sell'] = detect_macd_centerline(df['MACD_Line'])
-
-    # ═══════════════════════════════════════
-    # 🆕 P1 : 연속 상승 / 하락
-    # ═══════════════════════════════════════
-    cons = detect_consecutive_days(C)
-    for k, v in cons.items(): df[k] = v
-
-    # ═══════════════════════════════════════
-    # 🆕 P1 : 갭
-    # ═══════════════════════════════════════
-    df['Gap_Up'], df['Gap_Down'], df['Gap_Up_Closed'], df['Gap_Down_Closed'] = detect_gaps(C, O, H, L, atr)
-
-    # ═══════════════════════════════════════
-    # 🆕 P1 : 변동성 패턴
-    # ═══════════════════════════════════════
-    df['NR7'], df['NR7_2'] = detect_nr7(H, L)
-    df['Wide_Range_Bar'], df['Calm_After_Storm'] = detect_range_bars(H, L, atr)
-
-    # ═══════════════════════════════════════
-    # 🆕 P1 : 52 주 고 / 저
-    # ═══════════════════════════════════════
-    df['New_52W_High'], df['New_52W_Low'] = detect_52w(C, H, L)
-
-    # ═══════════════════════════════════════
-    # 🆕 P2 : Jeff Cooper Hit & Run
-    # ═══════════════════════════════════════
     df['Pullback_123_Bull'], df['Pullback_123_Bear'] = detect_123_pullback(H, L, C, df['ADX'], df['Plus_DI'], df['Minus_DI'])
     df['Setup_180_Bull'], df['Setup_180_Bear'] = detect_180_setup(C, O, H, L, m10, m50)
-    df['Boomer_Buy'], df['Boomer_Sell'] = detect_boomer(H, L, df['ADX'], df['Plus_DI'], df['Minus_DI'])
+    df['Setup_180_Bull'] &= vok & (~bsb); df['Setup_180_Bear'] &= vok & (~ssb)
     df['Expansion_BO'], df['Expansion_BD'] = detect_expansion(H, L, C)
-    df['Gilligans_Buy'], df['Gilligans_Sell'] = detect_gilligans(O, C, H, L)
-    df['Lizard_Bull'], df['Lizard_Bear'] = detect_lizard(O, C, H, L)
-    df['NonADX_123_Bull'], df['NonADX_123_Bear'] = detect_non_adx_123(H, L, C, m50)
-    df['Pocket_Pivot'] = detect_pocket_pivot(C, O, V, m50, m200)
 
+    vp=_volf(V,1.0)
+    df['Parabolic_Top_Sell']=para_top&vp
+    df['Parabolic_Bottom_Buy']=para_bot&vp
 
     # 시그널 계층 중복 제거
     _deduplicate(df)
-    # 🆕 추세 맥락 기반 필터 (중복제거 후, 쿨다운 전)
-    _apply_trend_filter(df)
-    # ═══════════════════════════════════════
-    # 쿨다운 (모든 시그널)
-    # ═══════════════════════════════════════
+    
+    # 🚀 추세 맥락 기반 필터 (Highlander Rule)
+    _apply_trend_filter(df, sb, sbe)
+    
+    # 쿨다운
     for s, cd in COOLDOWN_MAP.items():
         if s in df.columns: df[s] = _cooldown(df[s], cd)
 
-    # ═══════════════════════════════════════
-    # Confluence & Proximity & 메타
-    # ═══════════════════════════════════════
+    # Confluence & Proximity
     compute_confluence(df)
     df['Buy_Proximity'], df['Sell_Proximity'] = compute_proximity(
         wt1, wt2, df['RSI'], df['MFI'], df['RSI_MFI'],
@@ -1000,15 +549,12 @@ def detect_all_signals(df):
     df['_HTF1_Bull'], df['_HTF2_Bull'] = htf1, htf2
     return df
 
-
 # ──────────────────────────────────────────
-# Confluence / Proximity / Bias  (변경 없음)
+# Confluence / Proximity / Bias 
 # ──────────────────────────────────────────
 def compute_confluence(df, dw=5, df_=0.75):
-    bm = {k: v['w'] for k, v in SIGNAL_REGISTRY.items() 
-          if v['dir'] == 'buy' and k not in NEUTRAL_SIGNALS}
-    sm = {k: v['w'] for k, v in SIGNAL_REGISTRY.items() 
-          if v['dir'] == 'sell' and k not in NEUTRAL_SIGNALS}
+    bm = {k: v['w'] for k, v in SIGNAL_REGISTRY.items() if v['dir'] == 'buy'}
+    sm = {k: v['w'] for k, v in SIGNAL_REGISTRY.items() if v['dir'] == 'sell'}
     dk=np.array([df_**i for i in range(dw+1)]); ones=np.ones(dw+1)
     s=np.zeros(len(df)); bc=np.zeros(len(df)); sc=np.zeros(len(df))
     for col,w in bm.items():
@@ -1035,7 +581,6 @@ def compute_confluence(df, dw=5, df_=0.75):
     df['Strong_Sell']=(s<=-3.5)&(~df['Ultra_Sell'])
     return s
 
-
 def compute_proximity(wt1,wt2,rsi,mfi,rmfi,stk,macd_h,bb_w,sb,sbe):
     bp=pd.Series(0.0,index=wt1.index); sp=pd.Series(0.0,index=wt1.index)
     gap=(wt1-wt2).abs(); nc=gap<3
@@ -1056,7 +601,6 @@ def compute_proximity(wt1,wt2,rsi,mfi,rmfi,stk,macd_h,bb_w,sb,sbe):
     net=bp-sp
     return (pd.Series(np.where(net>=0,bp,bp*np.where(sbe,.4,.55)),index=wt1.index),
             pd.Series(np.where(net<=0,sp,sp*np.where(sb,.4,.55)),index=wt1.index))
-
 
 def compute_bias(meta, htf1, htf2):
     sc = 0.0
@@ -1100,7 +644,6 @@ def compute_bias(meta, htf1, htf2):
     elif sc > -9.0: return 'SELL', sc
     else: return 'STRONG SELL', sc
 
-
 def compute_signal_stats(df, col, direction, fwd=(2, 3, 5), mn=5):
     if col not in df.columns: return None
     mask = df[col].fillna(False).values.astype(bool)
@@ -1122,12 +665,10 @@ def compute_signal_stats(df, col, direction, fwd=(2, 3, 5), mn=5):
             st_res[f'{n}d_avg'] = st_res[f'{n}d_winrate'] = st_res[f'{n}d_median'] = None
     return st_res
 
-
 def compute_all_stats(dv):
     tgt={k:v['dir'] for k,v in SIGNAL_REGISTRY.items()}
     tgt.update({'Ultra_Buy':'buy','Strong_Buy':'buy','Ultra_Sell':'sell','Strong_Sell':'sell'})
     return {s:{**r,'direction':d} for s,d in tgt.items() if (r:=compute_signal_stats(dv, s, d)) and r['count']>0}
-
 
 # ──────────────────────────────────────────
 # 통합 분석 로직
@@ -1144,7 +685,6 @@ def analyze(ticker,chart_days=252,refresh=False):
         return fig,build_prompt_text(dc,meta),meta
     except Exception as e:
         return None,f"로딩 실패:{e}",None
-
 
 def build_speedometer_gauges(meta):
     conf_score=meta.get('confluence_score',0); bias_score=meta.get('bias_score',0)
@@ -1179,7 +719,6 @@ def build_speedometer_gauges(meta):
         height=230,margin=dict(l=20,r=20,t=50,b=10),font=dict(family="Pretendard"))
     return fig
 
-
 def _hl(fig,mask,idx,fill,txt=None,row=1):
     d=mask.astype(int).diff().fillna(0)
     starts=idx[d==1].tolist(); ends=idx[d==-1].tolist()
@@ -1190,7 +729,6 @@ def _hl(fig,mask,idx,fill,txt=None,row=1):
         if txt: kw.update(annotation_text=txt,annotation_position="top left",
                           annotation_font_size=10,annotation_font_color="#FF5252")
         fig.add_vrect(**kw)
-
 
 def build_chart(dc,ticker,regime,shield):
     mac={5:"#ff9900",10:"#ffb74d",20:'#f1c40f',50:'#e74c3c',100:'#9b59b6',125:'#3498db',200:'#2ecc71'}
@@ -1265,8 +803,8 @@ def build_chart(dc,ticker,regime,shield):
     wd=dc['WT1']-dc['WT2']
     fig.add_trace(go.Bar(x=dc.index,y=wd,marker_color=np.where(wd>=0,'#00E676','#FF1744').tolist(),name="WT Hist",opacity=0.3,hovertemplate="%{y:.1f}"),row=3,col=1)
 
-    for ml,clr in [(['Green_Circle','Green_Dot_T1','Green_Dot_T2','Gold_Dot'],'#00E676'),
-                   (['Red_Circle','Red_Dot_T1','Red_Dot_T2','Blood_Diamond'],'#FF1744')]:
+    for ml,clr in [(['Green_Dot_T1','Gold_Dot'],'#00E676'),
+                   (['Red_Dot_T1','Blood_Diamond'],'#FF1744')]:
         comb=pd.Series(False,index=dc.index)
         for mc in ml: comb|=dc.get(mc,pd.Series(False,index=dc.index))
         pts=dc[comb]
@@ -1322,7 +860,6 @@ def build_chart(dc,ticker,regime,shield):
     for ann in fig['layout']['annotations']: ann['font']=dict(size=12,color='#AAA',family='Pretendard')
     return fig
 
-
 # ──────────────────────────────────────────
 # 메타데이터 + AI 프롬프트
 # ──────────────────────────────────────────
@@ -1368,7 +905,6 @@ def build_metadata(dc,dv,ticker):
         'macd_hist':float(lat.get('MACD_Hist',0)),
     },regime,shield_str
 
-
 def build_prompt_text(dc,meta):
     lat=dc.iloc[-1]; rd=dc.tail(60)
     ps=", ".join([f"'{d.strftime('%Y-%m-%d')}:{r['Close']:.2f}'" for d,r in rd.iterrows()])
@@ -1403,7 +939,6 @@ def build_prompt_text(dc,meta):
             if wr is not None: lines.append(f"  {sn}:{sv['count']}회,2일승률{wr:.0f}%,평균주가변동{avg:+.1f}%")
         if lines: st_txt="\n📌 [백테스트(2년,상위15)]\n"+"\n".join(lines)
     return f"{ps}\n\n📌 [지표 요약]\n{inds}\n\n📌 [최근 시그널]\n{st_text}{st_txt}"
-
 
 def build_ai_prompt(ticker,phist,fundamentals):
     return f"""━━━━━━━━━━━━━
@@ -1512,7 +1047,6 @@ def build_ai_prompt(ticker,phist,fundamentals):
 [GRADE/Score]: [최종 등급]
 """
 
-
 # ──────────────────────────────────────────
 # UI 렌더 부속
 # ──────────────────────────────────────────
@@ -1525,7 +1059,6 @@ def _il(n,v):
     for t,l in _IT.get(n,[]):
         if v<=t: return l
     return ''
-
 
 def render_price_header(m):
     chg=m['price_change']; cp=m['price_change_pct']
@@ -1558,7 +1091,6 @@ def render_price_header(m):
                 ${m['atr']:.2f} ({m['atr_pct']:.1f}%)</p></div></div>
         <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">{ih}</div></div>""",unsafe_allow_html=True)
 
-
 def render_speedometer(m):
     gauge_fig=build_speedometer_gauges(m)
     st.plotly_chart(gauge_fig,use_container_width=True,theme=None,config={'displayModeBar':False})
@@ -1577,7 +1109,6 @@ def render_speedometer(m):
         <span style="font-size:1.1rem;font-weight:700;color:{clr}">{ico} 종합 판정: {bias} ({sc:.1f})</span>
         {f' · {prox_txt}' if prox_txt else ''}{sq_txt}</div>""",unsafe_allow_html=True)
 
-
 def render_alerts(m):
     alerts=[]
     bp,sp=m.get('buy_proximity',0),m.get('sell_proximity',0)
@@ -1594,7 +1125,6 @@ def render_alerts(m):
                 <span style="color:{clr};font-weight:700;font-size:.85rem">{pct:.0f}%</span></div>
             <div style="background:#1A1D24;border-radius:3px;height:6px;margin-top:6px">
                 <div style="background:{clr};width:{w}%;height:6px;border-radius:3px"></div></div></div>""",unsafe_allow_html=True)
-
 
 def render_signals(m):
     sigs=m['recent_signals']
@@ -1624,7 +1154,6 @@ def render_signals(m):
                 <span style="color:#888;font-size:.75rem">{len(group)}개</span></div>
             <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">{" ".join(parts)}</div></div>""",unsafe_allow_html=True)
 
-
 def render_stats(m):
     with st.expander("📊 백테스트 (2년, 진입: 시그널 다음날 시가, 청산: 2일 후 종가)",expanded=True):
         alls=m.get('all_signal_stats',{})
@@ -1651,7 +1180,6 @@ def render_stats(m):
         with c1: _side("🟢 BUY 전략 (롱)",{k:v for k,v in alls.items() if v['direction']=='buy'},is_sell=False)
         with c2: _side("🔴 SELL 전략 (숏/공매도)",{k:v for k,v in alls.items() if v['direction']=='sell'},is_sell=True)
 
-
 def render_analysis(msg):
     m,fig=msg.get('meta'),msg.get('fig')
     if m:
@@ -1671,13 +1199,12 @@ def render_analysis(msg):
         with t4:
             if m: render_company_details(m['ticker'])
 
-
 # ──────────────────────────────────────────
 # 사이드바
 # ──────────────────────────────────────────
 with st.sidebar:
-    st.markdown("## 🚦 CipherX")
-    st.markdown("<p style='color:#888;font-size:.8rem'>AI 퀀트 주가 분석 · MCB+ v10.0</p>",unsafe_allow_html=True)
+    st.markdown("## 🎯 CipherX Sniper")
+    st.markdown("<p style='color:#888;font-size:.8rem'>AI 퀀트 주가 분석 · V10.0</p>",unsafe_allow_html=True)
     st.markdown("---")
     st.markdown("### 📅 차트 기간")
     chart_period=st.radio("표시 기간",['3개월','6개월','1년','2년'],index=0,horizontal=True,key="period")
@@ -1701,26 +1228,24 @@ with st.sidebar:
     if st.button("🗑️ 대화 내역 지우기",use_container_width=True,type="secondary"):
         for key in ['messages','pending_ai_ticker','pending_ai_prompt','last_ticker']:
             st.session_state[key]=[{"role":"assistant","type":"text",
-                "content":"안녕하세요! 🚦 **CipherX v10** 입니다.\n\n분석할 **티커명**을 입력하세요."}] if key=='messages' else None
+                "content":"안녕하세요! 🎯 **CipherX Sniper** 입니다.\n\n분석할 **티커명**을 입력하세요."}] if key=='messages' else None
         st.rerun()
-
 
 # ──────────────────────────────────────────
 # 세션 관리
 # ──────────────────────────────────────────
 if 'messages' not in st.session_state:
     st.session_state.messages=[{"role":"assistant","type":"text",
-        "content":"안녕하세요! 🚦 **CipherX v10** 입니다.\n\n분석할 **티커명**을 입력하세요. 채팅처럼 이어서 여러 종목을 검색할 수 있습니다."}]
+        "content":"안녕하세요! 🎯 **CipherX Sniper** 입니다.\n\n분석할 **티커명**을 입력하세요. 채팅처럼 이어서 여러 종목을 검색할 수 있습니다."}]
 for key in ['pending_ai_ticker','pending_ai_prompt','last_ticker']:
     if key not in st.session_state: st.session_state[key]=None
 if 'enabled_signals' not in st.session_state:
     st.session_state['enabled_signals']=set(ALL_CHART_SIGNALS.keys())
 
-
 # ──────────────────────────────────────────
 # 챗 인터페이스 & AI 실행
 # ──────────────────────────────────────────
-st.markdown("<h2 style='text-align:center;color:#fff;margin-bottom:20px'>🚦 CipherX</h2>",unsafe_allow_html=True)
+st.markdown("<h2 style='text-align:center;color:#fff;margin-bottom:20px'>🎯 CipherX Sniper</h2>",unsafe_allow_html=True)
 
 if not st.session_state.last_ticker:
     st.markdown("<p style='text-align:center;color:#888;font-size:0.9rem;'>🔥 추천 주식 빠르게 분석해보기</p>",unsafe_allow_html=True)
@@ -1751,7 +1276,6 @@ for i,msg in enumerate(st.session_state.messages):
                 mime="text/markdown",use_container_width=True)
         else: st.markdown(msg.get("content",""))
 
-
 def _run_ai():
     tp=st.session_state.pending_ai_ticker
     pp=st.session_state.pending_ai_prompt
@@ -1767,7 +1291,8 @@ def _run_ai():
                 response=model.generate_content(pp,stream=True)
                 chunk_count=0
                 for chunk in response:
-                    text=chunk.text
+                    try: text=chunk.text
+                    except ValueError: continue
                     if text:
                         collected_chunks.append(text)
                         chunk_count+=1
@@ -1792,7 +1317,6 @@ def _run_ai():
         except Exception as e:
             pb.empty()
             st.error(f"AI 오류: {e}")
-
 
 def process_ticker(tv,refresh=False):
     tv=tv.strip().upper()
@@ -1831,7 +1355,6 @@ def process_ticker(tv,refresh=False):
             st.session_state.messages.append({"role":"assistant","type":"text",
                 "content":f"⚠️ **{tv}** 차트 렌더링에 실패했습니다. (데이터 부족)"})
             st.rerun()
-
 
 if st.session_state.get('quick_ticker'):
     qt=st.session_state.pop('quick_ticker')
