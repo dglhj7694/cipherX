@@ -2203,7 +2203,7 @@ def compute_bias(meta, htf1, htf2):
     else: return 'STRONG SELL', sc
 
 
-def compute_signal_stats(df, col, direction, fwd=(2, 3, 5), mn=5):
+def compute_signal_stats(df, col, direction, fwd=(3, 5, 10), mn=5):
     """
     고도화된 시그널 백테스트 엔진
     - 진입: 시그널 발생 다음 날 시가(Open)
@@ -3254,49 +3254,43 @@ def render_stats(m):
                 wr_bar = min(wr, 100)
                 
                 # 🛡️ 퀄리티 지표 색상 로직
-                # MDD: 0에 가까울수록(절대값이 작을수록) 좋음. -2% 이내면 훌륭, -5% 이상이면 위험
+# (앞부분 로직 동일: 색상 및 지표 세팅)
                 mdd_c = '#34D399' if abs(mdd) <= 2.0 else ('#FCD34D' if abs(mdd) <= 5.0 else '#F87171')
-                # Profit Factor: 1.5 이상 훌륭, 1.0 이하면 손실 우위
                 pf_c = '#34D399' if pf >= 1.5 else ('#FCD34D' if pf >= 1.0 else '#F87171')
-                # Sharpe Ratio: 1.0 이상 훌륭, 0.5 이하면 변동성 대비 보상 낮음
                 shp_c = '#34D399' if sharpe >= 1.0 else ('#FCD34D' if sharpe >= 0.5 else '#F87171')
 
-                # UI HTML 구성
-                st.markdown(f"""<div style="padding:10px 14px;margin:6px 0;border-radius:10px;
-                    background:rgba(255,255,255,0.015);border:1px solid rgba(255,255,255,0.04);transition:background .2s ease;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-                        <span style="color:#CBD5E1;font-weight:700;font-size:.85rem">{ic} {kor_label}
-                            <span style="color:#475569;font-size:.75rem;font-weight:500;margin-left:4px">({sv['count']}회)</span>
-                        </span>
-                        <span style="color:{av_c};font-weight:800;font-size:.95rem">{av:+.1f}%</span>
-                    </div>
-                    
-                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-                        <div style="flex:1;height:5px;background:#151921;border-radius:3px;overflow:hidden">
-                            <div style="width:{wr_bar}%;height:5px;background:{wr_c};border-radius:3px"></div>
-                        </div>
-                        <span style="color:{wr_c};font-size:.8rem;font-weight:800;width:40px;text-align:right">{wr:.0f}%</span>
-                    </div>
-                    
-                    <div style="display:flex;justify-content:space-between;align-items:center;
-                        padding-top:6px;border-top:1px dashed rgba(255,255,255,0.05);">
-                        
-                        <div style="display:flex;flex-direction:column;align-items:flex-start">
-                            <span style="color:#64748B;font-size:.65rem;text-transform:uppercase;letter-spacing:0.5px">Max DD</span>
-                            <span style="color:{mdd_c};font-size:.8rem;font-weight:700">{mdd:.1f}%</span>
-                        </div>
-                        
-                        <div style="display:flex;flex-direction:column;align-items:center">
-                            <span style="color:#64748B;font-size:.65rem;text-transform:uppercase;letter-spacing:0.5px">Profit Factor</span>
-                            <span style="color:{pf_c};font-size:.8rem;font-weight:700">{pf:.2f}</span>
-                        </div>
-                        
-                        <div style="display:flex;flex-direction:column;align-items:flex-end">
-                            <span style="color:#64748B;font-size:.65rem;text-transform:uppercase;letter-spacing:0.5px">Sharpe</span>
-                            <span style="color:{shp_c};font-size:.8rem;font-weight:700">{sharpe:.2f}</span>
-                        </div>
-                    </div>
-                </div>""", unsafe_allow_html=True)
+                # 💡 수정됨: 다중행 문자열의 들여쓰기를 없애서 코드 블록으로 인식되는 것을 방지합니다.
+                html_card = f"""
+<div style="padding:10px 14px;margin:6px 0;border-radius:10px;background:rgba(255,255,255,0.015);border:1px solid rgba(255,255,255,0.04);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="color:#CBD5E1;font-weight:700;font-size:.85rem">{ic} {kor_label}
+            <span style="color:#475569;font-size:.75rem;font-weight:500;margin-left:4px">({sv['count']}회)</span>
+        </span>
+        <span style="color:{av_c};font-weight:800;font-size:.95rem">{av:+.1f}%</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <div style="flex:1;height:5px;background:#151921;border-radius:3px;overflow:hidden">
+            <div style="width:{wr_bar}%;height:5px;background:{wr_c};border-radius:3px"></div>
+        </div>
+        <span style="color:{wr_c};font-size:.8rem;font-weight:800;width:40px;text-align:right">{wr:.0f}%</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding-top:6px;border-top:1px dashed rgba(255,255,255,0.05);">
+        <div style="display:flex;flex-direction:column;align-items:flex-start">
+            <span style="color:#64748B;font-size:.65rem;text-transform:uppercase;letter-spacing:0.5px">Max DD</span>
+            <span style="color:{mdd_c};font-size:.8rem;font-weight:700">{mdd:.1f}%</span>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center">
+            <span style="color:#64748B;font-size:.65rem;text-transform:uppercase;letter-spacing:0.5px">Profit Factor</span>
+            <span style="color:{pf_c};font-size:.8rem;font-weight:700">{pf:.2f}</span>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end">
+            <span style="color:#64748B;font-size:.65rem;text-transform:uppercase;letter-spacing:0.5px">Sharpe</span>
+            <span style="color:{shp_c};font-size:.8rem;font-weight:700">{sharpe:.2f}</span>
+        </div>
+    </div>
+</div>
+"""
+                st.markdown(html_card, unsafe_allow_html=True)
 
         c1, c2 = st.columns(2)
         with c1:
