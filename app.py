@@ -888,20 +888,25 @@ def build_ai_prompt(ticker,phist,fundamentals):
 # UI 렌더 및 앱 실행부
 # ──────────────────────────────────────────
 def render_price_header(m):
-    chg, cp = m['price_change'], m['price_change_pct']
-    cc = 'price-change-up' if chg>=0 else 'price-change-down'
-    ci = '▲' if chg>=0 else '▼'
-    tr, act = m['trend_regime'], m['action_label']
+    # 이전 버전(V10) 데이터와 호환되도록 .get() 방식으로 안전하게 값을 가져옵니다.
+    chg = m.get('price_change', 0)
+    cp = m.get('price_change_pct', 0)
+    cc = 'price-change-up' if chg >= 0 else 'price-change-down'
+    ci = '▲' if chg >= 0 else '▼'
+    
+    tr = m.get('trend_regime', 'NEUTRAL')
+    # action_label이 없으면 과거 데이터의 overall_bias를, 그것도 없으면 Neutral을 표기합니다.
+    act = m.get('action_label', m.get('overall_bias', 'Neutral'))
     
     st.markdown(f"""<div class="price-header">
         <div style="display:flex;justify-content:space-between;align-items:center">
-            <div><p class="price-label">🚦 {m['ticker']} · {m['last_date']} · <b>{tr}</b> · <span style="color:#00E5FF;font-weight:700">Action: {act}</span></p>
-            <p class="price-big" style="color:#FAFAFA">${m['price']:.2f}
+            <div><p class="price-label">🚦 {m.get('ticker', 'UNKNOWN')} · {m.get('last_date', '')} · <b>{tr}</b> · <span style="color:#00E5FF;font-weight:700">Action: {act}</span></p>
+            <p class="price-big" style="color:#FAFAFA">${m.get('price', 0):.2f}
                 <span class="{cc}" style="font-size:1rem;margin-left:8px">
                     {ci} {abs(chg):.2f} ({abs(cp):.2f}%)</span></p></div>
             <div style="text-align:right"><p class="price-label">Conf Score / ATR</p>
             <p style="color:#FFC107;font-size:1.1rem;font-weight:600;margin:0">
-                ★ {m['confluence_score']:.1f} / ${m['atr']:.2f}</p></div></div>
+                ★ {m.get('confluence_score', 0):.1f} / ${m.get('atr', 0):.2f}</p></div></div>
         </div>""", unsafe_allow_html=True)
 
 def render_signals(m):
