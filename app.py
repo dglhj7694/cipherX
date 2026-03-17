@@ -1361,53 +1361,6 @@ COMBO_MAP = {
     'Combo_MF_Reversal_Sell':   ('💸 자금흐름 전환 매도', 'sell'),      # 🆕
 }
 
-def get_trade_rationale(judgment, combos, bl, sl):
-    """7-Layer 점수와 콤보를 바탕으로 인간 친화적인 매매 근거를 생성합니다."""
-    combo_names = [c['name'] for c in combos]
-    
-    if 'BUY' in judgment:
-        if any('눌림목' in n for n in combo_names): return "📈 강세장 속 건강한 눌림목 (안전한 추세 탑승 구간)"
-        if any('자금흐름' in n or '합류' in n for n in combo_names): return "🐋 스마트머니(기관 자금) 유입 및 주요 지지선 방어"
-        if any('수축' in n for n in combo_names): return "💥 지루한 횡보/수축 국면 종료 후 상방 에너지 폭발"
-        if any('반전' in n for n in combo_names): return "🔄 단기 낙폭 과대 후 바닥권 턴어라운드 (V자 반등 기대)"
-        if any('모멘텀' in n for n in combo_names): return "🚀 강력한 거래량을 동반한 모멘텀 돌파 (신고가 랠리 징후)"
-        if bl['Trend'] >= 4: return "안정적인 중장기 상승 추세 지속"
-        return "전반적인 매수 지표 호전 및 매수세 유입"
-        
-    elif 'SELL' in judgment:
-        if any('소진' in n for n in combo_names): return "🌡️ 상승 피로도 극대화 및 단기 고점 징후 (차익 실현 물량 출회)"
-        if any('반등 실패' in n for n in combo_names): return "📉 하락 추세 속 데드캣 바운스(반등) 실패 (저항 직면)"
-        if any('붕괴' in n or '이탈' in n for n in combo_names): return "⚠️ 주요 지지선 무너짐 및 투매(Panic Sell) 발생 가능성"
-        if any('수축' in n for n in combo_names): return "💨 변동성 수축 후 하방으로 방향성 결정 (추가 하락 유의)"
-        if any('자금흐름' in n for n in combo_names): return "💸 스마트머니 대량 이탈 및 자금 흐름 급격한 악화"
-        if sl['Trend'] >= 4: return "강력한 하락 추세 지속 및 매수세 실종"
-        return "전반적인 매도 지표 악화 및 하방 압력 심화"
-        
-    elif judgment == 'MIXED':
-        return "⚔️ 매수 세력과 매도 세력 간의 팽팽한 힘겨루기 (방향성 탐색 중)"
-    else:
-        return "👀 뚜렷한 모멘텀 부재 (확실한 타점이 나올 때까지 관망 권장)"
-
-def get_judgment_detail(row):
-    # 7개 레이어로 변경
-    bl = {n: float(row.get(f'BJ_{n}', 0)) for n in ['Trend','Momentum','Candle','BB','Volume','MF','Pattern']}
-    sl = {n: float(row.get(f'SJ_{n}', 0)) for n in ['Trend','Momentum','Candle','BB','Volume','MF','Pattern']}
-    combos = [{'name': name, 'dir': d} for col, (name, d) in COMBO_MAP.items() if row.get(col, False)]
-    
-    judgment = str(row.get('Trade_Judgment', 'NEUTRAL'))
-    rationale = get_trade_rationale(judgment, combos, bl, sl)  # 🆕 근거 생성기 호출
-    
-    return {
-        'judgment': judgment,
-        'buy_total': float(row.get('Buy_Total', 0)),
-        'sell_total': float(row.get('Sell_Total', 0)),
-        'buy_layers': bl, 'sell_layers': sl,
-        'buy_active': int(row.get('Buy_Active_Layers', 0)),
-        'sell_active': int(row.get('Sell_Active_Layers', 0)),
-        'active_combos': combos,
-        'rationale': rationale,  # 🆕 딕셔너리에 추가
-        'net': float(row.get('Buy_Total', 0)) - float(row.get('Sell_Total', 0)),
-    }
 
 def get_judgment_detail(row):
     # 7개 레이어로 변경
@@ -2417,25 +2370,12 @@ def render_judgment(meta):
 
     j_label, j_color, _ = JUDGMENT_CONFIG.get(judgment, ('⚪ NEUTRAL','#64748B',''))
     net_color = '#34D399' if net > 0 else ('#F87171' if net < 0 else '#FCD34D')
-    
-    rationale_text = jd.get('rationale', '데이터 대기 중...') # 🆕 근거 텍스트 가져오기
 
     st.markdown(f"""
     <div class="judgment-card {card_cls}">
         <p style="font-size:2rem;font-weight:800;color:{j_color};margin:0;
            text-shadow:0 0 30px {j_color}40">{j_label}</p>
-           
-        <div style="margin-top:16px; padding:12px 16px; background:rgba(255,255,255,0.04); 
-                    border-radius:10px; border-left:4px solid {j_color}; text-align:left;">
-            <p style="color:#94A3B8; font-size:0.75rem; margin:0 0 4px 0; font-weight:700; letter-spacing:1px;">
-                💡 핵심 판단 근거
-            </p>
-            <p style="color:#F8FAFC; font-size:1.05rem; font-weight:700; margin:0; word-break:keep-all;">
-                {rationale_text}
-            </p>
-        </div>
-        
-        <div style="display:flex;justify-content:center;gap:32px;margin-top:20px">
+        <div style="display:flex;justify-content:center;gap:32px;margin-top:14px">
             <div>
                 <p style="color:#64748B;font-size:.7rem;margin:0;text-transform:uppercase;letter-spacing:1px">BUY Score</p>
                 <p style="color:#34D399;font-size:1.4rem;font-weight:800;margin:2px 0 0 0">{buy_t:.1f}</p>
