@@ -11,3 +11,4 @@ yfinance
 plotly
 pandas
 numpy
+scipy
