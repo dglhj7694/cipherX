@@ -2235,7 +2235,7 @@ with st.sidebar:
     chart_period=st.radio("차트기간",['3개월','6개월','1년','2년'],index=0,horizontal=True,key="period")
     chart_days={'3개월':63,'6개월':126,'1년':252,'2년':504}[chart_period]; st.markdown("---")
     with st.expander("🎛️ 설정",expanded=False):
-        _ss=st.checkbox("🟢🔴 STRONG",value=True,key="j_s"); _sn=st.checkbox("🟢🔴 BUY/SELL",value=True,key="j_n")
+        _ss=st.checkbox("🟢🔴 STRONG",value=False,key="j_s"); _sn=st.checkbox("🟢🔴 BUY/SELL",value=False,key="j_n")
         _sw=st.checkbox("🟡 WATCH",value=False,key="j_w"); _sm=st.checkbox("🟠 MIXED",value=False,key="j_m")
         ej=set()
         if _ss: ej|={'STRONG_BUY','STRONG_SELL'}
@@ -2243,7 +2243,7 @@ with st.sidebar:
         if _sw: ej|={'WATCH_BUY','WATCH_SELL'}
         if _sm: ej.add('MIXED')
         st.session_state['enabled_judgments']=ej
-        st.session_state['sig_display_level']=st.radio("시그널표시",['⭐ 핵심만 (Tier A)','📊 핵심+보조 (A+B)','🔍 전체'],index=0,key="sig_disp")
+        st.session_state['sig_display_level']=st.radio("시그널표시",['⭐ 핵심만 (Tier A)','📊 핵심+보조 (A+B)','🔍 전체'],index=1,key="sig_disp")
     if st.button("🗑️ 초기화",use_container_width=True,type="secondary"):
         for k in ['messages','pending_ai_ticker','pending_ai_prompt','last_ticker']:
             st.session_state[k]=[{"role":"assistant","type":"text","content":"안녕하세요! 🚦 **CipherX v12.2**"}] if k=='messages' else None
