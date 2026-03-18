@@ -1918,18 +1918,66 @@ def build_chart(dc, ticker, regime, shield):
     fig.add_trace(go.Scatter(x=dc.index,y=ca*3,line=dict(color='#FFD700',width=1.5,dash='dot'),name="Accel×3",opacity=0.6),row=7,col=1)
     fig.add_hline(y=0,line_color="gray",line_width=1,row=7,col=1)
 
-    fig.update_layout(template="plotly_dark",paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=2,r=2,t=40,b=2),height=1400,showlegend=True,hovermode="x unified",
-        hoverlabel=dict(bgcolor="rgba(14,17,23,0.95)",font_size=12,font_family="Pretendard"),
-        legend=dict(orientation="h",yanchor="bottom",y=1.02,xanchor="center",x=0.5,font=dict(size=9.5,color='#CCC'),bgcolor='rgba(0,0,0,0)'))
-    for i in range(1,8):
-        ya=f'yaxis{i}' if i>1 else 'yaxis'
-        fig.update_layout(**{ya:dict(gridcolor='rgba(45,51,59,0.5)',zerolinecolor='rgba(60,63,70,0.6)',tickfont=dict(size=10,color='#888'))})
-    fig.update_xaxes(rangeslider_visible=False,showspikes=True,spikecolor="#667eea",spikemode="across",spikethickness=1,spikedash="dot")
-    fig.update_yaxes(showspikes=True,spikecolor="#667eea",spikemode="across",spikethickness=1,spikedash="dot")
-    for ann in fig['layout']['annotations']: ann['font']=dict(size=12,color='#AAA',family='Pretendard')
-    return fig
+    # ═══ 레이아웃 ═══
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=2, r=2, t=40, b=2),
+        height=1400,
+        showlegend=True,
+        hovermode="x unified",
+        hoverlabel=dict(
+            bgcolor="rgba(14,17,23,0.95)",
+            font_size=12,
+            font_family="Pretendard"
+        ),
+        legend=dict(
+            orientation="h", yanchor="bottom", y=1.02,
+            xanchor="center", x=0.5,
+            font=dict(size=9.5, color='#CCC'),
+            bgcolor='rgba(0,0,0,0)'
+        )
+    )
 
+    for i in range(1, 8):
+        ya = f'yaxis{i}' if i > 1 else 'yaxis'
+        fig.update_layout(**{ya: dict(
+            gridcolor='rgba(45,51,59,0.5)',
+            zerolinecolor='rgba(60,63,70,0.6)',
+            tickfont=dict(size=10, color='#888')
+        )})
+
+    # 거래일이 아닌 날짜를 모두 제외 (주말 + 공휴일 + 휴장일)
+    all_calendar_days = pd.date_range(
+        start=dc.index[0], end=dc.index[-1], freq='D')
+    trading_days = dc.index.normalize()
+    non_trading_days = all_calendar_days.difference(trading_days)
+
+    fig.update_xaxes(
+        rangeslider_visible=False,
+        showspikes=True,
+        spikecolor="#667eea",
+        spikemode="across",
+        spikethickness=1,
+        spikedash="dot",
+        rangebreaks=[dict(values=non_trading_days.tolist())],
+        gridcolor='rgba(45,51,59,0.5)',
+        gridwidth=1,
+        tickfont=dict(size=10, color='#888')
+    )
+    fig.update_yaxes(
+        showspikes=True,
+        spikecolor="#667eea",
+        spikemode="across",
+        spikethickness=1,
+        spikedash="dot"
+    )
+
+    for ann in fig['layout']['annotations']:
+        ann['font'] = dict(size=12, color='#AAA', family='Pretendard')
+
+    return fig
 
 # ══════════════════════════════════════════
 #  메타데이터 + 프롬프트 + 분석
