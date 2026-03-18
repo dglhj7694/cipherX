@@ -504,6 +504,748 @@ JUDGMENT_CONFIG = {
 }
 
 
+# ══════════════════════════════════════════════════════════════
+#  CipherX V12.0 — Custom Scanner Module
+#  승률 높은 시그널 콤보 20종 + 차트 마킹 + 멀티 티커 스캐너
+# ══════════════════════════════════════════════════════════════
+
+
+# ──────────────────────────────────────────
+# 📋 스캐너 콤보 정의
+# ──────────────────────────────────────────
+SCANNER_COMBOS = {
+    # ═══════════ BUY 콤보 10종 ═══════════
+    'SC_Oversold_Bounce': {
+        'name': '🟢 Oversold Bounce',
+        'kor': '과매도 반등',
+        'dir': 'buy',
+        'tier': 1,
+        'icon': '🏓',
+        'color': '#00E676',
+        'desc': 'StochRSI 과매도 + 강세 캔들 + 20MA 돌파',
+        'category': '반전',
+    },
+    'SC_Breakout_Momentum': {
+        'name': '🟢 Breakout Momentum',
+        'kor': '돌파 모멘텀',
+        'dir': 'buy',
+        'tier': 1,
+        'icon': '🚀',
+        'color': '#00E676',
+        'desc': '확장 돌파 + 거래량 급증 + 52주 신고가',
+        'category': '돌파',
+    },
+    'SC_Pullback_Buy_Zone': {
+        'name': '🟢 Pullback Buy Zone',
+        'kor': '눌림목 매수',
+        'dir': 'buy',
+        'tier': 2,
+        'icon': '🎯',
+        'color': '#69F0AE',
+        'desc': '상승추세 + 20MA 눌림 + 해머/반등 캔들',
+        'category': '추세 지속',
+    },
+    'SC_Triple_Oversold': {
+        'name': '🟢 Triple Oversold Reversal',
+        'kor': '삼중 과매도 반전',
+        'dir': 'buy',
+        'tier': 1,
+        'icon': '💎',
+        'color': '#00E676',
+        'desc': 'WT+RSI+캔들 동시 과매도 극단에서 반전',
+        'category': '반전',
+    },
+    'SC_Squeeze_Fire_Bull': {
+        'name': '🟢 Squeeze Fire Bull',
+        'kor': '스퀴즈 돌파 매수',
+        'dir': 'buy',
+        'tier': 2,
+        'icon': '💥',
+        'color': '#00FFFF',
+        'desc': 'BB 스퀴즈 해소 + 거래량 + MACD 교차',
+        'category': '돌파',
+    },
+    'SC_Trend_Continuation': {
+        'name': '🟢 Trend Continuation',
+        'kor': '추세 지속 매수',
+        'dir': 'buy',
+        'tier': 2,
+        'icon': '📐',
+        'color': '#69F0AE',
+        'desc': 'ADX 강세 + 123 풀백 + 자금흐름 양호',
+        'category': '추세 지속',
+    },
+    'SC_Volume_Climax_Rev': {
+        'name': '🟢 Volume Climax Reversal',
+        'kor': '거래량 클라이맥스 반전',
+        'dir': 'buy',
+        'tier': 1,
+        'icon': '🌊',
+        'color': '#00BCD4',
+        'desc': '거래량 폭발 + WT 과매도 + 다이버전스',
+        'category': '반전',
+    },
+    'SC_Ichimoku_Breakout': {
+        'name': '🟢 Ichimoku Breakout',
+        'kor': '쿠모 돌파 매수',
+        'dir': 'buy',
+        'tier': 2,
+        'icon': '☁️',
+        'color': '#00E5FF',
+        'desc': '쿠모 상향돌파 + CMF 양호 + 거래량',
+        'category': '돌파',
+    },
+    'SC_Smart_Money_Accum': {
+        'name': '🟢 Smart Money Accumulation',
+        'kor': '스마트머니 매집',
+        'dir': 'buy',
+        'tier': 2,
+        'icon': '🏦',
+        'color': '#7C4DFF',
+        'desc': 'MF 전환 + CMF 양수 + BB 하단 반등',
+        'category': '매집',
+    },
+    'SC_Momentum_Ignition_Buy': {
+        'name': '🟢 Momentum Ignition',
+        'kor': '모멘텀 점화 매수',
+        'dir': 'buy',
+        'tier': 1,
+        'icon': '🔥',
+        'color': '#FF6D00',
+        'desc': '모멘텀 점화 + ST 강세전환 + ADX 상승',
+        'category': '돌파',
+    },
+
+    # ═══════════ SELL 콤보 10종 ═══════════
+    'SC_Overbought_Exhaust': {
+        'name': '🔴 Overbought Exhaustion',
+        'kor': '과매수 소진',
+        'dir': 'sell',
+        'tier': 1,
+        'icon': '🌡️',
+        'color': '#FF1744',
+        'desc': 'StochRSI 과매수 + 약세 캔들 + 20MA 이탈',
+        'category': '반전',
+    },
+    'SC_Breakdown_Momentum': {
+        'name': '🔴 Breakdown Momentum',
+        'kor': '붕괴 모멘텀',
+        'dir': 'sell',
+        'tier': 1,
+        'icon': '💨',
+        'color': '#FF1744',
+        'desc': '확장 붕괴 + 거래량 급증 + 52주 신저가',
+        'category': '붕괴',
+    },
+    'SC_Rally_Failure': {
+        'name': '🔴 Rally Failure',
+        'kor': '반등 실패',
+        'dir': 'sell',
+        'tier': 2,
+        'icon': '🎯',
+        'color': '#FF5252',
+        'desc': '하락추세 + 20MA 저항 + 슈팅스타',
+        'category': '추세 지속',
+    },
+    'SC_Triple_Overbought': {
+        'name': '🔴 Triple Overbought Reversal',
+        'kor': '삼중 과매수 반전',
+        'dir': 'sell',
+        'tier': 1,
+        'icon': '💀',
+        'color': '#FF1744',
+        'desc': 'WT+RSI+캔들 동시 과매수 극단에서 반전',
+        'category': '반전',
+    },
+    'SC_Squeeze_Fire_Bear': {
+        'name': '🔴 Squeeze Fire Bear',
+        'kor': '스퀴즈 돌파 매도',
+        'dir': 'sell',
+        'tier': 2,
+        'icon': '🧨',
+        'color': '#FF6600',
+        'desc': 'BB 스퀴즈 해소 하방 + 거래량 + MACD 교차',
+        'category': '붕괴',
+    },
+    'SC_Trend_Breakdown': {
+        'name': '🔴 Trend Breakdown',
+        'kor': '추세 붕괴 매도',
+        'dir': 'sell',
+        'tier': 2,
+        'icon': '📐',
+        'color': '#FF5252',
+        'desc': 'ADX 약세 + 123 풀백 매도 + 자금유출',
+        'category': '추세 지속',
+    },
+    'SC_Volume_Climax_Sell': {
+        'name': '🔴 Volume Climax Sell',
+        'kor': '거래량 클라이맥스 매도',
+        'dir': 'sell',
+        'tier': 1,
+        'icon': '🌋',
+        'color': '#D50000',
+        'desc': '거래량 폭발 매도 + WT 과매수 + 다이버전스',
+        'category': '반전',
+    },
+    'SC_Ichimoku_Breakdown': {
+        'name': '🔴 Ichimoku Breakdown',
+        'kor': '쿠모 하향 매도',
+        'dir': 'sell',
+        'tier': 2,
+        'icon': '☁️',
+        'color': '#FF6E40',
+        'desc': '쿠모 하향돌파 + CMF 약세 + 거래량',
+        'category': '붕괴',
+    },
+    'SC_Distribution': {
+        'name': '🔴 Distribution Signal',
+        'kor': '분배(투매) 신호',
+        'dir': 'sell',
+        'tier': 2,
+        'icon': '🏛️',
+        'color': '#E040FB',
+        'desc': 'MF 전환 + CMF 음수 + WT 하락',
+        'category': '분배',
+    },
+    'SC_Parabolic_Exhaust': {
+        'name': '🔴 Parabolic Exhaustion',
+        'kor': '포물선 소진',
+        'dir': 'sell',
+        'tier': 1,
+        'icon': '🌡️',
+        'color': '#FF0000',
+        'desc': '포물선 천장 + 거래량 폭발 + RSI 극과매수',
+        'category': '반전',
+    },
+}
+
+
+# ──────────────────────────────────────────
+# 📋 스캐너 콤보 탐지 함수
+# ──────────────────────────────────────────
+def detect_scanner_combos(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    고승률 시그널 콤보 20종 탐지
+    기존 시그널 컬럼이 이미 계산된 df를 입력받음
+    """
+    idx = df.index
+    C, O, H, L, V = df['Close'], df['Open'], df['High'], df['Low'], df['Volume']
+    F = lambda col: df.get(col, pd.Series(False, index=idx)).fillna(False)
+
+    # ── 공통 조건 ──
+    vol_ratio = V / (V.rolling(50, min_periods=10).mean() + 1e-10)
+    vol_15x = vol_ratio >= 1.5
+    vol_2x = vol_ratio >= 2.0
+    vol_3x = vol_ratio >= 3.0
+
+    above_50ma = C > df['MA50']
+    below_50ma = C < df['MA50']
+    ma50_rising = df['MA50'] > df['MA50'].shift(5)
+    ma50_falling = df['MA50'] < df['MA50'].shift(5)
+
+    candle_bull = F('Bullish_Engulfing') | F('Hammer') | F('Morning_Star') | F('Doji_Bullish')
+    candle_bear = F('Bearish_Engulfing') | F('Shooting_Star') | F('Evening_Star') | F('Doji_Bearish')
+
+    mf_rising = df.get('MF_Rising', pd.Series(False, index=idx)).fillna(False)
+    mf_falling = df.get('MF_Falling', pd.Series(False, index=idx)).fillna(False)
+    cmf = df.get('CMF', pd.Series(0, index=idx))
+    rmfi = df['RSI_MFI']
+
+    # ── 최근 발생 체크 (3봉 이내) ──
+    def _rec(col, lb=3):
+        s = F(col)
+        return s.astype(float).rolling(lb + 1, min_periods=1).max().fillna(0).astype(bool)
+
+    # ═══════════ BUY 콤보 ═══════════
+
+    # B1: Oversold Bounce — StochK<20 + 강세캔들 + 20MA 돌파
+    stoch_oversold = (df['StochK'] < 20) & (df['StochD'] < 20)
+    df['SC_Oversold_Bounce'] = (
+        stoch_oversold &
+        (candle_bull | _rec('StochRSI_Cross_Buy')) &
+        (_rec('Cross_Above_20MA') | (C > df['MA20'])) &
+        vol_15x
+    )
+
+    # B2: Breakout Momentum — 확장 돌파 + 거래량 + 52주 신고가
+    df['SC_Breakout_Momentum'] = (
+        (F('Expansion_BO') | F('New_52W_High')) &
+        vol_2x &
+        (F('New_52W_High') | (H >= H.rolling(60, min_periods=40).max())) &
+        (df['ADX'] > 20)
+    )
+
+    # B3: Pullback Buy Zone — 상승추세 + 20MA 눌림 + 해머
+    pullback_to_20 = (C <= df['MA20'] * 1.02) & (C >= df['MA20'] * 0.97)
+    df['SC_Pullback_Buy_Zone'] = (
+        above_50ma & ma50_rising &
+        (pullback_to_20 | _rec('Fell_Below_20MA') | F('EMA_Pullback_Buy')) &
+        (F('Hammer') | F('Doji_Bullish') | F('Outside_Bullish') |
+         (C > O) & (df['WT1'] > df['WT1'].shift(1)))
+    )
+
+    # B4: Triple Oversold Reversal — WT+RSI+캔들 동시 극단
+    triple_oversold = (
+        ((df['WT1'] < OS1).astype(int) +
+         (df['RSI'] < 35).astype(int) +
+         (df['MFI'] < 35).astype(int) +
+         (df['StochK'] < 20).astype(int)) >= 3
+    )
+    strong_bull_signal = (
+        F('Gold_Dot') | F('Green_Dot_T1') | F('Morning_Star') |
+        F('Bullish_Engulfing') | F('Bull_Divergence') |
+        F('Parabolic_Bottom_Buy')
+    )
+    df['SC_Triple_Oversold'] = triple_oversold & (strong_bull_signal | candle_bull)
+
+    # B5: Squeeze Fire Bull — BB 스퀴즈 해소 + 거래량 + MACD
+    df['SC_Squeeze_Fire_Bull'] = (
+        (F('BB_Squeeze_End_Bull') | F('Squeeze_Fire_Buy')) &
+        vol_15x &
+        (_rec('MACD_Cross_Buy') | _rec('MACD_Zero_Cross_Buy') |
+         (df['MACD_Hist'] > 0) & (df['MACD_Hist'] > df['MACD_Hist'].shift(1)))
+    )
+
+    # B6: Trend Continuation — ADX 강세 + 123 풀백
+    df['SC_Trend_Continuation'] = (
+        (df['ADX'] > 25) & (df['Plus_DI'] > df['Minus_DI']) &
+        (F('Pullback_123_Bull') | F('NonADX_123_Bull') | F('Boomer_Buy')) &
+        (mf_rising | (rmfi > rmfi.shift(3)))
+    )
+
+    # B7: Volume Climax Reversal — 거래량 폭발 + WT 과매도 + 다이버전스
+    df['SC_Volume_Climax_Rev'] = (
+        F('Volume_Climax_Buy') &
+        (df['WT1'] < -30) &
+        (_rec('Bull_Divergence') | _rec('RSI_Bull_Divergence') |
+         _rec('OBV_Div_Buy') | _rec('MF_Bull_Div') | candle_bull)
+    )
+
+    # B8: Ichimoku Breakout — 쿠모 돌파 + CMF + 거래량
+    kumo_top = pd.concat([df.get('Ichimoku_SenkouA', pd.Series(0, index=idx)),
+                           df.get('Ichimoku_SenkouB', pd.Series(0, index=idx))], axis=1).max(axis=1)
+    df['SC_Ichimoku_Breakout'] = (
+        (F('Kumo_Breakout_Bull') | F('TK_Cross_Bull')) &
+        (cmf > 0.05) &
+        vol_15x &
+        (C > kumo_top)
+    )
+
+    # B9: Smart Money Accumulation — MF전환 + CMF + BB하단반등
+    df['SC_Smart_Money_Accum'] = (
+        (F('MF_Cross_Bull') | (_rec('MF_Bull_Div'))) &
+        (cmf > 0) &
+        (F('BB_Lower_Bounce') | (df['Percent_B'] < 0.2)) &
+        (df['WT1'] > df['WT1'].shift(1))  # WT 반등 중
+    )
+
+    # B10: Momentum Ignition Buy — 모멘텀 점화 + ST + ADX
+    df['SC_Momentum_Ignition_Buy'] = (
+        (F('Momentum_Ignition_Buy') | (F('Expansion_BO') & vol_2x)) &
+        (F('SuperTrend_Buy') | (df['ST_Direction'] == 1)) &
+        (df['ADX'] > 20)
+    )
+
+    # ═══════════ SELL 콤보 ═══════════
+
+    # S1: Overbought Exhaustion — StochK>80 + 약세캔들 + 20MA 이탈
+    stoch_overbought = (df['StochK'] > 80) & (df['StochD'] > 80)
+    df['SC_Overbought_Exhaust'] = (
+        stoch_overbought &
+        (candle_bear | _rec('StochRSI_Cross_Sell')) &
+        (_rec('Fell_Below_20MA') | (C < df['MA20'])) &
+        vol_15x
+    )
+
+    # S2: Breakdown Momentum — 확장 붕괴 + 거래량 + 52주 신저가
+    df['SC_Breakdown_Momentum'] = (
+        (F('Expansion_BD') | F('New_52W_Low')) &
+        vol_2x &
+        (F('New_52W_Low') | (L <= L.rolling(60, min_periods=40).min())) &
+        (df['ADX'] > 20)
+    )
+
+    # S3: Rally Failure — 하락추세 + 20MA 저항 + 슈팅스타
+    resistance_at_20 = (C <= df['MA20'] * 1.02) & (C >= df['MA20'] * 0.97)
+    df['SC_Rally_Failure'] = (
+        below_50ma & ma50_falling &
+        (resistance_at_20 | _rec('Fell_Below_20MA')) &
+        (F('Shooting_Star') | F('Doji_Bearish') | F('Outside_Bearish') |
+         F('EMA_Pullback_Sell'))
+    )
+
+    # S4: Triple Overbought Reversal
+    triple_overbought = (
+        ((df['WT1'] > OB1).astype(int) +
+         (df['RSI'] > 65).astype(int) +
+         (df['MFI'] > 65).astype(int) +
+         (df['StochK'] > 80).astype(int)) >= 3
+    )
+    strong_bear_signal = (
+        F('Blood_Diamond') | F('Red_Dot_T1') | F('Evening_Star') |
+        F('Bearish_Engulfing') | F('Bear_Divergence') |
+        F('Parabolic_Top_Sell')
+    )
+    df['SC_Triple_Overbought'] = triple_overbought & (strong_bear_signal | candle_bear)
+
+    # S5: Squeeze Fire Bear
+    df['SC_Squeeze_Fire_Bear'] = (
+        (F('BB_Squeeze_End_Bear') | F('Squeeze_Fire_Sell')) &
+        vol_15x &
+        (_rec('MACD_Cross_Sell') | _rec('MACD_Zero_Cross_Sell') |
+         (df['MACD_Hist'] < 0) & (df['MACD_Hist'] < df['MACD_Hist'].shift(1)))
+    )
+
+    # S6: Trend Breakdown
+    df['SC_Trend_Breakdown'] = (
+        (df['ADX'] > 25) & (df['Minus_DI'] > df['Plus_DI']) &
+        (F('Pullback_123_Bear') | F('NonADX_123_Bear') | F('Boomer_Sell')) &
+        (mf_falling | (rmfi < rmfi.shift(3)))
+    )
+
+    # S7: Volume Climax Sell
+    df['SC_Volume_Climax_Sell'] = (
+        F('Volume_Climax_Sell') &
+        (df['WT1'] > 30) &
+        (_rec('Bear_Divergence') | _rec('RSI_Bear_Divergence') |
+         _rec('OBV_Div_Sell') | _rec('MF_Bear_Div') | candle_bear)
+    )
+
+    # S8: Ichimoku Breakdown
+    kumo_bot = pd.concat([df.get('Ichimoku_SenkouA', pd.Series(0, index=idx)),
+                           df.get('Ichimoku_SenkouB', pd.Series(0, index=idx))], axis=1).min(axis=1)
+    df['SC_Ichimoku_Breakdown'] = (
+        (F('Kumo_Breakout_Bear') | F('TK_Cross_Bear')) &
+        (cmf < -0.05) &
+        vol_15x &
+        (C < kumo_bot)
+    )
+
+    # S9: Distribution Signal
+    df['SC_Distribution'] = (
+        (F('MF_Cross_Bear') | _rec('MF_Bear_Div')) &
+        (cmf < 0) &
+        (df['WT1'] < df['WT1'].shift(1)) &
+        (df['WT1'] > 0)  # 아직 양수 영역 (하락 시작)
+    )
+
+    # S10: Parabolic Exhaustion
+    df['SC_Parabolic_Exhaust'] = (
+        (F('Parabolic_Top_Sell') | ((df['WT1'] > 80) & (df['WT1'] < df['WT1'].shift(1)))) &
+        vol_2x &
+        (df['RSI'] > 65)
+    )
+
+    # ── 쿨다운 적용 ──
+    for combo_name in SCANNER_COMBOS:
+        if combo_name in df.columns:
+            df[combo_name] = _cooldown(df[combo_name], bars=5)
+
+    return df
+
+
+# ──────────────────────────────────────────
+# 📊 차트에 스캐너 콤보 마킹
+# ──────────────────────────────────────────
+def add_scanner_markers_to_chart(fig, dc, row=1):
+    """
+    기존 차트에 스캐너 콤보 마커를 추가합니다.
+    판단 마커와는 별도로, 특별한 모양과 색상으로 표시됩니다.
+    """
+    for combo_name, combo_cfg in SCANNER_COMBOS.items():
+        if combo_name not in dc.columns:
+            continue
+        mask = dc[combo_name].fillna(False)
+        if not mask.any():
+            continue
+
+        sig_rows = dc[mask]
+        is_buy = combo_cfg['dir'] == 'buy'
+
+        # 매수: 캔들 아래, 매도: 캔들 위
+        if is_buy:
+            y_vals = sig_rows['Low'] - sig_rows['ATR'] * 0.5
+        else:
+            y_vals = sig_rows['High'] + sig_rows['ATR'] * 0.5
+
+        # 마커 스타일: Tier 1 = 크고 별 모양, Tier 2 = 중간 다이아몬드
+        tier = combo_cfg.get('tier', 2)
+        if tier == 1:
+            symbol = 'star-diamond'
+            size = 14
+            line_width = 2
+        else:
+            symbol = 'diamond'
+            size = 11
+            line_width = 1.5
+
+        # 호버 텍스트
+        hover_texts = []
+        for idx_v in sig_rows.index:
+            date_str = idx_v.strftime('%Y-%m-%d')
+            hover_texts.append(
+                f"<b>{combo_cfg['icon']} {combo_cfg['name']}</b><br>"
+                f"<span style='color:#94A3B8'>{combo_cfg['desc']}</span><br>"
+                f"<span style='color:#CBD5E1'>{date_str}</span><br>"
+                f"<span style='color:#A5B4FC'>카테고리: {combo_cfg['category']}</span>"
+            )
+
+        fig.add_trace(go.Scatter(
+            x=sig_rows.index,
+            y=y_vals,
+            mode='markers',
+            marker=dict(
+                symbol=symbol,
+                size=size,
+                color=combo_cfg['color'],
+                line=dict(width=line_width, color='#FFFFFF'),
+                opacity=0.9,
+            ),
+            name=f"SC: {combo_cfg['kor']}",
+            text=hover_texts,
+            hovertemplate="%{text}<extra></extra>",
+            hoverlabel=dict(
+                bgcolor='rgba(14,17,23,0.97)',
+                bordercolor=combo_cfg['color'],
+                font=dict(size=11, family='Pretendard', color='#FAFAFA'),
+                align='left',
+            ),
+            legendgroup='scanner',
+            legendgrouptitle_text='🔍 Scanner Combos',
+        ), row=row, col=1)
+
+
+# ──────────────────────────────────────────
+# 🔍 멀티 티커 스캐너
+# ──────────────────────────────────────────
+@st.cache_data(ttl=600, show_spinner=False)
+def scan_ticker(ticker: str, _ts=None) -> Optional[Dict]:
+    """단일 티커 스캔 결과 반환"""
+    try:
+        df = compute_and_cache(ticker, _ts)
+        if df is None or len(df) < 50:
+            return None
+
+        df = detect_scanner_combos(df)
+        lat = df.iloc[-1]
+
+        # 최근 3일 내 활성 콤보 수집
+        active_combos = []
+        for combo_name, combo_cfg in SCANNER_COMBOS.items():
+            if combo_name not in df.columns:
+                continue
+            # 최근 3봉 체크
+            recent = df[combo_name].tail(3)
+            if recent.any():
+                # 가장 최근 발생일
+                last_date = recent[recent].index[-1]
+                days_ago = (df.index[-1] - last_date).days
+                active_combos.append({
+                    'name': combo_cfg['name'],
+                    'kor': combo_cfg['kor'],
+                    'dir': combo_cfg['dir'],
+                    'tier': combo_cfg['tier'],
+                    'icon': combo_cfg['icon'],
+                    'color': combo_cfg['color'],
+                    'desc': combo_cfg['desc'],
+                    'category': combo_cfg['category'],
+                    'days_ago': days_ago,
+                    'date': last_date.strftime('%m/%d'),
+                })
+
+        if not active_combos:
+            return None
+
+        # 기본 메타 수집
+        jd = get_judgment_detail(lat) if 'Trade_Judgment' in df.columns else {}
+
+        return {
+            'ticker': ticker.upper(),
+            'price': float(lat['Close']),
+            'change_pct': float((lat['Close'] - df.iloc[-2]['Close']) / df.iloc[-2]['Close'] * 100) if len(df) >= 2 else 0,
+            'volume_ratio': float(lat['Volume'] / (df['Volume'].rolling(50, min_periods=10).mean().iloc[-1] + 1e-10)),
+            'judgment': jd.get('judgment', 'N/A'),
+            'confidence': jd.get('confidence', 0),
+            'buy_score': jd.get('buy_total', 0),
+            'sell_score': jd.get('sell_total', 0),
+            'active_combos': active_combos,
+            'buy_combos': [c for c in active_combos if c['dir'] == 'buy'],
+            'sell_combos': [c for c in active_combos if c['dir'] == 'sell'],
+            'wt1': float(lat.get('WT1', 0)),
+            'rsi': float(lat.get('RSI', 50)),
+            'adx': float(lat.get('ADX', 0)),
+        }
+    except Exception:
+        return None
+
+
+def scan_multiple_tickers(tickers: List[str], progress_callback=None) -> List[Dict]:
+    """여러 티커를 스캔하여 활성 콤보가 있는 결과만 반환"""
+    results = []
+    total = len(tickers)
+    for i, ticker in enumerate(tickers):
+        if progress_callback:
+            progress_callback(i / total, f"🔍 {ticker} 스캔 중... ({i+1}/{total})")
+        result = scan_ticker(ticker)
+        if result:
+            results.append(result)
+
+    # 콤보 수 + Tier 1 우선으로 정렬
+    results.sort(key=lambda x: (
+        -sum(1 for c in x['active_combos'] if c['tier'] == 1),
+        -len(x['active_combos']),
+    ))
+    return results
+
+
+# ──────────────────────────────────────────
+# 🖥️ 스캐너 UI
+# ──────────────────────────────────────────
+# 기본 워치리스트 (인기 종목)
+DEFAULT_WATCHLIST = {
+    '🔥 인기 대형주': ['NVDA', 'TSLA', 'AAPL', 'MSFT', 'AMZN', 'GOOG', 'META', 'AMD', 'NFLX', 'AVGO'],
+    '📊 ETF': ['QQQ', 'SPY', 'IWM', 'ARKK', 'SOXX', 'XLF', 'XLE', 'XLV', 'XLK', 'TQQQ'],
+    '🚀 성장주': ['PLTR', 'SNOW', 'CRWD', 'DDOG', 'NET', 'SHOP', 'SQ', 'COIN', 'MARA', 'RIOT'],
+    '💊 바이오/헬스': ['MRNA', 'BNTX', 'ISRG', 'DXCM', 'VEEV', 'ZTS', 'REGN', 'VRTX', 'ILMN', 'BIIB'],
+}
+
+
+def render_scanner_page():
+    """스캐너 전용 페이지/탭 렌더"""
+    st.markdown("## 🔍 CipherX Custom Scanner")
+    st.markdown("""<p style='color:#94A3B8;font-size:.9rem'>
+        검증된 고승률 시그널 콤보 20종을 멀티 티커에 실시간 적용합니다.
+        <b>Tier 1</b>(⭐⭐⭐⭐⭐) 콤보가 최우선으로 표시됩니다.</p>""",
+        unsafe_allow_html=True)
+
+    # ── 워치리스트 선택 ──
+    st.markdown("#### 📋 워치리스트 선택")
+    wl_tabs = st.tabs(list(DEFAULT_WATCHLIST.keys()) + ['✏️ 커스텀'])
+
+    selected_tickers = []
+    for i, (wl_name, tickers) in enumerate(DEFAULT_WATCHLIST.items()):
+        with wl_tabs[i]:
+            cols = st.columns(5)
+            for j, t in enumerate(tickers):
+                with cols[j % 5]:
+                    if st.checkbox(t, value=True, key=f"wl_{wl_name}_{t}"):
+                        if t not in selected_tickers:
+                            selected_tickers.append(t)
+
+    with wl_tabs[-1]:
+        custom_input = st.text_input(
+            "티커 입력 (쉼표 구분)",
+            placeholder="NVDA, TSLA, AAPL, ...",
+            key="custom_wl"
+        )
+        if custom_input:
+            for t in custom_input.split(','):
+                t = t.strip().upper()
+                if t and t not in selected_tickers:
+                    selected_tickers.append(t)
+
+    st.markdown(f"**선택된 종목: {len(selected_tickers)}개**")
+
+    # ── 필터 옵션 ──
+    filter_col1, filter_col2, filter_col3 = st.columns(3)
+    with filter_col1:
+        dir_filter = st.selectbox("방향 필터", ['전체', '매수만', '매도만'], key="sc_dir")
+    with filter_col2:
+        tier_filter = st.selectbox("등급 필터", ['전체', 'Tier 1만', 'Tier 2만'], key="sc_tier")
+    with filter_col3:
+        cat_filter = st.selectbox("카테고리", ['전체', '반전', '돌파', '추세 지속', '매집/분배'], key="sc_cat")
+
+    # ── 스캔 실행 ──
+    if st.button("🚀 스캔 시작", type="primary", use_container_width=True):
+        if not selected_tickers:
+            st.warning("종목을 선택해주세요.")
+            return
+
+        pb = st.progress(0, text="스캔 준비 중...")
+        results = scan_multiple_tickers(
+            selected_tickers,
+            progress_callback=lambda p, t: pb.progress(p, text=t)
+        )
+        pb.progress(1.0, text=f"✅ {len(results)}개 종목에서 콤보 발견!")
+        time.sleep(0.5)
+        pb.empty()
+
+        # 필터 적용
+        filtered = results
+        if dir_filter == '매수만':
+            filtered = [r for r in filtered if r['buy_combos']]
+        elif dir_filter == '매도만':
+            filtered = [r for r in filtered if r['sell_combos']]
+
+        if not filtered:
+            st.info("🔍 조건에 맞는 콤보가 발견되지 않았습니다.")
+            return
+
+        # ── 결과 카드 표시 ──
+        st.markdown(f"### 📊 스캔 결과: {len(filtered)}개 종목")
+
+        for result in filtered:
+            ticker = result['ticker']
+            chg = result['change_pct']
+            chg_color = '#34D399' if chg >= 0 else '#F87171'
+            chg_icon = '▲' if chg >= 0 else '▼'
+            j_label = result.get('judgment', 'N/A')
+            conf = result.get('confidence', 0)
+
+            # 콤보 카드
+            buy_combos = result['buy_combos']
+            sell_combos = result['sell_combos']
+
+            # Tier 1 콤보 강조
+            tier1_buy = [c for c in buy_combos if c['tier'] == 1]
+            tier1_sell = [c for c in sell_combos if c['tier'] == 1]
+            has_tier1 = bool(tier1_buy or tier1_sell)
+
+            border_color = '#FFD700' if has_tier1 else '#1C2233'
+            glow = 'box-shadow:0 0 15px rgba(255,215,0,0.15);' if has_tier1 else ''
+
+            # 콤보 HTML
+            combo_html = ""
+            for c in (buy_combos + sell_combos):
+                dot_color = '#34D399' if c['dir'] == 'buy' else '#F87171'
+                tier_badge = '⭐' * (3 - c['tier'] + 1)  # Tier1=⭐⭐⭐, Tier2=⭐⭐
+                combo_html += f"""<div style="display:flex;align-items:center;gap:8px;
+                    padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.03)">
+                    <span style="color:{dot_color};font-size:.9rem">●</span>
+                    <span style="color:#E8ECF1;font-weight:600;font-size:.85rem;flex:1">
+                        {c['icon']} {c['kor']}</span>
+                    <span style="font-size:.7rem">{tier_badge}</span>
+                    <span style="color:#64748B;font-size:.7rem">{c['date']}</span>
+                </div>"""
+
+            st.markdown(f"""<div style="background:linear-gradient(160deg,#0F1320,#141926);
+                border:1px solid {border_color};border-radius:14px;padding:16px 20px;
+                margin:8px 0;{glow}">
+                <div style="display:flex;justify-content:space-between;align-items:center;
+                    margin-bottom:10px">
+                    <div>
+                        <span style="color:#A5B4FC;font-weight:800;font-size:1.2rem">{ticker}</span>
+                        <span style="color:#64748B;font-size:.85rem;margin-left:10px">
+                            ${result['price']:.2f}</span>
+                        <span style="color:{chg_color};font-size:.85rem;margin-left:6px;font-weight:600">
+                            {chg_icon}{abs(chg):.1f}%</span>
+                    </div>
+                    <div style="display:flex;gap:8px;align-items:center">
+                        <span class="indicator-mini {'ind-bullish' if 'BUY' in j_label else ('ind-bearish' if 'SELL' in j_label else 'ind-neutral')}"
+                            style="font-size:.75rem">{j_label} {conf:.0f}%</span>
+                        <span style="color:#FCD34D;font-size:.8rem;font-weight:600">
+                            {len(buy_combos)}B / {len(sell_combos)}S</span>
+                    </div>
+                </div>
+                <div style="margin-top:6px">{combo_html}</div>
+            </div>""", unsafe_allow_html=True)
+
+            # 빠른 분석 버튼
+            if st.button(f"📊 {ticker} 상세 분석", key=f"scan_{ticker}", use_container_width=True):
+                st.session_state['quick_ticker'] = ticker
+
+
+
 # ══════════════════════════════════════════
 #  유틸리티 함수 (⚡ 최적화)
 # ══════════════════════════════════════════
@@ -1666,6 +2408,8 @@ def detect_all_signals(df: pd.DataFrame) -> pd.DataFrame:
     df['_HTF1_Bull'] = htf_ema_bull
     df['_HTF2_Bull'] = htf_ma_bull
 
+    df = detect_scanner_combos(df)
+
     # ═══ 8-Layer 판단 엔진 ═══
     compute_trade_judgment(df)
 
@@ -2712,6 +3456,10 @@ def build_chart(dc, ticker, regime, shield):
             jm = dc['Trade_Judgment'] == j_name
             if jm.any():
                 _hl(fig, jm, dc.index, fill_clr, None, 1)
+
+    # ═══ 🆕 스캐너 콤보 마커 ═══
+    if st.session_state.get('show_scanner_combos', True):
+        add_scanner_markers_to_chart(fig, dc, row=1)
 
     # ═══ Row 2: 거래량 ═══
     br = dc['Close'] < dc['Open']
@@ -3765,6 +4513,71 @@ def render_signals(m):
                     unsafe_allow_html=True)
 
 
+def render_scanner_tab(m):
+    """개별 종목의 스캐너 콤보 결과 표시"""
+    ticker = m['ticker']
+    st.markdown(f"### 🔍 {ticker} 스캐너 콤보")
+    
+    # scan_ticker 결과 가져오기
+    result = scan_ticker(ticker)
+    
+    if not result or not result['active_combos']:
+        st.info("최근 3일 내 활성 스캐너 콤보가 없습니다.")
+        
+        # 콤보 설명 표시
+        with st.expander("📋 사용 가능한 콤보 목록 (20종)", expanded=False):
+            for combo_name, combo_cfg in SCANNER_COMBOS.items():
+                dir_icon = '🟢' if combo_cfg['dir'] == 'buy' else '🔴'
+                tier_stars = '⭐' * (3 - combo_cfg['tier'] + 1)
+                st.markdown(f"""<div style="display:flex;align-items:center;gap:10px;
+                    padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.03)">
+                    <span>{dir_icon} {combo_cfg['icon']}</span>
+                    <span style="color:#E8ECF1;font-weight:600;flex:1">{combo_cfg['kor']}</span>
+                    <span style="color:#94A3B8;font-size:.8rem;flex:2">{combo_cfg['desc']}</span>
+                    <span>{tier_stars}</span>
+                </div>""", unsafe_allow_html=True)
+        return
+    
+    # 활성 콤보 표시
+    buy_combos = result['buy_combos']
+    sell_combos = result['sell_combos']
+    
+    if buy_combos:
+        st.markdown("#### 🟢 매수 콤보")
+        for c in buy_combos:
+            tier_stars = '⭐' * (3 - c['tier'] + 1)
+            st.markdown(f"""<div class="combo-card combo-buy">
+                <div style="display:flex;align-items:center;gap:10px;flex:1">
+                    <span style="font-size:1.2rem">{c['icon']}</span>
+                    <div>
+                        <span style="color:#E8ECF1;font-weight:700">{c['kor']}</span><br>
+                        <span style="color:#94A3B8;font-size:.8rem">{c['desc']}</span>
+                    </div>
+                </div>
+                <div style="text-align:right">
+                    <span style="font-size:.85rem">{tier_stars}</span><br>
+                    <span style="color:#64748B;font-size:.75rem">{c['date']}</span>
+                </div>
+            </div>""", unsafe_allow_html=True)
+    
+    if sell_combos:
+        st.markdown("#### 🔴 매도 콤보")
+        for c in sell_combos:
+            tier_stars = '⭐' * (3 - c['tier'] + 1)
+            st.markdown(f"""<div class="combo-card combo-sell">
+                <div style="display:flex;align-items:center;gap:10px;flex:1">
+                    <span style="font-size:1.2rem">{c['icon']}</span>
+                    <div>
+                        <span style="color:#E8ECF1;font-weight:700">{c['kor']}</span><br>
+                        <span style="color:#94A3B8;font-size:.8rem">{c['desc']}</span>
+                    </div>
+                </div>
+                <div style="text-align:right">
+                    <span style="font-size:.85rem">{tier_stars}</span><br>
+                    <span style="color:#64748B;font-size:.75rem">{c['date']}</span>
+                </div>
+            </div>""", unsafe_allow_html=True)
+
 # ──────────────────────────────────────────
 # 메인 분석 렌더 (🆕 5탭: 선행 지표 탭 추가)
 # ──────────────────────────────────────────
@@ -3775,11 +4588,12 @@ def render_analysis(msg):
         render_speedometer(m)
         render_alerts(m)
     if m or fig:
-        t0, t1, t2, t3, t4 = st.tabs([
+        t0, t1, t2, t3, t4, t5 = st.tabs([
             "🎯 매매 판단",
             "📊 차트",
             "⏳ 선행 지표",
             "🔔 시그널 이력",
+            "🔍 스캐너 콤보",   # 🆕
             "🏢 기업 상세",
         ])
         with t0:
@@ -3801,6 +4615,9 @@ def render_analysis(msg):
             if m:
                 render_signals(m)
         with t4:
+            if m:
+                render_scanner_tab(m)
+        with t5:
             if m:
                 render_company_details(m['ticker'])
 
@@ -3981,6 +4798,13 @@ with st.sidebar:
         st.session_state['enabled_judgments'] = enabled_judgments
         st.caption(f"차트 표시: {len(enabled_judgments)}개 등급")
         st.session_state['enabled_signals'] = set(ALL_CHART_SIGNALS.keys())
+
+        st.markdown("---")
+        st.markdown("**🔍 스캐너 콤보**")
+        _show_scanner = st.checkbox(
+            "차트에 스캐너 콤보 마커 표시",
+            value=True, key="show_sc")
+        st.session_state['show_scanner_combos'] = _show_scanner
 
     st.markdown("---")
 
