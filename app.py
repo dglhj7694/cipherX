@@ -190,6 +190,38 @@ tr:hover td{background:rgba(255,255,255,0.02)!important}
 ::-webkit-scrollbar-track{background:#0B0E14}
 ::-webkit-scrollbar-thumb{background:#2A3040;border-radius:3px}
 ::-webkit-scrollbar-thumb:hover{background:#3D4A5F}
+    div[data-baseweb="select"] ul li{
+        color:#1E293B!important;
+        background-color:#FFFFFF!important}
+    div[data-baseweb="select"] ul li:hover{
+        background-color:#EEF2FF!important;
+        color:#1E293B!important}
+    div[data-baseweb="select"] > div{
+        background-color:#12161F!important;
+        border-color:#2A3040!important;
+        color:#E8ECF1!important}
+    div[data-baseweb="select"] input{
+        color:#E8ECF1!important}
+    div[data-baseweb="select"] svg{
+        fill:#94A3B8!important}
+    div[data-baseweb="popover"] ul{
+        background-color:#FFFFFF!important;
+        border:1px solid #E2E8F0!important;
+        border-radius:10px!important}
+    div[data-baseweb="popover"] li{
+        color:#1E293B!important}
+    div[data-baseweb="popover"] li:hover{
+        background-color:#EEF2FF!important}
+    div[data-testid="stRadio"] label p{
+        color:#CBD5E1!important}
+    div[data-testid="stCheckbox"] label p{
+        color:#CBD5E1!important}
+    div[data-testid="stTextInput"] input{
+        background-color:#12161F!important;
+        border-color:#2A3040!important;
+        color:#E8ECF1!important}
+    div[data-testid="stTextInput"] input::placeholder{
+        color:#64748B!important}
 </style>""", unsafe_allow_html=True)
 
 inject_css()
