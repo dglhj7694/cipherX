@@ -2736,11 +2736,29 @@ def render_analysis(msg):
 # ══════════════════════════════════════════
 #  사이드바 + 세션 + 챗 인터페이스
 # ══════════════════════════════════════════
+# ──────────────────────────────────────────
+# 사이드바 (스캐너 모드 토글 추가)
+# ──────────────────────────────────────────
 with st.sidebar:
-    st.markdown("## 🚦 CipherX"); st.markdown("<p style='color:#888;font-size:.8rem'>AI 퀀트 주가 분석 · v12.1</p>", unsafe_allow_html=True); st.markdown("---")
+    st.markdown("## 🚦 CipherX")
+    st.markdown("<p style='color:#888;font-size:.8rem'>AI 퀀트 주가 분석 · v12.1</p>", unsafe_allow_html=True)
+    st.markdown("---")
+
+    # 🆕 모드 선택
+    st.markdown("### 🔀 모드 선택")
+    app_mode = st.radio(
+        "사용 모드",
+        ['📊 개별 종목 분석', '🔍 다중 종목 스캐너'],
+        index=0, key="app_mode"
+    )
+    st.markdown("---")
+
     st.markdown("### 📅 차트 기간")
-    chart_period = st.radio("표시 기간", ['3개월','6개월','1년','2년'], index=0, horizontal=True, key="period")
-    chart_days = {'3개월':63,'6개월':126,'1년':252,'2년':504}[chart_period]; st.markdown("---")
+    chart_period = st.radio("표시 기간", ['3개월','6개월','1년','2년'],
+                            index=0, horizontal=True, key="period")
+    chart_days = {'3개월':63,'6개월':126,'1년':252,'2년':504}[chart_period]
+    st.markdown("---")
+
     with st.expander("🎛️ 차트 표시 설정", expanded=False):
         _show_strong = st.checkbox("🟢🔴 STRONG", value=True, key="j_strong")
         _show_normal = st.checkbox("🟢🔴 BUY/SELL", value=True, key="j_normal")
@@ -2753,93 +2771,203 @@ with st.sidebar:
         if _show_mixed: enabled_judgments.add('MIXED')
         st.session_state['enabled_judgments'] = enabled_judgments
         st.session_state['enabled_signals'] = set(ALL_CHART_SIGNALS.keys())
-        st.session_state['show_scanner_combos'] = st.checkbox("차트에 스캐너 콤보 표시", value=True, key="show_sc")
+        st.session_state['show_scanner_combos'] = st.checkbox(
+            "차트에 스캐너 콤보 표시", value=True, key="show_sc")
+
     if st.button("🗑️ 대화 내역 지우기", use_container_width=True, type="secondary"):
         for key in ['messages','pending_ai_ticker','pending_ai_prompt','last_ticker']:
-            st.session_state[key] = [{"role":"assistant","type":"text","content":"안녕하세요! 🚦 **CipherX v12.1** 입니다.\n\n분석할 **티커명**을 입력하세요."}] if key == 'messages' else None
+            st.session_state[key] = [{
+                "role":"assistant","type":"text",
+                "content":"안녕하세요! 🚦 **CipherX v12.1** 입니다.\n\n분석할 **티커명**을 입력하세요."
+            }] if key == 'messages' else None
         st.rerun()
 
+
+# ──────────────────────────────────────────
+# 세션 관리
+# ──────────────────────────────────────────
 if 'messages' not in st.session_state:
-    st.session_state.messages = [{"role":"assistant","type":"text","content":"안녕하세요! 🚦 **CipherX v12.1** 입니다.\n\n분석할 **티커명**을 입력하세요."}]
+    st.session_state.messages = [{
+        "role":"assistant","type":"text",
+        "content":"안녕하세요! 🚦 **CipherX v12.1** 입니다.\n\n분석할 **티커명**을 입력하세요."
+    }]
 for key in ['pending_ai_ticker','pending_ai_prompt','last_ticker']:
     if key not in st.session_state: st.session_state[key] = None
-if 'enabled_signals' not in st.session_state: st.session_state['enabled_signals'] = set(ALL_CHART_SIGNALS.keys())
-if 'enabled_judgments' not in st.session_state: st.session_state['enabled_judgments'] = {'STRONG_BUY','BUY','SELL','STRONG_SELL'}
+if 'enabled_signals' not in st.session_state:
+    st.session_state['enabled_signals'] = set(ALL_CHART_SIGNALS.keys())
+if 'enabled_judgments' not in st.session_state:
+    st.session_state['enabled_judgments'] = {'STRONG_BUY','BUY','SELL','STRONG_SELL'}
 
 def _check_query_params():
     try:
-        qp = st.query_params; ticker_from_url = qp.get("ticker", None)
-        if ticker_from_url and st.session_state.last_ticker != ticker_from_url.upper(): return ticker_from_url.upper()
+        qp = st.query_params
+        ticker_from_url = qp.get("ticker", None)
+        if ticker_from_url and st.session_state.last_ticker != ticker_from_url.upper():
+            return ticker_from_url.upper()
     except: pass
     return None
 url_ticker = _check_query_params()
 
-st.markdown("<h2 style='text-align:center;color:#fff;margin-bottom:20px'>🚦 CipherX</h2>", unsafe_allow_html=True)
-if not st.session_state.last_ticker:
-    st.markdown("<p style='text-align:center;color:#888;font-size:0.9rem;'>🔥 추천 주식 빠르게 분석해보기</p>", unsafe_allow_html=True)
-    cols = st.columns(4); quick_tickers = ["NVDA","TSLA","AAPL","QQQ"]
-    for idx_q, col in enumerate(cols):
-        with col:
-            if st.button(f"{quick_tickers[idx_q]}", use_container_width=True): st.session_state['quick_ticker'] = quick_tickers[idx_q]
-    st.markdown("<br>", unsafe_allow_html=True)
 
-for i, msg in enumerate(st.session_state.messages):
-    av = "✨" if msg["role"] == "assistant" else "🧑‍💻"
-    with st.chat_message(msg["role"], avatar=av):
-        if msg.get("type") == "analysis":
-            st.markdown(msg.get("content", "")); render_analysis(msg)
-            if msg.get("prompt"):
-                with st.expander("📝 퀀트 프롬프트 원문 확인", expanded=False):
-                    st.code(msg["prompt"], language="markdown"); st_copy_to_clipboard(msg["prompt"], before_copy_label="📋 복사", after_copy_label="✅ 복사됨!")
-        elif msg.get("type") == "report":
-            with st.expander(f"📊 {msg.get('ticker','')} AI 퀀트 리포트", expanded=True): st.markdown(msg["content"])
-            st.download_button("📥 마크다운 파일 다운로드", key=f"dl_{i}_{msg.get('ticker','RPT')}",
-                data=msg["content"].encode('utf-8'), file_name=f"{msg.get('ticker','RPT').upper()}_Quant_{datetime.now().strftime('%Y%m%d_%H%M')}.md", mime="text/markdown", use_container_width=True)
-        else: st.markdown(msg.get("content", ""))
+# ──────────────────────────────────────────
+# 🆕 모드 분기: 스캐너 vs 개별 분석
+# ──────────────────────────────────────────
+app_mode = st.session_state.get('app_mode', '📊 개별 종목 분석')
 
-def _run_ai():
-    tp = st.session_state.pending_ai_ticker; pp = st.session_state.pending_ai_prompt
-    with st.chat_message("assistant", avatar="✨"):
-        pb = st.progress(0, text="퀀트 엔진 로딩 중...")
-        try:
-            pb.progress(10, text="Gemini 모델 초기화 중..."); model = get_gemini_model()
-            pb.progress(20, text="시장 데이터 취합 중..."); collected_chunks = []
-            def gemini_stream_generator():
-                pb.progress(40, text="🚀 AI 리포트 생성 중...")
-                response = model.generate_content(pp, stream=True); chunk_count = 0
-                for chunk in response:
-                    text = chunk.text
-                    if text:
-                        collected_chunks.append(text); chunk_count += 1; pb.progress(min(40 + chunk_count * 2, 95), text="차트 타점 및 전략 산출 중..."); yield text
-                pb.progress(100, text="✅ 퀀트 분석 완료!")
-            with st.expander(f"📊 {tp.upper()} AI 퀀트 리포트", expanded=True): st.write_stream(gemini_stream_generator())
-            time.sleep(0.3); pb.empty(); full_report = "".join(collected_chunks)
-            st.session_state.messages.append({"role":"assistant","type":"report","ticker":tp.upper(),"content":full_report})
-            st.session_state.pending_ai_ticker = None; st.session_state.pending_ai_prompt = None; st.rerun()
-        except Exception as e: pb.empty(); st.error(f"AI 오류: {e}")
+if app_mode == '🔍 다중 종목 스캐너':
+    # ═══════════════════════════════════
+    #  스캐너 모드
+    # ═══════════════════════════════════
+    st.markdown("<h2 style='text-align:center;color:#fff;margin-bottom:20px'>🔍 CipherX Scanner</h2>",
+                unsafe_allow_html=True)
+    render_scanner_page()
 
-def process_ticker(tv, refresh=False):
-    tv = tv.strip().upper(); st.session_state.pending_ai_ticker = None; st.session_state.pending_ai_prompt = None
-    if not _valid_fmt(tv): st.toast(f"⚠️ **{tv}** — 올바른 형식이 아닙니다.", icon="🚨"); return
-    if not validate_ticker(tv): st.toast(f"⚠️ **{tv}** — 데이터를 찾을 수 없습니다.", icon="🔍"); return
-    st.session_state.messages.append({"role":"user","type":"text","content":tv}); st.session_state.last_ticker = tv
-    try: st.query_params["ticker"] = tv
-    except: pass
-    with st.chat_message("assistant", avatar="✨"):
-        with st.status(f"🌐 {tv} 퀀트 파이프라인 가동 중...", expanded=True) as status:
-            st.write("📡 펀더멘탈/숏 데이터 조회..."); fundamentals = fetch_fundamentals(tv)
-            st.write("📊 기술 지표 + 8-Layer + 선행 지표 계산 중...")
-            fig, phist, meta = analyze(tv, chart_days, refresh)
-            if fig: prompt = build_ai_prompt(tv, phist, fundamentals); status.update(label=f"✅ {tv} 분석 완료!", state="complete", expanded=False)
-            else: prompt = None; status.update(label=f"⚠️ {tv} 실패", state="error", expanded=False)
-        if fig:
-            st.session_state.messages.append({"role":"assistant","type":"analysis","ticker":tv,"content":f"✅ **{tv}** 분석 완료.","fig":fig,"meta":meta,"prompt":prompt})
-            st.session_state.pending_ai_ticker = tv; st.session_state.pending_ai_prompt = prompt; st.rerun()
-        else:
-            st.session_state.messages.append({"role":"assistant","type":"text","content":f"⚠️ **{tv}** 분석 실패: {phist}"}); st.rerun()
+    # 스캐너에서 종목 클릭 시 → 개별 분석으로 전환
+    if st.session_state.get('quick_ticker'):
+        qt = st.session_state.pop('quick_ticker')
+        # 모드를 개별 분석으로 전환
+        st.session_state['app_mode'] = '📊 개별 종목 분석'
+        st.session_state['_auto_ticker'] = qt
+        st.rerun()
 
-if url_ticker and 'url_loaded' not in st.session_state: st.session_state['url_loaded'] = True; process_ticker(url_ticker)
-if st.session_state.get('quick_ticker'): qt = st.session_state.pop('quick_ticker'); process_ticker(qt)
-if st.session_state.pending_ai_ticker and st.session_state.pending_ai_prompt:
-    if st.button(f"🚀 {st.session_state.pending_ai_ticker.upper()} AI 심층 퀀트 분석 시작", type="primary", use_container_width=True): _run_ai()
-if ticker_input := st.chat_input("미국 주식 티커를 입력하세요 (예: TSLA, AAPL, QQQ)"): process_ticker(ticker_input)
+else:
+    # ═══════════════════════════════════
+    #  개별 종목 분석 모드 (기존 챗 인터페이스)
+    # ═══════════════════════════════════
+    st.markdown("<h2 style='text-align:center;color:#fff;margin-bottom:20px'>🚦 CipherX</h2>",
+                unsafe_allow_html=True)
+
+    if not st.session_state.last_ticker:
+        st.markdown("<p style='text-align:center;color:#888;font-size:0.9rem;'>"
+                    "🔥 추천 주식 빠르게 분석해보기</p>", unsafe_allow_html=True)
+        cols = st.columns(4)
+        quick_tickers = ["NVDA","TSLA","AAPL","QQQ"]
+        for idx_q, col in enumerate(cols):
+            with col:
+                if st.button(f"{quick_tickers[idx_q]}", use_container_width=True):
+                    st.session_state['quick_ticker'] = quick_tickers[idx_q]
+        st.markdown("<br>", unsafe_allow_html=True)
+
+    # 챗 메시지 렌더
+    for i, msg in enumerate(st.session_state.messages):
+        av = "✨" if msg["role"] == "assistant" else "🧑‍💻"
+        with st.chat_message(msg["role"], avatar=av):
+            if msg.get("type") == "analysis":
+                st.markdown(msg.get("content", ""))
+                render_analysis(msg)
+                if msg.get("prompt"):
+                    with st.expander("📝 퀀트 프롬프트 원문 확인", expanded=False):
+                        st.code(msg["prompt"], language="markdown")
+                        st_copy_to_clipboard(msg["prompt"],
+                                            before_copy_label="📋 복사",
+                                            after_copy_label="✅ 복사됨!")
+            elif msg.get("type") == "report":
+                with st.expander(f"📊 {msg.get('ticker','')} AI 퀀트 리포트", expanded=True):
+                    st.markdown(msg["content"])
+                st.download_button(
+                    "📥 마크다운 파일 다운로드",
+                    key=f"dl_{i}_{msg.get('ticker','RPT')}",
+                    data=msg["content"].encode('utf-8'),
+                    file_name=f"{msg.get('ticker','RPT').upper()}_Quant_{datetime.now().strftime('%Y%m%d_%H%M')}.md",
+                    mime="text/markdown", use_container_width=True)
+            else:
+                st.markdown(msg.get("content", ""))
+
+    # AI 실행
+    def _run_ai():
+        tp = st.session_state.pending_ai_ticker
+        pp = st.session_state.pending_ai_prompt
+        with st.chat_message("assistant", avatar="✨"):
+            pb = st.progress(0, text="퀀트 엔진 로딩 중...")
+            try:
+                pb.progress(10, text="Gemini 모델 초기화 중...")
+                model = get_gemini_model()
+                pb.progress(20, text="시장 데이터 취합 중...")
+                collected_chunks = []
+                def gemini_stream_generator():
+                    pb.progress(40, text="🚀 AI 리포트 생성 중...")
+                    response = model.generate_content(pp, stream=True)
+                    chunk_count = 0
+                    for chunk in response:
+                        text = chunk.text
+                        if text:
+                            collected_chunks.append(text)
+                            chunk_count += 1
+                            pb.progress(min(40 + chunk_count * 2, 95),
+                                       text="차트 타점 및 전략 산출 중...")
+                            yield text
+                    pb.progress(100, text="✅ 퀀트 분석 완료!")
+                with st.expander(f"📊 {tp.upper()} AI 퀀트 리포트", expanded=True):
+                    st.write_stream(gemini_stream_generator())
+                time.sleep(0.3); pb.empty()
+                full_report = "".join(collected_chunks)
+                st.session_state.messages.append({
+                    "role":"assistant","type":"report",
+                    "ticker":tp.upper(),"content":full_report})
+                st.session_state.pending_ai_ticker = None
+                st.session_state.pending_ai_prompt = None
+                st.rerun()
+            except Exception as e:
+                pb.empty(); st.error(f"AI 오류: {e}")
+
+    # 티커 처리
+    def process_ticker(tv, refresh=False):
+        tv = tv.strip().upper()
+        st.session_state.pending_ai_ticker = None
+        st.session_state.pending_ai_prompt = None
+        if not _valid_fmt(tv):
+            st.toast(f"⚠️ **{tv}** — 올바른 형식이 아닙니다.", icon="🚨"); return
+        if not validate_ticker(tv):
+            st.toast(f"⚠️ **{tv}** — 데이터를 찾을 수 없습니다.", icon="🔍"); return
+        st.session_state.messages.append({"role":"user","type":"text","content":tv})
+        st.session_state.last_ticker = tv
+        try: st.query_params["ticker"] = tv
+        except: pass
+        with st.chat_message("assistant", avatar="✨"):
+            with st.status(f"🌐 {tv} 퀀트 파이프라인 가동 중...", expanded=True) as status:
+                st.write("📡 펀더멘탈/숏 데이터 조회...")
+                fundamentals = fetch_fundamentals(tv)
+                st.write("📊 기술 지표 + 8-Layer + 선행 지표 계산 중...")
+                fig, phist, meta = analyze(tv, chart_days, refresh)
+                if fig:
+                    prompt = build_ai_prompt(tv, phist, fundamentals)
+                    status.update(label=f"✅ {tv} 분석 완료!", state="complete", expanded=False)
+                else:
+                    prompt = None
+                    status.update(label=f"⚠️ {tv} 실패", state="error", expanded=False)
+            if fig:
+                st.session_state.messages.append({
+                    "role":"assistant","type":"analysis","ticker":tv,
+                    "content":f"✅ **{tv}** 분석 완료.",
+                    "fig":fig,"meta":meta,"prompt":prompt})
+                st.session_state.pending_ai_ticker = tv
+                st.session_state.pending_ai_prompt = prompt
+                st.rerun()
+            else:
+                st.session_state.messages.append({
+                    "role":"assistant","type":"text",
+                    "content":f"⚠️ **{tv}** 분석 실패: {phist}"})
+                st.rerun()
+
+    # 실행 트리거
+    if url_ticker and 'url_loaded' not in st.session_state:
+        st.session_state['url_loaded'] = True
+        process_ticker(url_ticker)
+
+    # 스캐너에서 넘어온 자동 티커
+    if st.session_state.get('_auto_ticker'):
+        at = st.session_state.pop('_auto_ticker')
+        process_ticker(at)
+
+    if st.session_state.get('quick_ticker'):
+        qt = st.session_state.pop('quick_ticker')
+        process_ticker(qt)
+
+    if st.session_state.pending_ai_ticker and st.session_state.pending_ai_prompt:
+        if st.button(
+            f"🚀 {st.session_state.pending_ai_ticker.upper()} AI 심층 퀀트 분석 시작",
+            type="primary", use_container_width=True):
+            _run_ai()
+
+    if ticker_input := st.chat_input("미국 주식 티커를 입력하세요 (예: TSLA, AAPL, QQQ)"):
+        process_ticker(ticker_input)
