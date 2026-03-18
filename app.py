@@ -1548,8 +1548,15 @@ def compute_trade_judgment(df):
     # ═══ Adaptive Weighting (매수/매도 분리) ═══
     bw, sw = _compute_regime_weights(df)
     names = ['Trend','Momentum','Candle','BB','Volume','MF','Pattern','Anticipation']
-    df['Buy_Total'] = sum(df[f'BJ_{n}']*bw[n] for n in names)
-    df['Sell_Total'] = sum(df[f'SJ_{n}']*sw[n] for n in names)
+
+    # 1. 개별 레이어에 가중치를 먼저 적용하여 덮어쓰기
+    for n in names:
+        df[f'BJ_{n}'] = df[f'BJ_{n}'] * bw[n]
+        df[f'SJ_{n}'] = df[f'SJ_{n}'] * sw[n]
+
+    # 2. 이미 가중치가 적용된 컬럼들을 단순 합산
+    df['Buy_Total'] = sum(df[f'BJ_{n}'] for n in names)
+    df['Sell_Total'] = sum(df[f'SJ_{n}'] for n in names)
 
     # 콤보 보너스
     detect_combos(df, vol_ratio)
@@ -1880,12 +1887,11 @@ def build_chart(dc, ticker, regime, shield):
         sz=sc['sz'] if sn in tier_a else max(sc['sz']-3,6)
         op=0.95 if sn in tier_a else 0.75
         lw=1.5 if sn in tier_a else 1
+        tier_prefix = "⭐" if sn in tier_a else "📊"
         fig.add_trace(go.Scatter(x=sr.index,y=yv,mode='markers',
             marker=dict(symbol=sc['sym'],size=sz,color=sc['clr'],line=dict(width=lw,color='#FFF' if sn in tier_a else sc['clr']),opacity=op),
-            name=f"{sc['icon']} {sc['kor']}",text=ht,hovertemplate="%{text}<extra></extra>",
-            hoverlabel=dict(bgcolor='rgba(10,13,20,0.97)',bordercolor=sc['clr'],font=dict(size=11,family='Pretendard',color='#FAFAFA'),align='left'),
-            legendgroup='tier_a' if sn in tier_a else 'tier_b',
-            legendgrouptitle_text='⭐ 핵심' if sn in tier_a else '📊 보조'),row=1,col=1)
+            name=f"{tier_prefix} {sc['icon']} {sc['kor']}",text=ht,hovertemplate="%{text}<extra></extra>",
+            hoverlabel=dict(bgcolor='rgba(10,13,20,0.97)',bordercolor=sc['clr'],font=dict(size=11,family='Pretendard',color='#FAFAFA'),align='left')),row=1,col=1)
 
     # Row 2-7
     br=dc['Close']<dc['Open']
@@ -1926,7 +1932,7 @@ def build_chart(dc, ticker, regime, shield):
         margin=dict(l=2, r=2, t=40, b=2),
         height=1400,
         showlegend=True,
-        hovermode="x unified",
+        hovermode="closest",
         hoverlabel=dict(
             bgcolor="rgba(14,17,23,0.95)",
             font_size=12,
