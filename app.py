@@ -1,18 +1,6 @@
 # ══════════════════════════════════════════════════════════════
 #  CipherX V12.2 — Regime-Aware Judgment Architecture
 #  FULL INTEGRATED CODE
-#
-#  V12.1→V12.2 변경사항:
-#    [핵심] 5단계 시장 국면 인식 (Regime Detector)
-#    [핵심] 매수/매도 분리 Adaptive Weighting
-#    [핵심] Momentum 레이어 국면별 해석
-#    [핵심] Proximity 국면별 할인
-#    [핵심] Bias 추세 맥락 반영
-#    [차트] Tier A/B/C 시그널 필터링 + 리치 호버
-#    [시그널] 캔들 거래량 필터, Engulfing 추세 맥락
-#    [시그널] VP VAH/VAL, 7일 연속, NR7/3일 제거
-#    [엔진] TR 1회 계산, Time Decay, MTF 보정
-#    [엔진] 다차원 Confidence
 # ══════════════════════════════════════════════════════════════
 
 import streamlit as st
@@ -1560,30 +1548,38 @@ def compute_trade_judgment(df):
 
     # 콤보 보너스
     detect_combos(df, vol_ratio)
-    bcb=pd.Series(0.0,index=idx); scb=pd.Series(0.0,index=idx)
-    for col,(nm,d,t) in COMBO_MAP.items():
+    bcb = pd.Series(0.0, index=idx); scb = pd.Series(0.0, index=idx)
+    for col, (nm, d, t) in COMBO_MAP.items():
         if col not in df.columns: continue
-        bonus={1:JT.COMBO_TIER1_BONUS,2:JT.COMBO_TIER2_BONUS,3:JT.COMBO_TIER3_BONUS}.get(t,JT.COMBO_TIER3_BONUS)
-        if d=='buy': bcb+=np.where(df[col],bonus,0.0)
-        else: scb+=np.where(df[col],bonus,0.0)
-    df['Buy_Total']+=bcb; df['Sell_Total']+=scb
+        bonus = {1: JT.COMBO_TIER1_BONUS, 2: JT.COMBO_TIER2_BONUS, 3: JT.COMBO_TIER3_BONUS}.get(t, JT.COMBO_TIER3_BONUS)
+        if d == 'buy': bcb += np.where(df[col], bonus, 0.0)
+        else: scb += np.where(df[col], bonus, 0.0)
+    df['Buy_Combo_Bonus'] = bcb          # ← 새로 저장
+    df['Sell_Combo_Bonus'] = scb          # ← 새로 저장
+    df['Buy_Total'] += bcb; df['Sell_Total'] += scb
 
-    # MTF 보정
-    wts=df.get('Weekly_Trend_Score',pd.Series(0,index=idx))
-    wbu=wts>=JT.WEEKLY_BULL_THRESH; wbe=wts<=JT.WEEKLY_BEAR_THRESH
-    df['Buy_Total']+=np.where(wbu,JT.MTF_BONUS,np.where(wbe,JT.MTF_PENALTY,0))
-    df['Sell_Total']+=np.where(wbe,JT.MTF_BONUS,np.where(wbu,JT.MTF_PENALTY,0))
+    # ═══ MTF 보정 (저장) ═══
+    wts = df.get('Weekly_Trend_Score', pd.Series(0, index=idx))
+    wbu = wts >= JT.WEEKLY_BULL_THRESH; wbe = wts <= JT.WEEKLY_BEAR_THRESH
+    buy_mtf = np.where(wbu, JT.MTF_BONUS, np.where(wbe, JT.MTF_PENALTY, 0)).astype(float)
+    sell_mtf = np.where(wbe, JT.MTF_BONUS, np.where(wbu, JT.MTF_PENALTY, 0)).astype(float)
+    df['Buy_MTF_Adj'] = buy_mtf           # ← 새로 저장
+    df['Sell_MTF_Adj'] = sell_mtf          # ← 새로 저장
+    df['Buy_Total'] += buy_mtf; df['Sell_Total'] += sell_mtf
 
-    # Vol Shock
-    am5=atr.rolling(5,min_periods=3).mean(); asp=atr/(am5+1e-10)
-    vsd=(asp>=JT.ATR_SPIKE_THRESH)&(C<C.shift(1))&(C<O)
-    vsu=(asp>=JT.ATR_SPIKE_THRESH)&(C>C.shift(1))&(C>O)
-    ssk=_vectorized_streak(asp>=JT.ATR_SPIKE_MILD); severe=ssk>=JT.SHOCK_SEVERE_STREAK
-    bpen=np.where(vsd&severe,-8.0,np.where(vsd,-5.0,np.where((asp>=JT.ATR_SPIKE_MILD)&(C<O),-2.0,0)))
-    spen=np.where(vsu&severe,-5.0,np.where(vsu,-3.0,0))
-    df['Buy_Total']+=bpen; df['Sell_Total']+=spen
-    df['Buy_Total']=df['Buy_Total'].clip(lower=0); df['Sell_Total']=df['Sell_Total'].clip(lower=0)
-    df['ATR_Spike']=asp; df['Vol_Shock_Active']=vsd|vsu
+    # ═══ Vol Shock (저장) ═══
+    am5 = atr.rolling(5, min_periods=3).mean(); asp = atr / (am5 + 1e-10)
+    vsd = (asp >= JT.ATR_SPIKE_THRESH) & (C < C.shift(1)) & (C < O)
+    vsu = (asp >= JT.ATR_SPIKE_THRESH) & (C > C.shift(1)) & (C > O)
+    ssk = _vectorized_streak(asp >= JT.ATR_SPIKE_MILD); severe = ssk >= JT.SHOCK_SEVERE_STREAK
+    bpen = np.where(vsd & severe, -8.0, np.where(vsd, -5.0, np.where((asp >= JT.ATR_SPIKE_MILD) & (C < O), -2.0, 0))).astype(float)
+    spen = np.where(vsu & severe, -5.0, np.where(vsu, -3.0, 0)).astype(float)
+    df['Buy_VolShock_Adj'] = bpen          # ← 새로 저장
+    df['Sell_VolShock_Adj'] = spen         # ← 새로 저장
+    df['Buy_Total'] += bpen; df['Sell_Total'] += spen
+    df['Buy_Total'] = df['Buy_Total'].clip(lower=0)
+    df['Sell_Total'] = df['Sell_Total'].clip(lower=0)
+    df['ATR_Spike'] = asp; df['Vol_Shock_Active'] = vsd | vsu
 
     # 활성 레이어
     bln=['BJ_Trend','BJ_Momentum','BJ_Candle','BJ_BB','BJ_Volume','BJ_MF','BJ_Pattern','BJ_Anticipation']
@@ -1618,17 +1614,38 @@ def compute_trade_judgment(df):
 #  판단 상세 + Bias
 # ══════════════════════════════════════════
 def get_judgment_detail(row):
-    ln=['Trend','Momentum','Candle','BB','Volume','MF','Pattern','Anticipation']
-    bl={n:float(row.get(f'BJ_{n}',0)) for n in ln}; sl={n:float(row.get(f'SJ_{n}',0)) for n in ln}
-    combos=[{'name':nm,'dir':d,'tier':t} for col,(nm,d,t) in COMBO_MAP.items() if row.get(col,False)]
-    return {'judgment':str(row.get('Trade_Judgment','NEUTRAL')),'confidence':float(row.get('Judgment_Confidence',0)),
-        'buy_total':float(row.get('Buy_Total',0)),'sell_total':float(row.get('Sell_Total',0)),
-        'buy_layers':bl,'sell_layers':sl,'buy_active':int(row.get('Buy_Active_Layers',0)),
-        'sell_active':int(row.get('Sell_Active_Layers',0)),'active_combos':combos,
-        'net':float(row.get('Buy_Total',0))-float(row.get('Sell_Total',0)),
-        'setup_pressure_buy':float(row.get('Setup_Pressure_Buy',0)),
-        'setup_pressure_sell':float(row.get('Setup_Pressure_Sell',0)),
-        'composite_accel':float(row.get('Composite_Accel',0))}
+    ln = ['Trend', 'Momentum', 'Candle', 'BB', 'Volume', 'MF', 'Pattern', 'Anticipation']
+    bl = {n: float(row.get(f'BJ_{n}', 0)) for n in ln}
+    sl = {n: float(row.get(f'SJ_{n}', 0)) for n in ln}
+    combos = [{'name': nm, 'dir': d, 'tier': t} for col, (nm, d, t) in COMBO_MAP.items() if row.get(col, False)]
+
+    # 보정 항목
+    buy_adj = {
+        'Combo': float(row.get('Buy_Combo_Bonus', 0)),
+        'MTF': float(row.get('Buy_MTF_Adj', 0)),
+        'VolShock': float(row.get('Buy_VolShock_Adj', 0)),
+    }
+    sell_adj = {
+        'Combo': float(row.get('Sell_Combo_Bonus', 0)),
+        'MTF': float(row.get('Sell_MTF_Adj', 0)),
+        'VolShock': float(row.get('Sell_VolShock_Adj', 0)),
+    }
+
+    return {
+        'judgment': str(row.get('Trade_Judgment', 'NEUTRAL')),
+        'confidence': float(row.get('Judgment_Confidence', 0)),
+        'buy_total': float(row.get('Buy_Total', 0)),
+        'sell_total': float(row.get('Sell_Total', 0)),
+        'buy_layers': bl, 'sell_layers': sl,
+        'buy_adjustments': buy_adj, 'sell_adjustments': sell_adj,     # ← 추가
+        'buy_active': int(row.get('Buy_Active_Layers', 0)),
+        'sell_active': int(row.get('Sell_Active_Layers', 0)),
+        'active_combos': combos,
+        'net': float(row.get('Buy_Total', 0)) - float(row.get('Sell_Total', 0)),
+        'setup_pressure_buy': float(row.get('Setup_Pressure_Buy', 0)),
+        'setup_pressure_sell': float(row.get('Setup_Pressure_Sell', 0)),
+        'composite_accel': float(row.get('Composite_Accel', 0)),
+    }
 
 def compute_bias(meta, htf1, htf2):
     sc=0.0; wt1=meta.get('wt1',0); rsi=meta.get('rsi',50); mfi=meta.get('mfi',50)
@@ -2143,13 +2160,13 @@ def build_speedometer_gauges(meta):
 #  UI 렌더
 # ══════════════════════════════════════════
 def render_judgment(meta):
-    jd=meta.get('judgment_detail')
+    jd = meta.get('judgment_detail')
     if not jd: return
-    j=jd['judgment']; bt=jd['buy_total']; st_=jd['sell_total']; net=bt-st_; cf=jd.get('confidence',0)
-    cc='judgment-card-buy' if 'BUY' in j else ('judgment-card-sell' if 'SELL' in j else 'judgment-card-neutral')
-    jl,jc,_=JUDGMENT_CONFIG.get(j,('⚪ NEUTRAL','#64748B',''))
-    nc='#34D399' if net>0 else ('#F87171' if net<0 else '#FCD34D')
-    cbc=jc if cf>=60 else ('#FCD34D' if cf>=30 else '#475569')
+    j = jd['judgment']; bt = jd['buy_total']; st_ = jd['sell_total']; net = bt - st_; cf = jd.get('confidence', 0)
+    cc = 'judgment-card-buy' if 'BUY' in j else ('judgment-card-sell' if 'SELL' in j else 'judgment-card-neutral')
+    jl, jc, _ = JUDGMENT_CONFIG.get(j, ('⚪ NEUTRAL', '#64748B', ''))
+    nc = '#34D399' if net > 0 else ('#F87171' if net < 0 else '#FCD34D')
+    cbc = jc if cf >= 60 else ('#FCD34D' if cf >= 30 else '#475569')
     st.markdown(f"""<div class="judgment-card {cc}">
         <p style="font-size:2rem;font-weight:800;color:{jc};margin:0">{jl}</p>
         <div style="display:flex;align-items:center;gap:10px;justify-content:center;margin-top:8px">
@@ -2159,12 +2176,13 @@ def render_judgment(meta):
         <div style="display:flex;justify-content:center;gap:32px;margin-top:14px">
             <div><p style="color:#64748B;font-size:.7rem;margin:0">BUY</p><p style="color:#34D399;font-size:1.4rem;font-weight:800;margin:2px 0">{bt:.1f}</p></div>
             <div style="border-left:1px solid rgba(255,255,255,0.08);padding-left:32px"><p style="color:#64748B;font-size:.7rem;margin:0">SELL</p><p style="color:#F87171;font-size:1.4rem;font-weight:800;margin:2px 0">{st_:.1f}</p></div>
-            <div style="border-left:1px solid rgba(255,255,255,0.08);padding-left:32px"><p style="color:#64748B;font-size:.7rem;margin:0">NET</p><p style="color:{nc};font-size:1.4rem;font-weight:800;margin:2px 0">{net:+.1f}</p></div></div></div>""",unsafe_allow_html=True)
+            <div style="border-left:1px solid rgba(255,255,255,0.08);padding-left:32px"><p style="color:#64748B;font-size:.7rem;margin:0">NET</p><p style="color:{nc};font-size:1.4rem;font-weight:800;margin:2px 0">{net:+.1f}</p></div></div></div>""", unsafe_allow_html=True)
+
     # 국면 표시
-    rg=meta.get('regime',0); rgs=meta.get('regime_score',0)
-    rgl={2:'🟢🟢 STRONG UPTREND',1:'🟢 UPTREND',0:'⚪ RANGING',-1:'🔴 DOWNTREND',-2:'🔴🔴 STRONG DOWNTREND'}.get(rg,'?')
-    rgc='#34D399' if rg>=1 else ('#F87171' if rg<=-1 else '#FCD34D')
-    st.markdown(f"<div style='text-align:center;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);margin:6px 0'><span style='color:{rgc};font-weight:700'>국면: {rgl} ({rgs:+.1f})</span></div>",unsafe_allow_html=True)
+    rg = meta.get('regime', 0); rgs = meta.get('regime_score', 0)
+    rgl = {2: '🟢🟢 STRONG UPTREND', 1: '🟢 UPTREND', 0: '⚪ RANGING', -1: '🔴 DOWNTREND', -2: '🔴🔴 STRONG DOWNTREND'}.get(rg, '?')
+    rgc = '#34D399' if rg >= 1 else ('#F87171' if rg <= -1 else '#FCD34D')
+    st.markdown(f"<div style='text-align:center;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);margin:6px 0'><span style='color:{rgc};font-weight:700'>국면: {rgl} ({rgs:+.1f})</span></div>", unsafe_allow_html=True)
     combos=jd.get('active_combos',[])
     st.markdown("#### 🔥 활성 콤보")
     if combos:
