@@ -1029,13 +1029,13 @@ def scan_ticker(ticker: str, _ts=None) -> Optional[Dict]:
         df = detect_scanner_combos(df)
         lat = df.iloc[-1]
 
-        # 최근 3일 내 활성 콤보 수집
+        # 최근 5일 내 활성 콤보 수집
         active_combos = []
         for combo_name, combo_cfg in SCANNER_COMBOS.items():
             if combo_name not in df.columns:
                 continue
-            # 최근 3봉 체크
-            recent = df[combo_name].tail(3)
+            # 최근 53봉 체크
+            recent = df[combo_name].tail(5)
             if recent.any():
                 # 가장 최근 발생일
                 last_date = recent[recent].index[-1]
@@ -4522,7 +4522,7 @@ def render_scanner_tab(m):
     result = scan_ticker(ticker)
     
     if not result or not result['active_combos']:
-        st.info("최근 3일 내 활성 스캐너 콤보가 없습니다.")
+        st.info("최근 5일 내 활성 스캐너 콤보가 없습니다.")
         
         # 콤보 설명 표시
         with st.expander("📋 사용 가능한 콤보 목록 (20종)", expanded=False):
