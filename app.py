@@ -4766,7 +4766,7 @@ def render_anticipation_tab(m):
 
 
 # ──────────────────────────────────────────
-# 사이드바 (🆕 선행 지표 토글 + 디버그 확장)
+# 사이드바 (🆕 선행 지표 토글)
 # ──────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 🚦 CipherX")
@@ -4806,18 +4806,6 @@ with st.sidebar:
             value=True, key="show_sc")
         st.session_state['show_scanner_combos'] = _show_scanner
 
-    st.markdown("---")
-
-    with st.expander("🔍 디버그", expanded=False):
-        st.caption(f"시그널 총 수: {len(SIGNAL_REGISTRY)} + {len(COMPOSITE_SIGNALS)} composite")
-        st.caption(f"콤보 총 수: {len(COMBO_MAP)}")
-        st.caption(f"판단 레이어: {NUM_LAYERS} (🆕 +Anticipation)")
-        st.caption(f"STRONG BUY 기준: ≥{JT.STRONG_BUY_SCORE}, {JT.STRONG_BUY_LAYERS}층+")
-        st.caption(f"SELL 비대칭: ×{JT.SELL_ASYMMETRY}")
-        st.caption(f"콤보 Tier1/2/3 보너스: {JT.COMBO_TIER1_BONUS}/{JT.COMBO_TIER2_BONUS}/{JT.COMBO_TIER3_BONUS}")
-        st.caption(f"CROSS_SIGNAL_CAP: {JT.CROSS_SIGNAL_CAP}")
-        st.caption(f"모멘텀 가속 임계: Strong={JT.ACCEL_STRONG}, Mod={JT.ACCEL_MODERATE}")
-
     if st.button("🗑️ 대화 내역 지우기", use_container_width=True, type="secondary"):
         for key in ['messages', 'pending_ai_ticker', 'pending_ai_prompt', 'last_ticker']:
             if key == 'messages':
@@ -4837,11 +4825,7 @@ if 'messages' not in st.session_state:
     st.session_state.messages = [{
         "role": "assistant", "type": "text",
         "content": ("안녕하세요! 🚦 **CipherX v12.0** 입니다.\n\n"
-                    "분석할 **티커명**을 입력하세요. 채팅처럼 이어서 여러 종목을 검색할 수 있습니다.\n\n"
-                    "🆕 **V12.0 신규 기능:**\n"
-                    "- ⏳ **선행 지표** — 모멘텀 가속도, 셋업 축적, WT 수렴 속도\n"
-                    "- 📊 **8-Layer 판단** — Anticipation 레이어 추가\n"
-                    "- 📈 **확신도** — 판단과 함께 0~99% 확신도 표시")
+                    "분석할 **티커명**을 입력하세요. 채팅처럼 이어서 여러 종목을 검색할 수 있습니다.\n\n")
     }]
 for key in ['pending_ai_ticker', 'pending_ai_prompt', 'last_ticker']:
     if key not in st.session_state:
