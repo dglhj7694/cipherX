@@ -2243,11 +2243,11 @@ def render_analysis(msg):
     m,fig=msg.get('meta'),msg.get('fig')
     if m: render_price_header(m); st.plotly_chart(build_speedometer_gauges(m),use_container_width=True,theme=None,config={'displayModeBar':False}); render_alerts(m)
     if m or fig:
-        t0,t1,t2,t3,t4=st.tabs(["🎯 매매판단","📊 차트","🔔 시그널","⏳ 선행지표","🏢 기업상세"])
+        t0,t1,t2,t3,t4=st.tabs(["차트","매매판단","시그널","선행지표","기업상세"])
         with t0:
-            if m: render_judgment(m)
-        with t1:
             if fig: st.plotly_chart(fig,use_container_width=True,theme=None,config={'displaylogo':False,'modeBarButtonsToRemove':['lasso2d','select2d']})
+        with t1:
+            if m: render_judgment(m)
         with t2:
             if m: render_signals(m)
         with t3:
