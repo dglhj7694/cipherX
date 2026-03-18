@@ -2184,15 +2184,16 @@ def render_scanner_page():
     st.markdown("## 🔍 CipherX Custom Scanner")
     st.markdown("<p style='color:#94A3B8;font-size:.9rem'>검증된 고승률 시그널 콤보 20종을 멀티 티커에 실시간 적용합니다.</p>", unsafe_allow_html=True)
     st.markdown("#### 📋 워치리스트 선택")
-    wl_tabs = st.tabs(list(DEFAULT_WATCHLIST.keys()) + ['✏️ 커스텀'])
+    # wl_tabs = st.tabs(list(DEFAULT_WATCHLIST.keys()) + ['✏️ 커스텀'])
+    wl_tabs = st.tabs(['✏️ 커스텀'])
     selected_tickers = []
-    for i, (wl_name, tickers) in enumerate(DEFAULT_WATCHLIST.items()):
-        with wl_tabs[i]:
-            cols = st.columns(5)
-            for j, t in enumerate(tickers):
-                with cols[j % 5]:
-                    if st.checkbox(t, value=True, key=f"wl_{wl_name}_{t}"):
-                        if t not in selected_tickers: selected_tickers.append(t)
+    # for i, (wl_name, tickers) in enumerate(DEFAULT_WATCHLIST.items()):
+    #     with wl_tabs[i]:
+    #         cols = st.columns(5)
+    #         for j, t in enumerate(tickers):
+    #             with cols[j % 5]:
+    #                 if st.checkbox(t, value=True, key=f"wl_{wl_name}_{t}"):
+    #                     if t not in selected_tickers: selected_tickers.append(t)
     with wl_tabs[-1]:
         custom_input = st.text_input("티커 입력 (쉼표 구분)", placeholder="NVDA, TSLA, AAPL, ...", key="custom_wl")
         if custom_input:
