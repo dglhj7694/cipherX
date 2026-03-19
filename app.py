@@ -290,6 +290,38 @@ SIGNAL_REGISTRY = {
     'Relative_Strength_Sell':_sig(1.5,_S,'🐌','RS▼','star-diamond',11,'#FF6E40','High',1.5,'상대약세매도','SPY대비약세'),
 }
 
+SIGNAL_REGISTRY.update({
+    # ═══ UT Bot Alerts (2개) ═══
+    'UTBot_Buy': _sig(2.0, _B, '🤖', 'UTBot▲', 'triangle-up', 13, '#00E676', 'Low', -2.0,
+        'UT봇 매수', 'ATR트레일링스탑 매도→매수 전환'),
+    'UTBot_Sell': _sig(2.0, _S, '🤖', 'UTBot▼', 'triangle-down', 13, '#FF1744', 'High', 2.0,
+        'UT봇 매도', 'ATR트레일링스탑 매수→매도 전환'),
+    
+    # ═══ Hull MA (2개) ═══
+    'Hull_Turn_Bull': _sig(1.8, _B, '🟢', 'Hull▲', 'circle', 11, '#00E676', 'Low', -1.5,
+        'Hull MA 강세전환', 'HMA 빨강→초록 색상전환'),
+    'Hull_Turn_Bear': _sig(1.8, _S, '🔴', 'Hull▼', 'circle', 11, '#FF1744', 'High', 1.5,
+        'Hull MA 약세전환', 'HMA 초록→빨강 색상전환'),
+    
+    # ═══ Stochastic Slow (2개) ═══
+    'StochSlow_Cross_Buy': _sig(1.0, _B, '🔄', 'StSlow▲', 'circle-open', 9, '#81C784', 'Low', -1.0,
+        'Stoch Slow 매수교차', 'SlowK>SlowD 바닥권(20이하)'),
+    'StochSlow_Cross_Sell': _sig(1.0, _S, '🔄', 'StSlow▼', 'circle-open', 9, '#EF9A9A', 'High', 1.0,
+        'Stoch Slow 매도교차', 'SlowK<SlowD 천장권(80이상)'),
+    
+    # ═══ Squeeze Momentum 강화 (2개) ═══
+    'Squeeze_Mom_Cross_Up': _sig(1.5, _B, '💥', 'SqMom▲', 'diamond', 11, '#00FFFF', 'Low', -1.2,
+        '스퀴즈모멘텀 0선↑', '모멘텀 음→양 전환'),
+    'Squeeze_Mom_Cross_Down': _sig(1.5, _S, '💥', 'SqMom▼', 'diamond', 11, '#FF6600', 'High', 1.2,
+        '스퀴즈모멘텀 0선↓', '모멘텀 양→음 전환'),
+    
+    # ═══ VuManChu 강화 — Hull+WT 동시 확인 (2개) ═══
+    'VuManChu_Bull': _sig(2.5, _B, '💎', 'VuMC▲', 'star', 14, '#00E676', 'Low', -2.5,
+        'VuManChu 강세', 'WT과매도+Hull강세전환+다이버전스'),
+    'VuManChu_Bear': _sig(2.5, _S, '💎', 'VuMC▼', 'star', 14, '#FF1744', 'High', 2.5,
+        'VuManChu 약세', 'WT과매수+Hull약세전환+다이버전스'),
+})
+
 # Combined Scan 레지스트리 (28개) — CS_Parabolic_Exhaustion_Sell 추가
 COMBINED_SCAN_REGISTRY = {
     'CS_Ultimate_Buy':{'name':'🏆 ULTIMATE BUY','kor':'궁극의매수','dir':'buy','tier':1,'icon':'🏆','color':'#FFD700','desc':'6중확인','win':'75-85%'},
@@ -322,6 +354,25 @@ COMBINED_SCAN_REGISTRY = {
     'CS_Volatility_Explosion':{'name':'💣 Vol Explosion','kor':'변동성폭발셋업','dir':'neutral','tier':2,'icon':'💣','color':'#FFC107','desc':'NR7+BB스퀴즈','win':'방향70%+'},
 }
 
+COMBINED_SCAN_REGISTRY.update({
+    'CS_Triple_Confirm_Buy': {
+        'name': '🤖 Triple Confirm', 'kor': '삼중확인매수', 'dir': 'buy', 'tier': 1,
+        'icon': '🤖', 'color': '#00E676', 'desc': 'UTBot+Hull+WT 동시 매수', 'win': '75-85%'
+    },
+    'CS_Triple_Confirm_Sell': {
+        'name': '🤖 Triple Confirm', 'kor': '삼중확인매도', 'dir': 'sell', 'tier': 1,
+        'icon': '🤖', 'color': '#FF1744', 'desc': 'UTBot+Hull+WT 동시 매도', 'win': '75-85%'
+    },
+    'CS_VuManChu_Squeeze_Buy': {
+        'name': '💎 VuMC+Squeeze', 'kor': 'VuManChu스퀴즈매수', 'dir': 'buy', 'tier': 1,
+        'icon': '💎', 'color': '#00E676', 'desc': 'VuManChu+스퀴즈해소', 'win': '80-90%'
+    },
+    'CS_VuManChu_Squeeze_Sell': {
+        'name': '💎 VuMC+Squeeze', 'kor': 'VuManChu스퀴즈매도', 'dir': 'sell', 'tier': 1,
+        'icon': '💎', 'color': '#FF1744', 'desc': 'VuManChu+스퀴즈해소', 'win': '80-90%'
+    },
+})
+
 # 차트에 표시할 강력 시그널만 (마커 최소화)
 STRONG_BUY_SIGS = {'Gold_Dot','Green_Dot_T1','Parabolic_Bottom_Buy','Volume_Climax_Buy','Momentum_Ignition_Buy',
     'Expansion_BO','Morning_Star','Reversal_New_Highs','CS_Ultimate_Buy','CS_Triple_Oversold_Reversal',
@@ -329,6 +380,12 @@ STRONG_BUY_SIGS = {'Gold_Dot','Green_Dot_T1','Parabolic_Bottom_Buy','Volume_Clim
 STRONG_SELL_SIGS = {'Blood_Diamond','Red_Dot_T1','Parabolic_Top_Sell','Volume_Climax_Sell','Momentum_Ignition_Sell',
     'Expansion_BD','Evening_Star','Reversal_New_Lows','CS_Ultimate_Sell','CS_Triple_Overbought_Exhaustion',
     'CS_Breakdown_Momentum_Sell','CS_Blow_Off_Top','CS_Parabolic_Exhaustion_Sell'}
+
+STRONG_BUY_SIGS.add('VuManChu_Bull')
+STRONG_SELL_SIGS.add('VuManChu_Bear')
+
+STRONG_BUY_SIGS.update({'CS_Triple_Confirm_Buy', 'CS_VuManChu_Squeeze_Buy'})
+STRONG_SELL_SIGS.update({'CS_Triple_Confirm_Sell', 'CS_VuManChu_Squeeze_Sell'})
 
 # 쿨다운 맵 (누락 항목 추가)
 COOLDOWN_MAP = {
@@ -351,6 +408,15 @@ COOLDOWN_MAP = {
     'MF_Cross_Bull':10,'MF_Cross_Bear':10,
     'Pullback_123_Bull':7,'Pullback_123_Bear':7,
 }
+
+# 쿨다운 추가
+COOLDOWN_MAP.update({
+    'UTBot_Buy': 10, 'UTBot_Sell': 10,
+    'Hull_Turn_Bull': 7, 'Hull_Turn_Bear': 7,
+    'StochSlow_Cross_Buy': 7, 'StochSlow_Cross_Sell': 7,
+    'Squeeze_Mom_Cross_Up': 5, 'Squeeze_Mom_Cross_Down': 5,
+    'VuManChu_Bull': 10, 'VuManChu_Bear': 10,
+})
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  유틸리티 (개선: _vs에 fillna 추가)
@@ -568,13 +634,189 @@ def compute_indicators(df):
     regime_sc+=np.where(df['MACD_Line']>0,.5,-.5)
     rr=regime_sc.rolling(5,min_periods=3).mean();df['Regime_Score']=rr.clip(-8,8)
     df['Regime']=np.select([rr>=4,rr>=1.5,rr<=-4,rr<=-1.5],[2,1,-2,-1],default=0)
+
+    
+    # Hull Moving Average
+    df['HMA'], df['HMA_Rising'], df['Hull_Turn_Bull_Raw'], df['Hull_Turn_Bear_Raw'] = compute_hull_ma(c, period=20)
+    
+    # UT Bot Alerts
+    df['UTBot_Stop'], df['UTBot_Dir'], df['UTBot_Buy_Raw'], df['UTBot_Sell_Raw'] = compute_ut_bot(c, h, l, df['ATR'], key_value=1)
+    
+    # Stochastic Slow
+    df['SlowK'], df['SlowD'] = compute_stochastic_slow(h, l, c, k_period=14, d_period=3, smooth=3)
+    
+    # Squeeze Momentum 강화
+    sq_enh = compute_squeeze_momentum_enhanced(c, h, l, df['BB_Up'], df['BB_Low'], df['KC_Upper'], df['KC_Lower'], df['KC_Mid'])
+    df['Squeeze_Momentum'] = sq_enh['momentum']
+    df['Squeeze_Mom_Rising'] = sq_enh['mom_rising']
+    df['Squeeze_Mom_Positive'] = sq_enh['mom_positive']
+    df['Squeeze_Mom_Cross_Up_Raw'] = sq_enh['mom_cross_up']
+    df['Squeeze_Mom_Cross_Down_Raw'] = sq_enh['mom_cross_down']
+    
     return df
+
 
 print("✅ Part 1/4 완료 — V13.1 설정/레지스트리/유틸/기술지표")
 
 # ══════════════════════════════════════════════════════════════
 #  CipherX V13.1 — PART 2/4: 시그널 탐지 + 10-Layer Engine
 # ══════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════
+#  신규 보조지표 계산 함수들
+# ══════════════════════════════════════════════════════════════
+
+def compute_hull_ma(c, period=20):
+    """
+    Hull Moving Average (HMA) — 빠른 반응 + 매끄러운 곡선
+    공식: HMA = WMA(2*WMA(n/2) - WMA(n), sqrt(n))
+    색상 전환(상승→하락, 하락→상승)이 핵심 신호
+    """
+    half_p = max(int(period / 2), 1)
+    sqrt_p = max(int(np.sqrt(period)), 1)
+    
+    wma_half = c.rolling(half_p).apply(
+        lambda x: np.sum(x * np.arange(1, len(x)+1)) / np.sum(np.arange(1, len(x)+1)), raw=True)
+    wma_full = c.rolling(period).apply(
+        lambda x: np.sum(x * np.arange(1, len(x)+1)) / np.sum(np.arange(1, len(x)+1)), raw=True)
+    
+    diff = 2 * wma_half - wma_full
+    hma = diff.rolling(sqrt_p).apply(
+        lambda x: np.sum(x * np.arange(1, len(x)+1)) / np.sum(np.arange(1, len(x)+1)), raw=True)
+    
+    # 방향: HMA 기울기
+    hma_rising = hma > hma.shift(1)  # 초록 (상승)
+    hma_falling = hma < hma.shift(1)  # 빨강 (하락)
+    
+    # 색상 전환 — 핵심 신호
+    turn_bullish = hma_rising & ~hma_rising.shift(1).fillna(False)  # 빨강→초록
+    turn_bearish = hma_falling & ~hma_falling.shift(1).fillna(False)  # 초록→빨강
+    
+    return hma, hma_rising, turn_bullish, turn_bearish
+
+
+def compute_ut_bot(c, h, l, atr, key_value=1, atr_period=10):
+    """
+    UT Bot Alerts — ATR 기반 트레일링 스탑 매매 시스템
+    
+    원리: ATR × key_value 만큼의 트레일링 스탑을 유지하다가
+          가격이 스탑을 돌파하면 방향 전환 신호 발생
+    
+    key_value=1: 민감 (단타), key_value=2: 둔감 (스윙)
+    일봉에서는 key_value=1~2 권장
+    """
+    n = len(c)
+    xatr = atr * key_value
+    
+    cv = c.values
+    xatr_v = xatr.values
+    
+    # 트레일링 스탑 계산
+    trailing_stop = np.zeros(n)
+    direction = np.zeros(n, dtype=int)  # 1=매수, -1=매도
+    
+    trailing_stop[0] = cv[0]
+    direction[0] = 1
+    
+    for i in range(1, n):
+        if np.isnan(xatr_v[i]):
+            trailing_stop[i] = trailing_stop[i-1]
+            direction[i] = direction[i-1]
+            continue
+            
+        # 이전 방향이 매수(1)일 때
+        if direction[i-1] == 1:
+            new_stop = cv[i] - xatr_v[i]
+            trailing_stop[i] = max(new_stop, trailing_stop[i-1])  # 스탑은 올라가기만
+            
+            if cv[i] < trailing_stop[i]:  # 가격이 스탑 아래로 → 매도 전환
+                direction[i] = -1
+                trailing_stop[i] = cv[i] + xatr_v[i]
+            else:
+                direction[i] = 1
+        else:  # 이전 방향이 매도(-1)
+            new_stop = cv[i] + xatr_v[i]
+            trailing_stop[i] = min(new_stop, trailing_stop[i-1])  # 스탑은 내려가기만
+            
+            if cv[i] > trailing_stop[i]:  # 가격이 스탑 위로 → 매수 전환
+                direction[i] = 1
+                trailing_stop[i] = cv[i] - xatr_v[i]
+            else:
+                direction[i] = -1
+    
+    ts = pd.Series(trailing_stop, index=c.index)
+    dir_s = pd.Series(direction, index=c.index)
+    
+    # 전환 신호
+    buy_signal = (dir_s == 1) & (dir_s.shift(1) == -1)   # 매도→매수 전환
+    sell_signal = (dir_s == -1) & (dir_s.shift(1) == 1)  # 매수→매도 전환
+    
+    return ts, dir_s, buy_signal, sell_signal
+
+
+def compute_stochastic_slow(h, l, c, k_period=14, d_period=3, smooth=3):
+    """
+    Stochastic Slow — StochRSI보다 가짜 신호가 적음
+    일봉에서 바닥권(20이하) 교차가 진정한 저점 신호
+    
+    StochRSI와의 차이:
+    - StochRSI는 RSI에 스토캐스틱 적용 (모멘텀의 모멘텀)
+    - Stochastic Slow는 가격 자체에 적용 + 추가 스무딩
+    """
+    lowest_low = l.rolling(k_period).min()
+    highest_high = h.rolling(k_period).max()
+    
+    # Fast %K
+    fast_k = ((c - lowest_low) / (highest_high - lowest_low + 1e-10)) * 100
+    
+    # Slow %K = Fast %K의 SMA
+    slow_k = fast_k.rolling(smooth).mean()
+    
+    # Slow %D = Slow %K의 SMA
+    slow_d = slow_k.rolling(d_period).mean()
+    
+    return slow_k, slow_d
+
+
+def compute_squeeze_momentum_enhanced(c, h, l, bbu, bbl, kcu, kcl, kc_mid, period=20):
+    """
+    Squeeze Momentum Indicator (LazyBear 강화 버전)
+    
+    원본 대비 개선:
+    - 모멘텀 히스토그램 색상 4단계 (진한 초록 → 연한 초록 → 연한 빨강 → 진한 빨강)
+    - 스퀴즈 상태를 검은 점(축적) vs 회색 점(해소)으로 구분
+    """
+    # 스퀴즈 상태
+    squeeze_on = (bbu < kcu) & (bbl > kcl)    # BB가 KC 안 = 축적 중 (검은 점)
+    squeeze_off = ~squeeze_on                    # BB가 KC 밖 = 해소 (회색 점)
+    
+    # 모멘텀 계산 (원본 공식)
+    mid_hl = (h.rolling(period).max() + l.rolling(period).min()) / 2
+    momentum = c - (mid_hl + kc_mid) / 2
+    
+    # 선형 회귀로 스무딩 (원본은 linreg 사용, 여기서는 근사)
+    mom_smooth = momentum.rolling(period).mean()
+    
+    # 4단계 색상 분류
+    # 초록 진한: 모멘텀 양수 + 증가중
+    # 초록 연한: 모멘텀 양수 + 감소중  
+    # 빨간 연한: 모멘텀 음수 + 증가중 (바닥 탈출 시도)
+    # 빨간 진한: 모멘텀 음수 + 감소중
+    mom_rising = mom_smooth > mom_smooth.shift(1)
+    mom_positive = mom_smooth > 0
+    
+    return {
+        'squeeze_on': squeeze_on,
+        'squeeze_off': squeeze_off,
+        'momentum': mom_smooth,
+        'mom_rising': mom_rising,
+        'mom_positive': mom_positive,
+        # 핵심 신호: 스퀴즈 해소 + 모멘텀 방향
+        'squeeze_fire_up': squeeze_off & squeeze_on.shift(1).fillna(False) & mom_positive & mom_rising,
+        'squeeze_fire_down': squeeze_off & squeeze_on.shift(1).fillna(False) & ~mom_positive & ~mom_rising,
+        # 모멘텀 제로라인 교차
+        'mom_cross_up': (mom_smooth > 0) & (mom_smooth.shift(1) <= 0),
+        'mom_cross_down': (mom_smooth < 0) & (mom_smooth.shift(1) >= 0),
+    }
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  개별 시그널 탐지 함수들 (125개)
@@ -867,6 +1109,48 @@ def detect_all_signals(df):
     df['WT_Convergence_Bull']=(cs__>3)&(ga__>2)&(ga__<15)&(wt1<wt2)&(wt1<20)
     df['WT_Convergence_Bear']=(cs__>3)&(ga__>2)&(ga__<15)&(wt1>wt2)&(wt1>-20)
 
+    # --- UT Bot Alerts ---
+    # UT Bot 매수: 방향 전환 + 거래량 확인
+    df['UTBot_Buy'] = df['UTBot_Buy_Raw'].fillna(False) & vok
+    df['UTBot_Sell'] = df['UTBot_Sell_Raw'].fillna(False) & vok
+    
+    # --- Hull MA 전환 ---
+    # Hull 색상 전환 + WT 방향 확인으로 정확도 ↑
+    df['Hull_Turn_Bull'] = df['Hull_Turn_Bull_Raw'].fillna(False) & (wt1 > wt1.shift(1)) & vok
+    df['Hull_Turn_Bear'] = df['Hull_Turn_Bear_Raw'].fillna(False) & (wt1 < wt1.shift(1)) & vok
+    
+    # --- Stochastic Slow ---
+    slk, sld = df['SlowK'], df['SlowD']
+    df['StochSlow_Cross_Buy'] = (slk > sld) & (slk.shift(1) <= sld.shift(1)) & (slk < 20)
+    df['StochSlow_Cross_Sell'] = (slk < sld) & (slk.shift(1) >= sld.shift(1)) & (slk > 80)
+    
+    # --- Squeeze Momentum 강화 ---
+    df['Squeeze_Mom_Cross_Up'] = df['Squeeze_Mom_Cross_Up_Raw'].fillna(False) & vok
+    df['Squeeze_Mom_Cross_Down'] = df['Squeeze_Mom_Cross_Down_Raw'].fillna(False) & vok
+    
+    # --- VuManChu Cipher B 강화 (다중 확인 복합 시그널) ---
+    # 매수: WT 과매도 + Hull 강세전환 + (다이버전스 OR 캔들반전)
+    vu_buy_base = (wt1 < -40) & (df['HMA_Rising'].fillna(False))
+    vu_buy_confirm = (
+        df.get('Bull_Divergence', pd.Series(False, index=idx)).fillna(False) |
+        df.get('RSI_Bull_Divergence', pd.Series(False, index=idx)).fillna(False) |
+        df.get('Bullish_Engulfing', pd.Series(False, index=idx)).fillna(False) |
+        df.get('Hammer', pd.Series(False, index=idx)).fillna(False) |
+        df.get('Morning_Star', pd.Series(False, index=idx)).fillna(False)
+    )
+    df['VuManChu_Bull'] = vu_buy_base & vu_buy_confirm & vok
+    
+    # 매도: WT 과매수 + Hull 약세전환 + (다이버전스 OR 캔들반전)
+    vu_sell_base = (wt1 > 40) & (~df['HMA_Rising'].fillna(True))
+    vu_sell_confirm = (
+        df.get('Bear_Divergence', pd.Series(False, index=idx)).fillna(False) |
+        df.get('RSI_Bear_Divergence', pd.Series(False, index=idx)).fillna(False) |
+        df.get('Bearish_Engulfing', pd.Series(False, index=idx)).fillna(False) |
+        df.get('Shooting_Star', pd.Series(False, index=idx)).fillna(False) |
+        df.get('Evening_Star', pd.Series(False, index=idx)).fillna(False)
+    )
+    df['VuManChu_Bear'] = vu_sell_base & vu_sell_confirm & vok
+
     # 쿨다운 (개선: 모든 PAIRED 추가)
     PAIRED={('MACD_Cross_Buy','MACD_Cross_Sell'):12,('Bullish_Engulfing','Bearish_Engulfing'):5,
         ('Hammer','Shooting_Star'):5,('Morning_Star','Evening_Star'):7,('DMI_Cross_Bull','DMI_Cross_Bear'):10,
@@ -880,7 +1164,13 @@ def detect_all_signals(df):
         ('Boomer_Buy','Boomer_Sell'):10,
         ('Setup_180_Bull','Setup_180_Bear'):7,
         ('VWAP_Bounce_Buy','VWAP_Reject_Sell'):7,
-        ('Momentum_Ignition_Buy','Momentum_Ignition_Sell'):10}
+        ('Momentum_Ignition_Buy','Momentum_Ignition_Sell'):10
+        ('UTBot_Buy', 'UTBot_Sell'): 10,
+        ('Hull_Turn_Bull', 'Hull_Turn_Bear'): 7,
+        ('StochSlow_Cross_Buy', 'StochSlow_Cross_Sell'): 7,
+        ('Squeeze_Mom_Cross_Up', 'Squeeze_Mom_Cross_Down'): 5,
+        ('VuManChu_Bull', 'VuManChu_Bear'): 10,
+        }
     ph__=set()
     for (bs,ss),cd in PAIRED.items():_cd_dir(df,bs,ss,cd);ph__.add(bs);ph__.add(ss)
     for s,cd in COOLDOWN_MAP.items():
@@ -969,6 +1259,31 @@ def detect_combined_scans(df, vol_ratio):
     df['CS_Structure_Support_Buy']=n_vp&n_bl&(C>O)
     df['CS_Overbought_Fade_Sell']=sob_&sc__&(n50|n_bu)
     df['CS_Volatility_Explosion']=(F('NR7_2').astype(int)+F('BB_Squeeze').astype(int)+(vr<.5).astype(int)+F('Inside_Day').astype(int))>=3
+    # Hull + UT Bot + WT 삼중 확인 매수
+    df['CS_Triple_Confirm_Buy'] = (
+        F('UTBot_Buy') &                          # UT Bot 매수 전환
+        df.get('HMA_Rising', pd.Series(False, index=idx)).fillna(False) &  # Hull 상승
+        (N('WT1') > N('WT2')) &                    # WT 상승 교차
+        vok_
+    )
+    
+    # Hull + UT Bot + WT 삼중 확인 매도
+    df['CS_Triple_Confirm_Sell'] = (
+        F('UTBot_Sell') &                          # UT Bot 매도 전환
+        ~df.get('HMA_Rising', pd.Series(True, index=idx)).fillna(True) &  # Hull 하락
+        (N('WT1') < N('WT2')) &                    # WT 하락 교차
+        vok_
+    )
+    
+    # VuManChu + Squeeze 동시 (매우 희귀하고 강력)
+    df['CS_VuManChu_Squeeze_Buy'] = (
+        F('VuManChu_Bull') &
+        (F('Squeeze_Fire_Buy') | F('Squeeze_Mom_Cross_Up'))
+    )
+    df['CS_VuManChu_Squeeze_Sell'] = (
+        F('VuManChu_Bear') &
+        (F('Squeeze_Fire_Sell') | F('Squeeze_Mom_Cross_Down'))
+    )
 
     # 개선: CS 쿨다운 티어별 차등
     for sn,cfg in COMBINED_SCAN_REGISTRY.items():
@@ -1016,7 +1331,12 @@ def compute_10layer_judgment(df, vol_ratio):
     bm+=np.select([(N('RSI')<30)&rr_,N('RSI')<30,(N('RSI')<45)&rr_],[3,1.5,1],default=0.)
     bm+=np.select([(N('StochK')<20)&(N('StochK')>N('StochD')),N('StochK')<20],[2.5,1],default=0.)
     bm+=np.select([(N('WT1')<OS1)&wr_,N('WT1')<OS1,(N('WT1')<-20)&wr_],[3,1,1],default=0.)
-    df['BL_Momentum']=bm.clip(-2,JT.MOMENTUM_CAP)
+    bm += _sp(df, 'UTBot_Buy', 2.5)          # UT Bot 매수 전환 — 높은 신뢰도
+    bm += _sp(df, 'StochSlow_Cross_Buy', 1.5) # Stoch Slow 바닥 교차
+    bm += _sp(df, 'Squeeze_Mom_Cross_Up', 1.5) # 스퀴즈 모멘텀 0선↑
+    # Hull MA 상승 중이면 모멘텀 보너스
+    bm += np.where(df.get('HMA_Rising', pd.Series(False, index=idx)).fillna(False) & (N('WT1') > N('WT1').shift(1)), 1.0, 0)
+    df['BL_Momentum'] = bm.clip(-2, JT.MOMENTUM_CAP)
 
     bcc=pd.Series(0.,index=idx)
     for s,p in [('Morning_Star',3.5),('Bullish_Engulfing',3),('Hammer',2.5),('Outside_Bullish',2.5),('Doji_Bullish',1)]:
@@ -1049,7 +1369,9 @@ def compute_10layer_judgment(df, vol_ratio):
         ('Kumo_Breakout_Bull',2.5),('Reversal_New_Highs',2.5),('Slingshot_Bull',2),('Jack_In_Box_Bull',2),
         ('Relative_Strength_Buy',2.5),('VP_VAL_Support',1.5)]:
         bp+=_sp(df,s,p)
-    df['BL_Pattern']=bp.clip(upper=JT.PATTERN_CAP)
+    bp += _sp(df, 'VuManChu_Bull', 3.0)       # VuManChu 강세 — 다중확인이라 높은 점수
+    bp += _sp(df, 'Hull_Turn_Bull', 2.0)       # Hull 색상 전환
+    df['BL_Pattern'] = bp.clip(upper=JT.PATTERN_CAP)
 
     bcs=pd.Series(0.,index=idx)
     for cs_n,cfg in COMBINED_SCAN_REGISTRY.items():
@@ -1067,7 +1389,10 @@ def compute_10layer_judgment(df, vol_ratio):
     sp_buy+=np.where(N('StochK')<25,1,0)+np.where(ca>JT.ACCEL_MOD,2,np.where(ca>.5,1,0))
     df['Setup_Pressure_Buy']=sp_buy
     bl_+=np.where(sp_buy>=8,3,np.where(sp_buy>=5,2,np.where(sp_buy>=3,1,0)))
-    df['BL_Leading']=bl_.clip(-1,JT.LEADING_CAP)
+    utbot_dir = df.get('UTBot_Dir', pd.Series(0, index=idx))
+    bl_ += np.where(utbot_dir == 1, 1.0, np.where(utbot_dir == -1, -0.5, 0))  # UT Bot 매수 방향이면 +1
+    bl_ += np.where(df.get('HMA_Rising', pd.Series(False, index=idx)).fillna(False), 0.5, -0.5)  # Hull 상승이면 +0.5
+    df['BL_Leading'] = bl_.clip(-1, JT.LEADING_CAP)
 
     blag=pd.Series(0.,index=idx)
     blag+=np.where(a200&a50&(N('MA50')>N('MA200')),3,np.where(a50&(N('MA50')>N('MA200')),2,np.where(a200,1,0)))
@@ -1092,7 +1417,11 @@ def compute_10layer_judgment(df, vol_ratio):
     sm_+=np.select([(N('RSI')>70)&rf_,N('RSI')>70,(N('RSI')>55)&rf_],[3,1.5,1],default=0.)
     sm_+=np.select([(N('StochK')>80)&(N('StochK')<N('StochD')),N('StochK')>80],[2.5,1],default=0.)
     sm_+=np.select([(N('WT1')>OB1)&wf_,N('WT1')>OB1,(N('WT1')>20)&wf_],[3,1,1],default=0.)
-    df['SL_Momentum']=sm_.clip(-2,JT.MOMENTUM_CAP)
+    sm_ += _sp(df, 'UTBot_Sell', 2.5)
+    sm_ += _sp(df, 'StochSlow_Cross_Sell', 1.5)
+    sm_ += _sp(df, 'Squeeze_Mom_Cross_Down', 1.5)
+    sm_ += np.where(~df.get('HMA_Rising', pd.Series(True, index=idx)).fillna(True) & (N('WT1') < N('WT1').shift(1)), 1.0, 0)
+    df['SL_Momentum'] = sm_.clip(-2, JT.MOMENTUM_CAP)
 
     scc_=pd.Series(0.,index=idx)
     for s,p in [('Evening_Star',3.5),('Bearish_Engulfing',3),('Shooting_Star',2.5),('Outside_Bearish',2.5),('Doji_Bearish',1)]:
@@ -1125,7 +1454,9 @@ def compute_10layer_judgment(df, vol_ratio):
         ('Kumo_Breakout_Bear',2.5),('Reversal_New_Lows',2.5),('Slingshot_Bear',2),('Jack_In_Box_Bear',2),
         ('Relative_Strength_Sell',2),('VP_VAH_Resistance',1.5)]:
         spp_+=_sp(df,s,p)
-    df['SL_Pattern']=spp_.clip(upper=JT.PATTERN_CAP)
+    spp_ += _sp(df, 'VuManChu_Bear', 3.0)
+    spp_ += _sp(df, 'Hull_Turn_Bear', 2.0)
+    df['SL_Pattern'] = spp_.clip(upper=JT.PATTERN_CAP)
 
     scs_=pd.Series(0.,index=idx)
     for cs_n,cfg in COMBINED_SCAN_REGISTRY.items():
@@ -1143,7 +1474,9 @@ def compute_10layer_judgment(df, vol_ratio):
     sp_sell+=np.where(N('StochK')>75,1,0)+np.where(ca<-JT.ACCEL_MOD,2,np.where(ca<-.5,1,0))
     df['Setup_Pressure_Sell']=sp_sell
     sl__+=np.where(sp_sell>=8,3,np.where(sp_sell>=5,2,np.where(sp_sell>=3,1,0)))
-    df['SL_Leading']=sl__.clip(-1,JT.LEADING_CAP)
+    sl__ += np.where(utbot_dir == -1, 1.0, np.where(utbot_dir == 1, -0.5, 0))
+    sl__ += np.where(~df.get('HMA_Rising', pd.Series(True, index=idx)).fillna(True), 0.5, -0.5)
+    df['SL_Leading'] = sl__.clip(-1, JT.LEADING_CAP)
 
     slag_=pd.Series(0.,index=idx)
     slag_+=np.where(b200&b50&(N('MA50')<N('MA200')),3,np.where(b50&(N('MA50')<N('MA200')),2,np.where(b200,1,0)))
@@ -1256,6 +1589,14 @@ def _build_candle_hover(dc):
         lv = str(row.get('Leading_Verdict',''))
         lgv = str(row.get('Lagging_Verdict',''))
 
+        ut_dir = int(row.get('UTBot_Dir', 0))
+        ut_label = '🤖매수' if ut_dir == 1 else ('🤖매도' if ut_dir == -1 else '🤖N/A')
+        hma_dir = '🟢▲' if row.get('HMA_Rising', False) else '🔴▼'
+        slk_v = row.get('SlowK', 50)
+        sq_mom = row.get('Squeeze_Momentum', 0)
+        
+        lines.append(f"UT:{ut_label} Hull:{hma_dir} SlowK:{slk_v:.0f} SqMom:{sq_mom:.2f}")
+        
         # 조립
         lines = [f"<b>{ds}</b>  O:{o_:.2f} H:{h_:.2f} L:{l_:.2f} C:{c_:.2f}"]
         lines.append(f"Vol:{row.get('Volume',0):,.0f}  ATR:{row.get('ATR',0):.2f}")
@@ -1420,6 +1761,36 @@ def build_chart(dc, ticker):
                           "B:%{customdata[0]:.1f} S:%{customdata[1]:.1f} NET:%{y:.1f}<extra></extra>"),
             row=5, col=1)
         fig.add_hline(y=0, line_color="#475569", line_width=1, row=5, col=1)
+
+    # UT Bot 트레일링 스탑 라인 (매수=초록, 매도=빨강)
+    if 'UTBot_Stop' in dc.columns and 'UTBot_Dir' in dc.columns:
+        ut_buy = dc['UTBot_Dir'] == 1
+        ut_sell = dc['UTBot_Dir'] == -1
+        fig.add_trace(go.Scatter(
+            x=dc.index, y=dc['UTBot_Stop'].where(ut_buy),
+            line=dict(color='rgba(0,230,118,0.4)', width=1.5, dash='dot'),
+            name='UTBot▲', connectgaps=False, hoverinfo='skip'
+        ), row=1, col=1)
+        fig.add_trace(go.Scatter(
+            x=dc.index, y=dc['UTBot_Stop'].where(ut_sell),
+            line=dict(color='rgba(255,23,68,0.4)', width=1.5, dash='dot'),
+            name='UTBot▼', connectgaps=False, hoverinfo='skip'
+        ), row=1, col=1)
+    
+    # Hull MA 라인 (색상 전환)
+    if 'HMA' in dc.columns and 'HMA_Rising' in dc.columns:
+        hma_up = dc['HMA_Rising'].fillna(False)
+        fig.add_trace(go.Scatter(
+            x=dc.index, y=dc['HMA'].where(hma_up),
+            line=dict(color='#00E676', width=2),
+            name='HMA▲', connectgaps=False, hoverinfo='skip'
+        ), row=1, col=1)
+        fig.add_trace(go.Scatter(
+            x=dc.index, y=dc['HMA'].where(~hma_up),
+            line=dict(color='#FF1744', width=2),
+            name='HMA▼', connectgaps=False, hoverinfo='skip'
+        ), row=1, col=1)
+
 
     # ═══ 레이아웃 ═══
     fig.update_layout(
