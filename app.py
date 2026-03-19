@@ -2054,7 +2054,7 @@ def analyze(ticker,chart_days=252,refresh=False):
 
 def init_session():
     defs = {
-        'messages': [...],
+        'messages':[{"role":"assistant","type":"text","content":"🚦 **CipherX V13.3** \n**티커명**을 입력하세요."}],
         'pending_ai_ticker': None,
         'pending_ai_prompt': None,
         'last_ticker': None,
