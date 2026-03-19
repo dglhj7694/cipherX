@@ -1524,31 +1524,44 @@ def build_chart(dc, ticker):
     _sig_marker(fig, dc, 'MACD_Zero_Cross_Sell', 4, dc['MACD_Line'], '#E57373', 'diamond', 8, '⬇️MC0▼')
 
     # ══════════════════════════════════════
-    #  Row 5: Money Flow (MFI) — 신규
+    #  Row 5: Money Flow — MFI 센터링 + RSI_MFI 바
     # ══════════════════════════════════════
-    mfi = dc.get('MFI', pd.Series(50, index=dc.index))
+    mfi_raw = dc.get('MFI', pd.Series(50, index=dc.index))
+    mfi_centered = mfi_raw - 50  # ★ 50 기준 센터링 → -50 ~ +50
     rmfi = dc.get('RSI_MFI', pd.Series(0, index=dc.index))
 
-    fig.add_trace(go.Scatter(x=dc.index, y=mfi, line=dict(color='#AB47BC', width=2),
-        name="MFI", hovertemplate="MFI:%{y:.1f}<extra></extra>"), row=5, col=1)
+    # RSI_MFI 바 차트 (이미 음수/양수)
     fig.add_trace(go.Bar(x=dc.index, y=rmfi,
-        marker_color=np.where(rmfi>=0, 'rgba(0,230,118,.4)', 'rgba(255,23,68,.4)').tolist(),
-        name="MF Flow", opacity=.6, hoverinfo='skip', showlegend=False), row=5, col=1)
-    fig.add_hrect(y0=80, y1=100, fillcolor="rgba(239,68,68,.08)", line_width=0, row=5, col=1)
-    fig.add_hrect(y0=0, y1=20, fillcolor="rgba(16,185,129,.08)", line_width=0, row=5, col=1)
-    fig.add_hline(y=80, line_dash='dash', line_color='#FF5252', line_width=1, row=5, col=1)
-    fig.add_hline(y=20, line_dash='dash', line_color='#4FC3F7', line_width=1, row=5, col=1)
-    fig.add_hline(y=50, line_dash='dot', line_color='#475569', line_width=1, row=5, col=1)
+        marker_color=np.where(rmfi >= 0, 'rgba(0,230,118,.35)', 'rgba(255,23,68,.35)').tolist(),
+        name="MF Flow", opacity=.7, hoverinfo='skip', showlegend=False), row=5, col=1)
 
-    _sig_marker(fig, dc, 'MF_Cross_Bull', 5, mfi, '#00E676', 'triangle-up', 10, '💰MF▲')
-    _sig_marker(fig, dc, 'MF_Cross_Bear', 5, mfi, '#FF1744', 'triangle-down', 10, '💸MF▼')
-    _sig_marker(fig, dc, 'MF_Bull_Div', 5, mfi, '#7C4DFF', 'diamond', 10, '💹MFDiv▲')
-    _sig_marker(fig, dc, 'MF_Bear_Div', 5, mfi, '#E040FB', 'diamond', 10, '💹MFDiv▼')
-    _sig_marker(fig, dc, 'MF_Accel_Up', 5, mfi, '#69F0AE', 'arrow-up', 8, '📈MFA▲')
-    _sig_marker(fig, dc, 'MF_Accel_Dn', 5, mfi, '#FF5252', 'arrow-down', 8, '📉MFA▼')
-    _sig_marker(fig, dc, 'CMF_Bull', 5, mfi, '#00BCD4', 'circle', 8, '🌀CMF▲')
-    _sig_marker(fig, dc, 'CMF_Bear', 5, mfi, '#FF5722', 'circle', 8, '🌀CMF▼')
+    # MFI 센터링 라인 (50 → 0 기준)
+    fig.add_trace(go.Scatter(x=dc.index, y=mfi_centered,
+        line=dict(color='#AB47BC', width=2.5), name="MFI",
+        hovertemplate="MFI:%{customdata:.1f} (센터:%{y:+.1f})<extra></extra>",
+        customdata=mfi_raw.values  # 원본 MFI 값 표시
+    ), row=5, col=1)
 
+    # 과매수/과매도 영역 (센터링 기준)
+    fig.add_hrect(y0=30, y1=50, fillcolor="rgba(239,68,68,.08)", line_width=0, row=5, col=1)   # MFI 80~100
+    fig.add_hrect(y0=-50, y1=-30, fillcolor="rgba(16,185,129,.08)", line_width=0, row=5, col=1) # MFI 0~20
+
+    # 기준선
+    fig.add_hline(y=30, line_dash='dash', line_color='#FF5252', line_width=1, row=5, col=1)   # MFI 80
+    fig.add_hline(y=-30, line_dash='dash', line_color='#4FC3F7', line_width=1, row=5, col=1)  # MFI 20
+    fig.add_hline(y=0, line_dash='solid', line_color='#475569', line_width=1.5, row=5, col=1)  # MFI 50 = 중심
+
+    # 시그널 마커 (Y값도 센터링)
+    mfi_for_marker = mfi_centered  # 마커 위치도 센터링된 값 사용
+    _sig_marker(fig, dc, 'MF_Cross_Bull', 5, mfi_for_marker, '#00E676', 'triangle-up', 10, '💰MF▲')
+    _sig_marker(fig, dc, 'MF_Cross_Bear', 5, mfi_for_marker, '#FF1744', 'triangle-down', 10, '💸MF▼')
+    _sig_marker(fig, dc, 'MF_Bull_Div', 5, mfi_for_marker, '#7C4DFF', 'diamond', 10, '💹MFDiv▲')
+    _sig_marker(fig, dc, 'MF_Bear_Div', 5, mfi_for_marker, '#E040FB', 'diamond', 10, '💹MFDiv▼')
+    _sig_marker(fig, dc, 'MF_Accel_Up', 5, mfi_for_marker, '#69F0AE', 'arrow-up', 8, '📈MFA▲')
+    _sig_marker(fig, dc, 'MF_Accel_Dn', 5, mfi_for_marker, '#FF5252', 'arrow-down', 8, '📉MFA▼')
+    _sig_marker(fig, dc, 'CMF_Bull', 5, mfi_for_marker, '#00BCD4', 'circle', 8, '🌀CMF▲')
+    _sig_marker(fig, dc, 'CMF_Bear', 5, mfi_for_marker, '#FF5722', 'circle', 8, '🌀CMF▼')
+    
     # ══════════════════════════════════════
     #  Row 6: Stochastic Slow
     # ══════════════════════════════════════
