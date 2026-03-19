@@ -1660,8 +1660,8 @@ def build_chart(dc, ticker):
         fig.update_layout(**{ya: dict(gridcolor='rgba(51,65,85,.3)', tickfont=dict(size=9, color='#64748B'))})
 
     # MFI, StochSlow Y축 고정
-    fig.update_yaxes(range=[0, 100], row=5, col=1)
-    fig.update_yaxes(range=[0, 100], row=6, col=1)
+    fig.update_yaxes(range=[-100, 100], row=5, col=1)
+    fig.update_yaxes(range=[-100, 100], row=6, col=1)
 
     # 비거래일 제거
     all_d = pd.date_range(start=dc.index[0], end=dc.index[-1], freq='D')
