@@ -2111,7 +2111,7 @@ if st.session_state.get('app_mode') == '스캐너':
         tickers = st.session_state['scan_tickers_override']
         scan_source = selected_sector or "섹터"
     else:
-        tickers = SECTOR_GROUPS['직접 입력']
+        tickers = [t.strip().upper() for t in ci.split(',') if t.strip()]
         scan_source = "직접 입력"
     
     # 스캔 실행 버튼
