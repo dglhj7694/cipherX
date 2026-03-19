@@ -2146,27 +2146,32 @@ if current_mode == '스캐너':
         pb = st.progress(0, text=f"🔍 {scan_source} 스캔 시작...")
         results = []
 
+        # ── _scan_one 수정: 시그널 없어도 결과에 포함 ──
         def _scan_one(t):
             try:
                 df_ = compute_and_cache(t)
                 if df_ is None or len(df_) < 50: return None
                 dc_ = df_.tail(63); acs = []
+                latest_sig_date = None  # 가장 최근 시그널 날짜
                 for cn, ccfg in COMBINED_SCAN_REGISTRY.items():
                     if cn in dc_.columns and dc_[cn].tail(5).any():
                         ld = dc_[cn].tail(5)[dc_[cn].tail(5)].index[-1]
                         acs.append({'icon': ccfg['icon'], 'kor': ccfg['kor'],
                                     'dir': ccfg['dir'], 'tier': ccfg['tier'],
                                     'date': ld.strftime('%m/%d')})
-                if not acs: return None
+                        if latest_sig_date is None or ld > latest_sig_date:
+                            latest_sig_date = ld
                 lat_ = dc_.iloc[-1]
                 chg_ = _sf((lat_['Close'] - dc_.iloc[-2]['Close']) / dc_.iloc[-2]['Close'] * 100) if len(dc_) >= 2 else 0
+                # ★ 시그널 없어도 반환 (acs가 빈 리스트여도 OK)
                 return {
                     'ticker': t, 'price': _sf(lat_['Close']), 'chg': chg_,
                     'scans': sorted(acs, key=lambda x: x['tier']),
                     'jg': str(lat_.get('Trade_Judgment', 'N/A')),
                     'cf': _sf(lat_.get('Judgment_Confidence', 0)),
                     'br': _sf(lat_.get('Buy_Reversal_Bonus', 0)),
-                    'sr': _sf(lat_.get('Sell_Reversal_Bonus', 0))
+                    'sr': _sf(lat_.get('Sell_Reversal_Bonus', 0)),
+                    'latest_sig': latest_sig_date.strftime('%Y-%m-%d') if latest_sig_date else '9999-99-99',  # 없으면 맨 뒤
                 }
             except: return None
 
@@ -2181,7 +2186,24 @@ if current_mode == '스캐너':
         pb.progress(1.0, text=f"✅ {len(results)}/{len(tickers)} 발견")
         time.sleep(.3); pb.empty()
 
-        results.sort(key=lambda x: (-sum(1 for s in x['scans'] if s['tier'] == 1), -len(x['scans'])))
+        # ── 정렬 수정: 최근 시그널 순 → T1 개수 순 ──
+        results.sort(key=lambda x: (
+            x['latest_sig'] == '9999-99-99',  # 시그널 없는 종목 맨 뒤
+            x['latest_sig'],                    # 날짜 역순 (문자열이라 뒤집어야 함)
+        ), reverse=False)
+        # 더 정확한 역순 정렬:
+        results.sort(key=lambda x: (
+            0 if x['scans'] else 1,                                          # 시그널 있는 것 먼저
+            x['latest_sig'] if x['scans'] else '9999-99-99',                # 최근 시그널 날짜순 (역순)
+            -sum(1 for s in x['scans'] if s['tier'] == 1),                  # T1 많은 순
+        ), reverse=False)
+        # 날짜가 문자열이라 최신이 뒤로 감 → 수정:
+        from datetime import datetime as dt_
+        results.sort(key=lambda x: (
+            0 if x['scans'] else 1,
+            -(dt_.strptime(x['latest_sig'], '%Y-%m-%d').timestamp() if x['latest_sig'] != '9999-99-99' else 0),
+            -sum(1 for s in x['scans'] if s['tier'] == 1),
+        ))
 
         # ★ 결과를 session_state에 저장
         st.session_state['scan_results'] = results
@@ -2214,29 +2236,38 @@ if current_mode == '스캐너':
         )
         st.markdown(stats_html, unsafe_allow_html=True)
 
+        # ── 결과 카드 수정: 시그널 없는 종목도 표시 ──
         for r in results:
             chc = '#34D399' if r['chg'] >= 0 else '#F87171'
             chi = '▲' if r['chg'] >= 0 else '▼'
             jc_ = '#34D399' if 'BUY' in r['jg'] else ('#F87171' if 'SELL' in r['jg'] else '#FCD34D')
 
-            scan_items = []
-            for s in r['scans']:
-                s_clr = '#34D399' if s['dir'] == 'buy' else ('#F87171' if s['dir'] == 'sell' else '#FFC107')
-                scan_items.append(
-                    f"<div style='display:flex;gap:6px;padding:2px 0'>"
-                    f"<span style='color:{s_clr}'>●</span>"
-                    f"<span style='color:#E8ECF1;font-size:.82rem'>{s['icon']}{s['kor']}</span>"
-                    f"<span style='color:#64748B;font-size:.7rem'>{s['date']}</span></div>"
-                )
-            sh = "".join(scan_items)
+            # 시그널 항목
+            if r['scans']:
+                scan_items = []
+                for s in r['scans']:
+                    s_clr = '#34D399' if s['dir'] == 'buy' else ('#F87171' if s['dir'] == 'sell' else '#FFC107')
+                    scan_items.append(
+                        f"<div style='display:flex;gap:6px;padding:2px 0'>"
+                        f"<span style='color:{s_clr}'>●</span>"
+                        f"<span style='color:#E8ECF1;font-size:.82rem'>{s['icon']}{s['kor']}</span>"
+                        f"<span style='color:#64748B;font-size:.7rem'>{s['date']}</span></div>"
+                    )
+                sh = "".join(scan_items)
+            else:
+                sh = "<div style='padding:4px 0'><span style='color:#475569;font-size:.8rem'>— 최근 시그널 없음 —</span></div>"
 
             rev_info = ""
             if r['br'] > 2: rev_info += f"<span style='color:#34D399;font-size:.7rem'>🔄B+{r['br']:.0f}</span>"
             if r['sr'] > 2: rev_info += f"<span style='color:#F87171;font-size:.7rem'>🔄S+{r['sr']:.0f}</span>"
 
+            # 시그널 유무에 따라 테두리 색 변경
+            border_clr = '#1E293B' if r['scans'] else '#0F172A'
+            opacity = '1' if r['scans'] else '.6'
+
             card_html = (
                 f"<div style='background:linear-gradient(160deg,#0F1320,#141926);"
-                f"border:1px solid #1E293B;border-radius:14px;padding:14px 18px;margin:6px 0'>"
+                f"border:1px solid {border_clr};border-radius:14px;padding:14px 18px;margin:6px 0;opacity:{opacity}'>"
                 f"<div style='display:flex;justify-content:space-between;margin-bottom:8px'>"
                 f"<span style='color:#A5B4FC;font-weight:800;font-size:1.15rem'>{r['ticker']}</span>"
                 f"<div><span style='color:{jc_};font-size:.8rem;font-weight:600'>{r['jg']}({r['cf']:.0f}%)</span>"
@@ -2246,8 +2277,9 @@ if current_mode == '스캐너':
             )
             st.markdown(card_html, unsafe_allow_html=True)
 
-            if st.button(f"📊 {r['ticker']} 분석", key=f"sc_{r['ticker']}", use_container_width=True):
-                st.session_state['_mode'] = '분석'   
+            if st.button(f"{r['ticker']} 분석", key=f"sc_{r['ticker']}", use_container_width=True):
+                st.session_state['_mode'] = '분석'
+                st.session_state['_mode_ver'] = st.session_state.get('_mode_ver', 0) + 1
                 st.session_state['_auto'] = r['ticker']
                 st.rerun()
 
