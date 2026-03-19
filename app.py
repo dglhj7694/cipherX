@@ -2096,7 +2096,7 @@ if st.session_state.get('app_mode') == '스캐너':
             border-radius:10px;padding:10px 14px;margin:8px 0">
             <span style="color:#A5B4FC;font-weight:700">{selected_sector}</span>
             <span style="color:#64748B;margin-left:8px">{len(sec_tickers)}종목</span>
-            <div style="margin-top:6px;color:#94A3B8;font-size:.8rem">{', '.join(sec_tickers[:100])}{'...' if len(sec_tickers)>20 else ''}</div>
+            <div style="margin-top:6px;color:#94A3B8;font-size:.8rem">{', '.join(sec_tickers[:100])}{'...' if len(sec_tickers)>100 else ''}</div>
         </div>""", unsafe_allow_html=True)
     
     # 커스텀 입력 (섹터와 별도)
