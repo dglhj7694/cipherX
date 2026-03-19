@@ -2064,17 +2064,17 @@ with st.sidebar:
     app_mode=st.radio("모드",['📊 분석','🔍 스캐너'],index=0,key="app_mode")
     chart_period=st.radio("기간",['3개월','6개월','1년'],index=0,horizontal=True,key="period")
     chart_days={'3개월':63,'6개월':126,'1년':252}[chart_period]
-    if st.button("🗑️ 초기화",use_container_width=True,type="secondary"):
+    if st.button("초기화",use_container_width=True,type="secondary"):
         for k in ['messages','pending_ai_ticker','pending_ai_prompt','last_ticker']:
             st.session_state[k]=[{"role":"assistant","type":"text","content":"🚦 **CipherX V13.3**"}] if k=='messages' else None
         st.rerun()
 
 # ═══ 스캐너 모드 (섹터 선택 + 병렬) ═══
-if st.session_state.get('app_mode') == '🔍 스캐너':
-    st.markdown("<h2 style='text-align:center;color:#fff'>🔍 Scanner</h2>", unsafe_allow_html=True)
+if st.session_state.get('app_mode') == '스캐너':
+    st.markdown("<h2 style='text-align:center;color:#fff'>Scanner</h2>", unsafe_allow_html=True)
     
     # ── 섹터 선택 UI ──
-    st.markdown("#### 📂 섹터 선택")
+    st.markdown("#### 섹터 선택")
     sector_names = list(SECTOR_GROUPS.keys())
     
     # 섹터 버튼 (가로 배열)
@@ -2084,7 +2084,7 @@ if st.session_state.get('app_mode') == '🔍 스캐너':
     for i, sec_name in enumerate(sector_names):
         with cols_sec[i]:
             count = len(SECTOR_GROUPS[sec_name])
-            if st.button(f"{sec_name}\n({count}종목)", key=f"sec_{i}", use_container_width=True):
+            if st.button(f"{sec_name}\n({count})", key=f"sec_{i}", use_container_width=True):
                 st.session_state['selected_sector'] = sec_name
                 st.session_state['scan_tickers_override'] = SECTOR_GROUPS[sec_name]
                 st.rerun()
@@ -2096,11 +2096,11 @@ if st.session_state.get('app_mode') == '🔍 스캐너':
             border-radius:10px;padding:10px 14px;margin:8px 0">
             <span style="color:#A5B4FC;font-weight:700">{selected_sector}</span>
             <span style="color:#64748B;margin-left:8px">{len(sec_tickers)}종목</span>
-            <div style="margin-top:6px;color:#94A3B8;font-size:.8rem">{', '.join(sec_tickers[:20])}{'...' if len(sec_tickers)>20 else ''}</div>
+            <div style="margin-top:6px;color:#94A3B8;font-size:.8rem">{', '.join(sec_tickers[:100])}{'...' if len(sec_tickers)>20 else ''}</div>
         </div>""", unsafe_allow_html=True)
     
     # 커스텀 입력 (섹터와 별도)
-    st.markdown("#### ✏️ 직접 입력")
+    st.markdown("#### 직접 입력")
     ci = st.text_input("티커 (쉼표구분)", placeholder="NVDA,TSLA,AAPL...", key="scan_in")
     
     # 최종 티커 리스트 결정
@@ -2111,15 +2111,15 @@ if st.session_state.get('app_mode') == '🔍 스캐너':
         tickers = st.session_state['scan_tickers_override']
         scan_source = selected_sector or "섹터"
     else:
-        tickers = SECTOR_GROUPS['⭐ 인기 종목']
-        scan_source = "⭐ 인기 종목"
+        tickers = SECTOR_GROUPS['직접 입력']
+        scan_source = "직접 입력"
     
     # 스캔 실행 버튼
     col_btn1, col_btn2 = st.columns([3, 1])
     with col_btn1:
         scan_btn = st.button(f"🚀 {scan_source} 스캔 ({len(tickers)}종목)", type="primary", use_container_width=True)
     with col_btn2:
-        if st.button("🗑️ 초기화", use_container_width=True):
+        if st.button("초기화", use_container_width=True):
             st.session_state.pop('selected_sector', None)
             st.session_state.pop('scan_tickers_override', None)
             st.rerun()
