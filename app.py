@@ -1164,7 +1164,7 @@ def detect_all_signals(df):
         ('Boomer_Buy','Boomer_Sell'):10,
         ('Setup_180_Bull','Setup_180_Bear'):7,
         ('VWAP_Bounce_Buy','VWAP_Reject_Sell'):7,
-        ('Momentum_Ignition_Buy','Momentum_Ignition_Sell'):10
+        ('Momentum_Ignition_Buy','Momentum_Ignition_Sell'):10,
         ('UTBot_Buy', 'UTBot_Sell'): 10,
         ('Hull_Turn_Bull', 'Hull_Turn_Bear'): 7,
         ('StochSlow_Cross_Buy', 'StochSlow_Cross_Sell'): 7,
@@ -1596,7 +1596,7 @@ def _build_candle_hover(dc):
         sq_mom = row.get('Squeeze_Momentum', 0)
         
         lines.append(f"UT:{ut_label} Hull:{hma_dir} SlowK:{slk_v:.0f} SqMom:{sq_mom:.2f}")
-        
+
         # 조립
         lines = [f"<b>{ds}</b>  O:{o_:.2f} H:{h_:.2f} L:{l_:.2f} C:{c_:.2f}"]
         lines.append(f"Vol:{row.get('Volume',0):,.0f}  ATR:{row.get('ATR',0):.2f}")
