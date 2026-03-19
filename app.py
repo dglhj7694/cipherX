@@ -46,7 +46,7 @@ div.stButton>button[kind="secondary"]{background-color:#12161F!important;color:#
 .cs-card{border-radius:10px;padding:10px 14px;margin:5px 0;border-left:4px solid}
 div[data-baseweb="select"]>div{background-color:#12161F!important;border-color:#2A3040!important;color:#E8ECF1!important}
 div[data-baseweb="select"] input{color:#E8ECF1!important}
-div[data-baseweb="popover"] ul{background-color:#FFFFFF!important;border-radius:10px!important}
+div[data-baseweb="popover"] ul{background-color:#FFFFFF!important;border-radius:12px!important}
 div[data-baseweb="popover"] li{color:#1E293B!important}
 div[data-baseweb="popover"] li:hover{background-color:#EEF2FF!important}
 div[data-testid="stRadio"] label p{color:#CBD5E1!important}
@@ -55,7 +55,7 @@ div[data-testid="stTabs"] button{color:#64748B!important;font-weight:700!importa
 div[data-testid="stTabs"] button[aria-selected="true"]{color:#A5B4FC!important;border-bottom-color:#6366F1!important}
 section[data-testid="stSidebar"]{background-color:#080A10;border-right:1px solid #151921}
 header{background-color:transparent!important}
-div[data-testid="stMetricValue"]{color:#F8FAFC!important}
+div[data-testid="stMetricValue"]{color:#F8FAFC!important}u
 ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#0B0E14}::-webkit-scrollbar-thumb{background:#2A3040;border-radius:3px}
 </style>""", unsafe_allow_html=True)
 inject_css()
