@@ -1680,10 +1680,11 @@ def build_chart(dc, ticker):
     return fig
 
 def build_metadata(dc,ticker):
-    lat=dc.iloc[-1];prev=dc.iloc[-2] if len(dc)>=2 else lat
-    pc=lat['Close']-prev['Close'];pp=pc/(prev['Close']+1e-10)*100
-    LN=['Trend','Momentum','Candle','BB','Volume','MF','Pattern','Combined','Leading','Lagging']
-    bl={n:_sf(lat.get(f'BL_{n}',0)) for n in LN};sl={n:_sf(lat.get(f'SL_{n}',0)) for n in LN}
+    lat = dc.iloc[-1]; prev = dc.iloc[-2] if len(dc) >= 2 else lat
+    pc = lat['Close'] - prev['Close']; pp = pc / (prev['Close'] + 1e-10) * 100
+    LN = ['Trend','Momentum','Candle','BB','Volume','MF','Pattern','Combined','Leading','Lagging']
+    bl = {n: _sf(lat.get(f'BL_{n}', 0)) for n in LN}
+    sl = {n: _sf(lat.get(f'SL_{n}', 0)) for n in LN}
     acs=[]
     for cn,ccfg in COMBINED_SCAN_REGISTRY.items():
         if cn in dc.columns and dc[cn].tail(5).any():
@@ -1697,23 +1698,60 @@ def build_metadata(dc,ticker):
             if col in dc.columns and row.get(col,False):recent.append((cfg['icon'],cfg['kor'],ds,cfg['dir'],False))
         for col,cfg in COMBINED_SCAN_REGISTRY.items():
             if col in dc.columns and row.get(col,False):recent.append((cfg['icon'],cfg['kor'],ds,cfg['dir'],True))
-    rg=int(lat.get('Regime',0));rl={2:'STRONG BULL 🟢🟢',1:'BULL 🟢',0:'NEUTRAL ⚪',-1:'BEAR 🔴',-2:'STRONG BEAR 🔴🔴'}.get(rg,'N/A')
-    return {'ticker':ticker.upper(),'price':_sf(lat['Close']),'price_change':pc,'price_change_pct':pp,
-        'volume':_sf(lat['Volume']),'avg_volume':_sf(dc['Volume'].rolling(20).mean().iloc[-1]),
-        'wt1':_sf(lat.get('WT1')),'rsi':_sf(lat.get('RSI'),50),'mfi':_sf(lat.get('MFI'),50),'stochk':_sf(lat.get('StochK'),50),
-        'adx':_sf(lat.get('ADX')),'atr':_sf(lat.get('ATR')),'atr_pct':_sf(lat.get('ATR'))/(max(_sf(lat['Close']),0.01))*100,
-        'macd_hist':_sf(lat.get('MACD_Hist')),'cmf':_sf(lat.get('CMF')),'composite_accel':_sf(lat.get('Composite_Accel')),
-        'rs_ratio':_sf(lat.get('RS_Ratio'),1),'regime':rg,'regime_label':rl,'regime_score':_sf(lat.get('Regime_Score')),
-        'last_date':dc.index[-1].strftime('%Y-%m-%d'),'squeeze_on':bool(lat.get('Squeeze_On',False)),
-        'buy_total':_sf(lat.get('Buy_Total')),'sell_total':_sf(lat.get('Sell_Total')),
-        'buy_active':int(_sf(lat.get('Buy_Active_Layers'))),'sell_active':int(_sf(lat.get('Sell_Active_Layers'))),
-        'buy_layers':bl,'sell_layers':sl,'judgment':str(lat.get('Trade_Judgment','NEUTRAL')),'confidence':_sf(lat.get('Judgment_Confidence')),
-        'leading_verdict':str(lat.get('Leading_Verdict','중립')),'lagging_verdict':str(lat.get('Lagging_Verdict','비추세/횡보')),
-        'setup_pressure_buy':_sf(lat.get('Setup_Pressure_Buy')),'setup_pressure_sell':_sf(lat.get('Setup_Pressure_Sell')),
-        'utbot_dir':int(_sf(lat.get('UTBot_Dir'))),'hma_rising':bool(lat.get('HMA_Rising',False)),
-        'slowk':_sf(lat.get('SlowK'),50),'squeeze_mom':_sf(lat.get('Squeeze_Momentum')),
-        'buy_reversal':_sf(lat.get('Buy_Reversal_Bonus')),'sell_reversal':_sf(lat.get('Sell_Reversal_Bonus')),
-        'combined_scans':acs,'recent_signals':recent}
+    rg = int(lat.get('Regime', 0))
+    rl = {2:'STRONG BULL 🟢🟢',1:'BULL 🟢',0:'NEUTRAL ⚪',-1:'BEAR 🔴',-2:'STRONG BEAR 🔴🔴'}.get(rg, 'N/A')
+    
+    return {
+        'ticker': ticker.upper(),
+        'price': _sf(lat['Close']),
+        'price_change': pc, 'price_change_pct': pp,
+        'volume': _sf(lat['Volume']),
+        'avg_volume': _sf(dc['Volume'].rolling(20).mean().iloc[-1]),
+        'wt1': _sf(lat.get('WT1')), 'rsi': _sf(lat.get('RSI'), 50),
+        'mfi': _sf(lat.get('MFI'), 50), 'stochk': _sf(lat.get('StochK'), 50),
+        'adx': _sf(lat.get('ADX')), 'atr': _sf(lat.get('ATR')),
+        'atr_pct': _sf(lat.get('ATR')) / (max(_sf(lat['Close']), 0.01)) * 100,
+        'macd_hist': _sf(lat.get('MACD_Hist')),
+        'cmf': _sf(lat.get('CMF')),
+        'composite_accel': _sf(lat.get('Composite_Accel')),
+        'rs_ratio': _sf(lat.get('RS_Ratio'), 1),
+        'regime': rg, 'regime_label': rl,
+        'regime_score': _sf(lat.get('Regime_Score')),
+        'last_date': dc.index[-1].strftime('%Y-%m-%d'),
+        'squeeze_on': bool(lat.get('Squeeze_On', False)),
+        'buy_total': _sf(lat.get('Buy_Total')),
+        'sell_total': _sf(lat.get('Sell_Total')),
+        'buy_active': int(_sf(lat.get('Buy_Active_Layers'))),
+        'sell_active': int(_sf(lat.get('Sell_Active_Layers'))),
+        'buy_layers': bl, 'sell_layers': sl,
+        'judgment': str(lat.get('Trade_Judgment', 'NEUTRAL')),
+        'confidence': _sf(lat.get('Judgment_Confidence')),
+        'leading_verdict': str(lat.get('Leading_Verdict', '중립')),
+        'lagging_verdict': str(lat.get('Lagging_Verdict', '비추세/횡보')),
+        'setup_pressure_buy': _sf(lat.get('Setup_Pressure_Buy')),
+        'setup_pressure_sell': _sf(lat.get('Setup_Pressure_Sell')),
+        'utbot_dir': int(_sf(lat.get('UTBot_Dir'))),
+        'hma_rising': bool(lat.get('HMA_Rising', False)),
+        'slowk': _sf(lat.get('SlowK'), 50),
+        'squeeze_mom': _sf(lat.get('Squeeze_Momentum')),
+        'buy_reversal': _sf(lat.get('Buy_Reversal_Bonus')),
+        'sell_reversal': _sf(lat.get('Sell_Reversal_Bonus')),
+        # ★ 누락 필드 추가
+        'ma50': _sf(lat.get('MA50')),
+        'ma200': _sf(lat.get('MA200')),
+        'vp_poc': _sf(lat.get('VP_POC')),
+        'vp_vah': _sf(lat.get('VP_VAH')),
+        'vp_val': _sf(lat.get('VP_VAL')),
+        'percent_b': _sf(lat.get('Percent_B'), 0.5),
+        'rsi_mfi': _sf(lat.get('RSI_MFI')),
+        'bb_up': _sf(lat.get('BB_Up')),
+        'bb_low': _sf(lat.get('BB_Low')),
+        'ema8': _sf(lat.get('EMA8')),
+        'ema21': _sf(lat.get('EMA21')),
+        'obv_trend': 'rising' if _sf(lat.get('OBV')) > _sf(dc['OBV'].rolling(20).mean().iloc[-1]) else 'falling',
+        # 리스트
+        'combined_scans': acs, 'recent_signals': recent,
+    }
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  UI (개선: 반전보너스 표시, st.dataframe 시그널)
@@ -1846,48 +1884,40 @@ print("✅ Part 3/4 완료")
 # ══════════════════════════════════════════════════════════════
 
 def build_prompt_text(dc, meta):
-    """
-    AI에 전달할 데이터를 3개 블록으로 분리:
-    Block A: 원시 가격 데이터 (객관적 팩트)
-    Block B: 원시 기술 지표 (AI가 직접 해석할 수 있는 수치)
-    Block C: 시그널 발생 이력 (사실만, 판단 없이)
-    Block D: 시스템 판단 (마지막에, "검증 대상"으로 제공)
-    """
-    m = meta
-    lat = dc.iloc[-1]; rd = dc.tail(60)
-
-    # ═══ Block A: 원시 가격 데이터 ═══
+    m = meta; lat = dc.iloc[-1]; rd = dc.tail(60)
     prices = ", ".join([f"'{d.strftime('%m/%d')}:{r['Close']:.2f}'" for d, r in rd.iterrows()])
     
-    vol_avg = m['avg_volume']
-    vol_ratio = m['volume'] / max(vol_avg, 1)
+    vol_ratio = m['volume'] / max(m['avg_volume'], 1)
     
     block_a = (
-        f" [A. 가격 데이터 — 최근 60일]\n"
-        f"{prices}\n\n"
+        f"📌 [A. 가격 데이터 — 최근 60일]\n{prices}\n\n"
         f"현재가: ${m['price']:.2f} (전일대비 {m['price_change_pct']:+.2f}%)\n"
         f"거래량: {m['volume']:,.0f} (20일 평균 대비 {vol_ratio:.1f}배)\n"
         f"ATR(14): ${m['atr']:.2f} ({m['atr_pct']:.1f}%)\n"
     )
 
-    # ═══ Block B: 원시 기술 지표 (수치만, 해석 없이) ═══
+    # ★ 수정: $0 값은 "미계산"으로 표시
+    ma_str = f"MA50=${m['ma50']:.2f}, MA200=${m['ma200']:.2f}" if m['ma50'] > 0 else "MA50/MA200=데이터 부족"
+    vp_str = f"VP_POC=${m['vp_poc']:.2f}, VAH=${m['vp_vah']:.2f}, VAL=${m['vp_val']:.2f}" if m['vp_poc'] > 0 else "VP=데이터 부족"
+    bb_str = f"BB상단=${m.get('bb_up',0):.2f}, BB하단=${m.get('bb_low',0):.2f}" if m.get('bb_up', 0) > 0 else ""
+    
     block_b = (
-        f" [B. 기술 지표 — 당일 수치]\n"
+        f"📌 [B. 기술 지표 — 당일 수치]\n"
         f"모멘텀: RSI={m['rsi']:.1f}, MFI={m['mfi']:.1f}, WaveTrend={m['wt1']:.1f}, StochK={m['stochk']:.1f}, SlowK={m.get('slowk',50):.1f}\n"
         f"추세: ADX={m['adx']:.1f}, MACD_Hist={m['macd_hist']:.4f}\n"
-        f"자금흐름: CMF={m['cmf']:.3f}, RSI_MFI={m.get('rsi_mfi',0):.1f}\n"
-        f"구조: BB %B={m.get('percent_b',0.5):.2f}, VP_POC=${m.get('vp_poc',0):.2f}, VAH=${m.get('vp_vah',0):.2f}, VAL=${m.get('vp_val',0):.2f}\n"
-        f"이동평균: MA50=${m.get('ma50',0):.2f}, MA200=${m.get('ma200',0):.2f}\n"
+        f"자금흐름: CMF={m['cmf']:.3f}, RSI_MFI={m.get('rsi_mfi',0):.1f}, OBV추세={m.get('obv_trend','N/A')}\n"
+        f"구조: BB %B={m.get('percent_b',0.5):.2f}, {bb_str}\n"
+        f"  {vp_str}\n"
+        f"  {ma_str}\n"
         f"보조지표: UTBot방향={'매수중' if m.get('utbot_dir',0)==1 else '매도중' if m.get('utbot_dir',0)==-1 else '미정'}, "
         f"Hull={'상승' if m.get('hma_rising') else '하락'}, SqMom={m.get('squeeze_mom',0):.3f}\n"
         f"상대강도: RS(vs SPY)={m['rs_ratio']:.3f}\n"
     )
 
-    # ═══ Block C: 시그널 발생 이력 (사실만) ═══
+    # Block C: 시그널 (기존 동일)
     sig_lines = []
     for ir, row in dc.tail(20).iterrows():
-        dd = ir.strftime('%m/%d')
-        day_sigs = []
+        dd = ir.strftime('%m/%d'); day_sigs = []
         for k, v in SIGNAL_REGISTRY.items():
             if row.get(k, False):
                 direction = '▲' if v['dir'] == 'buy' else ('▼' if v['dir'] == 'sell' else '•')
@@ -1896,18 +1926,16 @@ def build_prompt_text(dc, meta):
             if row.get(k, False):
                 direction = '▲' if v['dir'] == 'buy' else ('▼' if v['dir'] == 'sell' else '•')
                 day_sigs.append(f"{direction}{v['kor']}[T{v['tier']}]")
-        if day_sigs:
-            sig_lines.append(f"  {dd}: {', '.join(day_sigs)}")
-    
-    block_c = f" [C. 최근 시그널 발생 이력 — 사실만]\n"
+        if day_sigs: sig_lines.append(f"  {dd}: {', '.join(day_sigs)}")
+    block_c = f"📌 [C. 최근 시그널 발생 이력 — 사실만]\n"
     block_c += "\n".join(sig_lines[-15:]) if sig_lines else "  (최근 20일 내 시그널 없음)"
 
-    # ═══ Block D: 시스템 판단 (검증 대상) ═══
+    # Block D: 시스템 판단
     buy_layer_str = ', '.join(f"{k}:{v:.1f}" for k, v in m['buy_layers'].items() if v > 0)
     sell_layer_str = ', '.join(f"{k}:{v:.1f}" for k, v in m['sell_layers'].items() if v > 0)
     
     block_d = (
-        f"\n [D. 시스템(CipherX) 판단 —  검증 대상 (정답이 아닌 '가설'로 취급하세요)]\n"
+        f"\n📌 [D. 시스템(CipherX) 판단 — ⚠️ 검증 대상 (정답이 아닌 '가설'로 취급하세요)]\n"
         f"  시스템 결론: {m['judgment']} (확신도 {m['confidence']:.0f}%)\n"
         f"  BUY 스코어: {m['buy_total']:.1f} (활성 {m['buy_active']}/{NUM_LAYERS}층) [{buy_layer_str}]\n"
         f"  SELL 스코어: {m['sell_total']:.1f} (활성 {m['sell_active']}/{NUM_LAYERS}층) [{sell_layer_str}]\n"
@@ -1919,7 +1947,6 @@ def build_prompt_text(dc, meta):
         block_d += f"  Combined Scan: {_cs_str(m['combined_scans'])}\n"
 
     return f"{block_a}\n{block_b}\n{block_c}\n{block_d}"
-
 
 def build_ai_prompt(ticker, phist, fund):
     return f"""━━━  Role (역할) ━━━
