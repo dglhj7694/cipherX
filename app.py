@@ -2067,19 +2067,27 @@ def init_session():
 
 init_session()
 
+# ── 사이드바 수정 ──
 with st.sidebar:
-    st.markdown("## 🚦 CipherX V13.3");st.markdown("<p style='color:#64748B;font-size:.75rem'>Reversal-Aware 10-Layer · 139 Signals</p>",unsafe_allow_html=True);st.markdown("---")
-    app_mode=st.radio("모드",['분석','스캐너'],index=0,key="app_mode")
-    chart_period=st.radio("기간",['3개월','6개월','1년'],index=0,horizontal=True,key="period")
-    chart_days={'3개월':63,'6개월':126,'1년':252}[chart_period]
-    if st.button("초기화",use_container_width=True,type="secondary"):
-        for k in ['messages','pending_ai_ticker','pending_ai_prompt','last_ticker']:
-            st.session_state[k]=[{"role":"assistant","type":"text","content":"🚦 **CipherX V13.3**"}] if k=='messages' else None
+    st.markdown("## 🚦 CipherX V13.3")
+    st.markdown("---")
+
+    # ★ key 제거, index로 제어
+    _mode_index = 0 if st.session_state.get('_mode', '분석') == '분석' else 1
+    app_mode = st.radio("모드", ['분석', '스캐너'], index=_mode_index)
+    st.session_state['_mode'] = app_mode  # 별도 키에 저장
+
+    chart_period = st.radio("기간", ['3개월', '6개월', '1년'], index=0, horizontal=True, key="period")
+    chart_days = {'3개월': 63, '6개월': 126, '1년': 252}[chart_period]
+
+    if st.button("🗑️ 초기화", use_container_width=True, type="secondary"):
+        for k in ['messages', 'pending_ai_ticker', 'pending_ai_prompt', 'last_ticker']:
+            st.session_state[k] = [{"role":"assistant","type":"text","content":"🚦 **CipherX V13.3**"}] if k == 'messages' else None
         st.rerun()
 
 # ═══ 스캐너 모드 (섹터 선택 + 병렬) ═══
-# ── 스캐너 섹션 전체 수정 ──
-if st.session_state.get('app_mode') == '스캐너':
+current_mode = st.session_state.get('_mode', '📊 분석')
+if current_mode == '스캐너':
     st.markdown("<h2 style='text-align:center;color:#fff'>🔍 Scanner</h2>", unsafe_allow_html=True)
 
     st.markdown("#### 📂 섹터 선택")
@@ -2236,7 +2244,7 @@ if st.session_state.get('app_mode') == '스캐너':
             st.markdown(card_html, unsafe_allow_html=True)
 
             if st.button(f"📊 {r['ticker']} 분석", key=f"sc_{r['ticker']}", use_container_width=True):
-                st.session_state['app_mode'] = '분석'  
+                st.session_state['_mode'] = '분석'   
                 st.session_state['_auto'] = r['ticker']
                 st.rerun()
 
@@ -2309,7 +2317,8 @@ else:
                     "fig_json":fig_json,"meta":meta,"prompt":prompt})  # 개선: fig_json 저장
                 st.session_state.pending_ai_ticker=tv;st.session_state.pending_ai_prompt=prompt;st.rerun()
             else:st.session_state.messages.append({"role":"assistant","type":"text","content":f"⚠️ **{tv}** 실패:{phist}"});st.rerun()
-    if st.session_state.get('_auto'):process_ticker(st.session_state.pop('_auto'))
+    if st.session_state.get('_auto'):
+        process_ticker(st.session_state.pop('_auto'))
     if st.session_state.get('quick'):process_ticker(st.session_state.pop('quick'))
     if st.session_state.pending_ai_ticker and st.session_state.pending_ai_prompt:
         if st.button(f"🚀 {st.session_state.pending_ai_ticker.upper()} AI분석",type="primary",use_container_width=True):_run_ai()
