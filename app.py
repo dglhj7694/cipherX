@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from company_details import render_company_details
 from sectors import SECTOR_GROUPS
 
-st.set_page_config(page_title="CipherX V13.3", page_icon="📈", layout="centered", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="CipherX V13.3", page_icon="📈", layout="wide", initial_sidebar_state="collapsed")
 
 def inject_css():
     st.markdown("""<style>
@@ -26,7 +26,7 @@ html,body,[class*="css"]{font-family:'Pretendard',sans-serif!important}
 p,li{color:#E8ECF1!important} h1,h2{color:#FFF!important;font-weight:800!important}
 h3{color:#F0F4F8!important;font-weight:700!important}
 h4{color:#CBD5E1!important;font-weight:600!important;font-size:1rem!important}
-.block-container{padding-top:1rem!important;max-width:960px}
+.block-container{padding-top:1rem!important;max-width:1400px}
 div.stButton>button[kind="primary"]{background:linear-gradient(135deg,#6366F1,#8B5CF6)!important;color:#fff!important;border:none!important;border-radius:12px!important;font-weight:700!important;width:100%}
 div.stButton>button[kind="secondary"]{background-color:#12161F!important;color:#C4CDD8!important;border:1px solid #2A3040!important;border-radius:12px!important;width:100%}
 .price-header{background:linear-gradient(160deg,#0F1320,#141926);border:1px solid #1C2233;border-radius:16px;padding:20px 24px;margin-bottom:18px}
