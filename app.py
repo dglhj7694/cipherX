@@ -2061,7 +2061,7 @@ init_session()
 
 with st.sidebar:
     st.markdown("## 🚦 CipherX V13.3");st.markdown("<p style='color:#64748B;font-size:.75rem'>Reversal-Aware 10-Layer · 139 Signals</p>",unsafe_allow_html=True);st.markdown("---")
-    app_mode=st.radio("모드",['📊 분석','🔍 스캐너'],index=0,key="app_mode")
+    app_mode=st.radio("모드",['분석','스캐너'],index=0,key="app_mode")
     chart_period=st.radio("기간",['3개월','6개월','1년'],index=0,horizontal=True,key="period")
     chart_days={'3개월':63,'6개월':126,'1년':252}[chart_period]
     if st.button("초기화",use_container_width=True,type="secondary"):
@@ -2222,7 +2222,7 @@ if st.session_state.get('app_mode') == '스캐너':
                 st.markdown(card_html, unsafe_allow_html=True)
                 
                 if st.button(f"📊 {r['ticker']}", key=f"sc_{r['ticker']}", use_container_width=True):
-                    st.session_state['app_mode'] = '📊 분석'
+                    st.session_state['app_mode'] = '분석'
                     st.session_state['_auto'] = r['ticker']
                     st.rerun()
 
