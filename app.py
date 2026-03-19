@@ -2069,8 +2069,7 @@ with st.sidebar:
             st.session_state[k]=[{"role":"assistant","type":"text","content":"🚦 **CipherX V13.3**"}] if k=='messages' else None
         st.rerun()
 
-# ═══ 스캐너 (개선: 병렬 처리) ═══
-# ═══ 스캐너 모드 (개선: 섹터 선택 + 병렬) ═══
+# ═══ 스캐너 모드 (섹터 선택 + 병렬) ═══
 if st.session_state.get('app_mode') == '🔍 스캐너':
     st.markdown("<h2 style='text-align:center;color:#fff'>🔍 Scanner</h2>", unsafe_allow_html=True)
     
@@ -2173,17 +2172,19 @@ if st.session_state.get('app_mode') == '🔍 스캐너':
             # 요약 통계
             buy_tickers = [r for r in results if 'BUY' in r['jg']]
             sell_tickers = [r for r in results if 'SELL' in r['jg']]
-            st.markdown(f"""<div style="display:flex;gap:12px;margin-bottom:12px">
-                <div style="flex:1;background:rgba(0,230,118,.06);border:1px solid #10B98133;border-radius:10px;padding:10px;text-align:center">
-                    <span style="color:#34D399;font-weight:800;font-size:1.3rem">{len(buy_tickers)}</span>
-                    <span style="color:#64748B;font-size:.8rem;margin-left:4px">매수 시그널</span></div>
-                <div style="flex:1;background:rgba(255,23,68,.06);border:1px solid #EF444433;border-radius:10px;padding:10px;text-align:center">
-                    <span style="color:#F87171;font-weight:800;font-size:1.3rem">{len(sell_tickers)}</span>
-                    <span style="color:#64748B;font-size:.8rem;margin-left:4px">매도 시그널</span></div>
-                <div style="flex:1;background:rgba(99,102,241,.06);border:1px solid #6366F133;border-radius:10px;padding:10px;text-align:center">
-                    <span style="color:#A5B4FC;font-weight:800;font-size:1.3rem">{len(results)}</span>
-                    <span style="color:#64748B;font-size:.8rem;margin-left:4px">/ {len(tickers)} 종목</span></div>
-            </div>""", unsafe_allow_html=True)
+            stats_html = (
+                f"<div style='display:flex;gap:12px;margin-bottom:12px'>"
+                f"<div style='flex:1;background:rgba(0,230,118,.06);border:1px solid #10B98133;border-radius:10px;padding:10px;text-align:center'>"
+                f"<span style='color:#34D399;font-weight:800;font-size:1.3rem'>{len(buy_tickers)}</span>"
+                f"<span style='color:#64748B;font-size:.8rem;margin-left:4px'>매수 시그널</span></div>"
+                f"<div style='flex:1;background:rgba(255,23,68,.06);border:1px solid #EF444433;border-radius:10px;padding:10px;text-align:center'>"
+                f"<span style='color:#F87171;font-weight:800;font-size:1.3rem'>{len(sell_tickers)}</span>"
+                f"<span style='color:#64748B;font-size:.8rem;margin-left:4px'>매도 시그널</span></div>"
+                f"<div style='flex:1;background:rgba(99,102,241,.06);border:1px solid #6366F133;border-radius:10px;padding:10px;text-align:center'>"
+                f"<span style='color:#A5B4FC;font-weight:800;font-size:1.3rem'>{len(results)}</span>"
+                f"<span style='color:#64748B;font-size:.8rem;margin-left:4px'>/ {len(tickers)} 종목</span></div></div>"
+            )
+            st.markdown(stats_html, unsafe_allow_html=True)
             
             # 결과 카드
             for r in results:
@@ -2207,17 +2208,18 @@ if st.session_state.get('app_mode') == '🔍 스캐너':
                 if r['br'] > 2: rev_info += f" <span style='color:#34D399;font-size:.7rem'>🔄B+{r['br']:.0f}</span>"
                 if r['sr'] > 2: rev_info += f" <span style='color:#F87171;font-size:.7rem'>🔄S+{r['sr']:.0f}</span>"
                 
-                st.markdown(f"""<div style="background:linear-gradient(160deg,#0F1320,#141926);
-                    border:1px solid #1E293B;border-radius:14px;padding:14px 18px;margin:6px 0">
-                    <div style="display:flex;justify-content:space-between;margin-bottom:8px">
-                        <span style="color:#A5B4FC;font-weight:800;font-size:1.15rem">{r['ticker']}</span>
-                        <div>
-                            <span style="color:{jc_};font-size:.8rem;font-weight:600">{r['jg']}({r['cf']:.0f}%)</span>
-                            {rev_info}
-                            <span style="color:{chc};font-size:.8rem;margin-left:8px">{chi}{abs(r['chg']):.1f}%</span>
-                        </div>
-                    </div>{sh}
-                </div>""", unsafe_allow_html=True)
+                card_html = (
+                    f"<div style='background:linear-gradient(160deg,#0F1320,#141926);"
+                    f"border:1px solid #1E293B;border-radius:14px;padding:14px 18px;margin:6px 0'>"
+                    f"<div style='display:flex;justify-content:space-between;margin-bottom:8px'>"
+                    f"<span style='color:#A5B4FC;font-weight:800;font-size:1.15rem'>{r['ticker']}</span>"
+                    f"<div>"
+                    f"<span style='color:{jc_};font-size:.8rem;font-weight:600'>{r['jg']}({r['cf']:.0f}%)</span>"
+                    f"{rev_info}"
+                    f"<span style='color:{chc};font-size:.8rem;margin-left:8px'>{chi}{abs(r['chg']):.1f}%</span>"
+                    f"</div></div>{sh}</div>"
+                )
+                st.markdown(card_html, unsafe_allow_html=True)
                 
                 if st.button(f"📊 {r['ticker']}", key=f"sc_{r['ticker']}", use_container_width=True):
                     st.session_state['app_mode'] = '📊 분석'
