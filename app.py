@@ -2086,7 +2086,7 @@ with st.sidebar:
         st.rerun()
 
 # ═══ 스캐너 모드 (섹터 선택 + 병렬) ═══
-current_mode = st.session_state.get('_mode', '📊 분석')
+current_mode = st.session_state.get('_mode', '분석')
 if current_mode == '스캐너':
     st.markdown("<h2 style='text-align:center;color:#fff'>🔍 Scanner</h2>", unsafe_allow_html=True)
 
