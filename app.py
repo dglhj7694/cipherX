@@ -259,10 +259,10 @@ SIGNAL_REGISTRY={
     'Relative_Strength_Buy':_sig(2,_B,'💪','RS▲','star-diamond',13,'#00E5FF','Low',-1.8,'상대강도매수','SPY대비강세'),
     'Relative_Strength_Sell':_sig(1.5,_S,'🐌','RS▼','star-diamond',11,'#FF6E40','High',1.5,'상대약세매도','SPY대비약세'),
     # 신규 보조지표 (10)
-    'UTBot_Buy':_sig(2,_B,'🤖','UTBot▲','triangle-up',13,'#00E676','Low',-2,'UT봇매수','ATR트레일링 매도→매수전환'),
-    'UTBot_Sell':_sig(2,_S,'🤖','UTBot▼','triangle-down',13,'#FF1744','High',2,'UT봇매도','ATR트레일링 매수→매도전환'),
-    'Hull_Turn_Bull':_sig(1.8,_B,'🟢','Hull▲','circle',11,'#00E676','Low',-1.5,'Hull강세전환','HMA빨강→초록'),
-    'Hull_Turn_Bear':_sig(1.8,_S,'🔴','Hull▼','circle',11,'#FF1744','High',1.5,'Hull약세전환','HMA초록→빨강'),
+    'UTBot_Buy':_sig(2,_B,'🤖','UTBot▲','triangle-up',15,'#00E676','Low',-2,'UT봇매수','ATR트레일링 매도→매수전환'),
+    'UTBot_Sell':_sig(2,_S,'🤖','UTBot▼','triangle-down',15,'#FF1744','High',2,'UT봇매도','ATR트레일링 매수→매도전환'),
+    'Hull_Turn_Bull':_sig(1.8,_B,'🟢','Hull▲','circle',15,'#00E676','Low',-1.5,'Hull강세전환','HMA빨강→초록'),
+    'Hull_Turn_Bear':_sig(1.8,_S,'🔴','Hull▼','circle',15,'#FF1744','High',1.5,'Hull약세전환','HMA초록→빨강'),
     'StochSlow_Cross_Buy':_sig(1,_B,'🔄','StSl▲','circle-open',9,'#81C784','Low',-1,'StochSlow매수','SlowK>SlowD바닥권'),
     'StochSlow_Cross_Sell':_sig(1,_S,'🔄','StSl▼','circle-open',9,'#EF9A9A','High',1,'StochSlow매도','SlowK<SlowD천장권'),
     'Squeeze_Mom_Cross_Up':_sig(1.5,_B,'💥','SqMom▲','diamond',11,'#00FFFF','Low',-1.2,'스퀴즈모멘텀0↑','모멘텀음→양'),
@@ -1228,11 +1228,7 @@ def compute_10layer_judgment(df,vol_ratio,hma_r_v):
 print("✅ Part 2/4 완료 — 139개 시그널 + 반전 인식 10-Layer")
 
 # ══════════════════════════════════════════════════════════════
-#  CipherX V13.3 — PART 3/4: 차트(벡터화 호버) + UI
-# ══════════════════════════════════════════════════════════════
-
-# ══════════════════════════════════════════════════════════════
-#  CipherX V13.3 — PART 3/4 교체: MF차트+UTBot+시그널호버강화
+#  CipherX V13.3 — PART 3/4
 # ══════════════════════════════════════════════════════════════
 
 def _build_candle_hover(dc):
@@ -1453,7 +1449,7 @@ def build_chart(dc, ticker):
                 reasons.append(f"{reg.get('kor','')}")
         reason_str = ', '.join(reasons[:3]) if reasons else '다중 강세 합류'
         fig.add_trace(go.Scatter(x=sr.index, y=yv, mode='markers',
-            marker=dict(symbol='star', size=16, color='#FFD700',
+            marker=dict(symbol='star', size=8, color='#FFD700',
                 line=dict(width=2, color='#00E676'), opacity=.95),
             name='⭐강력매수',
             hovertemplate=f"<b>⭐ 강력매수</b><br><span style='color:#94A3B8'>{reason_str}</span><br>%{{x|%Y-%m-%d}}<extra></extra>"),
@@ -1467,7 +1463,7 @@ def build_chart(dc, ticker):
                 reasons.append(f"{reg.get('kor','')}")
         reason_str = ', '.join(reasons[:3]) if reasons else '다중 약세 합류'
         fig.add_trace(go.Scatter(x=sr.index, y=yv, mode='markers',
-            marker=dict(symbol='star', size=16, color='#FFD700',
+            marker=dict(symbol='star', size=8, color='#FFD700',
                 line=dict(width=2, color='#FF1744'), opacity=.95),
             name='⭐강력매도',
             hovertemplate=f"<b>⭐ 강력매도</b><br><span style='color:#94A3B8'>{reason_str}</span><br>%{{x|%Y-%m-%d}}<extra></extra>"),
