@@ -1841,56 +1841,162 @@ print("✅ Part 3/4 완료")
 #  CipherX V13.3 — PART 4/4: AI, 스캐너(병렬), 메인 루프
 # ══════════════════════════════════════════════════════════════
 
-def build_prompt_text(dc,meta):
-    lat=dc.iloc[-1];rd=dc.tail(60);ps=", ".join([f"'{d.strftime('%Y-%m-%d')}:{r['Close']:.2f}'" for d,r in rd.iterrows()])
-    sl=[]
-    for ir,row in dc.tail(30).iterrows():
-        dd=ir.strftime('%Y-%m-%d')
-        for k,v in SIGNAL_REGISTRY.items():
-            if row.get(k,False):sl.append(f"{v['icon']}{v['kor']} {dd}")
-        for k,v in COMBINED_SCAN_REGISTRY.items():
-            if row.get(k,False):sl.append(f"🎯{v['kor']}[T{v['tier']}] {dd}")
-    st_text="\n".join(sl[-25:]) if sl else "시그널없음"
-    m=meta
-    inds=(f"WT={m['wt1']:.1f},RSI={m['rsi']:.1f},MFI={m['mfi']:.1f},StK={m['stochk']:.1f},SlowK={m.get('slowk',50):.1f},"
-          f"ADX={m['adx']:.1f},ATR={m['atr']:.2f}({m['atr_pct']:.1f}%),MACD_H={m['macd_hist']:.3f},CMF={m['cmf']:.3f},"
-          f"Regime={m['regime']}({m['regime_score']:.1f}),RS={m['rs_ratio']:.3f},Accel={m['composite_accel']:.2f},"
-          f"UTBot={'BUY' if m.get('utbot_dir',0)==1 else 'SELL' if m.get('utbot_dir',0)==-1 else 'N/A'},"
-          f"Hull={'UP' if m.get('hma_rising') else 'DN'},SqMom={m.get('squeeze_mom',0):.2f}")
-    # 개선: f-string 호환성 수정
-    buy_layer_str=', '.join(f"{k}={v:.1f}" for k,v in m['buy_layers'].items() if v!=0)
-    sell_layer_str=', '.join(f"{k}={v:.1f}" for k,v in m['sell_layers'].items() if v!=0)
-    jtext=(f"\n📌[매매판단]\n  최종:{m['judgment']}({m['confidence']:.0f}%)\n"
-           f"  BUY:{m['buy_total']:.1f}({m['buy_active']}/{NUM_LAYERS}) SELL:{m['sell_total']:.1f}({m['sell_active']}/{NUM_LAYERS})\n"
-           f"  BUY층:{buy_layer_str}\n  SELL층:{sell_layer_str}\n"
-           f"  반전보너스: B+{m.get('buy_reversal',0):.1f} S+{m.get('sell_reversal',0):.1f}\n"
-           f"  ⏳선행:{m['leading_verdict']} | 📊후행:{m['lagging_verdict']}\n")
-    if m['combined_scans']:jtext+=f"  🎯CS:{_cs_str(m['combined_scans'])}\n"
-    return f"{ps}\n\n📌[지표]{inds}\n\n📌[시그널]\n{st_text}{jtext}"
+# ══════════════════════════════════════════════════════════════
+#  프롬프트 시스템 — 확증 편향 제거 버전
+# ══════════════════════════════════════════════════════════════
 
-def build_ai_prompt(ticker,phist,fund):
-    return f"""━━━ Role ━━━
-월스트리트 20년+ 퀀트 펀드매니저. 반전 인식 10-Layer 기반 냉철한 분석.
-━━━ Rules ━━━
-1. ATR기반 손절/목표가 2. 10-Layer+반전보너스 크로스체크 3. Combined Scan+UTBot+Hull+VuManChu 활용
-4. 선행지표(가속도,셋업,UTBot방향,Hull색)로 1~3일 예측 5. 후행지표(국면,RS)로 대세 확인
-6. 시나리오별 확률% 7. 환각금지 8. 바닥매수/고점매도 반전 신호 중점 해석
-9. 반전보너스가 5+ 이면 추세와 반대 방향의 반전 가능성 중요하게 평가
-━━━ Data ━━━
+def build_prompt_text(dc, meta):
+    """
+    AI에 전달할 데이터를 3개 블록으로 분리:
+    Block A: 원시 가격 데이터 (객관적 팩트)
+    Block B: 원시 기술 지표 (AI가 직접 해석할 수 있는 수치)
+    Block C: 시그널 발생 이력 (사실만, 판단 없이)
+    Block D: 시스템 판단 (마지막에, "검증 대상"으로 제공)
+    """
+    m = meta
+    lat = dc.iloc[-1]; rd = dc.tail(60)
+
+    # ═══ Block A: 원시 가격 데이터 ═══
+    prices = ", ".join([f"'{d.strftime('%m/%d')}:{r['Close']:.2f}'" for d, r in rd.iterrows()])
+    
+    vol_avg = m['avg_volume']
+    vol_ratio = m['volume'] / max(vol_avg, 1)
+    
+    block_a = (
+        f" [A. 가격 데이터 — 최근 60일]\n"
+        f"{prices}\n\n"
+        f"현재가: ${m['price']:.2f} (전일대비 {m['price_change_pct']:+.2f}%)\n"
+        f"거래량: {m['volume']:,.0f} (20일 평균 대비 {vol_ratio:.1f}배)\n"
+        f"ATR(14): ${m['atr']:.2f} ({m['atr_pct']:.1f}%)\n"
+    )
+
+    # ═══ Block B: 원시 기술 지표 (수치만, 해석 없이) ═══
+    block_b = (
+        f" [B. 기술 지표 — 당일 수치]\n"
+        f"모멘텀: RSI={m['rsi']:.1f}, MFI={m['mfi']:.1f}, WaveTrend={m['wt1']:.1f}, StochK={m['stochk']:.1f}, SlowK={m.get('slowk',50):.1f}\n"
+        f"추세: ADX={m['adx']:.1f}, MACD_Hist={m['macd_hist']:.4f}\n"
+        f"자금흐름: CMF={m['cmf']:.3f}, RSI_MFI={m.get('rsi_mfi',0):.1f}\n"
+        f"구조: BB %B={m.get('percent_b',0.5):.2f}, VP_POC=${m.get('vp_poc',0):.2f}, VAH=${m.get('vp_vah',0):.2f}, VAL=${m.get('vp_val',0):.2f}\n"
+        f"이동평균: MA50=${m.get('ma50',0):.2f}, MA200=${m.get('ma200',0):.2f}\n"
+        f"보조지표: UTBot방향={'매수중' if m.get('utbot_dir',0)==1 else '매도중' if m.get('utbot_dir',0)==-1 else '미정'}, "
+        f"Hull={'상승' if m.get('hma_rising') else '하락'}, SqMom={m.get('squeeze_mom',0):.3f}\n"
+        f"상대강도: RS(vs SPY)={m['rs_ratio']:.3f}\n"
+    )
+
+    # ═══ Block C: 시그널 발생 이력 (사실만) ═══
+    sig_lines = []
+    for ir, row in dc.tail(20).iterrows():
+        dd = ir.strftime('%m/%d')
+        day_sigs = []
+        for k, v in SIGNAL_REGISTRY.items():
+            if row.get(k, False):
+                direction = '▲' if v['dir'] == 'buy' else ('▼' if v['dir'] == 'sell' else '•')
+                day_sigs.append(f"{direction}{v['kor']}")
+        for k, v in COMBINED_SCAN_REGISTRY.items():
+            if row.get(k, False):
+                direction = '▲' if v['dir'] == 'buy' else ('▼' if v['dir'] == 'sell' else '•')
+                day_sigs.append(f"{direction}{v['kor']}[T{v['tier']}]")
+        if day_sigs:
+            sig_lines.append(f"  {dd}: {', '.join(day_sigs)}")
+    
+    block_c = f" [C. 최근 시그널 발생 이력 — 사실만]\n"
+    block_c += "\n".join(sig_lines[-15:]) if sig_lines else "  (최근 20일 내 시그널 없음)"
+
+    # ═══ Block D: 시스템 판단 (검증 대상) ═══
+    buy_layer_str = ', '.join(f"{k}:{v:.1f}" for k, v in m['buy_layers'].items() if v > 0)
+    sell_layer_str = ', '.join(f"{k}:{v:.1f}" for k, v in m['sell_layers'].items() if v > 0)
+    
+    block_d = (
+        f"\n [D. 시스템(CipherX) 판단 —  검증 대상 (정답이 아닌 '가설'로 취급하세요)]\n"
+        f"  시스템 결론: {m['judgment']} (확신도 {m['confidence']:.0f}%)\n"
+        f"  BUY 스코어: {m['buy_total']:.1f} (활성 {m['buy_active']}/{NUM_LAYERS}층) [{buy_layer_str}]\n"
+        f"  SELL 스코어: {m['sell_total']:.1f} (활성 {m['sell_active']}/{NUM_LAYERS}층) [{sell_layer_str}]\n"
+        f"  반전 보너스: 매수+{m.get('buy_reversal',0):.1f}, 매도+{m.get('sell_reversal',0):.1f}\n"
+        f"  선행지표 판단: {m['leading_verdict']}\n"
+        f"  후행지표 판단: {m['lagging_verdict']}\n"
+    )
+    if m['combined_scans']:
+        block_d += f"  Combined Scan: {_cs_str(m['combined_scans'])}\n"
+
+    return f"{block_a}\n{block_b}\n{block_c}\n{block_d}"
+
+
+def build_ai_prompt(ticker, phist, fund):
+    return f"""━━━  Role (역할) ━━━
+당신은 월스트리트에서 20년 이상 경력의 **독립 리서치 애널리스트**입니다.
+고객사의 퀀트 트레이딩 시스템(CipherX)이 산출한 결과를 **교차 검증(Cross-Validation)**하는 것이 당신의 임무입니다.
+시스템을 무비판적으로 수용하는 '예스맨'이 아니라, 시스템이 놓치고 있는 맹점과 리스크를 짚어내는 **'Devil's Advocate(악마의 변호인)'** 역할을 수행하세요.
+
+━━━  Rules (핵심 원칙) ━━━
+1. **데이터 위계**: Block A~C(원시 데이터)를 먼저 독자적으로 분석한 뒤, Block D(시스템 판단)와 대조하세요. Block D는 '정답'이 아니라 '검증할 가설'입니다.
+2. **반드시 반론 제시**: 시스템이 BUY라면 SELL 근거를 적극 탐색하고, SELL이라면 BUY 근거를 찾으세요. 양쪽 논리를 모두 전개한 뒤 확률로 비교하세요.
+3. **확률적 사고**: "오른다/내린다" 단정 금지. 시나리오별 확률(%)과 조건부 트리거를 명시하세요.
+4. **구체적 가격**: 지지/저항은 VP_POC, VAH, VAL, MA, ATR 기반으로 소수점 둘째 자리까지 명시하세요.
+5. **자금 추적**: CMF, OBV, 거래량 비율로 스마트 머니의 매집/분배/관망 상태를 추론하세요.
+6. **환각 금지**: 데이터에 없는 외부 정보(뉴스, 실적 등)를 지어내지 마세요. 모르면 "데이터 범위 밖"이라고 명시하세요.
+7. **시스템 오류 탐색**: 시스템 판단과 원시 지표 사이에 괴리가 있다면 반드시 지적하세요. (예: 시스템=BUY인데 CMF가 음수, 거래량 감소 등)
+
+━━━  Data (입력 데이터) ━━━
 [{ticker}]
 {phist}
-📌[펀더멘탈] {fund}
-━━━ Output ━━━
-# 🚦 {{ticker}} 퀀트 리포트
-[🔵/🔴/🟠] 핵심 한줄
-### 📊 시장심리
-### ⚖️ 10-Layer + 반전 판단 검증 (추세점수 vs 반전보너스 해석)
-### 🎯 Combined Scan + 신규지표 (UTBot/Hull/VuManChu)
-### ⏳ 선행지표 예측
-### 📊 후행지표 확인
-### 📈 종합 기술분석
-### 🔮 시나리오 (🔵긍정 🟠베이스 🔴리스크 + ATR전략)
-### 📋 결론 (종합의견+예측+GRADE)"""
+ [펀더멘탈 참고] {fund}
+
+━━━  Output Format ━━━
+※ 아래 구조를 엄격히 지키되, 각 섹션에서 시스템 동의/반박을 명확히 하세요.
+
+# 🚦 {{ticker}} 독립 검증 리포트
+
+[🔵/🔴/🟠] **핵심 한줄** — 원시 데이터 기반의 독자적 판단 (시스템과 다를 수 있음)
+
+---
+
+###  1. 시장 심리 — 객관적 팩트 체크
+* **가격 동향:** [60일 가격 흐름 요약, 추세 단계(축적/상승/분배/하락)]
+* **거래량 & 수급:** [거래량 평균 대비, CMF/OBV 방향 → 스마트 머니 해석]
+* **모멘텀 상태:** [RSI/MFI/WT/StochK 수치 → 과매수·과매도·중립 객관 진단]
+
+###  2. 시스템 판단 교차 검증
+* **시스템 주장:** [{ticker}에 대한 CipherX의 결론 요약]
+* **✅ 동의하는 근거:** [원시 지표 중 시스템 판단을 뒷받침하는 것들]
+* **❌ 반박하는 근거 (Devil's Advocate):** [시스템 판단과 충돌하거나 간과된 지표/패턴. 없으면 "특별한 반박 근거 없음" 명시]
+* ** 간과된 리스크:** [시스템이 놓치고 있을 수 있는 위험 요소 — 거래량 감소, 다이버전스 미확인, 과열 장기화 등]
+
+###  3. 핵심 시그널 해석
+* **WaveTrend/VuManChu:** [과매수·과매도 상태, 다이버전스 유무, 교차 신호 해석]
+* **추세 지표 (UTBot/Hull/ST):** [방향 일치 여부, 충돌 시 어느 쪽이 우세한지 판단]
+* **자금 흐름 (MFI/CMF/OBV):** [가격 방향과 자금 흐름의 일치/괴리]
+
+###  4. 구조적 지지/저항
+| 레벨 | 가격 | 근거 | 돌파/이탈 시 시나리오 |
+|------|------|------|----------------------|
+| 1차 저항 | $__.__ | [VAH/MA/BB상단 등] | [돌파 시 목표] |
+| 1차 지지 | $__.__ | [VP_POC/MA/BB하단 등] | [이탈 시 목표] |
+| 2차 지지 | $__.__ | [VAL/MA200 등] | [이탈 시 최악] |
+
+### 5. 주가변동이유 및 이벤트 
+* **[긍정:🔵/부정 :🔴/중간:🟠] [이유 1: 뉴스,공시,매크로 지표, 섹터 이슈 등]
+* **[이유 2]
+* **[이유...]
+* **[이유...]
+
+###  6. 확률 기반 시나리오
+* 🔵 **강세 시나리오** — 확률: __%
+  [트리거 조건] → [목표가] (근거: )
+* 🟠 **베이스 시나리오** — 확률: __%
+  [가장 유력한 흐름] (근거: )
+* 🔴 **약세 시나리오** — 확률: __%
+  [트리거 조건] → [목표가] (근거: )
+
+###  7. 실전 전략
+* **진입:** [공격적 $__.__  /  보수적 $__.__]
+* **손절:** $__.__ (근거: ATR × __ or 지지선 이탈)
+* **익절:** 1차 $__.__ / 2차 $__.__ (분할 매도 비율)
+* **R:R 비율:** 1:__
+
+###  결론
+[🔵/🔴/🟠] [2~3문장 최종 요약 — 시스템 판단에 동의하는지 여부 + 핵심 조건 + 투자 매력도 GRADE(A~F)]
+※ 시스템과 의견이 다르다면 그 이유를 명확히 밝히세요."""
+
 
 def analyze(ticker,chart_days=252,refresh=False):
     try:
@@ -1984,10 +2090,10 @@ else:
             if msg.get("type")=="analysis":
                 st.markdown(msg.get("content",""));render_analysis(msg)
                 if msg.get("prompt"):
-                    with st.expander("📝 프롬프트",expanded=False):st.code(msg["prompt"],language="markdown");st_copy_to_clipboard(msg["prompt"],before_copy_label="📋복사",after_copy_label="✅됨!")
+                    with st.expander(" 프롬프트",expanded=False):st.code(msg["prompt"],language="markdown");st_copy_to_clipboard(msg["prompt"],before_copy_label="📋복사",after_copy_label="✅됨!")
             elif msg.get("type")=="report":
-                with st.expander(f"📊 {msg.get('ticker','')} AI리포트",expanded=True):st.markdown(msg["content"])
-                st.download_button("📥",key=f"dl_{i}",data=msg["content"].encode('utf-8'),file_name=f"{msg.get('ticker','')}_V133_{datetime.now().strftime('%Y%m%d')}.md",mime="text/markdown",use_container_width=True)
+                with st.expander(f" {msg.get('ticker','')} AI리포트",expanded=True):st.markdown(msg["content"])
+                st.download_button("",key=f"dl_{i}",data=msg["content"].encode('utf-8'),file_name=f"{msg.get('ticker','')}_V133_{datetime.now().strftime('%Y%m%d')}.md",mime="text/markdown",use_container_width=True)
             else:st.markdown(msg.get("content",""))
     def _run_ai():
         tp=st.session_state.pending_ai_ticker;pp=st.session_state.pending_ai_prompt
@@ -2000,7 +2106,7 @@ else:
                     for ch in model.generate_content(pp,stream=True):
                         if ch.text:col_.append(ch.text);yield ch.text
                     pb.progress(100,text="✅완료!")
-                with st.expander(f"📊 {tp.upper()} AI리포트",expanded=True):st.write_stream(gen())
+                with st.expander(f" {tp.upper()} AI리포트",expanded=True):st.write_stream(gen())
                 time.sleep(.3);pb.empty()
                 st.session_state.messages.append({"role":"assistant","type":"report","ticker":tp.upper(),"content":"".join(col_)})
                 st.session_state.pending_ai_ticker=None;st.session_state.pending_ai_prompt=None;st.rerun()
@@ -2011,23 +2117,23 @@ else:
         if not validate_ticker(tv):st.toast(f"⚠️ {tv} 없음",icon="🔍");return
         st.session_state.messages.append({"role":"user","type":"text","content":tv});st.session_state.last_ticker=tv
         with st.chat_message("assistant",avatar="✨"):
-            with st.status(f"🌐 {tv} 분석중...",expanded=True) as status:
-                st.write("📡 데이터수집...");fund=fetch_fundamentals(tv)
-                st.write("📊 139시그널+32CS+반전인식10Layer 분석...")
+            with st.status(f" {tv} 분석중...",expanded=True) as status:
+                st.write(" 데이터수집...");fund=fetch_fundamentals(tv)
+                st.write(" 139시그널+32CS+반전인식10Layer 분석...")
                 fig_json,phist,meta=analyze(tv,chart_days,refresh)
                 if fig_json and meta:
                     cs_n=len(meta.get('combined_scans',[]));t1_n=sum(1 for s in meta.get('combined_scans',[]) if s['tier']==1)
                     ut_d='매수' if meta.get('utbot_dir',0)==1 else ('매도' if meta.get('utbot_dir',0)==-1 else '중립')
                     br_=meta.get('buy_reversal',0);sr_=meta.get('sell_reversal',0)
-                    st.write(f"🎯 판단:{meta['judgment']}({meta['confidence']:.0f}%) CS:{cs_n}(T1:{t1_n}) UT:{ut_d}")
+                    st.write(f" 판단:{meta['judgment']}({meta['confidence']:.0f}%) CS:{cs_n}(T1:{t1_n}) UT:{ut_d}")
                     if br_>2 or sr_>2:st.write(f"🔄 반전보너스: B+{br_:.1f} S+{sr_:.1f}")
                     prompt=build_ai_prompt(tv,phist,fund);status.update(label=f"✅ {tv} 완료!",state="complete",expanded=False)
                 else:prompt=None;status.update(label=f"⚠️ {tv} 실패",state="error",expanded=False)
             if fig_json:
-                content=f"✅ **{tv}** — **{meta['judgment']}** ({meta['confidence']:.0f}%)"
+                content=f" **{tv}** — **{meta['judgment']}** ({meta['confidence']:.0f}%)"
                 if meta.get('combined_scans'):
                     bn_=sum(1 for s in meta['combined_scans'] if s['dir']=='buy');sn__=sum(1 for s in meta['combined_scans'] if s['dir']=='sell')
-                    content+=f"\n🎯 CS: 매수{bn_} 매도{sn__}"
+                    content+=f"\n CS: 매수{bn_} 매도{sn__}"
                 content+=f"\n⏳ 선행:{meta['leading_verdict']} | 📊 후행:{meta['lagging_verdict']}"
                 br_v=meta.get('buy_reversal',0);sr_v=meta.get('sell_reversal',0)
                 if br_v>2 or sr_v>2:content+=f"\n🔄 반전: B+{br_v:.1f} S+{sr_v:.1f}"
