@@ -1562,12 +1562,83 @@ def render_signals(m):
         parts=" ".join([f"<span class='ind-mini {'ind-b' if s=='buy' else ('ind-s' if s=='sell' else 'ind-n')}'>{i} {l}</span>" for i,l,s in grp])
         st.markdown(f"<div style='background:{bl};border-radius:10px;padding:10px 14px;margin:5px 0'><div style='display:flex;justify-content:space-between;margin-bottom:4px'><span style='font-weight:700;color:#E8ECF1'>📅 {ds}</span><span style='color:#64748B;font-size:.7rem'>{len(grp)}개</span></div><div style='display:flex;gap:3px;flex-wrap:wrap'>{parts}</div></div>",unsafe_allow_html=True)
 
+def run_backtest_evaluation(df, forward_periods=[3, 5, 10, 20]):
+    """실제 과거 데이터를 기반으로 10-Layer 판단과 콤보의 승률/수익률을 검증합니다."""
+    # 1. N일 후의 미래 수익률(Forward Returns) 및 승리 여부 계산
+    for p in forward_periods:
+        df[f'Fwd_Ret_{p}d'] = df['Close'].shift(-p) / df['Close'] - 1
+        df[f'Win_{p}d'] = (df[f'Fwd_Ret_{p}d'] > 0).astype(float) # 수익이 나면 1, 아니면 0
+
+    # 2. Trade_Judgment (판단 등급별) 성과 분석
+    judgment_results = []
+    judgments_to_track = ['STRONG_BUY', 'BUY', 'WATCH_BUY', 'WATCH_SELL', 'SELL', 'STRONG_SELL']
+    
+    for judgment in judgments_to_track:
+        mask = df['Trade_Judgment'] == judgment
+        count = mask.sum()
+        if count == 0: continue
+        
+        row = {'판단 등급': judgment, '발생 횟수': count}
+        for p in forward_periods:
+            row[f'{p}일 후 승률(%)'] = df.loc[mask, f'Win_{p}d'].mean() * 100
+            row[f'{p}일 후 평균수익률(%)'] = df.loc[mask, f'Fwd_Ret_{p}d'].mean() * 100
+        judgment_results.append(row)
+        
+    # 3. Combined Scan (주요 콤보별) 성과 분석
+    combo_results = []
+    for combo_name, cfg in COMBINED_SCAN_REGISTRY.items():
+        if combo_name not in df.columns: continue
+        mask = df[combo_name] == True
+        count = mask.sum()
+        if count == 0: continue
+        
+        row = {'콤보 이름': f"{cfg['icon']} {cfg['kor']} (T{cfg['tier']})", '방향': cfg['dir'], '발생 횟수': count}
+        for p in forward_periods:
+            # 매도 시그널은 하락해야 승리이므로 부호를 반대로 계산
+            multiplier = 1 if cfg['dir'] == 'buy' else -1
+            win_rate = ((df.loc[mask, f'Fwd_Ret_{p}d'] * multiplier) > 0).mean() * 100
+            avg_ret = df.loc[mask, f'Fwd_Ret_{p}d'].mean() * 100
+            
+            row[f'{p}일 후 승률(%)'] = win_rate
+            row[f'{p}일 후 평균수익률(%)'] = avg_ret
+        combo_results.append(row)
+
+    return pd.DataFrame(judgment_results), pd.DataFrame(combo_results)
+
+def render_backtest_tab(df, ticker):
+    st.markdown(f"### 🧪 {ticker} 실제 데이터 백테스트 검증 (최근 2년)")
+    st.write("각 시그널 발생 후 3일, 5일, 10일, 20일 뒤의 **실제 주가 등락**을 추적한 결과입니다.")
+    
+    # 평가 함수 실행 (최근 N일의 데이터는 미래 수익률을 알 수 없으므로 dropna 처리)
+    df_eval = df.copy()
+    j_df, c_df = run_backtest_evaluation(df_eval)
+    
+    if not j_df.empty:
+        st.markdown("#### ⚖️ 10-Layer 판단 등급별 성과")
+        st.dataframe(j_df.style.format(precision=2).background_gradient(cmap='RdYlGn', subset=[col for col in j_df.columns if '%' in col]), use_container_width=True)
+        
+    if not c_df.empty:
+        st.markdown("#### 🎯 Combined Scan (콤보) 패턴별 성과")
+        # 매수/매도 분리해서 표시
+        buy_c_df = c_df[c_df['방향'] == 'buy'].drop(columns=['방향'])
+        sell_c_df = c_df[c_df['방향'] == 'sell'].drop(columns=['방향'])
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("<p style='color:#34D399;font-weight:bold'>▲ 매수 콤보 검증</p>", unsafe_allow_html=True)
+            if not buy_c_df.empty:
+                st.dataframe(buy_c_df.style.format(precision=2).background_gradient(cmap='Greens', subset=[col for col in buy_c_df.columns if '%' in col]), use_container_width=True)
+        with c2:
+            st.markdown("<p style='color:#F87171;font-weight:bold'>▼ 매도 콤보 검증 (승률: 하락 시 승리)</p>", unsafe_allow_html=True)
+            if not sell_c_df.empty:
+                st.dataframe(sell_c_df.style.format(precision=2).background_gradient(cmap='Reds', subset=[col for col in sell_c_df.columns if '승률' in col]), use_container_width=True)
+
 
 def render_analysis(msg):
-    m,fig=msg.get('meta'),msg.get('fig')
+    m, fig, raw_df = msg.get('meta'), msg.get('fig'), msg.get('raw_df') # raw_df를 넘겨받도록 수정 필요
     if m: render_price_header(m)
     if m or fig:
-        t0,t1,t2,t3,t4=st.tabs(["📈차트","⚖️매매판단","🎯CombinedScan","⏳선행/후행","📋시그널"])
+        t0, t1, t2, t3, t4, t5 = st.tabs(["📈차트", "⚖️매매판단", "🎯CombinedScan", "⏳선행/후행", "📋시그널", "🧪백테스트 검증"])
         with t0:
             if fig: st.plotly_chart(fig,use_container_width=True,theme=None,config={'displaylogo':False,'modeBarButtonsToRemove':['lasso2d','select2d']})
         with t1:
@@ -1578,6 +1649,9 @@ def render_analysis(msg):
             if m: render_leading_lagging(m)
         with t4:
             if m: render_signals(m)
+        with t5:
+            if raw_df is not None:
+                render_backtest_tab(raw_df, m['ticker'])
 
 
 print("✅ Part 3/4 완료: 차트 빌더 + UI")
