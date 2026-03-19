@@ -14,6 +14,7 @@ from collections import OrderedDict
 from scipy.signal import find_peaks
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from company_details import render_company_details
+from sectors import SECTOR_GROUPS
 
 st.set_page_config(page_title="CipherX V13.3", page_icon="📈", layout="centered", initial_sidebar_state="collapsed")
 
@@ -2069,53 +2070,161 @@ with st.sidebar:
         st.rerun()
 
 # ═══ 스캐너 (개선: 병렬 처리) ═══
-if st.session_state.get('app_mode')=='🔍 스캐너':
-    st.markdown("<h2 style='text-align:center;color:#fff'>🔍 Scanner</h2>",unsafe_allow_html=True)
-    ci=st.text_input("티커(쉼표구분)",placeholder="NVDA,TSLA,AAPL...",key="scan_in")
-    tickers=[t.strip().upper() for t in ci.split(',') if t.strip()] if ci else ['NVDA','TSLA','AAPL','MSFT','AMZN','META','AMD','QQQ','SPY']
-    if st.button("🚀 스캔",type="primary",use_container_width=True):
-        pb=st.progress(0);results=[]
+# ═══ 스캐너 모드 (개선: 섹터 선택 + 병렬) ═══
+if st.session_state.get('app_mode') == '🔍 스캐너':
+    st.markdown("<h2 style='text-align:center;color:#fff'>🔍 Scanner</h2>", unsafe_allow_html=True)
+    
+    # ── 섹터 선택 UI ──
+    st.markdown("#### 📂 섹터 선택")
+    sector_names = list(SECTOR_GROUPS.keys())
+    
+    # 섹터 버튼 (가로 배열)
+    cols_sec = st.columns(len(sector_names))
+    selected_sector = st.session_state.get('selected_sector', None)
+    
+    for i, sec_name in enumerate(sector_names):
+        with cols_sec[i]:
+            count = len(SECTOR_GROUPS[sec_name])
+            if st.button(f"{sec_name}\n({count}종목)", key=f"sec_{i}", use_container_width=True):
+                st.session_state['selected_sector'] = sec_name
+                st.session_state['scan_tickers_override'] = SECTOR_GROUPS[sec_name]
+                st.rerun()
+    
+    # 선택된 섹터 표시
+    if selected_sector:
+        sec_tickers = SECTOR_GROUPS.get(selected_sector, [])
+        st.markdown(f"""<div style="background:rgba(99,102,241,.08);border:1px solid #6366F133;
+            border-radius:10px;padding:10px 14px;margin:8px 0">
+            <span style="color:#A5B4FC;font-weight:700">{selected_sector}</span>
+            <span style="color:#64748B;margin-left:8px">{len(sec_tickers)}종목</span>
+            <div style="margin-top:6px;color:#94A3B8;font-size:.8rem">{', '.join(sec_tickers[:20])}{'...' if len(sec_tickers)>20 else ''}</div>
+        </div>""", unsafe_allow_html=True)
+    
+    # 커스텀 입력 (섹터와 별도)
+    st.markdown("#### ✏️ 직접 입력")
+    ci = st.text_input("티커 (쉼표구분)", placeholder="NVDA,TSLA,AAPL...", key="scan_in")
+    
+    # 최종 티커 리스트 결정
+    if ci and ci.strip():
+        tickers = [t.strip().upper() for t in ci.split(',') if t.strip()]
+        scan_source = "직접 입력"
+    elif st.session_state.get('scan_tickers_override'):
+        tickers = st.session_state['scan_tickers_override']
+        scan_source = selected_sector or "섹터"
+    else:
+        tickers = SECTOR_GROUPS['⭐ 인기 종목']
+        scan_source = "⭐ 인기 종목"
+    
+    # 스캔 실행 버튼
+    col_btn1, col_btn2 = st.columns([3, 1])
+    with col_btn1:
+        scan_btn = st.button(f"🚀 {scan_source} 스캔 ({len(tickers)}종목)", type="primary", use_container_width=True)
+    with col_btn2:
+        if st.button("🗑️ 초기화", use_container_width=True):
+            st.session_state.pop('selected_sector', None)
+            st.session_state.pop('scan_tickers_override', None)
+            st.rerun()
+    
+    if scan_btn:
+        pb = st.progress(0, text=f"🔍 {scan_source} 스캔 시작...")
+        results = []
+        
         def _scan_one(t):
             try:
-                df_=compute_and_cache(t)
-                if df_ is None or len(df_)<50:return None
-                dc_=df_.tail(63);acs=[]
-                for cn,ccfg in COMBINED_SCAN_REGISTRY.items():
+                df_ = compute_and_cache(t)
+                if df_ is None or len(df_) < 50: return None
+                dc_ = df_.tail(63); acs = []
+                for cn, ccfg in COMBINED_SCAN_REGISTRY.items():
                     if cn in dc_.columns and dc_[cn].tail(5).any():
-                        ld=dc_[cn].tail(5)[dc_[cn].tail(5)].index[-1]
-                        acs.append({'icon':ccfg['icon'],'kor':ccfg['kor'],'dir':ccfg['dir'],'tier':ccfg['tier'],'date':ld.strftime('%m/%d')})
-                if not acs:return None
-                lat_=dc_.iloc[-1];chg_=_sf((lat_['Close']-dc_.iloc[-2]['Close'])/dc_.iloc[-2]['Close']*100) if len(dc_)>=2 else 0
-                return {'ticker':t,'price':_sf(lat_['Close']),'chg':chg_,'scans':sorted(acs,key=lambda x:x['tier']),
-                    'jg':str(lat_.get('Trade_Judgment','N/A')),'cf':_sf(lat_.get('Judgment_Confidence',0)),
-                    'br':_sf(lat_.get('Buy_Reversal_Bonus',0)),'sr':_sf(lat_.get('Sell_Reversal_Bonus',0))}
-            except:return None
-        # 개선: 병렬 처리
-        with ThreadPoolExecutor(max_workers=min(6,len(tickers))) as ex:
-            futs={ex.submit(_scan_one,t):t for t in tickers}
-            for idx_f,f in enumerate(as_completed(futs)):
-                pb.progress((idx_f+1)/len(tickers),text=f"🔍 {futs[f]}")
-                r=f.result()
-                if r:results.append(r)
-        pb.progress(1.0,text=f"✅ {len(results)}개");time.sleep(.3);pb.empty()
-        if not results:st.info("없음")
+                        ld = dc_[cn].tail(5)[dc_[cn].tail(5)].index[-1]
+                        acs.append({'icon': ccfg['icon'], 'kor': ccfg['kor'], 'dir': ccfg['dir'],
+                                    'tier': ccfg['tier'], 'date': ld.strftime('%m/%d')})
+                if not acs: return None
+                lat_ = dc_.iloc[-1]
+                chg_ = _sf((lat_['Close'] - dc_.iloc[-2]['Close']) / dc_.iloc[-2]['Close'] * 100) if len(dc_) >= 2 else 0
+                return {
+                    'ticker': t, 'price': _sf(lat_['Close']), 'chg': chg_,
+                    'scans': sorted(acs, key=lambda x: x['tier']),
+                    'jg': str(lat_.get('Trade_Judgment', 'N/A')),
+                    'cf': _sf(lat_.get('Judgment_Confidence', 0)),
+                    'br': _sf(lat_.get('Buy_Reversal_Bonus', 0)),
+                    'sr': _sf(lat_.get('Sell_Reversal_Bonus', 0))
+                }
+            except: return None
+        
+        # 병렬 처리
+        with ThreadPoolExecutor(max_workers=min(8, len(tickers))) as ex:
+            futs = {ex.submit(_scan_one, t): t for t in tickers}
+            for idx_f, f in enumerate(as_completed(futs)):
+                t_name = futs[f]
+                pb.progress((idx_f + 1) / len(tickers), text=f"🔍 {t_name} ({idx_f+1}/{len(tickers)})")
+                r = f.result()
+                if r: results.append(r)
+        
+        pb.progress(1.0, text=f"✅ {len(results)}/{len(tickers)} 발견")
+        time.sleep(.3); pb.empty()
+        
+        if not results:
+            st.info(f"🔍 {scan_source}에서 활성 Combined Scan 없음")
         else:
-            results.sort(key=lambda x:(-sum(1 for s in x['scans'] if s['tier']==1),-len(x['scans'])))
+            # 정렬: T1 개수 → 총 스캔 수 → 변동률
+            results.sort(key=lambda x: (-sum(1 for s in x['scans'] if s['tier'] == 1), -len(x['scans'])))
+            
+            # 요약 통계
+            buy_tickers = [r for r in results if 'BUY' in r['jg']]
+            sell_tickers = [r for r in results if 'SELL' in r['jg']]
+            st.markdown(f"""<div style="display:flex;gap:12px;margin-bottom:12px">
+                <div style="flex:1;background:rgba(0,230,118,.06);border:1px solid #10B98133;border-radius:10px;padding:10px;text-align:center">
+                    <span style="color:#34D399;font-weight:800;font-size:1.3rem">{len(buy_tickers)}</span>
+                    <span style="color:#64748B;font-size:.8rem;margin-left:4px">매수 시그널</span></div>
+                <div style="flex:1;background:rgba(255,23,68,.06);border:1px solid #EF444433;border-radius:10px;padding:10px;text-align:center">
+                    <span style="color:#F87171;font-weight:800;font-size:1.3rem">{len(sell_tickers)}</span>
+                    <span style="color:#64748B;font-size:.8rem;margin-left:4px">매도 시그널</span></div>
+                <div style="flex:1;background:rgba(99,102,241,.06);border:1px solid #6366F133;border-radius:10px;padding:10px;text-align:center">
+                    <span style="color:#A5B4FC;font-weight:800;font-size:1.3rem">{len(results)}</span>
+                    <span style="color:#64748B;font-size:.8rem;margin-left:4px">/ {len(tickers)} 종목</span></div>
+            </div>""", unsafe_allow_html=True)
+            
+            # 결과 카드
             for r in results:
-                chc='#34D399' if r['chg']>=0 else '#F87171';chi='▲' if r['chg']>=0 else '▼'
-                jc_='#34D399' if 'BUY' in r['jg'] else ('#F87171' if 'SELL' in r['jg'] else '#FCD34D')
-                # 개선: f-string 중첩 해결
-                scan_items=[]
+                chc = '#34D399' if r['chg'] >= 0 else '#F87171'
+                chi = '▲' if r['chg'] >= 0 else '▼'
+                jc_ = '#34D399' if 'BUY' in r['jg'] else ('#F87171' if 'SELL' in r['jg'] else '#FCD34D')
+                
+                # 스캔 항목
+                scan_items = []
                 for s in r['scans']:
-                    s_clr='#34D399' if s['dir']=='buy' else ('#F87171' if s['dir']=='sell' else '#FFC107')
-                    scan_items.append(f"<div style='display:flex;gap:6px;padding:2px 0'><span style='color:{s_clr}'>●</span><span style='color:#E8ECF1;font-size:.82rem'>{s['icon']}{s['kor']}</span><span style='color:#64748B;font-size:.7rem'>{s['date']}</span></div>")
-                sh="".join(scan_items)
-                rev_info=""
-                if r['br']>2:rev_info+=f" <span style='color:#34D399;font-size:.7rem'>🔄B+{r['br']:.0f}</span>"
-                if r['sr']>2:rev_info+=f" <span style='color:#F87171;font-size:.7rem'>🔄S+{r['sr']:.0f}</span>"
-                st.markdown(f"<div style='background:linear-gradient(160deg,#0F1320,#141926);border:1px solid #1E293B;border-radius:14px;padding:14px 18px;margin:6px 0'><div style='display:flex;justify-content:space-between;margin-bottom:8px'><span style='color:#A5B4FC;font-weight:800;font-size:1.15rem'>{r['ticker']}</span><div><span style='color:{jc_};font-size:.8rem;font-weight:600'>{r['jg']}({r['cf']:.0f}%)</span>{rev_info} <span style='color:{chc};font-size:.8rem;margin-left:8px'>{chi}{abs(r['chg']):.1f}%</span></div></div>{sh}</div>",unsafe_allow_html=True)
-                if st.button(f"📊 {r['ticker']}",key=f"sc_{r['ticker']}",use_container_width=True):
-                    st.session_state['app_mode']='📊 분석';st.session_state['_auto']=r['ticker'];st.rerun()
+                    s_clr = '#34D399' if s['dir'] == 'buy' else ('#F87171' if s['dir'] == 'sell' else '#FFC107')
+                    scan_items.append(
+                        f"<div style='display:flex;gap:6px;padding:2px 0'>"
+                        f"<span style='color:{s_clr}'>●</span>"
+                        f"<span style='color:#E8ECF1;font-size:.82rem'>{s['icon']}{s['kor']}</span>"
+                        f"<span style='color:#64748B;font-size:.7rem'>{s['date']}</span></div>"
+                    )
+                sh = "".join(scan_items)
+                
+                rev_info = ""
+                if r['br'] > 2: rev_info += f" <span style='color:#34D399;font-size:.7rem'>🔄B+{r['br']:.0f}</span>"
+                if r['sr'] > 2: rev_info += f" <span style='color:#F87171;font-size:.7rem'>🔄S+{r['sr']:.0f}</span>"
+                
+                st.markdown(f"""<div style="background:linear-gradient(160deg,#0F1320,#141926);
+                    border:1px solid #1E293B;border-radius:14px;padding:14px 18px;margin:6px 0">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+                        <span style="color:#A5B4FC;font-weight:800;font-size:1.15rem">{r['ticker']}</span>
+                        <div>
+                            <span style="color:{jc_};font-size:.8rem;font-weight:600">{r['jg']}({r['cf']:.0f}%)</span>
+                            {rev_info}
+                            <span style="color:{chc};font-size:.8rem;margin-left:8px">{chi}{abs(r['chg']):.1f}%</span>
+                        </div>
+                    </div>{sh}
+                </div>""", unsafe_allow_html=True)
+                
+                if st.button(f"📊 {r['ticker']}", key=f"sc_{r['ticker']}", use_container_width=True):
+                    st.session_state['app_mode'] = '📊 분석'
+                    st.session_state['_auto'] = r['ticker']
+                    st.rerun()
+
+
 # ═══ 분석 ═══
 else:
     st.markdown("<h2 style='text-align:center;color:#fff;margin-bottom:16px'>🚦 CipherX</h2>",unsafe_allow_html=True)
