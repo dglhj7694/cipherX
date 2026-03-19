@@ -2074,7 +2074,7 @@ with st.sidebar:
 
     # ★ key 제거, index로 제어
     _mode_index = 0 if st.session_state.get('_mode', '분석') == '분석' else 1
-    app_mode = st.sidebar.radio("모드", ['분석', '스캐너'], key='app_mode')
+    app_mode = st.radio("모드", ['분석', '스캐너'], index=_mode_index)
     st.session_state['_mode'] = app_mode  # 별도 키에 저장
 
     chart_period = st.radio("기간", ['3개월', '6개월', '1년'], index=0, horizontal=True, key="period")
