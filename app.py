@@ -13,6 +13,7 @@ from plotly.subplots import make_subplots
 from collections import OrderedDict
 from scipy.signal import find_peaks
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from company_details import render_company_details
 
 st.set_page_config(page_title="CipherX V13.3", page_icon="📈", layout="centered", initial_sidebar_state="collapsed")
 
@@ -1817,7 +1818,7 @@ def render_analysis(msg):
     if m: render_price_header(m)
     if m or fig_json:
         # 개선: 4탭으로 축소 (시그널 탭 제거)
-        t0, t1, t2, t3 = st.tabs(["📈 차트", "⚖️ 매매판단", "🎯 Combined Scan", "⏳ 선행/후행"])
+        t0, t1, t2, t3, t4 = st.tabs(["차트", "매매판단", "Combined Scan", "선행/후행", "기업 상세"])
         with t0:
             if fig_json:
                 fig = go.Figure(json.loads(fig_json))
@@ -1830,6 +1831,8 @@ def render_analysis(msg):
             if m: render_combined_scans(m)
         with t3:
             if m: render_leading_lagging(m)
+        with t4:
+            if m: render_company_details(m['ticker'])
 
 
 print("✅ Part 3/4 완료")
