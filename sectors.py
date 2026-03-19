@@ -34,7 +34,6 @@ SECTOR_GROUPS = {
 
     # 🧬 특수 테마
     '양자컴퓨팅': ['IONQ', 'RGTI', 'QBTS', 'QUBT', 'ARQQ', 'SKYT'],
-
     # 🖥️ 기존 이미지(IMG) 기반 리스트
     '소프트웨어': ['FTNT', 'MANH', 'CHKP', 'TEAM', 'DUOL', 'CVLT', 'DDOG', 'TYL', 'PANW', 'NOW', 'MSFT', 'HUBS', 'META', 'SNOW', 'CRWD', 'ZS', 'GWRE', 'RBRK', 'S', 'ORCL', 'UPST', 'INOD', 'ZETA', 'U', 'TEM', 'PGY', 'APP', 'FROG', 'KVYO', 'OKTA', 'NET', 'PLTR', 'MDB', 'AI', 'CRM', 'ADBE'],
     '로봇/자동화': ['RRX', 'TDY', 'AMBA', 'ISRG', 'AMAT', 'KEYS', 'TEL', 'TKR', 'ST', 'PTC', 'MEI', 'PH', 'ZBRA', 'ALNT', 'QCOM', 'ADI', 'CW', 'CGNX', 'ON', 'TSLA', 'ROK', 'RKT', 'APH', 'PATH', 'VICR', 'RR', 'SERV', 'SYM', 'STRC', 'TER', 'NOVT', 'ABB', 'FANUY', 'SYK', 'MBLY', 'EMR'],

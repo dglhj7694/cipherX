@@ -2086,18 +2086,25 @@ current_mode = st.session_state.get('_mode', '분석')
 if current_mode == '스캐너':
     st.markdown("<h2 style='text-align:center;color:#fff'>🔍 Scanner</h2>", unsafe_allow_html=True)
 
+    # ── 섹터 선택 UI 수정 ──
     st.markdown("#### 📂 섹터 선택")
     sector_names = list(SECTOR_GROUPS.keys())
-    cols_sec = st.columns(len(sector_names))
     selected_sector = st.session_state.get('selected_sector', None)
 
-    for i, sec_name in enumerate(sector_names):
-        with cols_sec[i]:
-            count = len(SECTOR_GROUPS[sec_name])
-            if st.button(f"{sec_name}\n({count}종목)", key=f"sec_{i}", use_container_width=True):
-                st.session_state['selected_sector'] = sec_name
-                st.session_state['scan_tickers_override'] = SECTOR_GROUPS[sec_name]
-                st.rerun()
+    # 한 줄에 3개씩
+    for row_start in range(0, len(sector_names), 3):
+        row_items = sector_names[row_start:row_start + 3]
+        cols_sec = st.columns(3)  # 항상 3칸 고정
+        for i, sec_name in enumerate(row_items):
+            with cols_sec[i]:
+                count = len(SECTOR_GROUPS[sec_name])
+                is_selected = selected_sector == sec_name
+                btn_type = "primary" if is_selected else "secondary"
+                if st.button(f"{sec_name}\n({count})", key=f"sec_{row_start+i}", 
+                            use_container_width=True, type=btn_type):
+                    st.session_state['selected_sector'] = sec_name
+                    st.session_state['scan_tickers_override'] = SECTOR_GROUPS[sec_name]
+                    st.rerun()
 
     if selected_sector:
         sec_tickers = SECTOR_GROUPS.get(selected_sector, [])
