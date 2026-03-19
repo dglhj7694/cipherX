@@ -1028,117 +1028,331 @@ def compute_10layer_judgment(df,vol_ratio):
 
 print("✅ Part 2/4 완료 — 139개 시그널 + 32개 CS + 10-Layer (신규지표 통합)")
 
-# ══════════════════════════════════════════════════════════════
-#  CipherX V13.2 — PART 3/4: 차트(캔들호버+HMA/UTBot+강력마커) + UI
-# ══════════════════════════════════════════════════════════════
-
 def _build_candle_hover(dc):
-    """캔들 자체에 호버 상세정보 내장"""
-    texts=[]
+    """캔들 호버 상세정보"""
+    texts = []
     for iv in dc.index:
-        row=dc.loc[iv];ds=iv.strftime('%Y-%m-%d')
-        bs,ss=[],[]
-        for sn,cfg in SIGNAL_REGISTRY.items():
-            if sn in dc.columns and row.get(sn,False):
-                if cfg['dir']=='buy':bs.append(f"{cfg['icon']}{cfg['kor']}")
-                elif cfg['dir']=='sell':ss.append(f"{cfg['icon']}{cfg['kor']}")
-        cs_a=[]
-        for cn,ccfg in COMBINED_SCAN_REGISTRY.items():
-            if cn in dc.columns and row.get(cn,False):
+        row = dc.loc[iv]; ds = iv.strftime('%Y-%m-%d')
+        bs, ss = [], []
+        for sn, cfg in SIGNAL_REGISTRY.items():
+            if sn in dc.columns and row.get(sn, False):
+                if cfg['dir'] == 'buy': bs.append(f"{cfg['icon']}{cfg['kor']}")
+                elif cfg['dir'] == 'sell': ss.append(f"{cfg['icon']}{cfg['kor']}")
+        cs_a = []
+        for cn, ccfg in COMBINED_SCAN_REGISTRY.items():
+            if cn in dc.columns and row.get(cn, False):
                 cs_a.append(f"{ccfg['icon']}{ccfg['kor']}")
-        rg=int(row.get('Regime',0));rl={2:'🟢🟢UP',1:'🟢UP',0:'⚪RNG',-1:'🔴DN',-2:'🔴🔴DN'}.get(rg,'?')
-        jg=str(row.get('Trade_Judgment',''));cf=float(row.get('Judgment_Confidence',0))
-        bt=float(row.get('Buy_Total',0));st_=float(row.get('Sell_Total',0))
-        lv=str(row.get('Leading_Verdict',''));lgv=str(row.get('Lagging_Verdict',''))
-        ut_d=int(row.get('UTBot_Dir',0));ut_l='🤖Buy' if ut_d==1 else ('🤖Sell' if ut_d==-1 else '')
-        hma_d='🟢' if row.get('HMA_Rising',False) else '🔴'
-        lines=[f"<b>{ds}</b> O:{row['Open']:.2f} H:{row['High']:.2f} L:{row['Low']:.2f} C:{row['Close']:.2f}",
-               f"Vol:{row.get('Volume',0):,.0f} ATR:{row.get('ATR',0):.2f}",
-               f"─"*30,
-               f"<b>📍{jg}</b>({cf:.0f}%) B:{bt:.1f} S:{st_:.1f} NET:{bt-st_:+.1f}",
-               f"국면:{rl} WT:{row.get('WT1',0):.0f} RSI:{row.get('RSI',0):.0f} StK:{row.get('StochK',0):.0f} SlowK:{row.get('SlowK',50):.0f}",
-               f"Hull:{hma_d} {ut_l} ADX:{row.get('ADX',0):.0f} SqMom:{row.get('Squeeze_Momentum',0):.2f}"]
-        if lv!='중립' or lgv!='비추세/횡보':lines.append(f"⏳{lv} | 📊{lgv}")
-        if cs_a:lines.append(f"─"*30);lines.append(f"<b style='color:#FFD700'>🎯CS:</b> {' '.join(cs_a[:4])}")
-        if bs:lines.append(f"<span style='color:#6EE7B7'>▲{len(bs)}: {' '.join(bs[:5])}</span>")
-        if ss:lines.append(f"<span style='color:#FCA5A5'>▼{len(ss)}: {' '.join(ss[:5])}</span>")
+        rg = int(row.get('Regime', 0))
+        rl = {2:'🟢🟢UP',1:'🟢UP',0:'⚪RNG',-1:'🔴DN',-2:'🔴🔴DN'}.get(rg, '?')
+        jg = str(row.get('Trade_Judgment', '')); cf = float(row.get('Judgment_Confidence', 0))
+        bt = float(row.get('Buy_Total', 0)); st_ = float(row.get('Sell_Total', 0))
+        lv = str(row.get('Leading_Verdict', '')); lgv = str(row.get('Lagging_Verdict', ''))
+        ut_d = int(row.get('UTBot_Dir', 0)); ut_l = '🤖Buy' if ut_d == 1 else ('🤖Sell' if ut_d == -1 else '')
+        hma_d = '🟢' if row.get('HMA_Rising', False) else '🔴'
+        lines = [
+            f"<b>{ds}</b> O:{row['Open']:.2f} H:{row['High']:.2f} L:{row['Low']:.2f} C:{row['Close']:.2f}",
+            f"Vol:{row.get('Volume',0):,.0f} ATR:{row.get('ATR',0):.2f}",
+            f"─" * 30,
+            f"<b>📍{jg}</b>({cf:.0f}%) B:{bt:.1f} S:{st_:.1f} NET:{bt-st_:+.1f}",
+            f"국면:{rl} WT:{row.get('WT1',0):.0f} RSI:{row.get('RSI',0):.0f} StK:{row.get('StochK',0):.0f}",
+            f"SlowK:{row.get('SlowK',50):.0f} Hull:{hma_d} {ut_l} SqMom:{row.get('Squeeze_Momentum',0):.2f}",
+        ]
+        if lv != '중립' or lgv != '비추세/횡보':
+            lines.append(f"⏳{lv} | 📊{lgv}")
+        if cs_a:
+            lines.append(f"─" * 30)
+            lines.append(f"<b style='color:#FFD700'>🎯CS:</b> {' '.join(cs_a[:4])}")
+        if bs: lines.append(f"<span style='color:#6EE7B7'>▲{len(bs)}: {' '.join(bs[:5])}</span>")
+        if ss: lines.append(f"<span style='color:#FCA5A5'>▼{len(ss)}: {' '.join(ss[:5])}</span>")
         texts.append("<br>".join(lines))
     return texts
 
-def _collect_strong_markers(dc):
-    idx=dc.index
-    sb=pd.Series(False,index=idx);ss=pd.Series(False,index=idx)
-    for sn in STRONG_BUY_SIGS:
-        if sn in dc.columns:sb|=dc[sn].fillna(False)
-    for sn in STRONG_SELL_SIGS:
-        if sn in dc.columns:ss|=dc[sn].fillna(False)
-    return sb,ss
 
-def build_chart(dc,ticker):
-    mac={20:'#f1c40f',50:'#e74c3c',200:'#2ecc71'}
-    fig=make_subplots(rows=5,cols=1,shared_xaxes=True,vertical_spacing=0.03,
-        row_heights=[.40,.07,.14,.14,.25],subplot_titles=("","Volume","WaveTrend","MACD","10-Layer Score"))
-    candle_hover=_build_candle_hover(dc)
-    fig.add_trace(go.Candlestick(x=dc.index,open=dc['Open'],high=dc['High'],low=dc['Low'],close=dc['Close'],
-        name="Price",increasing_line_color='#00E676',decreasing_line_color='#FF1744',
-        increasing_fillcolor='rgba(0,230,118,.8)',decreasing_fillcolor='rgba(255,23,68,.8)',
-        text=candle_hover,hoverinfo='text',
-        hoverlabel=dict(bgcolor='rgba(11,14,20,.97)',bordercolor='#334155',font=dict(size=11,family='Pretendard',color='#F1F5F9'),align='left')),row=1,col=1)
-    for ma_p in [20,50,200]:
-        fig.add_trace(go.Scatter(x=dc.index,y=dc[f'MA{ma_p}'],line=dict(color=mac[ma_p],width=1.2),name=f'{ma_p}MA',hoverinfo='skip'),row=1,col=1)
-    for mc,clr,nm in [(dc['ST_Direction']==1,'#00E676','ST▲'),(dc['ST_Direction']==-1,'#FF1744','ST▼')]:
-        fig.add_trace(go.Scatter(x=dc.index,y=dc['SuperTrend'].where(mc),line=dict(color=clr,width=2),name=nm,connectgaps=False,hoverinfo='skip'),row=1,col=1)
-    fig.add_trace(go.Scatter(x=dc.index,y=dc['BB_Up'],line=dict(color='#475569',width=1,dash='dot'),name='BB↑',hoverinfo='skip'),row=1,col=1)
-    fig.add_trace(go.Scatter(x=dc.index,y=dc['BB_Low'],line=dict(color='#475569',width=1,dash='dot'),name='BB↓',fill='tonexty',fillcolor='rgba(71,85,105,.06)',hoverinfo='skip'),row=1,col=1)
-    # Hull MA
+def _collect_strong_markers(dc):
+    idx = dc.index
+    sb = pd.Series(False, index=idx)
+    ss = pd.Series(False, index=idx)
+    for sn in STRONG_BUY_SIGS:
+        if sn in dc.columns: sb |= dc[sn].fillna(False)
+    for sn in STRONG_SELL_SIGS:
+        if sn in dc.columns: ss |= dc[sn].fillna(False)
+    return sb, ss
+
+
+def _add_signal_markers(fig, dc, sig_name, row_num, y_series, color, symbol, size, name):
+    """지표 서브플롯에 시그널 발생 마커 추가"""
+    if sig_name not in dc.columns:
+        return
+    mask = dc[sig_name].fillna(False)
+    if not mask.any():
+        return
+    sr = dc[mask]
+    yv = y_series[mask] if isinstance(y_series, pd.Series) else pd.Series(y_series, index=dc.index)[mask]
+    fig.add_trace(go.Scatter(
+        x=sr.index, y=yv, mode='markers',
+        marker=dict(symbol=symbol, size=size, color=color, line=dict(width=1.5, color='#FFF'), opacity=0.95),
+        name=name, showlegend=False,
+        hovertemplate=f"{name}<br>%{{x|%Y-%m-%d}}<extra></extra>"
+    ), row=row_num, col=1)
+
+
+def build_chart(dc, ticker):
+    """
+    7-Row 차트: 캔들 + Volume + WT + MACD + StochSlow + SqueezeMom + 10Layer
+    각 지표 서브플롯에 시그널 발생 시 마커 표시
+    """
+    mac = {20: '#f1c40f', 50: '#e74c3c', 200: '#2ecc71'}
+
+    fig = make_subplots(
+        rows=7, cols=1, shared_xaxes=True, vertical_spacing=0.025,
+        row_heights=[.35, .05, .10, .10, .10, .10, .20],
+        subplot_titles=("", "Volume", "WaveTrend", "MACD", "Stochastic Slow", "Squeeze Momentum", "10-Layer Score")
+    )
+
+    # ══════════════════════════════════════
+    #  Row 1: 캔들 + MA + BB + ST + HMA + UTBot
+    # ══════════════════════════════════════
+    candle_hover = _build_candle_hover(dc)
+    fig.add_trace(go.Candlestick(
+        x=dc.index, open=dc['Open'], high=dc['High'], low=dc['Low'], close=dc['Close'],
+        name="Price", increasing_line_color='#00E676', decreasing_line_color='#FF1744',
+        increasing_fillcolor='rgba(0,230,118,.8)', decreasing_fillcolor='rgba(255,23,68,.8)',
+        text=candle_hover, hoverinfo='text',
+        hoverlabel=dict(bgcolor='rgba(11,14,20,.97)', bordercolor='#334155',
+            font=dict(size=11, family='Pretendard', color='#F1F5F9'), align='left')
+    ), row=1, col=1)
+
+    # MA
+    for ma_p in [20, 50, 200]:
+        fig.add_trace(go.Scatter(x=dc.index, y=dc[f'MA{ma_p}'],
+            line=dict(color=mac[ma_p], width=1.2), name=f'{ma_p}MA', hoverinfo='skip'), row=1, col=1)
+
+    # SuperTrend
+    for mc, clr, nm in [(dc['ST_Direction'] == 1, '#00E676', 'ST▲'), (dc['ST_Direction'] == -1, '#FF1744', 'ST▼')]:
+        fig.add_trace(go.Scatter(x=dc.index, y=dc['SuperTrend'].where(mc),
+            line=dict(color=clr, width=2), name=nm, connectgaps=False, hoverinfo='skip'), row=1, col=1)
+
+    # BB
+    fig.add_trace(go.Scatter(x=dc.index, y=dc['BB_Up'], line=dict(color='#475569', width=1, dash='dot'),
+        name='BB↑', hoverinfo='skip'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=dc.index, y=dc['BB_Low'], line=dict(color='#475569', width=1, dash='dot'),
+        name='BB↓', fill='tonexty', fillcolor='rgba(71,85,105,.06)', hoverinfo='skip'), row=1, col=1)
+
+    # Hull MA (색상 전환)
     if 'HMA' in dc.columns and 'HMA_Rising' in dc.columns:
-        hup=dc.get('HMA_Rising',pd.Series(False,index=dc.index)).fillna(False)
-        fig.add_trace(go.Scatter(x=dc.index,y=dc['HMA'].where(hup),line=dict(color='#00E676',width=2.5),name='HMA▲',connectgaps=False,hoverinfo='skip'),row=1,col=1)
-        fig.add_trace(go.Scatter(x=dc.index,y=dc['HMA'].where(~hup),line=dict(color='#FF1744',width=2.5),name='HMA▼',connectgaps=False,hoverinfo='skip'),row=1,col=1)
+        hup = dc.get('HMA_Rising', pd.Series(False, index=dc.index)).fillna(False)
+        fig.add_trace(go.Scatter(x=dc.index, y=dc['HMA'].where(hup),
+            line=dict(color='#00E676', width=2.5), name='HMA▲', connectgaps=False, hoverinfo='skip'), row=1, col=1)
+        fig.add_trace(go.Scatter(x=dc.index, y=dc['HMA'].where(~hup),
+            line=dict(color='#FF1744', width=2.5), name='HMA▼', connectgaps=False, hoverinfo='skip'), row=1, col=1)
+
+        # Hull 전환 마커 (캔들 차트에)
+        _add_signal_markers(fig, dc, 'Hull_Turn_Bull', 1, dc['Low'] - dc['ATR'] * 0.8, '#00E676', 'circle', 8, '🟢Hull▲')
+        _add_signal_markers(fig, dc, 'Hull_Turn_Bear', 1, dc['High'] + dc['ATR'] * 0.8, '#FF1744', 'circle', 8, '🔴Hull▼')
+
     # UT Bot 트레일링 스탑
     if 'UTBot_Stop' in dc.columns and 'UTBot_Dir' in dc.columns:
-        ub_=dc['UTBot_Dir']==1;us_=dc['UTBot_Dir']==-1
-        fig.add_trace(go.Scatter(x=dc.index,y=dc['UTBot_Stop'].where(ub_),line=dict(color='rgba(0,230,118,.4)',width=1.5,dash='dot'),name='UT▲',connectgaps=False,hoverinfo='skip'),row=1,col=1)
-        fig.add_trace(go.Scatter(x=dc.index,y=dc['UTBot_Stop'].where(us_),line=dict(color='rgba(255,23,68,.4)',width=1.5,dash='dot'),name='UT▼',connectgaps=False,hoverinfo='skip'),row=1,col=1)
-    # 강력 마커만
-    sb,ss=_collect_strong_markers(dc)
+        ub_ = dc['UTBot_Dir'] == 1; us_ = dc['UTBot_Dir'] == -1
+        fig.add_trace(go.Scatter(x=dc.index, y=dc['UTBot_Stop'].where(ub_),
+            line=dict(color='rgba(0,230,118,.4)', width=1.5, dash='dot'),
+            name='UT▲', connectgaps=False, hoverinfo='skip'), row=1, col=1)
+        fig.add_trace(go.Scatter(x=dc.index, y=dc['UTBot_Stop'].where(us_),
+            line=dict(color='rgba(255,23,68,.4)', width=1.5, dash='dot'),
+            name='UT▼', connectgaps=False, hoverinfo='skip'), row=1, col=1)
+
+        # UTBot 전환 마커 (캔들 차트에)
+        _add_signal_markers(fig, dc, 'UTBot_Buy', 1, dc['Low'] - dc['ATR'] * 1.2, '#00E676', 'triangle-up', 12, '🤖UTBot▲')
+        _add_signal_markers(fig, dc, 'UTBot_Sell', 1, dc['High'] + dc['ATR'] * 1.2, '#FF1744', 'triangle-down', 12, '🤖UTBot▼')
+
+    # 강력 마커 (⭐)
+    sb, ss = _collect_strong_markers(dc)
     if sb.any():
-        sr=dc[sb];yv=sr['Low']-sr['ATR']*1.5
-        fig.add_trace(go.Scatter(x=sr.index,y=yv,mode='markers',marker=dict(symbol='triangle-up',size=14,color='#00E676',line=dict(width=2,color='#FFF'),opacity=.95),name='⭐강력매수',hoverinfo='skip'),row=1,col=1)
+        sr = dc[sb]; yv = sr['Low'] - sr['ATR'] * 2.0
+        fig.add_trace(go.Scatter(x=sr.index, y=yv, mode='markers',
+            marker=dict(symbol='star', size=16, color='#FFD700', line=dict(width=2, color='#00E676'), opacity=.95),
+            name='⭐강력매수', hoverinfo='skip'), row=1, col=1)
     if ss.any():
-        sr=dc[ss];yv=sr['High']+sr['ATR']*1.5
-        fig.add_trace(go.Scatter(x=sr.index,y=yv,mode='markers',marker=dict(symbol='triangle-down',size=14,color='#FF1744',line=dict(width=2,color='#FFF'),opacity=.95),name='⭐강력매도',hoverinfo='skip'),row=1,col=1)
-    # Volume
-    br=dc['Close']<dc['Open']
-    fig.add_trace(go.Bar(x=dc.index,y=dc['Volume'],marker_color=np.where(br,'rgba(255,23,68,.5)','rgba(0,230,118,.5)').tolist(),name="Vol",opacity=.8,hoverinfo='skip'),row=2,col=1)
-    # WT
-    fig.add_trace(go.Scatter(x=dc.index,y=dc['WT1'],line=dict(color='#00E676',width=2),name="WT1",hovertemplate="WT1:%{y:.1f}<extra></extra>"),row=3,col=1)
-    fig.add_trace(go.Scatter(x=dc.index,y=dc['WT2'],line=dict(color='#FF1744',width=1.5,dash='dot'),name="WT2",hoverinfo='skip'),row=3,col=1)
-    wd=dc['WT1']-dc['WT2']
-    fig.add_trace(go.Bar(x=dc.index,y=wd,marker_color=np.where(wd>=0,'rgba(0,230,118,.3)','rgba(255,23,68,.3)').tolist(),name="WTH",hoverinfo='skip'),row=3,col=1)
-    for lv_,cc_,d_ in [(OB1,'#FF5252','solid'),(0,'#475569','dot'),(OS1,'#4FC3F7','solid')]:fig.add_hline(y=lv_,line_dash=d_,line_color=cc_,line_width=1,row=3,col=1)
-    # MACD
-    fig.add_trace(go.Scatter(x=dc.index,y=dc['MACD_Line'],line=dict(color='#29B6F6',width=1.5),name="MACD",hovertemplate="MACD:%{y:.3f}<extra></extra>"),row=4,col=1)
-    fig.add_trace(go.Scatter(x=dc.index,y=dc['MACD_Signal'],line=dict(color='#FFA726',width=1.5),name="Sig",hoverinfo='skip'),row=4,col=1)
-    mh_=dc['MACD_Hist']
-    fig.add_trace(go.Bar(x=dc.index,y=mh_,marker_color=np.where(mh_>=0,'#26A69A','#EF5350').tolist(),name="Hist",opacity=.7,hoverinfo='skip'),row=4,col=1)
-    fig.add_hline(y=0,line_color="#475569",line_width=1,row=4,col=1)
-    # 10-Layer NET
+        sr = dc[ss]; yv = sr['High'] + sr['ATR'] * 2.0
+        fig.add_trace(go.Scatter(x=sr.index, y=yv, mode='markers',
+            marker=dict(symbol='star', size=16, color='#FFD700', line=dict(width=2, color='#FF1744'), opacity=.95),
+            name='⭐강력매도', hoverinfo='skip'), row=1, col=1)
+
+    # VuManChu 마커 (캔들에 다이아몬드)
+    _add_signal_markers(fig, dc, 'VuManChu_Bull', 1, dc['Low'] - dc['ATR'] * 1.8, '#00E676', 'diamond', 12, '💎VuMC▲')
+    _add_signal_markers(fig, dc, 'VuManChu_Bear', 1, dc['High'] + dc['ATR'] * 1.8, '#FF1744', 'diamond', 12, '💎VuMC▼')
+
+    # ══════════════════════════════════════
+    #  Row 2: Volume
+    # ══════════════════════════════════════
+    bear_bar = dc['Close'] < dc['Open']
+    fig.add_trace(go.Bar(x=dc.index, y=dc['Volume'],
+        marker_color=np.where(bear_bar, 'rgba(255,23,68,.5)', 'rgba(0,230,118,.5)').tolist(),
+        name="Vol", opacity=.8, hoverinfo='skip'), row=2, col=1)
+
+    # ══════════════════════════════════════
+    #  Row 3: WaveTrend + 교차 마커
+    # ══════════════════════════════════════
+    fig.add_trace(go.Scatter(x=dc.index, y=dc['WT1'], line=dict(color='#00E676', width=2), name="WT1",
+        hovertemplate="WT1:%{y:.1f}<extra></extra>"), row=3, col=1)
+    fig.add_trace(go.Scatter(x=dc.index, y=dc['WT2'], line=dict(color='#FF1744', width=1.5, dash='dot'), name="WT2",
+        hoverinfo='skip'), row=3, col=1)
+    wd = dc['WT1'] - dc['WT2']
+    fig.add_trace(go.Bar(x=dc.index, y=wd,
+        marker_color=np.where(wd >= 0, 'rgba(0,230,118,.25)', 'rgba(255,23,68,.25)').tolist(),
+        name="WTH", hoverinfo='skip'), row=3, col=1)
+    for lv_, cc_, d_ in [(OB1, '#FF5252', 'solid'), (0, '#475569', 'dot'), (OS1, '#4FC3F7', 'solid')]:
+        fig.add_hline(y=lv_, line_dash=d_, line_color=cc_, line_width=1, row=3, col=1)
+
+    # WT 시그널 마커
+    # Gold_Dot / Green_Dot_T1 = WT 과매도 교차 → WT 차트에 마커
+    _add_signal_markers(fig, dc, 'Gold_Dot', 3, dc['WT1'], '#FFD700', 'star', 14, '🏆Gold')
+    _add_signal_markers(fig, dc, 'Green_Dot_T1', 3, dc['WT1'], '#00E676', 'circle', 10, '🟢T1')
+    _add_signal_markers(fig, dc, 'Green_Dot_T2', 3, dc['WT1'], '#69F0AE', 'circle', 8, '🟩T2')
+    _add_signal_markers(fig, dc, 'Blood_Diamond', 3, dc['WT1'], '#DC143C', 'star', 14, '🩸Blood')
+    _add_signal_markers(fig, dc, 'Red_Dot_T1', 3, dc['WT1'], '#FF1744', 'circle', 10, '🔴T1')
+    _add_signal_markers(fig, dc, 'Red_Dot_T2', 3, dc['WT1'], '#FF5252', 'circle', 8, '🟥T2')
+    # 다이버전스
+    _add_signal_markers(fig, dc, 'Bull_Divergence', 3, dc['WT1'], '#AA00FF', 'triangle-up', 10, '📈BullDiv')
+    _add_signal_markers(fig, dc, 'Bear_Divergence', 3, dc['WT1'], '#AA00FF', 'triangle-down', 10, '📉BearDiv')
+
+    # ══════════════════════════════════════
+    #  Row 4: MACD + 교차 마커
+    # ══════════════════════════════════════
+    fig.add_trace(go.Scatter(x=dc.index, y=dc['MACD_Line'], line=dict(color='#29B6F6', width=1.5), name="MACD",
+        hovertemplate="MACD:%{y:.3f}<extra></extra>"), row=4, col=1)
+    fig.add_trace(go.Scatter(x=dc.index, y=dc['MACD_Signal'], line=dict(color='#FFA726', width=1.5), name="Sig",
+        hoverinfo='skip'), row=4, col=1)
+    mh_ = dc['MACD_Hist']
+    fig.add_trace(go.Bar(x=dc.index, y=mh_,
+        marker_color=np.where(mh_ >= 0, '#26A69A', '#EF5350').tolist(),
+        name="Hist", opacity=.7, hoverinfo='skip'), row=4, col=1)
+    fig.add_hline(y=0, line_color="#475569", line_width=1, row=4, col=1)
+
+    # MACD 교차 마커
+    _add_signal_markers(fig, dc, 'MACD_Cross_Buy', 4, dc['MACD_Line'], '#00E676', 'triangle-up', 10, '〽️MCD▲')
+    _add_signal_markers(fig, dc, 'MACD_Cross_Sell', 4, dc['MACD_Line'], '#FF1744', 'triangle-down', 10, '〽️MCD▼')
+    _add_signal_markers(fig, dc, 'MACD_Zero_Cross_Buy', 4, dc['MACD_Line'], '#4CAF50', 'diamond', 8, '⬆️MC0▲')
+    _add_signal_markers(fig, dc, 'MACD_Zero_Cross_Sell', 4, dc['MACD_Line'], '#E57373', 'diamond', 8, '⬇️MC0▼')
+
+    # ══════════════════════════════════════
+    #  Row 5: Stochastic Slow + 교차 마커
+    # ══════════════════════════════════════
+    slk = dc.get('SlowK', pd.Series(50, index=dc.index))
+    sld = dc.get('SlowD', pd.Series(50, index=dc.index))
+
+    fig.add_trace(go.Scatter(x=dc.index, y=slk, line=dict(color='#00BCD4', width=2), name="SlowK",
+        hovertemplate="SlowK:%{y:.1f}<extra></extra>"), row=5, col=1)
+    fig.add_trace(go.Scatter(x=dc.index, y=sld, line=dict(color='#FF9800', width=1.5, dash='dot'), name="SlowD",
+        hoverinfo='skip'), row=5, col=1)
+
+    # 과매수/과매도 영역 배경
+    fig.add_hrect(y0=80, y1=100, fillcolor="rgba(239,68,68,.08)", line_width=0, row=5, col=1)
+    fig.add_hrect(y0=0, y1=20, fillcolor="rgba(16,185,129,.08)", line_width=0, row=5, col=1)
+    fig.add_hline(y=80, line_dash='dash', line_color='#FF5252', line_width=1, row=5, col=1)
+    fig.add_hline(y=20, line_dash='dash', line_color='#4FC3F7', line_width=1, row=5, col=1)
+    fig.add_hline(y=50, line_dash='dot', line_color='#475569', line_width=1, row=5, col=1)
+
+    # Stoch Slow 교차 마커
+    _add_signal_markers(fig, dc, 'StochSlow_Cross_Buy', 5, slk, '#00E676', 'triangle-up', 12, '🔄StSl▲')
+    _add_signal_markers(fig, dc, 'StochSlow_Cross_Sell', 5, slk, '#FF1744', 'triangle-down', 12, '🔄StSl▼')
+    # StochRSI 교차도 표시
+    _add_signal_markers(fig, dc, 'StochRSI_Cross_Buy', 5, slk, '#81C784', 'circle', 8, '🔄StR▲')
+    _add_signal_markers(fig, dc, 'StochRSI_Cross_Sell', 5, slk, '#EF9A9A', 'circle', 8, '🔄StR▼')
+
+    # ══════════════════════════════════════
+    #  Row 6: Squeeze Momentum + 스퀴즈 배경 + 마커
+    # ══════════════════════════════════════
+    sq_mom = dc.get('Squeeze_Momentum', pd.Series(0, index=dc.index))
+    sq_rising = dc.get('Squeeze_Mom_Rising', pd.Series(False, index=dc.index)).fillna(False)
+    sq_positive = dc.get('Squeeze_Mom_Positive', pd.Series(False, index=dc.index)).fillna(False)
+    sq_on = dc.get('Squeeze_On', pd.Series(False, index=dc.index)).fillna(False)
+
+    # 4색 히스토그램: 진한초록/연한초록/연한빨강/진한빨강
+    sq_colors = np.where(
+        sq_positive & sq_rising, '#00E676',      # 양수+증가 = 진한 초록
+        np.where(sq_positive & ~sq_rising, '#69F0AE',  # 양수+감소 = 연한 초록
+        np.where(~sq_positive & sq_rising, '#FF8A80',   # 음수+증가 = 연한 빨강 (바닥 탈출)
+        '#FF1744')))                                      # 음수+감소 = 진한 빨강
+
+    fig.add_trace(go.Bar(x=dc.index, y=sq_mom, marker_color=sq_colors.tolist(),
+        name="SqMom", opacity=.85,
+        hovertemplate="SqMom:%{y:.3f}<extra></extra>"), row=6, col=1)
+    fig.add_hline(y=0, line_color="#475569", line_width=1, row=6, col=1)
+
+    # 스퀴즈 ON 표시 (검은 점 → 하단에 작은 점으로)
+    if sq_on.any():
+        sq_on_idx = dc.index[sq_on]
+        fig.add_trace(go.Scatter(
+            x=sq_on_idx,
+            y=[0] * len(sq_on_idx),
+            mode='markers',
+            marker=dict(symbol='circle', size=4, color='#FFC107', opacity=0.8),
+            name='Squeeze ON', showlegend=True,
+            hovertemplate="⚡Squeeze ON<br>%{x|%Y-%m-%d}<extra></extra>"
+        ), row=6, col=1)
+
+    # Squeeze 시그널 마커
+    _add_signal_markers(fig, dc, 'Squeeze_Fire_Buy', 6, sq_mom, '#00FFFF', 'star-diamond', 14, '💥SqFire▲')
+    _add_signal_markers(fig, dc, 'Squeeze_Fire_Sell', 6, sq_mom, '#FF6600', 'star-diamond', 14, '🧨SqFire▼')
+    _add_signal_markers(fig, dc, 'Squeeze_Mom_Cross_Up', 6, sq_mom, '#00E676', 'diamond', 10, '💥SqMom▲')
+    _add_signal_markers(fig, dc, 'Squeeze_Mom_Cross_Down', 6, sq_mom, '#FF1744', 'diamond', 10, '💥SqMom▼')
+
+    # ══════════════════════════════════════
+    #  Row 7: 10-Layer NET Score
+    # ══════════════════════════════════════
     if 'Buy_Total' in dc.columns:
-        net=dc['Buy_Total']-dc['Sell_Total']
-        colors=np.where(net>=10,'#00E676',np.where(net>=5,'#69F0AE',np.where(net<=-10,'#FF1744',np.where(net<=-5,'#FF5252','#FFC107'))))
-        fig.add_trace(go.Bar(x=dc.index,y=net,marker_color=colors.tolist(),name="10L NET",opacity=.8,
-            customdata=np.stack([dc['Buy_Total'].values,dc['Sell_Total'].values,dc.get('Trade_Judgment',pd.Series('N/A',index=dc.index)).values,dc.get('Judgment_Confidence',pd.Series(0,index=dc.index)).values],axis=-1),
-            hovertemplate="<b>%{customdata[2]}</b>(%{customdata[3]:.0f}%)<br>B:%{customdata[0]:.1f} S:%{customdata[1]:.1f} NET:%{y:.1f}<extra></extra>"),row=5,col=1)
-        fig.add_hline(y=0,line_color="#475569",line_width=1,row=5,col=1)
-    fig.update_layout(template="plotly_dark",paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=2,r=2,t=40,b=2),height=1200,showlegend=True,hovermode="x unified",
-        legend=dict(orientation="h",yanchor="bottom",y=1.02,xanchor="center",x=.5,font=dict(size=9,color='#94A3B8'),bgcolor='rgba(0,0,0,0)'))
-    for i in range(1,6):
-        ya=f'yaxis{i}' if i>1 else 'yaxis';fig.update_layout(**{ya:dict(gridcolor='rgba(51,65,85,.3)',tickfont=dict(size=10,color='#64748B'))})
-    all_d=pd.date_range(start=dc.index[0],end=dc.index[-1],freq='D');nt=all_d.difference(dc.index.normalize())
-    fig.update_xaxes(rangeslider_visible=False,rangebreaks=[dict(values=nt.tolist())],gridcolor='rgba(51,65,85,.3)',tickfont=dict(size=10,color='#64748B'))
-    for ann in fig['layout']['annotations']:ann['font']=dict(size=12,color='#94A3B8',family='Pretendard')
+        net = dc['Buy_Total'] - dc['Sell_Total']
+        colors = np.where(net >= 10, '#00E676',
+                 np.where(net >= 5, '#69F0AE',
+                 np.where(net <= -10, '#FF1744',
+                 np.where(net <= -5, '#FF5252', '#FFC107'))))
+        jg_vals = dc.get('Trade_Judgment', pd.Series('N/A', index=dc.index)).values
+        cf_vals = dc.get('Judgment_Confidence', pd.Series(0, index=dc.index)).values
+
+        fig.add_trace(go.Bar(x=dc.index, y=net, marker_color=colors.tolist(),
+            name="10L NET", opacity=.8,
+            customdata=np.stack([dc['Buy_Total'].values, dc['Sell_Total'].values, jg_vals, cf_vals], axis=-1),
+            hovertemplate="<b>%{customdata[2]}</b>(%{customdata[3]:.0f}%)<br>"
+                          "B:%{customdata[0]:.1f} S:%{customdata[1]:.1f} NET:%{y:.1f}<extra></extra>"),
+            row=7, col=1)
+        fig.add_hline(y=0, line_color="#475569", line_width=1, row=7, col=1)
+
+    # ══════════════════════════════════════
+    #  레이아웃
+    # ══════════════════════════════════════
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=2, r=2, t=40, b=2),
+        height=1500,  # 7행이라 높이 증가
+        showlegend=True,
+        hovermode="x unified",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5,
+            font=dict(size=8, color='#94A3B8'), bgcolor='rgba(0,0,0,0)')
+    )
+
+    for i in range(1, 8):
+        ya = f'yaxis{i}' if i > 1 else 'yaxis'
+        fig.update_layout(**{ya: dict(gridcolor='rgba(51,65,85,.3)', tickfont=dict(size=9, color='#64748B'))})
+
+    # Stochastic Y축 범위 고정
+    fig.update_yaxes(range=[0, 100], row=5, col=1)
+
+    # 비거래일 제거
+    all_d = pd.date_range(start=dc.index[0], end=dc.index[-1], freq='D')
+    nt = all_d.difference(dc.index.normalize())
+    fig.update_xaxes(
+        rangeslider_visible=False,
+        rangebreaks=[dict(values=nt.tolist())],
+        gridcolor='rgba(51,65,85,.3)',
+        tickfont=dict(size=9, color='#64748B')
+    )
+
+    # 서브플롯 제목 스타일
+    for ann in fig['layout']['annotations']:
+        ann['font'] = dict(size=11, color='#94A3B8', family='Pretendard')
+
     return fig
 
 def build_metadata(dc,ticker):
