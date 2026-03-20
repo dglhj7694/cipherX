@@ -22,7 +22,7 @@ SECTOR_GROUPS = {
         'COHR','CIEN','FN','CEG','VST','CCJ','OKLO','SMR','NEE',
         'ISRG','SYM','SERV','PATH','PLTR','SNOW','MDB','TSLA',
         'CRWD','PANW','DDOG','NET','ZS','S','RXRX','SDGR','RKLB',
-        'ASTS','MP',
+        'ASTS','MP','SNDK',
     ],
 
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -65,7 +65,7 @@ SECTOR_GROUPS = {
         'OKTA','TENB',
     ],
     '스토리지/메모리': [
-        'WDC','MU','STX','PSTG','PENG','NTAP','DELL',
+        'WDC','MU','STX','PSTG','PENG','NTAP','DELL','SNDK',
     ],
     'AI플랫폼/SW': [
         'INOD','FIVN','TDC','BOX','CRWV','NBIS','PLTR','SNOW','MDB',
