@@ -1255,6 +1255,217 @@ def _committee_leading(df,N):
     conviction=np.clip(np.maximum(ag.values,dg.values)*20+10,10,90)
     return norm_score,pd.Series(conviction,index=idx)
 
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  🏷️ 판단 이유 자동 생성 (신규)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+def _generate_judgment_reason(judgment, ensemble_score, ctx_code, veto_str,
+                              synergy, prediction_boost, buy_agree, sell_agree,
+                              wt1, rsi, mfi, cmf, obv_rising, adx, vol_ratio,
+                              ma50_above, ma200_above, bb_pctb, macd_improving,
+                              stoch_k, hma_rising, utbot_dir, squeeze_on,
+                              cm_scores, cm_convictions):
+    """
+    판단 + 컨텍스트 + 지표 조합으로 상세 이유 문자열 생성.
+    Returns: (reason_short, reason_detail, action_label)
+    """
+    ctx_label = CTX_KOR.get(ctx_code, '기본')
+
+    # ═══ 위원회 동향 요약 ═══
+    trend_s = cm_scores.get('Trend', 0)
+    mom_s = cm_scores.get('Momentum', 0)
+    money_s = cm_scores.get('Money', 0)
+    struct_s = cm_scores.get('Structure', 0)
+    lead_s = cm_scores.get('Leading', 0)
+
+    # ═══ STRONG_BUY ═══
+    if judgment == 'STRONG_BUY':
+        # 항복 바닥 (극과매도 + 거래량 폭발 + 반전)
+        if 'Capitul' in veto_str:
+            reason = "투매 항복 바닥 확인 — 극단 과매도에서 거래량 폭발과 함께 강한 반전 캔들 출현"
+            detail = f"WT={wt1:.0f} RSI={rsi:.0f}의 극과매도 + 거래량 {vol_ratio:.1f}x 폭발 + 양봉 전환으로 투매 종료 시그널"
+            return reason, detail, "강력매수 🟢🟢🟢"
+
+        # 극과매도 V자 반등
+        if ctx_code == CTX_EXTREME_OS and synergy > 10:
+            reason = "단기 투매 종료 및 V자 급반등 가능성 고조 — 모멘텀 전환 확인"
+            detail = f"WT={wt1:.0f}에서 방향전환 + {buy_agree}개 위원회 매수 동의 + 교차시너지 {synergy:+.1f}"
+            return reason, detail, "강력매수 🟢🟢🟢"
+
+        # 다중 위원회 만장일치
+        if buy_agree >= 4:
+            reason = "다중 확인 강세 — 추세/모멘텀/자금/구조/선행 4개 이상 위원회 동시 매수 판단"
+            factors = []
+            if mom_s > 30: factors.append(f"모멘텀 강세({mom_s:+.0f})")
+            if money_s > 15: factors.append(f"자금 유입({money_s:+.0f})")
+            if lead_s > 20: factors.append(f"선행지표 상승({lead_s:+.0f})")
+            if trend_s > 20: factors.append(f"추세 정배열({trend_s:+.0f})")
+            detail = " + ".join(factors) if factors else "전 위원회 강세 합류"
+            return reason, detail, "강력매수 🟢🟢🟢"
+
+        reason = "복합 강세 시그널 다중 확인 — 높은 확률의 상승 진입 구간"
+        detail = f"ES={ensemble_score:+.1f}, {buy_agree}개 위원회 동의, 컨텍스트={ctx_label}"
+        return reason, detail, "강력매수 🟢🟢🟢"
+
+    # ═══ STRONG_SELL ═══
+    elif judgment == 'STRONG_SELL':
+        if 'Blowoff' in veto_str:
+            reason = "블로우오프 천장 확인 — 극단 과매수에서 거래량 폭발 후 강한 하락 전환"
+            detail = f"WT={wt1:.0f} RSI={rsi:.0f} 극과매수 + 거래량 {vol_ratio:.1f}x + 음봉 전환"
+            return reason, detail, "강력매도 🔴🔴🔴"
+
+        if ctx_code == CTX_EXTREME_OB and synergy < -10:
+            reason = "오버슈팅 한계 도달 — 단기 급락 및 추세 반전 위험 고조"
+            detail = f"WT={wt1:.0f}에서 꺾임 + {sell_agree}개 위원회 매도 + 교차시너지 {synergy:+.1f}"
+            return reason, detail, "강력매도 🔴🔴🔴"
+
+        if sell_agree >= 4:
+            reason = "전면적 약세 — 추세/모멘텀/자금/구조 다중 하락 확인"
+            factors = []
+            if mom_s < -30: factors.append(f"모멘텀 급락({mom_s:+.0f})")
+            if money_s < -15: factors.append(f"자금 이탈({money_s:+.0f})")
+            if trend_s < -20: factors.append(f"추세 역배열({trend_s:+.0f})")
+            detail = " + ".join(factors) if factors else "전 위원회 약세 합류"
+            return reason, detail, "강력매도 🔴🔴🔴"
+
+        reason = "복합 약세 시그널 다중 확인 — 손절 또는 숏 진입 구간"
+        detail = f"ES={ensemble_score:+.1f}, {sell_agree}개 위원회 매도"
+        return reason, detail, "강력매도 🔴🔴🔴"
+
+    # ═══ BUY ═══
+    elif judgment == 'BUY':
+        # 매집 완료 후 돌파 임박
+        if ctx_code == CTX_ACCUMULATION or ctx_code == CTX_BOTTOMING:
+            reason = "바닥권 매집 완료 — 조만간 박스권 상단 돌파 예상"
+            detail = f"CMF={cmf:.3f} 자금 유입 + OBV {'상승' if obv_rising else '하락'} + 횡보 구간 내 에너지 축적"
+            return reason, detail, "매수 🟢🟢"
+
+        # 추세 내 눌림목
+        if ma50_above and ma200_above and mom_s > 15:
+            reason = "상승 추세 내 건전한 눌림목 — 모멘텀 재가속 확인"
+            detail = f"정배열(50MA>{('200MA' if ma200_above else '')}위) + 모멘텀 반등({mom_s:+.0f}) + {'MACD개선' if macd_improving else ''}"
+            return reason, detail, "매수 🟢🟢"
+
+        # 스퀴즈 해소 상방
+        if squeeze_on or (struct_s > 15 and lead_s > 10):
+            reason = "에너지 축적 후 상방 돌파 — 변동성 확대 구간 진입"
+            detail = f"BB스퀴즈 {'진행중→해소' if squeeze_on else '해소'} + 구조({struct_s:+.0f}) + 선행({lead_s:+.0f})"
+            return reason, detail, "매수 🟢🟢"
+
+        # 모멘텀 전환
+        if synergy > 5:
+            reason = "모멘텀 전환 확인 — 선행지표와 모멘텀이 추세 전환을 선도"
+            detail = f"교차시너지 {synergy:+.1f} (Momentum vs Trend 충돌 = 바닥 전환)"
+            return reason, detail, "매수 🟢🟢"
+
+        reason = "상승 모멘텀 우위 — 매수 조건 충족"
+        detail = f"ES={ensemble_score:+.1f}, B{buy_agree}:S{sell_agree}, 컨텍스트={ctx_label}"
+        return reason, detail, "매수 🟢🟢"
+
+    # ═══ SELL ═══
+    elif judgment == 'SELL':
+        if ctx_code == CTX_DISTRIBUTION or ctx_code == CTX_TOPPING:
+            reason = "고점 매물 출회 및 세력 이탈 — 지지선 붕괴 및 하락 전환 예상"
+            detail = f"CMF={cmf:.3f} 자금 이탈 + OBV {'하락' if not obv_rising else '상승'} + 분배 구간 확인"
+            return reason, detail, "매도 🔴🔴"
+
+        if not ma50_above and not ma200_above and mom_s < -15:
+            reason = "하락 추세 가속 — 역배열 심화 + 모멘텀 악화"
+            detail = f"역배열(50MA/200MA 아래) + 모멘텀({mom_s:+.0f}) + {'MACD악화' if not macd_improving else ''}"
+            return reason, detail, "매도 🔴🔴"
+
+        if synergy < -5:
+            reason = "천장 전환 신호 — 모멘텀+선행이 추세 반전을 경고"
+            detail = f"교차시너지 {synergy:+.1f} (Momentum 하락 vs Trend 상승 = 천장 경고)"
+            return reason, detail, "매도 🔴🔴"
+
+        reason = "하락 모멘텀 우위 — 리스크 관리 필요"
+        detail = f"ES={ensemble_score:+.1f}, B{buy_agree}:S{sell_agree}"
+        return reason, detail, "매도 🔴🔴"
+
+    # ═══ WATCH_BUY ═══
+    elif judgment == 'WATCH_BUY':
+        if ctx_code == CTX_EXTREME_OS:
+            reason = "과매도 영역 접근 — 반등 준비 구간, 확인 후 진입 권장"
+            detail = f"WT={wt1:.0f} RSI={rsi:.0f} 과매도 접근 + 아직 반전 캔들 미확인"
+            return reason, detail, "단기매수 관찰 🟡🟢"
+
+        if prediction_boost > 5:
+            reason = "상승 모멘텀 형성 중 — 가속도 개선, 추가 확인 시 매수 유리"
+            detail = f"예측부스트 {prediction_boost:+.1f} + MACD {'개선' if macd_improving else '미개선'}"
+            return reason, detail, "단기매수 관찰 🟡🟢"
+
+        if hma_rising and utbot_dir == 1:
+            reason = "선행지표 강세 전환 — Hull+UTBot 매수 전환, 추세 확인 대기"
+            detail = f"Hull 상승 + UTBot 매수 + 추세 확인 필요 (MA50 {'위' if ma50_above else '아래'})"
+            return reason, detail, "단기매수 관찰 🟡🟢"
+
+        reason = "상승 모멘텀 우위이나 확인 부족 — 저점 매수 기회 탐색"
+        detail = f"ES={ensemble_score:+.1f}, 추가 확인 대기"
+        return reason, detail, "단기매수 관찰 🟡🟢"
+
+    # ═══ WATCH_SELL ═══
+    elif judgment == 'WATCH_SELL':
+        if ctx_code == CTX_EXTREME_OB:
+            reason = "과매수 영역 접근 — 조정 준비 구간, 확인 후 매도 권장"
+            detail = f"WT={wt1:.0f} RSI={rsi:.0f} 과매수 접근 + 아직 반전 미확인"
+            return reason, detail, "단기매도 관찰 🟡🔴"
+
+        if prediction_boost < -5:
+            reason = "하락 모멘텀 형성 중 — 가속도 악화, 보수적 리스크 관리 필요"
+            detail = f"예측부스트 {prediction_boost:+.1f}"
+            return reason, detail, "단기매도 관찰 🟡🔴"
+
+        if not hma_rising and utbot_dir == -1:
+            reason = "선행지표 약세 전환 — Hull+UTBot 매도, 추가 하락 가능"
+            detail = f"Hull 하락 + UTBot 매도 + 지지선 이탈 위험"
+            return reason, detail, "단기매도 관찰 🟡🔴"
+
+        reason = "하락 모멘텀 우위이나 확인 부족 — 보수적 대응 필요"
+        detail = f"ES={ensemble_score:+.1f}"
+        return reason, detail, "단기매도 관찰 🟡🔴"
+
+    # ═══ MIXED ═══
+    elif judgment == 'MIXED':
+        if squeeze_on or ctx_code == CTX_VOL_DRY:
+            reason = "에너지 응축 및 방향성 탐색 중 — 변동성 폭발(Squeeze) 직전"
+            detail = f"BB스퀴즈 {'ON' if squeeze_on else 'OFF'} + 거래량 고갈 + 방향 미결정"
+            return reason, detail, "관망/대기 🟠"
+
+        if buy_agree >= 2 and sell_agree >= 2:
+            reason = "매수·매도 세력 팽팽한 균형 — 방향성 결정 이벤트 대기"
+            detail = f"B{buy_agree}:S{sell_agree} 균형 + 위원회 간 의견 충돌"
+            return reason, detail, "관망/대기 🟠"
+
+        reason = "상반된 시그널 혼재 — 명확한 방향성 확인 전 진입 자제"
+        detail = f"ES={ensemble_score:+.1f}, 매수/매도 위원 충돌"
+        return reason, detail, "관망/대기 🟠"
+
+    # ═══ NEUTRAL ═══
+    else:
+        if ctx_code == CTX_RANGING:
+            reason = "뚜렷한 방향성 부재 — 중요 지지/저항선 이탈 여부 확인 필요"
+            detail = f"ADX={adx:.0f} 낮은 추세 강도 + 횡보 구간"
+            return reason, detail, "중립/관망 ⚪"
+
+        if ctx_code == CTX_VOL_DRY:
+            reason = "거래량 고갈 — 폭풍 전 고요, 방향성 돌파 대기"
+            detail = "거래량 감소 + BB 수축 + 방향 미결정"
+            return reason, detail, "중립/관망 ⚪"
+
+        if ctx_code == CTX_POST_EXPLOSION:
+            reason = "변동성 폭발 직후 — 방향 확인 단계, 성급한 진입 자제"
+            detail = "대형 캔들 출현 직후 + 추세 정착 여부 관찰"
+            return reason, detail, "중립/관망 ⚪"
+
+        if abs(ensemble_score) < 5:
+            reason = "시그널 부족 — 명확한 매매 근거 없음, 관망 권장"
+            detail = f"ES={ensemble_score:+.1f} (임계치 미달)"
+            return reason, detail, "중립/관망 ⚪"
+
+        reason = "혼조세 — 추가 확인 신호 대기"
+        detail = f"ES={ensemble_score:+.1f}, 컨텍스트={ctx_label}"
+        return reason, detail, "중립/관망 ⚪"
+
 
 def compute_committee_ensemble(df,vol_ratio,hma_r_v):
     """🏛️ V14.1 — Active Flip + 교차 시너지 + 예측 부스트 + 동적 임계치"""
@@ -1397,6 +1608,50 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
         conf[i]=np.clip(raw,5,99)
 
     df['Trade_Judgment']=j;df['Judgment_Confidence']=conf;df['Buy_Agree']=buy_agree;df['Sell_Agree']=sell_agree
+
+    # ═══ Step 9: ★ 판단 이유 생성 ═══
+    obv_val = N('OBV').values; obv_ma_val = N('OBV').rolling(20, min_periods=10).mean().values
+    mh_vals = N('MACD_Hist').values; mh_prev = np.roll(mh_vals, 1)
+    
+    reasons_short = []; reasons_detail = []; action_labels = []
+    for i in range(n):
+        cm_s = {cm: eff_score[i, ci] for ci, cm in enumerate(COMMITTEE_NAMES)}
+        cm_c = {cm: eff_conv[i, ci] for ci, cm in enumerate(COMMITTEE_NAMES)}
+        r_short, r_detail, a_label = _generate_judgment_reason(
+            judgment=j[i],
+            ensemble_score=ensemble_score[i],
+            ctx_code=int(ctx_v[i]),
+            veto_str=df['Veto_Flags'].iloc[i] if i < len(df) else '',
+            synergy=synergy_bonus[i],
+            prediction_boost=prediction_boost[i],
+            buy_agree=buy_agree[i],
+            sell_agree=sell_agree[i],
+            wt1=N('WT1').values[i],
+            rsi=N('RSI').values[i],
+            mfi=N('MFI').values[i],
+            cmf=N('CMF').values[i],
+            obv_rising=bool(obv_val[i] > obv_ma_val[i]) if not np.isnan(obv_ma_val[i]) else True,
+            adx=N('ADX').values[i],
+            vol_ratio=vol_ratio.values[i],
+            ma50_above=bool(C[i] > N('MA50').values[i]) if not np.isnan(N('MA50').values[i]) else False,
+            ma200_above=bool(C[i] > N('MA200').values[i]) if not np.isnan(N('MA200').values[i]) else False,
+            bb_pctb=N('Percent_B').values[i],
+            macd_improving=bool(mh_vals[i] > mh_prev[i]) if i > 0 else False,
+            stoch_k=N('StochK').values[i],
+            hma_rising=bool(hma_r_v[i]) if i < len(hma_r_v) else False,
+            utbot_dir=int(N('UTBot_Dir').values[i]),
+            squeeze_on=bool(df.get('Squeeze_On', pd.Series(False, index=idx)).iloc[i]),
+            cm_scores=cm_s,
+            cm_convictions=cm_c,
+        )
+        reasons_short.append(r_short)
+        reasons_detail.append(r_detail)
+        action_labels.append(a_label)
+
+    df['Judgment_Reason'] = reasons_short
+    df['Judgment_Detail'] = reasons_detail
+    df['Action_Label'] = action_labels
+
     return df
 
 
@@ -1455,6 +1710,8 @@ def _build_candle_hover(dc):
     ov=_g('Open');hv=_g('High');lv=_g('Low');cv=_g('Close');vol_v=_g('Volume')
     atr_v=_g('ATR');wt_v=_g('WT1');rsi_v=_g('RSI',50);mfi_v=_g('MFI',50)
     jg_v=_gs('Trade_Judgment','');cf_v=_g('Judgment_Confidence')
+    reason_v = _gs('Judgment_Reason', '')
+    action_v = _gs('Action_Label', '')
     bt_v=_g('Buy_Total');st_v=_g('Sell_Total');es_v=_g('Ensemble_Score')
     ctx_v=_g('Market_Context');lv_v=_gs('Leading_Verdict','');lgv_v=_gs('Lagging_Verdict','')
     ut_v=_g('UTBot_Dir');hma_v=dc.get('HMA_Rising',pd.Series(False,index=dc.index)).fillna(False).values
@@ -1472,7 +1729,13 @@ def _build_candle_hover(dc):
         p.append(f"Vol:{vol_v[i]:,.0f} ATR:{atr_v[i]:.2f}")
         p.append("─"*28)
         ctx_l=CTX_KOR.get(int(ctx_v[i]),'기본')
-        p.append(f"<b>📍{jg_v[i]}</b>({cf_v[i]:.0f}%) ES:{es_v[i]:+.1f} [{ctx_l}]")
+        act_str = str(action_v[i]) if action_v[i] else ''
+        p.append(f"<b>📍{act_str}</b> ({cf_v[i]:.0f}%) ES:{es_v[i]:+.1f} [{ctx_l}]")
+        rsn = str(reason_v[i])
+        if rsn:
+            rsn_clr = '#6EE7B7' if 'BUY' in str(jg_v[i]) or '매수' in act_str else ('#FCA5A5' if 'SELL' in str(jg_v[i]) or '매도' in act_str else '#FCD34D')
+            p.append(f"<span style='color:{rsn_clr};font-size:11px'>💬 {rsn}</span>")
+
         p.append(f"WT:{wt_v[i]:.0f} RSI:{rsi_v[i]:.0f} MFI:{mfi_v[i]:.0f} UT:{'B' if ut_v[i]==1 else 'S' if ut_v[i]==-1 else '-'} Hull:{'🟢' if hma_v[i] else '🔴'}")
         if abs(pred_v[i])>3:
             p.append(f"<span style='color:{'#6EE7B7' if pred_v[i]>0 else '#FCA5A5'}'>🔮예측부스트:{pred_v[i]:+.1f}</span>")
@@ -1733,6 +1996,9 @@ def build_metadata(dc,ticker):
         'ema8':_sf(lat.get('EMA8')),'ema21':_sf(lat.get('EMA21')),
         'obv_trend':'rising' if _sf(lat.get('OBV'))>_sf(dc['OBV'].rolling(20).mean().iloc[-1]) else 'falling',
         'combined_scans':acs,'recent_signals':recent,
+        'judgment_reason': str(lat.get('Judgment_Reason', '')),
+        'judgment_detail': str(lat.get('Judgment_Detail', '')),
+        'action_label': str(lat.get('Action_Label', '')),
     }
 
 
@@ -1766,13 +2032,22 @@ def render_judgment_card(m):
     jc='#34D399' if 'BUY' in jg else('#F87171' if 'SELL' in jg else '#FCD34D')
     labels={'STRONG_BUY':'🟢🟢🟢 STRONG BUY','BUY':'🟢🟢 BUY','WATCH_BUY':'🟡🟢 WATCH BUY','NEUTRAL':'⚪ NEUTRAL','MIXED':'🟠 MIXED','WATCH_SELL':'🟡🔴 WATCH SELL','SELL':'🔴🔴 SELL','STRONG_SELL':'🔴🔴🔴 STRONG SELL'}
     ba=m.get('buy_agree',0);sa=m.get('sell_agree',0);veto=m.get('veto_flags','')
-    veto_html=f"<div style='margin-top:6px'><span style='background:rgba(239,68,68,.15);color:#FCA5A5;padding:3px 8px;border-radius:6px;font-size:.7rem;font-weight:700'>🚫 {veto}</span></div>" if veto else ""
     syn=m.get('reversal_synergy',0);pred=m.get('prediction_boost',0)
+    # ★ 판단 이유
+    reason=m.get('judgment_reason','');detail=m.get('judgment_detail','');action=m.get('action_label','')
+    reason_html=""
+    if reason:
+        reason_html=f"""<div style='margin-top:12px;background:rgba(255,255,255,.04);border-radius:10px;padding:12px 16px;text-align:left'>
+            <p style='color:{jc};font-weight:800;font-size:.95rem;margin:0 0 4px'>🏷️ {action}</p>
+            <p style='color:#E8ECF1;font-size:.88rem;margin:0 0 4px'>💬 {reason}</p>
+            <p style='color:#94A3B8;font-size:.78rem;margin:0'>📋 {detail}</p></div>"""
+    veto_html=f"<div style='margin-top:6px'><span style='background:rgba(239,68,68,.15);color:#FCA5A5;padding:3px 8px;border-radius:6px;font-size:.7rem;font-weight:700'>🚫 {veto}</span></div>" if veto else ""
     extra=""
     if abs(syn)>5:extra+=f"<span style='color:{'#34D399' if syn>0 else '#F87171'};font-size:.8rem;margin:0 4px'>🔄시너지:{syn:+.1f}</span>"
     if abs(pred)>3:extra+=f"<span style='color:{'#34D399' if pred>0 else '#F87171'};font-size:.8rem;margin:0 4px'>🔮예측:{pred:+.1f}</span>"
     st.markdown(f"""<div class="score-card {cc}"><p style="font-size:2rem;font-weight:800;color:{jc};margin:0">{labels.get(jg,jg)}</p>
         <div style="display:flex;align-items:center;gap:10px;justify-content:center;margin-top:8px"><div style="flex:0 0 200px;height:8px;background:#1E293B;border-radius:4px;overflow:hidden"><div style="width:{min(cf,100)}%;height:8px;background:{jc};border-radius:4px"></div></div><span style="color:{jc};font-weight:800;font-size:1.1rem">{cf:.0f}%</span></div>
+        {reason_html}
         <div style="display:flex;justify-content:center;gap:32px;margin-top:14px">
         <div><p style="color:#64748B;font-size:.7rem;margin:0">Ensemble</p><p style="color:{'#34D399' if es>0 else '#F87171' if es<0 else '#FCD34D'};font-size:1.4rem;font-weight:800;margin:2px 0">{es:+.1f}</p></div>
         <div style="border-left:1px solid rgba(255,255,255,.08);padding-left:32px"><p style="color:#64748B;font-size:.7rem;margin:0">찬성</p><p style="color:#F8FAFC;font-size:1.4rem;font-weight:800;margin:2px 0">B{ba}:S{sa}</p></div>
@@ -2136,6 +2411,9 @@ if current_mode == '스캐너':
                     'ba': int(_sf(lat_.get('Buy_Agree', 0))),
                     'sa': int(_sf(lat_.get('Sell_Agree', 0))),
                     'latest_sig': latest_sig_date.strftime('%Y-%m-%d') if latest_sig_date else '9999-99-99',
+                    # ★ 신규
+                    'reason': str(lat_.get('Judgment_Reason', '')),
+                    'action': str(lat_.get('Action_Label', '')),
                 }
             except: return None
 
@@ -2262,7 +2540,9 @@ else:
                     prompt = None
                     status.update(label=f"⚠️ {tv} 실패", state="error", expanded=False)
             if fig_json:
-                content = f"**{tv}** — **{meta['judgment']}** ({meta['confidence']:.0f}%)"
+                action = meta.get('action_label', '')
+                reason = meta.get('judgment_reason', '')
+                content = f"**{tv}** — **{action}**\n💬 {reason}"
                 es = meta.get('ensemble_score', 0); ctx_l = meta.get('context_label', '기본')
                 ba = meta.get('buy_agree', 0); sa = meta.get('sell_agree', 0)
                 syn = meta.get('reversal_synergy', 0); pred = meta.get('prediction_boost', 0)
