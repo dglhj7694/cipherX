@@ -1146,97 +1146,165 @@ def _detect_context_vectorized(df):
 
 
 def _committee_trend(df, N):
-    """📈 추세 위원회 — MA, ADX, SuperTrend, Ichimoku, Regime"""
-    C=df['Close'];idx=df.index
-    score=pd.Series(0., index=idx)
+    """📈 추세 위원회 — MA, ADX, ST, Ichimoku + ★평균회귀 서브스코어"""
+    C = df['Close']; idx = df.index
+    score = pd.Series(0., index=idx)
 
-    # MA 배열 (정배열 vs 역배열)
-    a200=C>N('MA200');a50=C>N('MA50');a20=C>N('MA20')
-    b200=C<N('MA200');b50=C<N('MA50');b20=C<N('MA20')
-    score+=np.where(a200&a50&a20, 30, np.where(a200&a50, 20, np.where(a50, 10, 0)))
-    score+=np.where(b200&b50&b20, -30, np.where(b200&b50, -20, np.where(b50, -10, 0)))
+    # ── 기존: MA 배열 ──
+    a200 = C > N('MA200'); a50 = C > N('MA50'); a20 = C > N('MA20')
+    b200 = C < N('MA200'); b50 = C < N('MA50'); b20 = C < N('MA20')
+    score += np.where(a200 & a50 & a20, 30, np.where(a200 & a50, 20, np.where(a50, 10, 0)))
+    score += np.where(b200 & b50 & b20, -30, np.where(b200 & b50, -20, np.where(b50, -10, 0)))
 
-    # MA 기울기 (방향성)
-    ma50_slope=(N('MA50')-N('MA50').shift(10))/(N('MA50').shift(10)+1e-10)*100
-    score+=np.clip(ma50_slope*3, -15, 15)
+    # ── 기존: MA 기울기 ──
+    ma50_slope = (N('MA50') - N('MA50').shift(10)) / (N('MA50').shift(10) + 1e-10) * 100
+    score += np.clip(ma50_slope * 3, -15, 15)
 
-    # ADX + DI
-    adx_val=N('ADX');pdi=N('Plus_DI');mdi=N('Minus_DI')
-    di_diff=pdi-mdi
-    score+=np.where(adx_val>25, np.clip(di_diff*.5,-15,15), np.clip(di_diff*.2,-5,5))
+    # ── 기존: ADX + DI ──
+    adx_val = N('ADX'); pdi = N('Plus_DI'); mdi = N('Minus_DI')
+    di_diff = pdi - mdi
+    score += np.where(adx_val > 25, np.clip(di_diff * .5, -15, 15), np.clip(di_diff * .2, -5, 5))
 
-    # SuperTrend
-    score+=np.where(N('ST_Direction')==1, 10, np.where(N('ST_Direction')==-1, -10, 0))
+    # ── 기존: SuperTrend ──
+    score += np.where(N('ST_Direction') == 1, 10, np.where(N('ST_Direction') == -1, -10, 0))
 
-    # Ichimoku
-    kumo_top=pd.concat([N('Ichimoku_SenkouA'),N('Ichimoku_SenkouB')],axis=1).max(axis=1)
-    kumo_bot=pd.concat([N('Ichimoku_SenkouA'),N('Ichimoku_SenkouB')],axis=1).min(axis=1)
-    score+=np.where(C>kumo_top, 10, np.where(C<kumo_bot, -10, 0))
+    # ── 기존: Ichimoku ──
+    kumo_top = pd.concat([N('Ichimoku_SenkouA'), N('Ichimoku_SenkouB')], axis=1).max(axis=1)
+    kumo_bot = pd.concat([N('Ichimoku_SenkouA'), N('Ichimoku_SenkouB')], axis=1).min(axis=1)
+    score += np.where(C > kumo_top, 10, np.where(C < kumo_bot, -10, 0))
 
-    # 정규화 (-100 ~ +100)
-    norm_score=(score/JT.TREND_NORM*100).clip(-100,100)
+    # ═══ ★ 신규: 평균회귀(Mean Reversion) 서브스코어 ═══
+    # 가격이 MA에서 극단적으로 이탈하면, 추세 "방향"이 아닌 "과잉"을 측정
+    atr = N('ATR')
+    ma50_val = N('MA50'); ma200_val = N('MA200')
 
-    # 확신도: ADX 기반 (추세 없으면 확신 낮음)
-    conviction=np.clip(adx_val.values*2, 5, 95)
-    # 극과매도/과매수에서 추세 확신도 대폭 감소 (핵심!)
-    wt1=N('WT1').values;rsi=N('RSI').values
-    extreme_os_factor=np.clip((-50-wt1)/30, 0, 1)*0.7 + np.clip((30-rsi)/20, 0, 1)*0.3
-    extreme_ob_factor=np.clip((wt1-50)/30, 0, 1)*0.7 + np.clip((rsi-70)/20, 0, 1)*0.3
-    # 극단 상황일수록 추세 확신도 감소
-    conviction=conviction*(1 - np.maximum(extreme_os_factor, extreme_ob_factor)*0.8)
-    conviction=np.clip(conviction, 5, 95)
+    # MA50 대비 이탈도 (ATR 단위)
+    dist_ma50 = (C - ma50_val) / (atr + 1e-10)
+    # MA200 대비 이탈도 (ATR 단위)
+    dist_ma200 = (C - ma200_val) / (atr + 1e-10)
+
+    # 극단 이탈 시 반대 방향으로 점수 (평균회귀 압력)
+    # 가격이 MA50보다 2ATR 이상 아래 → 매수 압력 (반등 가능성)
+    # 가격이 MA50보다 2ATR 이상 위 → 매도 압력 (조정 가능성)
+    reversion_50 = np.where(dist_ma50 < -3, 20,    # 3ATR 아래: 강한 반등 압력
+                   np.where(dist_ma50 < -2, 12,     # 2ATR 아래: 중간 반등 압력
+                   np.where(dist_ma50 > 3, -20,     # 3ATR 위: 강한 조정 압력
+                   np.where(dist_ma50 > 2, -12, 0))))
+
+    reversion_200 = np.where(dist_ma200 < -4, 15,
+                    np.where(dist_ma200 < -2.5, 8,
+                    np.where(dist_ma200 > 4, -15,
+                    np.where(dist_ma200 > 2.5, -8, 0))))
+
+    # 평균회귀는 추세와 독립적인 힘 → 추세 점수에 직접 가산
+    score += reversion_50 + reversion_200
+
+    # ═══ ★ 신규: 추세 전환 조기 감지 ═══
+    # MA50 기울기가 음→양 전환 중 (기울기의 2차 미분)
+    ma50_accel = ma50_slope - ma50_slope.shift(5)
+    # 하락 추세에서 기울기 꺾이는 중 → 전환 초기 보너스
+    score += np.where((ma50_slope < 0) & (ma50_accel > 0.5), 8, 0)  # 하락 둔화
+    score += np.where((ma50_slope > 0) & (ma50_accel < -0.5), -8, 0)  # 상승 둔화
+
+    # ── 정규화 ──
+    norm_score = (score / JT.TREND_NORM * 100).clip(-100, 100)
+
+    # ── 확신도: ADX 기반 + ★극단에서 감소 강화 ──
+    conviction = np.clip(adx_val.values * 2, 5, 95)
+    wt1 = N('WT1').values; rsi = N('RSI').values
+    extreme_os_factor = np.clip((-50 - wt1) / 30, 0, 1) * 0.7 + np.clip((30 - rsi) / 20, 0, 1) * 0.3
+    extreme_ob_factor = np.clip((wt1 - 50) / 30, 0, 1) * 0.7 + np.clip((rsi - 70) / 20, 0, 1) * 0.3
+    conviction = conviction * (1 - np.maximum(extreme_os_factor, extreme_ob_factor) * 0.8)
+    conviction = np.clip(conviction, 5, 95)
 
     return norm_score, pd.Series(conviction, index=idx)
 
 
 def _committee_momentum(df, N):
-    """🔥 모멘텀 위원회 — RSI, WT, MACD, Stoch, 가속도"""
-    idx=df.index
-    score=pd.Series(0., index=idx)
+    """🔥 모멘텀 위원회 — RSI, WT, MACD, Stoch + ★전환 방향전환 보너스 강화"""
+    idx = df.index
+    score = pd.Series(0., index=idx)
 
-    # RSI (0-100 → -50~+50 범위)
-    rsi=N('RSI')
-    rsi_score=(rsi-50)  # 50 중심
-    rsi_dir=np.where(rsi>rsi.shift(1), 5, np.where(rsi<rsi.shift(1), -5, 0))
-    score+=rsi_score*.6 + rsi_dir
+    # ── 기존: RSI ──
+    rsi = N('RSI')
+    rsi_score = (rsi - 50)
+    rsi_dir = np.where(rsi > rsi.shift(1), 5, np.where(rsi < rsi.shift(1), -5, 0))
+    score += rsi_score * .6 + rsi_dir
 
-    # WaveTrend (이미 -100~+100 범위)
-    wt1=N('WT1');wt2=N('WT2')
-    wt_score=wt1*.3  # WT 기여
-    wt_cross=np.where(wt1>wt2, 8, np.where(wt1<wt2, -8, 0))
-    wt_dir=np.where(wt1>wt1.shift(1), 5, np.where(wt1<wt1.shift(1), -5, 0))
-    score+=wt_score + wt_cross + wt_dir
+    # ── 기존: WaveTrend ──
+    wt1 = N('WT1'); wt2 = N('WT2')
+    wt_score = wt1 * .3
+    wt_cross = np.where(wt1 > wt2, 8, np.where(wt1 < wt2, -8, 0))
+    wt_dir = np.where(wt1 > wt1.shift(1), 5, np.where(wt1 < wt1.shift(1), -5, 0))
+    score += wt_score + wt_cross + wt_dir
 
-    # MACD
-    mh=N('MACD_Hist')
-    mh_dir=np.where(mh>mh.shift(1), 8, np.where(mh<mh.shift(1), -8, 0))
-    mh_sign=np.where(mh>0, 5, np.where(mh<0, -5, 0))
-    score+=mh_dir + mh_sign
+    # ── 기존: MACD ──
+    mh = N('MACD_Hist')
+    mh_dir = np.where(mh > mh.shift(1), 8, np.where(mh < mh.shift(1), -8, 0))
+    mh_sign = np.where(mh > 0, 5, np.where(mh < 0, -5, 0))
+    score += mh_dir + mh_sign
 
-    # Stoch
-    stk=N('StochK');std=N('StochD')
-    stk_score=(stk-50)*.2
-    stk_cross=np.where((stk>std)&(stk<30), 10, np.where((stk<std)&(stk>70), -10, 0))
-    score+=stk_score + stk_cross
+    # ── 기존: Stoch ──
+    stk = N('StochK'); std = N('StochD')
+    stk_score = (stk - 50) * .2
+    stk_cross = np.where((stk > std) & (stk < 30), 10, np.where((stk < std) & (stk > 70), -10, 0))
+    score += stk_score + stk_cross
 
-    # 복합 가속도
-    ca=N('Composite_Accel')
-    score+=np.clip(ca*5, -15, 15)
+    # ── 기존: 복합 가속도 ──
+    ca = N('Composite_Accel')
+    score += np.clip(ca * 5, -15, 15)
 
-    # 정규화
-    norm_score=(score/JT.MOMENTUM_NORM*100).clip(-100,100)
+    # ═══ ★ 신규: 위상 전환(Phase Transition) 보너스 ═══
+    # 극단 + 방향전환 + 캔들확인 = 위상 전환 확정
+    wt1_v = wt1.values; rsi_v = rsi.values; mfi_v = N('MFI').values
+    wt1_turn_up = (wt1_v < -30) & (wt1_v > np.roll(wt1_v, 1))  # WT 과매도+꺾임
+    wt1_turn_dn = (wt1_v > 30) & (wt1_v < np.roll(wt1_v, 1))   # WT 과매수+꺾임
+    rsi_turn_up = (rsi_v < 40) & (rsi_v > np.roll(rsi_v, 1))
+    rsi_turn_dn = (rsi_v > 60) & (rsi_v < np.roll(rsi_v, 1))
 
-    # 확신도: 극단에서 높음 (핵심 — 바닥/천장에서 모멘텀이 주도)
-    extremity=np.maximum(
-        np.clip((-wt1.values-30)/40, 0, 1),  # 과매도 극단
-        np.clip((wt1.values-30)/40, 0, 1)     # 과매수 극단
+    # 강세 위상 전환: 다중 오실레이터 동시 꺾임
+    bull_phase = (
+        wt1_turn_up.astype(float) +
+        rsi_turn_up.astype(float) +
+        (mfi_v < 35).astype(float) +                              # MFI 과매도
+        (N('MACD_Hist').values > np.roll(N('MACD_Hist').values, 1)).astype(float)  # MACD 개선
     )
-    # 방향 전환 감지 → 확신도 부스트
-    turning_up=(wt1.values<-30)&(wt1.values>np.roll(wt1.values,1))
-    turning_dn=(wt1.values>30)&(wt1.values<np.roll(wt1.values,1))
-    turn_boost=np.where(turning_up|turning_dn, 20, 0)
+    # 약세 위상 전환: 다중 오실레이터 동시 꺾임
+    bear_phase = (
+        wt1_turn_dn.astype(float) +
+        rsi_turn_dn.astype(float) +
+        (mfi_v > 65).astype(float) +
+        (N('MACD_Hist').values < np.roll(N('MACD_Hist').values, 1)).astype(float)
+    )
 
-    conviction=np.clip(40 + extremity*50 + turn_boost, 15, 95)
+    # 3개 이상 동시 꺾임 = 강한 위상 전환
+    phase_buy_bonus = np.where(bull_phase >= 4, 25, np.where(bull_phase >= 3, 15, np.where(bull_phase >= 2, 5, 0)))
+    phase_sell_bonus = np.where(bear_phase >= 4, -25, np.where(bear_phase >= 3, -15, np.where(bear_phase >= 2, -5, 0)))
+    score += phase_buy_bonus + phase_sell_bonus
+
+    # ═══ ★ 신규: 극단 반전 강도 부스터 ═══
+    # WT<-70에서 꺾이면 → 추가 대형 보너스
+    deep_os_turn = (wt1_v < -70) & (wt1_v > np.roll(wt1_v, 1))
+    deep_ob_turn = (wt1_v > 70) & (wt1_v < np.roll(wt1_v, 1))
+    score += np.where(deep_os_turn, 20, 0)
+    score += np.where(deep_ob_turn, -20, 0)
+
+    # ── 정규화 ──
+    norm_score = (score / JT.MOMENTUM_NORM * 100).clip(-100, 100)
+
+    # ── 확신도: 극단+전환에서 대폭 상승 ──
+    extremity = np.maximum(
+        np.clip((-wt1.values - 30) / 40, 0, 1),
+        np.clip((wt1.values - 30) / 40, 0, 1)
+    )
+    turning_up = (wt1.values < -30) & (wt1.values > np.roll(wt1.values, 1))
+    turning_dn = (wt1.values > 30) & (wt1.values < np.roll(wt1.values, 1))
+    turn_boost = np.where(turning_up | turning_dn, 20, 0)
+
+    # ★ 위상 전환 확인 시 확신도 추가 부스트
+    phase_conv_boost = np.where(bull_phase >= 3, 15, np.where(bear_phase >= 3, 15, 0))
+
+    conviction = np.clip(40 + extremity * 50 + turn_boost + phase_conv_boost, 15, 98)
 
     return norm_score, pd.Series(conviction, index=idx)
 
@@ -1395,182 +1463,233 @@ def _committee_leading(df, N):
 
 
 def compute_committee_ensemble(df, vol_ratio, hma_r_v):
-    """🏛️ 5-Committee Ensemble → 최종 판단"""
-    idx=df.index;n=len(df)
-    N=lambda c,d=0:df.get(c,pd.Series(d,index=idx)).fillna(d)
+    """🏛️ 5-Committee Ensemble V14.1 — ★전환점 감지 강화"""
+    idx = df.index; n = len(df)
+    N = lambda c, d=0: df.get(c, pd.Series(d, index=idx)).fillna(d)
 
     # ═══ Step 1: 시장 컨텍스트 감지 ═══
-    ctx=_detect_context_vectorized(df)
-    df['Market_Context']=ctx
+    ctx = _detect_context_vectorized(df)
+    df['Market_Context'] = ctx
 
     # ═══ Step 2: 5개 위원회 독립 평가 ═══
-    scores={};convictions={}
+    scores = {}; convictions = {}
     scores['Trend'], convictions['Trend'] = _committee_trend(df, N)
     scores['Momentum'], convictions['Momentum'] = _committee_momentum(df, N)
     scores['Money'], convictions['Money'] = _committee_money(df, N)
     scores['Structure'], convictions['Structure'] = _committee_structure(df, N)
     scores['Leading'], convictions['Leading'] = _committee_leading(df, N)
 
-    # 저장
     for cm in COMMITTEE_NAMES:
         df[f'CM_{cm}_Score'] = scores[cm]
         df[f'CM_{cm}_Conv'] = convictions[cm]
 
-    # ═══ Step 3: 컨텍스트 기반 가중치 결정 ═══
-    ctx_v=ctx.values
-    weights_arr=np.zeros((n, NUM_COMMITTEES))
+    # ═══ Step 3: 컨텍스트 기반 가중치 ═══
+    ctx_v = ctx.values
+    weights_arr = np.zeros((n, NUM_COMMITTEES))
     for ctx_code, ctx_name in CTX_LABELS.items():
-        mask=(ctx_v==ctx_code)
+        mask = (ctx_v == ctx_code)
         if mask.any():
-            w=CONTEXT_WEIGHTS.get(ctx_name, CONTEXT_WEIGHTS['default'])
-            weights_arr[mask]=w
+            w = CONTEXT_WEIGHTS.get(ctx_name, CONTEXT_WEIGHTS['default'])
+            weights_arr[mask] = w
 
     # ═══ Step 4: Veto 로직 ═══
-    wt1=N('WT1').values;rsi=N('RSI').values;mfi=N('MFI').values
-    cmf=N('CMF').values;obv=N('OBV').values
-    obv_ma=N('OBV').rolling(20,min_periods=10).mean().values
-    C=df['Close'].values;O=df['Open'].values
+    wt1 = N('WT1').values; rsi = N('RSI').values; mfi = N('MFI').values
+    cmf = N('CMF').values; obv = N('OBV').values
+    obv_ma = N('OBV').rolling(20, min_periods=10).mean().values
+    C = df['Close'].values; O = df['Open'].values
 
-    veto_flags=np.zeros((n,6),dtype=bool)  # 6가지 거부권
+    veto_flags = np.zeros((n, 6), dtype=bool)
 
-    # Veto 1: 극과매도 → 추세 SELL 거부
-    veto_extreme_os=(wt1<-60)|(rsi<JT.VETO_EXTREME_RSI_LO)
-    veto_flags[:,0]=veto_extreme_os
-    # Veto 2: 극과매수 → 추세 BUY 거부
-    veto_extreme_ob=(wt1>60)|(rsi>JT.VETO_EXTREME_RSI_HI)
-    veto_flags[:,1]=veto_extreme_ob
-    # Veto 3: 매집 → 추세 SELL 감쇄
-    flat_p=((pd.Series(C).rolling(20).max()-pd.Series(C).rolling(20).min())/(pd.Series(C).rolling(20).min()+1e-10)<.08).values
-    veto_accum=flat_p&(cmf>JT.VETO_MONEY_CMF)&(obv>obv_ma)
-    veto_flags[:,2]=veto_accum
-    # Veto 4: 분배 → 추세 BUY 감쇄
-    veto_distrib=flat_p&(cmf<-JT.VETO_MONEY_CMF)&(obv<obv_ma)
-    veto_flags[:,3]=veto_distrib
-    # Veto 5: 항복 바닥 (극과매도+거래량폭발+양봉)
-    vr_v=vol_ratio.values
-    veto_capitul=veto_extreme_os&(vr_v>=3)&(C>O)
-    veto_flags[:,4]=veto_capitul
-    # Veto 6: 블로우오프 천장 (극과매수+거래량폭발+음봉)
-    veto_blowoff=veto_extreme_ob&(vr_v>=3)&(C<O)
-    veto_flags[:,5]=veto_blowoff
+    veto_extreme_os = (wt1 < -60) | (rsi < JT.VETO_EXTREME_RSI_LO)
+    veto_flags[:, 0] = veto_extreme_os
+    veto_extreme_ob = (wt1 > 60) | (rsi > JT.VETO_EXTREME_RSI_HI)
+    veto_flags[:, 1] = veto_extreme_ob
+    flat_p = ((pd.Series(C).rolling(20).max() - pd.Series(C).rolling(20).min()) / (pd.Series(C).rolling(20).min() + 1e-10) < .08).values
+    veto_accum = flat_p & (cmf > JT.VETO_MONEY_CMF) & (obv > obv_ma)
+    veto_flags[:, 2] = veto_accum
+    veto_distrib = flat_p & (cmf < -JT.VETO_MONEY_CMF) & (obv < obv_ma)
+    veto_flags[:, 3] = veto_distrib
+    vr_v = vol_ratio.values
+    veto_capitul = veto_extreme_os & (vr_v >= 3) & (C > O)
+    veto_flags[:, 4] = veto_capitul
+    veto_blowoff = veto_extreme_ob & (vr_v >= 3) & (C < O)
+    veto_flags[:, 5] = veto_blowoff
 
-    df['Veto_Flags']=pd.Series([
-        ','.join([['ExOS','ExOB','Accum','Distrib','Capitul','Blowoff'][j]
-                  for j in range(6) if veto_flags[i,j]])
+    df['Veto_Flags'] = pd.Series([
+        ','.join([['ExOS', 'ExOB', 'Accum', 'Distrib', 'Capitul', 'Blowoff'][j]
+                  for j in range(6) if veto_flags[i, j]])
         for i in range(n)], index=idx)
 
-    # ═══ Step 5: Veto 적용 → 유효 점수 계산 ═══
-    score_arr=np.column_stack([scores[cm].values for cm in COMMITTEE_NAMES])
-    conv_arr=np.column_stack([convictions[cm].values for cm in COMMITTEE_NAMES])
+    # ═══ Step 5: Veto 적용 + ★Active Flip (중립화 → 반대방향 기여) ═══
+    score_arr = np.column_stack([scores[cm].values for cm in COMMITTEE_NAMES])
+    conv_arr = np.column_stack([convictions[cm].values for cm in COMMITTEE_NAMES])
+    eff_score = score_arr.copy()
+    eff_conv = conv_arr.copy()
 
-    # Veto 적용: 점수/확신도 수정
-    eff_score=score_arr.copy()
-    eff_conv=conv_arr.copy()
+    # Veto 1: 극과매도 → Trend SELL 무력화 + ★반대로 매수 기여 (Active Flip)
+    os_mask = veto_flags[:, 0]
+    # 기존 Trend 음수 점수의 강도에 비례하여 양수 점수로 전환 (overextension = 반등 압력)
+    trend_sell_magnitude = np.abs(np.minimum(eff_score[os_mask, 0], 0))  # 음수 크기
+    flip_strength = np.clip(trend_sell_magnitude * 0.4, 0, 30)  # 최대 30점 양수 전환
+    eff_score[os_mask, 0] = flip_strength  # ★ 0이 아닌 양수로!
+    eff_conv[os_mask, 0] = np.minimum(eff_conv[os_mask, 0], 25)  # Trend 확신 낮춤
+    eff_conv[os_mask, 1] *= 1.4   # Momentum 부스트
+    eff_conv[os_mask, 2] *= 1.3   # Money 부스트
+    eff_conv[os_mask, 4] *= 1.3   # Leading 부스트
 
-    # Veto 1: 극과매도 → Trend 점수 음수(SELL) 부분 무력화
-    os_mask=veto_flags[:,0]
-    eff_score[os_mask,0]=np.maximum(eff_score[os_mask,0], 0)  # Trend SELL→0
-    eff_conv[os_mask,0]=np.minimum(eff_conv[os_mask,0], 20)   # Trend 확신 20% 캡
-    eff_conv[os_mask,1]*=1.3  # Momentum 부스트
-    eff_conv[os_mask,2]*=1.3  # Money 부스트
+    # Veto 2: 극과매수 → Trend BUY 무력화 + ★반대로 매도 기여
+    ob_mask = veto_flags[:, 1]
+    trend_buy_magnitude = np.abs(np.maximum(eff_score[ob_mask, 0], 0))
+    flip_strength_sell = np.clip(trend_buy_magnitude * 0.4, 0, 30)
+    eff_score[ob_mask, 0] = -flip_strength_sell  # ★ 0이 아닌 음수로!
+    eff_conv[ob_mask, 0] = np.minimum(eff_conv[ob_mask, 0], 25)
+    eff_conv[ob_mask, 1] *= 1.4
+    eff_conv[ob_mask, 2] *= 1.3
+    eff_conv[ob_mask, 4] *= 1.3
 
-    # Veto 2: 극과매수 → Trend 점수 양수(BUY) 부분 무력화
-    ob_mask=veto_flags[:,1]
-    eff_score[ob_mask,0]=np.minimum(eff_score[ob_mask,0], 0)  # Trend BUY→0
-    eff_conv[ob_mask,0]=np.minimum(eff_conv[ob_mask,0], 20)
-    eff_conv[ob_mask,1]*=1.3
-    eff_conv[ob_mask,2]*=1.3
+    # Veto 3: 매집 → Trend 감쇄 + Money 부스트
+    acc_mask = veto_flags[:, 2]
+    eff_score[acc_mask, 0] = eff_score[acc_mask, 0] * 0.3
+    eff_conv[acc_mask, 2] *= 1.5
 
-    # Veto 3: 매집 → Trend SELL 감쇄
-    acc_mask=veto_flags[:,2]
-    eff_score[acc_mask,0]=eff_score[acc_mask,0]*0.3  # Trend 70% 감쇄
-    eff_conv[acc_mask,2]*=1.5  # Money 대폭 부스트
+    # Veto 4: 분배 → Trend 감쇄 + Money 부스트
+    dist_mask = veto_flags[:, 3]
+    eff_score[dist_mask, 0] = eff_score[dist_mask, 0] * 0.3
+    eff_conv[dist_mask, 2] *= 1.5
 
-    # Veto 4: 분배 → Trend BUY 감쇄
-    dist_mask=veto_flags[:,3]
-    eff_score[dist_mask,0]=eff_score[dist_mask,0]*0.3
-    eff_conv[dist_mask,2]*=1.5
-
-    # Veto 5: 항복 바닥 → 모든 SELL 무력화
-    cap_mask=veto_flags[:,4]
+    # Veto 5: 항복 바닥 → ★모든 SELL 무력화 + 강제 매수 기여
+    cap_mask = veto_flags[:, 4]
     for ci in range(NUM_COMMITTEES):
-        eff_score[cap_mask,ci]=np.maximum(eff_score[cap_mask,ci], 0)
+        sell_mag = np.abs(np.minimum(eff_score[cap_mask, ci], 0))
+        eff_score[cap_mask, ci] = np.maximum(eff_score[cap_mask, ci], 0) + sell_mag * 0.3
+    eff_conv[cap_mask, 1] = np.clip(eff_conv[cap_mask, 1] * 1.5, 0, 98)  # Momentum 대폭 부스트
 
-    # Veto 6: 블로우오프 천장 → 모든 BUY 무력화
-    bo_mask=veto_flags[:,5]
+    # Veto 6: 블로우오프 천장 → ★모든 BUY 무력화 + 강제 매도 기여
+    bo_mask = veto_flags[:, 5]
     for ci in range(NUM_COMMITTEES):
-        eff_score[bo_mask,ci]=np.minimum(eff_score[bo_mask,ci], 0)
+        buy_mag = np.abs(np.maximum(eff_score[bo_mask, ci], 0))
+        eff_score[bo_mask, ci] = np.minimum(eff_score[bo_mask, ci], 0) - buy_mag * 0.3
+    eff_conv[bo_mask, 1] = np.clip(eff_conv[bo_mask, 1] * 1.5, 0, 98)
 
     # 확신도 클리핑
-    eff_conv=np.clip(eff_conv, 0, 100)
+    eff_conv = np.clip(eff_conv, 0, 100)
 
-    # ═══ Step 6: 가중 투표 → 최종 앙상블 점수 ═══
-    # effective_contribution = score × (conviction/100) × context_weight
-    contributions=eff_score * (eff_conv/100.) * weights_arr
-    ensemble_score=contributions.sum(axis=1)
+    # ═══ Step 6: ★★★ 교차 시너지 (Reversal Synergy) ★★★ ═══
+    # 핵심 아이디어: Trend와 Momentum이 반대 방향일 때,
+    # 극단 영역에서 이 "충돌" 자체가 전환 신호.
+    # 독립 위원 간 불일치 패턴을 인식하여 앙상블에 보너스 부여.
+
+    synergy_bonus = np.zeros(n)
+
+    trend_s = eff_score[:, 0]   # Trend
+    mom_s = eff_score[:, 1]     # Momentum
+    money_s = eff_score[:, 2]   # Money
+    struct_s = eff_score[:, 3]  # Structure
+    lead_s = eff_score[:, 4]    # Leading
+
+    # ── 강세 교차 시너지: Momentum+Leading이 BUY인데 Trend가 약함/SELL ──
+    # → 바닥 전환 신호
+    bull_synergy_cond = (
+        (mom_s > 20) &    # Momentum이 확실히 BUY
+        (lead_s > 10) &   # Leading도 BUY
+        (trend_s < 10)    # Trend는 아직 약하거나 SELL
+    )
+    # 시너지 강도: Momentum + Leading이 강할수록, Trend가 약할수록 보너스 큼
+    bull_syn_strength = np.clip((mom_s + lead_s) * 0.15 + np.abs(np.minimum(trend_s, 0)) * 0.1, 0, 25)
+    synergy_bonus += np.where(bull_synergy_cond, bull_syn_strength, 0)
+
+    # Money가 동의하면 추가 부스트 (자금 유입 확인)
+    money_agree_bull = bull_synergy_cond & (money_s > 5)
+    synergy_bonus += np.where(money_agree_bull, 8, 0)
+
+    # Structure(캔들)가 동의하면 추가 부스트
+    struct_agree_bull = bull_synergy_cond & (struct_s > 10)
+    synergy_bonus += np.where(struct_agree_bull, 5, 0)
+
+    # ── 약세 교차 시너지: Momentum+Leading이 SELL인데 Trend가 강함/BUY ──
+    # → 천장 전환 신호
+    bear_synergy_cond = (
+        (mom_s < -20) &
+        (lead_s < -10) &
+        (trend_s > -10)
+    )
+    bear_syn_strength = np.clip((-mom_s - lead_s) * 0.15 + np.abs(np.maximum(trend_s, 0)) * 0.1, 0, 25)
+    synergy_bonus -= np.where(bear_synergy_cond, bear_syn_strength, 0)
+
+    money_agree_bear = bear_synergy_cond & (money_s < -5)
+    synergy_bonus -= np.where(money_agree_bear, 8, 0)
+    struct_agree_bear = bear_synergy_cond & (struct_s < -10)
+    synergy_bonus -= np.where(struct_agree_bear, 5, 0)
+
+    df['Reversal_Synergy'] = synergy_bonus
+
+    # ═══ Step 7: 가중 투표 → 최종 앙상블 점수 ═══
+    contributions = eff_score * (eff_conv / 100.) * weights_arr
+    ensemble_score = contributions.sum(axis=1) + synergy_bonus  # ★ 시너지 보너스 가산
 
     # 위원회별 투표 방향
-    for ci,cm in enumerate(COMMITTEE_NAMES):
-        s=eff_score[:,ci];c=eff_conv[:,ci]
-        vote=np.full(n, 0, dtype=int)  # 0=NEUTRAL
-        vote=np.where((s>15)&(c>=25), 1, vote)   # BUY
-        vote=np.where((s<-15)&(c>=25), -1, vote)  # SELL
-        vote=np.where(c<15, -99, vote)  # ABSTAIN
-        df[f'CM_{cm}_Vote']=vote
-        df[f'CM_{cm}_EffScore']=eff_score[:,ci]
-        df[f'CM_{cm}_EffConv']=eff_conv[:,ci]
+    for ci, cm in enumerate(COMMITTEE_NAMES):
+        s = eff_score[:, ci]; c = eff_conv[:, ci]
+        vote = np.full(n, 0, dtype=int)
+        vote = np.where((s > 15) & (c >= 25), 1, vote)
+        vote = np.where((s < -15) & (c >= 25), -1, vote)
+        vote = np.where(c < 15, -99, vote)
+        df[f'CM_{cm}_Vote'] = vote
+        df[f'CM_{cm}_EffScore'] = eff_score[:, ci]
+        df[f'CM_{cm}_EffConv'] = eff_conv[:, ci]
 
-    df['Ensemble_Score']=ensemble_score
+    df['Ensemble_Score'] = ensemble_score
 
-    # ═══ Step 7: 최종 판단 ═══
-    # 찬성 위원 수 계산
-    buy_agree=np.zeros(n,dtype=int)
-    sell_agree=np.zeros(n,dtype=int)
+    # ═══ Step 8: 최종 판단 (★시너지 보너스 반영) ═══
+    buy_agree = np.zeros(n, dtype=int)
+    sell_agree = np.zeros(n, dtype=int)
     for ci in range(NUM_COMMITTEES):
-        buy_agree+=(eff_score[:,ci]>15).astype(int)&(eff_conv[:,ci]>=25).astype(int)
-        sell_agree+=(eff_score[:,ci]<-15).astype(int)&(eff_conv[:,ci]>=25).astype(int)
+        buy_agree += ((eff_score[:, ci] > 15) & (eff_conv[:, ci] >= 25)).astype(int)
+        sell_agree += ((eff_score[:, ci] < -15) & (eff_conv[:, ci] >= 25)).astype(int)
 
-    j=np.full(n,'NEUTRAL',dtype=object)
-    conf=np.zeros(n,dtype=float)
+    j = np.full(n, 'NEUTRAL', dtype=object)
+    conf = np.zeros(n, dtype=float)
 
     for i in range(n):
-        es=ensemble_score[i]
-        ba=buy_agree[i];sa=sell_agree[i]
+        es = ensemble_score[i]
+        ba = buy_agree[i]; sa = sell_agree[i]
+        syn = synergy_bonus[i]
 
-        # STRONG_BUY: 높은 점수 + 다수 위원 동의
-        if es>=JT.STRONG_BUY_TH and ba>=JT.STRONG_MIN_AGREE:
-            j[i]='STRONG_BUY'
-        elif es>=JT.BUY_TH and ba>=JT.BUY_MIN_AGREE:
-            j[i]='BUY'
-        elif es>=JT.WATCH_BUY_TH and ba>=JT.WATCH_MIN_AGREE:
-            j[i]='WATCH_BUY'
-        elif es<=JT.STRONG_SELL_TH and sa>=JT.STRONG_MIN_AGREE:
-            j[i]='STRONG_SELL'
-        elif es<=JT.SELL_TH and sa>=JT.BUY_MIN_AGREE:
-            j[i]='SELL'
-        elif es<=JT.WATCH_SELL_TH and sa>=JT.WATCH_MIN_AGREE:
-            j[i]='WATCH_SELL'
-        elif ba>=3 and sa>=3:
-            j[i]='MIXED'
+        # ★ 교차 시너지가 강하면 찬성 위원 수 요건 완화
+        # (Trend가 반대여도 나머지가 합의하면 전환 신호로 인정)
+        syn_agree_relax = 1 if abs(syn) >= 15 else 0
 
-        # Confidence 계산
-        abs_es=abs(es)
-        # 위원 동의율
-        dom_agree=max(ba,sa)
-        agree_pct=dom_agree/NUM_COMMITTEES*40
-        # 앙상블 점수 기여
-        score_pct=min(abs_es/60*35, 35)
-        # 평균 확신도
-        avg_conv=np.mean(eff_conv[i])/100*25
-        raw_conf=agree_pct+score_pct+avg_conv
-        if j[i] in ('NEUTRAL','MIXED'):
-            raw_conf=max(15, min(55, raw_conf))
-        conf[i]=np.clip(raw_conf, 5, 99)
+        if es >= JT.STRONG_BUY_TH and ba >= (JT.STRONG_MIN_AGREE - syn_agree_relax):
+            j[i] = 'STRONG_BUY'
+        elif es >= JT.BUY_TH and ba >= (JT.BUY_MIN_AGREE - syn_agree_relax):
+            j[i] = 'BUY'
+        elif es >= JT.WATCH_BUY_TH and ba >= max(JT.WATCH_MIN_AGREE - syn_agree_relax, 1):
+            j[i] = 'WATCH_BUY'
+        elif es <= JT.STRONG_SELL_TH and sa >= (JT.STRONG_MIN_AGREE - syn_agree_relax):
+            j[i] = 'STRONG_SELL'
+        elif es <= JT.SELL_TH and sa >= (JT.BUY_MIN_AGREE - syn_agree_relax):
+            j[i] = 'SELL'
+        elif es <= JT.WATCH_SELL_TH and sa >= max(JT.WATCH_MIN_AGREE - syn_agree_relax, 1):
+            j[i] = 'WATCH_SELL'
+        elif ba >= 3 and sa >= 3:
+            j[i] = 'MIXED'
 
-    df['Trade_Judgment']=j
-    df['Judgment_Confidence']=conf
-    df['Buy_Agree']=buy_agree
-    df['Sell_Agree']=sell_agree
+        # Confidence 계산 (★시너지 보너스 반영)
+        abs_es = abs(es)
+        dom_agree = max(ba, sa)
+        agree_pct = dom_agree / NUM_COMMITTEES * 35
+        score_pct = min(abs_es / 60 * 30, 30)
+        avg_conv = np.mean(eff_conv[i]) / 100 * 20
+        syn_pct = min(abs(syn) / 20 * 15, 15)  # ★ 시너지 기여
+        raw_conf = agree_pct + score_pct + avg_conv + syn_pct
+        if j[i] in ('NEUTRAL', 'MIXED'):
+            raw_conf = max(15, min(55, raw_conf))
+        conf[i] = np.clip(raw_conf, 5, 99)
+
+    df['Trade_Judgment'] = j
+    df['Judgment_Confidence'] = conf
+    df['Buy_Agree'] = buy_agree
+    df['Sell_Agree'] = sell_agree
 
     return df
 
