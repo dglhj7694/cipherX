@@ -1,5 +1,5 @@
 # ══════════════════════════════════════════════════════════════
-#  CipherX V14.0 — 5-Committee Ensemble Judgment System
+#  CipherX  — 5-Committee Ensemble Judgment System
 #  PART 1/4: 설정, 레지스트리, 유틸리티, 기술지표
 # ══════════════════════════════════════════════════════════════
 
@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from company_details import render_company_details
 from sectors import SECTOR_GROUPS
 
-st.set_page_config(page_title="CipherX V14.0", page_icon="📈", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="CipherX ", page_icon="📈", layout="wide", initial_sidebar_state="collapsed")
 
 def inject_css():
     st.markdown("""<style>
@@ -611,7 +611,7 @@ def compute_indicators(df):
 print("✅ Part 1/4 완료")
 
 # ══════════════════════════════════════════════════════════════
-#  CipherX V14.0 — PART 2/4
+#  CipherX  — PART 2/4
 #  시그널 탐지 + Combined Scan + 5-Committee Ensemble System
 # ══════════════════════════════════════════════════════════════
 
@@ -1697,7 +1697,7 @@ def compute_committee_ensemble(df, vol_ratio, hma_r_v):
 print("✅ Part 2/4 완료 — 5-Committee Ensemble Judgment System")
 
 # ══════════════════════════════════════════════════════════════
-#  CipherX V14.0 — PART 3/4
+#  CipherX  — PART 3/4
 #  차트, 호버(시그널 생략 없음), 위원회 시각화, UI
 # ══════════════════════════════════════════════════════════════
 
@@ -2461,7 +2461,7 @@ def render_analysis(msg):
 print("✅ Part 3/4 완료")
 
 # ══════════════════════════════════════════════════════════════
-#  CipherX V14.0 — PART 4/4
+#  CipherX  — PART 4/4
 #  AI 프롬프트(위원회+Veto), 스캐너(병렬), 메인 루프
 # ══════════════════════════════════════════════════════════════
 
@@ -2647,7 +2647,7 @@ def analyze(ticker, chart_days=252, refresh=False):
 
 def init_session():
     defs = {
-        'messages': [{"role":"assistant","type":"text","content":"🚦 **CipherX V14.0** — 5-Committee Ensemble\n**티커명**을 입력하세요."}],
+        'messages': [{"role":"assistant","type":"text","content":"🚦 **CipherX ** — 5-Committee Ensemble\n**티커명**을 입력하세요."}],
         'pending_ai_ticker': None,
         'pending_ai_prompt': None,
         'last_ticker': None,
@@ -2662,7 +2662,7 @@ init_session()
 
 # ── 사이드바 ──
 with st.sidebar:
-    st.markdown("## 🚦 CipherX V14.0")
+    st.markdown("## 🚦 CipherX ")
     st.markdown("<p style='color:#64748B;font-size:.8rem'>5-Committee Ensemble System</p>", unsafe_allow_html=True)
     st.markdown("---")
 
@@ -2675,14 +2675,14 @@ with st.sidebar:
 
     if st.button("🗑️ 초기화", use_container_width=True, type="secondary"):
         for k in ['messages', 'pending_ai_ticker', 'pending_ai_prompt', 'last_ticker']:
-            st.session_state[k] = [{"role":"assistant","type":"text","content":"🚦 **CipherX V14.0**"}] if k == 'messages' else None
+            st.session_state[k] = [{"role":"assistant","type":"text","content":"🚦 **CipherX **"}] if k == 'messages' else None
         st.rerun()
 
 
 # ═══ 스캐너 모드 ═══
 current_mode = st.session_state.get('_mode', '분석')
 if current_mode == '스캐너':
-    st.markdown("<h2 style='text-align:center;color:#fff'>🔍 Scanner</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align:center;color:#fff'>Scanner</h2>", unsafe_allow_html=True)
 
     st.markdown("#### 📂 섹터 선택")
     sector_names = list(SECTOR_GROUPS.keys())
@@ -2873,7 +2873,7 @@ if current_mode == '스캐너':
 
 # ═══ 분석 모드 ═══
 else:
-    st.markdown("<h2 style='text-align:center;color:#fff;margin-bottom:16px'>🚦 CipherX V14.0</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align:center;color:#fff;margin-bottom:16px'>🚦 CipherX </h2>", unsafe_allow_html=True)
     st.markdown("<p style='text-align:center;color:#64748B;margin-top:-12px;margin-bottom:16px'>5-Committee Ensemble Trading System</p>", unsafe_allow_html=True)
 
     if not st.session_state.last_ticker:
@@ -2996,4 +2996,4 @@ else:
         process_ticker(ti)
 
 
-print("✅ CipherX V14.0 전체 완료!")
+print("✅ CipherX  전체 완료!")
