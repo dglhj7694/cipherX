@@ -68,6 +68,83 @@ header{background-color:transparent!important;}
 div[data-testid="stMetricValue"]{color:#F8FAFC!important;font-weight:800!important;letter-spacing:-0.5px;}
 div[data-testid="stMetricDelta"]{font-weight:700!important;}
 ::-webkit-scrollbar{width:6px;height:6px;} ::-webkit-scrollbar-track{background:rgba(0,0,0,0.2);} ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:3px;} ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.2);}
+.glass-metric{background:rgba(15,19,32,.55);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:16px 18px;text-align:center;transition:all .35s cubic-bezier(.16,1,.3,1);position:relative;overflow:hidden;}
+.glass-metric:hover{border-color:rgba(99,102,241,.25);transform:translateY(-3px);box-shadow:0 8px 28px rgba(0,0,0,.35);}
+.glass-metric .gm-label{color:#64748B;font-size:.72rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;margin:0 0 6px;}
+.glass-metric .gm-value{font-size:1.65rem;font-weight:800;margin:0;letter-spacing:-1px;line-height:1.2;}
+.glass-metric .gm-sub{color:#94A3B8;font-size:.72rem;font-weight:600;margin:4px 0 0;}
+.glass-metric .gm-bar{height:4px;background:rgba(255,255,255,.06);border-radius:3px;margin-top:10px;overflow:hidden;}
+.glass-metric .gm-bar-fill{height:4px;border-radius:3px;transition:width .6s cubic-bezier(.16,1,.3,1);}
+.conf-ring{position:relative;width:90px;height:90px;margin:0 auto;}
+.conf-ring svg{transform:rotate(-90deg);width:90px;height:90px;}
+.conf-ring .ring-bg{fill:none;stroke:rgba(255,255,255,.06);stroke-width:6;}
+.conf-ring .ring-fg{fill:none;stroke-width:6;stroke-linecap:round;transition:stroke-dashoffset .8s cubic-bezier(.16,1,.3,1);}
+.conf-ring .ring-text{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-weight:800;font-size:1.1rem;}
+.cm-card{background:rgba(15,19,32,.5);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.05);border-radius:12px;padding:14px;text-align:center;transition:all .3s;}
+.cm-card:hover{border-color:rgba(99,102,241,.2);transform:translateY(-2px);}
+.cm-card .cm-name{color:#94A3B8;font-size:.72rem;font-weight:700;letter-spacing:.5px;margin:0 0 6px;}
+.cm-card .cm-score{font-size:1.35rem;font-weight:800;margin:0;letter-spacing:-.5px;}
+.cm-card .cm-vote{display:inline-block;padding:2px 8px;border-radius:6px;font-size:.68rem;font-weight:700;margin-top:6px;}
+.cm-card .cm-mini-bar{height:4px;background:rgba(255,255,255,.06);border-radius:2px;margin-top:8px;overflow:hidden}
+.cm-card .cm-mini-fill{height:4px;border-radius:2px;}
+.dual-layer{display:flex;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.03);transition:all .2s;}
+.dual-layer:hover{background:rgba(255,255,255,.02);}
+.dual-layer .dl-name{color:#94A3B8;font-size:.76rem;width:72px;text-align:center;font-weight:600;flex-shrink:0;}
+.dual-layer .dl-bar-wrap{flex:1;height:8px;background:rgba(0,0,0,.25);border-radius:4px;overflow:hidden;position:relative;box-shadow:inset 0 1px 3px rgba(0,0,0,.4);}
+.dual-layer .dl-fill-b{position:absolute;right:50%;height:8px;background:linear-gradient(270deg,#059669,#34D399);border-radius:4px 0 0 4px;transition:width .5s;}
+.dual-layer .dl-fill-s{position:absolute;left:50%;height:8px;background:linear-gradient(90deg,#DC2626,#F87171);border-radius:0 4px 4px 0;transition:width .5s;}
+.dual-layer .dl-center{position:absolute;left:50%;top:0;width:1px;height:8px;background:rgba(255,255,255,.15);}
+.dual-layer .dl-val{font-size:.72rem;font-weight:700;width:42px;text-align:center;flex-shrink:0;}
+.stat-mini{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);border-radius:10px;padding:10px 12px;text-align:center;transition:all .25s;}
+.stat-mini:hover{border-color:rgba(99,102,241,.15);}
+.stat-mini .sm-label{color:#64748B;font-size:.65rem;font-weight:700;margin:0;letter-spacing:.4px;}
+.stat-mini .sm-value{font-size:1rem;font-weight:800;margin:2px 0 0;letter-spacing:-.3px;}
+.tow-bar{height:10px;background:rgba(0,0,0,.3);border-radius:5px;position:relative;overflow:hidden;margin:6px 0;box-shadow:inset 0 1px 3px rgba(0,0,0,.5);}
+.tow-bar .tow-buy{position:absolute;right:50%;height:10px;background:linear-gradient(270deg,#065F46,#34D399);border-radius:5px 0 0 5px;}
+.tow-bar .tow-sell{position:absolute;left:50%;height:10px;background:linear-gradient(90deg,#7F1D1D,#F87171);border-radius:0 5px 5px 0;}
+.tow-bar .tow-center{position:absolute;left:50%;top:-1px;width:2px;height:12px;background:#fff;border-radius:1px;transform:translateX(-1px);z-index:1;}
+.vote-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin:0 2px;box-shadow:0 0 6px rgba(0,0,0,.3);}
+.vote-dot.buy{background:#34D399;box-shadow:0 0 8px rgba(52,211,153,.4);}
+.vote-dot.sell{background:#F87171;box-shadow:0 0 8px rgba(248,113,113,.4);}
+.vote-dot.neutral{background:#475569;}
+.vote-dot.abstain{background:#1E293B;border:1px solid #334155;}
+@media(max-width:768px){
+  .block-container{padding-top:.5rem!important}
+  .price-header{padding:14px 16px;border-radius:12px}
+  .price-big{font-size:1.6rem!important}
+  .ind-mini{padding:3px 7px;font-size:.68rem}
+  .glass-metric{padding:12px 14px;border-radius:12px}
+  .glass-metric .gm-value{font-size:1.3rem}
+  .glass-metric .gm-label{font-size:.65rem}
+  .cm-card{padding:10px}
+  .cm-card .cm-score{font-size:1.1rem}
+  .cm-card .cm-name{font-size:.65rem}
+  .dual-layer .dl-name{width:56px;font-size:.68rem}
+  .dual-layer .dl-val{width:34px;font-size:.65rem}
+  .stat-mini{padding:8px 10px}
+  .stat-mini .sm-value{font-size:.88rem}
+  .score-card{padding:16px;border-radius:12px}
+  .conf-ring{width:70px;height:70px}
+  .conf-ring svg{width:70px;height:70px}
+  .conf-ring .ring-text{font-size:.9rem}
+  div[style*="grid-template-columns:repeat(4"]{grid-template-columns:repeat(2,1fr)!important}
+  div[style*="grid-template-columns:repeat(5"]{grid-template-columns:repeat(2,1fr)!important}
+  div[style*="grid-template-columns:repeat(6"]{grid-template-columns:repeat(3,1fr)!important}
+  div[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}
+}
+@media(max-width:480px){
+  .price-big{font-size:1.3rem!important}
+  .glass-metric .gm-value{font-size:1.1rem}
+  .dual-layer .dl-name{width:48px;font-size:.62rem}
+  .dual-layer .dl-val{width:30px;font-size:.6rem}
+  .cm-card .cm-score{font-size:.95rem}
+  .conf-ring{width:60px;height:60px}
+  .conf-ring svg{width:60px;height:60px}
+  .conf-ring .ring-text{font-size:.8rem}
+  div[style*="grid-template-columns:repeat(4"]{grid-template-columns:1fr!important}
+  div[style*="grid-template-columns:repeat(5"]{grid-template-columns:repeat(2,1fr)!important}
+  div[style*="grid-template-columns:repeat(6"]{grid-template-columns:repeat(2,1fr)!important}
+}
 </style>""", unsafe_allow_html=True)
 
 # ━━━ Constants ━━━
@@ -230,7 +307,7 @@ else:
     for i,msg in enumerate(st.session_state.messages):
         av="assistant" if msg["role"]=="assistant" else "user"
         with st.chat_message(msg["role"],avatar=av):
-            if msg.get("type")=="analysis":st.markdown(msg.get("content",""));render_analysis(msg)
+            if msg.get("type")=="analysis":st.markdown(msg.get("content",""),unsafe_allow_html=True);render_analysis(msg)
             elif msg.get("type")=="report":
                 with st.expander(f"{msg.get('ticker','')} AI Report",expanded=True):st.markdown(msg["content"])
                 st.download_button("Download Report",key=f"dl_{i}",data=msg["content"].encode('utf-8'),file_name=f"{msg.get('ticker','')}_V142_{datetime.now().strftime('%Y%m%d')}.md",mime="text/markdown",use_container_width=True)
@@ -271,15 +348,7 @@ else:
                     prompt=build_ai_prompt(tv,phist,fund);status.update(label=f"✅ {tv} — {act}",state="complete",expanded=False)
                 else:prompt=None;status.update(label=f"⚠️ {tv} 실패",state="error")
             if fj:
-                content=f"**{tv}** — **{meta.get('action_label','')}**\n💬 {meta.get('judgment_reason','')}"
-                es=meta.get('ensemble_score',0);syn=meta.get('reversal_synergy',0);pred=meta.get('prediction_boost',0)
-                content+=f"\n🏛️ ES:{es:+.1f} | B{meta.get('buy_agree',0)}:S{meta.get('sell_agree',0)} | 🌐{meta.get('context_label','')}"
-                if abs(syn)>5:content+=f" | 🔄{syn:+.1f}"
-                if abs(pred)>3:content+=f" | 🔮{pred:+.1f}"
-                if meta.get('combined_scans'):content+=f"\n🎯 CS:매수{sum(1 for s in meta['combined_scans'] if s['dir']=='buy')} 매도{sum(1 for s in meta['combined_scans'] if s['dir']=='sell')}"
-                content+=f"\n⏳{meta['leading_verdict']} | 📊{meta['lagging_verdict']}"
-                veto=meta.get('veto_flags','')
-                if veto:content+=f"\n🚫 {veto}"
+                content=""
                 st.session_state.messages.append({"role":"assistant","type":"analysis","ticker":tv,"content":content,"fig_json":fj,"meta":meta,"prompt":prompt})
                 st.session_state.pending_ai_ticker=tv;st.session_state.pending_ai_prompt=prompt;st.rerun()
             else:st.session_state.messages.append({"role":"assistant","type":"text","content":f"⚠️ **{tv}** 실패:{phist}"});st.rerun()

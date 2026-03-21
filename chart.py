@@ -243,6 +243,9 @@ def build_metadata(dc,ticker):
         'ma50':_sf(lat.get('MA50')),'ma200':_sf(lat.get('MA200')),'vp_poc':_sf(lat.get('VP_POC')),'vp_vah':_sf(lat.get('VP_VAH')),'vp_val':_sf(lat.get('VP_VAL')),
         'percent_b':_sf(lat.get('Percent_B'),0.5),'rsi_mfi':_sf(lat.get('RSI_MFI')),'bb_up':_sf(lat.get('BB_Up')),'bb_low':_sf(lat.get('BB_Low')),
         'ema8':_sf(lat.get('EMA8')),'ema21':_sf(lat.get('EMA21')),'obv_trend':'rising' if _sf(lat.get('OBV'))>_sf(dc['OBV'].rolling(20).mean().iloc[-1]) else 'falling',
-        'combined_scans':acs,'recent_signals':recent}
+        'combined_scans':acs,'recent_signals':recent,
+        'high_52w':float(dc['High'].max()),'low_52w':float(dc['Low'].min()),
+        'ma50_dist':round((_sf(lat['Close'])-_sf(lat.get('MA50',_sf(lat['Close']))))/_sf(lat['Close'])*100,2) if _sf(lat.get('MA50')) else 0,
+        'ma200_dist':round((_sf(lat['Close'])-_sf(lat.get('MA200',_sf(lat['Close']))))/_sf(lat['Close'])*100,2) if _sf(lat.get('MA200')) else 0}
 
 # ━━━ UI ━━━
