@@ -152,7 +152,7 @@ div[data-testid="stMetricDelta"]{font-weight:700!important;}
 .ai-report-wrap details summary{background:linear-gradient(135deg,rgba(99,102,241,0.08),rgba(139,92,246,0.06))!important;border-bottom:1px solid rgba(99,102,241,0.1)!important;padding:16px 20px!important;font-weight:700!important;color:#A5B4FC!important;font-size:1rem!important;letter-spacing:-0.3px;transition:all .3s;}
 .ai-report-wrap details summary:hover{background:linear-gradient(135deg,rgba(99,102,241,0.14),rgba(139,92,246,0.1))!important;color:#C7D2FE!important;}
 .ai-report-wrap details summary svg{color:#6366F1!important;}
-.ai-report-wrap details>div{padding:6px 8px!important;}
+.ai-report-wrap details>div{padding:6px 8px!important;overflow-wrap:break-word!important;word-break:break-word!important;overflow:hidden!important;max-width:100%!important;box-sizing:border-box!important;}
 .ai-report-wrap details h3{color:#C7D2FE!important;font-weight:700!important;font-size:1.05rem!important;border-bottom:1px solid rgba(99,102,241,0.1);padding-bottom:8px;margin-top:20px!important;}
 .ai-report-wrap details hr{border-color:rgba(99,102,241,0.08)!important;margin:16px 0!important;}
 .ai-report-wrap details strong{color:#E2E8F0!important;}
