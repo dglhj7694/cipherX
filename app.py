@@ -344,7 +344,7 @@ else:
                     if 'STRONG' in jg:st.toast(f"{'🟢🟢🟢' if 'BUY' in jg else '🔴🔴🔴'} {tv} {jg}!",icon="🚀" if 'BUY' in jg else "⚠️")
                     veto=meta.get('veto_flags','')
                     if veto:st.toast(f"🚫 Veto:{veto}",icon="🚫")
-                    for cs in [s for s in meta.get('combined_scans',[]) if s['tier']==1 and s['is_today']]:st.toast(f"🎯 T1 {cs['kor']}!",icon=cs['icon'])
+                    for cs in [s for s in meta.get('combined_scans',[]) if s['tier']==1 and s['is_today']]:st.toast(f"🎯 T1 {cs['kor']}!",icon="🎯")
                     prompt=build_ai_prompt(tv,phist,fund);status.update(label=f"✅ {tv} — {act}",state="complete",expanded=False)
                 else:prompt=None;status.update(label=f"⚠️ {tv} 실패",state="error")
             if fj:

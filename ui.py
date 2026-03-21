@@ -35,39 +35,61 @@ def render_judgment_card(m):
     jg=m['judgment'];es=m.get('ensemble_score',0);cf=m['confidence']
     cc='score-card-buy' if 'BUY' in jg else('score-card-sell' if 'SELL' in jg else 'score-card-neutral')
     jc='#34D399' if 'BUY' in jg else('#F87171' if 'SELL' in jg else '#FCD34D')
-    labels={'STRONG_BUY':'STRONG BUY','BUY':'BUY','WATCH_BUY':'WATCH BUY','NEUTRAL':'NEUTRAL','MIXED':'MIXED','WATCH_SELL':'WATCH SELL','SELL':'SELL','STRONG_SELL':'STRONG SELL'}
     ba=m.get('buy_agree',0);sa=m.get('sell_agree',0);veto=m.get('veto_flags','');syn=m.get('reversal_synergy',0);pred=m.get('prediction_boost',0)
     reason=m.get('judgment_reason','');detail=m.get('judgment_detail','');action=m.get('action_label','')
-    # Confidence ring SVG
     circ=2*3.14159*36;offset=circ*(1-cf/100)
-    reason_html=""
-    if reason:reason_html=f"<div class='reason-card'><p style='color:{jc};font-weight:800;font-size:.95rem;margin:0 0 4px'>[{action}]</p><p style='color:#E8ECF1;font-size:.88rem;margin:0 0 4px'>{reason}</p><p style='color:#94A3B8;font-size:.78rem;margin:0'>{detail}</p></div>"
     # Committee vote dots
     committee=m.get('committee',{})
     dots_html=""
     if committee:
         dots=[]
+        abbr={'Trend':'TR','Momentum':'MO','Money':'MN','Structure':'ST','Leading':'LD'}
         for cm in COMMITTEE_NAMES:
             data=committee.get(cm,{});vote=data.get('vote','NEUTRAL')
             dcls='buy' if vote=='BUY' else ('sell' if vote=='SELL' else ('abstain' if vote=='ABSTAIN' else 'neutral'))
-            dots.append(f"<span class='vote-dot {dcls}' title='{cm}: {vote}'></span>")
-        dots_html=f"<div style='margin-top:12px'><span style='color:#64748B;font-size:.7rem;font-weight:700;margin-right:8px'>위원회 투표</span>{''.join(dots)}</div>"
-    veto_html=f"<div style='margin-top:8px'><span style='background:rgba(239,68,68,.15);color:#FCA5A5;padding:3px 8px;border-radius:6px;font-size:.7rem;font-weight:700'>[VETO] {veto}</span></div>" if veto else ""
-    extra=""
-    if abs(syn)>5:extra+=f"<span style='color:{'#34D399' if syn>0 else '#F87171'};font-size:.8rem;margin:0 4px'>[SYN] {syn:+.1f}</span>"
-    if abs(pred)>3:extra+=f"<span style='color:{'#34D399' if pred>0 else '#F87171'};font-size:.8rem;margin:0 4px'>[PRED] {pred:+.1f}</span>"
+            vc='#34D399' if vote=='BUY' else('#F87171' if vote=='SELL' else '#475569')
+            dots.append(f"<span style='display:inline-flex;align-items:center;gap:2px;margin:0 3px'><span class='vote-dot {dcls}'></span><span style='color:{vc};font-size:.6rem;font-weight:600'>{abbr.get(cm,cm[:2])}</span></span>")
+        dots_html=f"<div style='margin-top:10px;display:flex;align-items:center;justify-content:center;gap:2px'><span style='color:#475569;font-size:.65rem;margin-right:4px'>위원회</span>{''.join(dots)}</div>"
+    veto_html=f"<div style='margin-top:8px;text-align:center'><span style='background:rgba(239,68,68,.15);color:#FCA5A5;padding:4px 10px;border-radius:6px;font-size:.72rem;font-weight:700'>VETO {veto}</span></div>" if veto else ""
+    # Badges
+    badges=""
+    if abs(syn)>5:badges+=f"<span style='background:rgba({'52,211,153' if syn>0 else '248,113,113'},.12);color:{'#34D399' if syn>0 else '#F87171'};padding:3px 8px;border-radius:6px;font-size:.72rem;font-weight:700'>SYN {syn:+.1f}</span> "
+    if abs(pred)>3:badges+=f"<span style='background:rgba({'52,211,153' if pred>0 else '248,113,113'},.12);color:{'#34D399' if pred>0 else '#F87171'};padding:3px 8px;border-radius:6px;font-size:.72rem;font-weight:700'>PRED {pred:+.1f}</span>"
+    # Ensemble gauge
+    es_norm=min(max((es+80)/160*100,0),100)
+    es_c='#34D399' if es>0 else '#F87171' if es<0 else '#FCD34D'
+    # Agree ratio bar
+    total_agree=max(ba+sa,1);ba_pct=ba/total_agree*100
     st.markdown(f"""<div class="score-card {cc} fade-up">
-        <div style="display:flex;align-items:center;justify-content:center;gap:28px">
+        <div style="display:flex;align-items:center;justify-content:center;gap:28px;flex-wrap:wrap">
             <div class="conf-ring"><svg viewBox="0 0 80 80"><circle class="ring-bg" cx="40" cy="40" r="36"/><circle class="ring-fg" cx="40" cy="40" r="36" stroke="{jc}" stroke-dasharray="{circ:.1f}" stroke-dashoffset="{offset:.1f}"/></svg><span class="ring-text" style="color:{jc}">{cf:.0f}%</span></div>
-            <div><p style="font-size:2rem;font-weight:800;color:{jc};margin:0;letter-spacing:-1px;">{labels.get(jg,jg)}</p>{dots_html}</div>
+            <div>
+                <p style="font-size:1.8rem;font-weight:800;color:{jc};margin:0;letter-spacing:-.5px">{action}</p>
+                {dots_html}
+            </div>
         </div>
-        {reason_html}
-        <div style="display:flex;justify-content:center;gap:32px;margin-top:18px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.05)">
-            <div><p style="color:#64748B;font-size:.75rem;font-weight:700;margin:0">Ensemble</p><p style="color:{'#34D399' if es>0 else '#F87171' if es<0 else '#FCD34D'};font-size:1.4rem;font-weight:800;margin:2px 0">{es:+.1f}</p></div>
-            <div style="border-left:1px solid rgba(255,255,255,.08);padding-left:32px"><p style="color:#64748B;font-size:.75rem;font-weight:700;margin:0">Agree</p><p style="color:#F8FAFC;font-size:1.4rem;font-weight:800;margin:2px 0">B{ba}:S{sa}</p></div>
-            <div style="border-left:1px solid rgba(255,255,255,.08);padding-left:32px"><p style="color:#64748B;font-size:.75rem;font-weight:700;margin:0">Context</p><p style="color:#A5B4FC;font-size:1.1rem;font-weight:800;margin:2px 0">{m.get('context_label','기본')}</p></div>
+        <div style="margin:16px 0;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:14px 18px;border-left:3px solid {jc}">
+            <p style="color:#E2E8F0;font-size:.9rem;font-weight:600;margin:0 0 6px">{reason}</p>
+            <p style="color:#64748B;font-size:.78rem;margin:0">{detail}</p>
         </div>
-        <div style='margin-top:10px'>{extra}</div>{veto_html}</div>""",unsafe_allow_html=True)
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:14px">
+            <div style="background:rgba(255,255,255,.03);border-radius:10px;padding:12px;text-align:center">
+                <p style="color:#64748B;font-size:.68rem;font-weight:700;margin:0 0 4px">Ensemble</p>
+                <p style="color:{es_c};font-size:1.3rem;font-weight:800;margin:0">{es:+.1f}</p>
+                <div style="height:3px;background:rgba(255,255,255,.06);border-radius:2px;margin-top:6px;overflow:hidden"><div style="height:100%;width:{es_norm}%;background:{es_c};border-radius:2px"></div></div>
+            </div>
+            <div style="background:rgba(255,255,255,.03);border-radius:10px;padding:12px;text-align:center">
+                <p style="color:#64748B;font-size:.68rem;font-weight:700;margin:0 0 4px">Agree B:S</p>
+                <p style="color:#F8FAFC;font-size:1.3rem;font-weight:800;margin:0">{ba}:{sa}</p>
+                <div style="height:3px;background:rgba(248,113,113,.3);border-radius:2px;margin-top:6px;overflow:hidden"><div style="height:100%;width:{ba_pct}%;background:#34D399;border-radius:2px"></div></div>
+            </div>
+            <div style="background:rgba(255,255,255,.03);border-radius:10px;padding:12px;text-align:center">
+                <p style="color:#64748B;font-size:.68rem;font-weight:700;margin:0 0 4px">Context</p>
+                <p style="color:#A5B4FC;font-size:1.05rem;font-weight:800;margin:0">{m.get('context_label','기본')}</p>
+                <div style="height:3px;background:rgba(165,180,252,.15);border-radius:2px;margin-top:6px;overflow:hidden"><div style="height:100%;width:100%;background:#A5B4FC;border-radius:2px;opacity:.4"></div></div>
+            </div>
+        </div>
+        <div style='margin-top:10px;display:flex;justify-content:center;gap:8px;flex-wrap:wrap'>{badges}</div>{veto_html}</div>""",unsafe_allow_html=True)
 
 def render_committee_panel(m):
     committee=m.get('committee',{})
