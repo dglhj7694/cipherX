@@ -215,7 +215,7 @@ def render_analysis(msg):
     m,fj=msg.get('meta'),msg.get('fig_json')
     if m:render_price_header(m)
     if m or fj:
-        t0,t1,t2,t3,t4=st.tabs(["📊 차트","🎯 종합판단","🔬 10-Layer","🎯 콤보스캔","📈 기업정보"])
+        t0,t1,t2,t3,t4=st.tabs(["차트","종합판단","10-Layer","콤보스캔","기업정보"])
         with t0:
             if fj:fig=go.Figure(json.loads(fj));st.plotly_chart(fig,use_container_width=True,theme=None,config={'displaylogo':False,'modeBarButtonsToRemove':['lasso2d','select2d']});st.caption("*차트에 마우스를 올리면 상세 판단 사유 및 위원회 투표 현황 툴팁이 표시됩니다.")
         with t1:
