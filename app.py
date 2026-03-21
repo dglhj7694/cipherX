@@ -145,6 +145,29 @@ div[data-testid="stMetricDelta"]{font-weight:700!important;}
   div[style*="grid-template-columns:repeat(5"]{grid-template-columns:repeat(2,1fr)!important}
   div[style*="grid-template-columns:repeat(6"]{grid-template-columns:repeat(2,1fr)!important}
 }
+/* ── AI Report & Prompt Expander ── */
+.ai-report-wrap details{background:rgba(15,19,32,0.65)!important;backdrop-filter:blur(16px)!important;-webkit-backdrop-filter:blur(16px)!important;border:1px solid rgba(99,102,241,0.2)!important;border-radius:16px!important;box-shadow:0 8px 32px rgba(0,0,0,0.35)!important;transition:all .4s cubic-bezier(.16,1,.3,1)!important;overflow:hidden!important;}
+.ai-report-wrap details:hover{border-color:rgba(99,102,241,0.4)!important;box-shadow:0 12px 40px rgba(99,102,241,0.15)!important;transform:translateY(-2px);}
+.ai-report-wrap details[open]{border-color:rgba(99,102,241,0.3)!important;}
+.ai-report-wrap details summary{background:linear-gradient(135deg,rgba(99,102,241,0.08),rgba(139,92,246,0.06))!important;border-bottom:1px solid rgba(99,102,241,0.1)!important;padding:16px 20px!important;font-weight:700!important;color:#A5B4FC!important;font-size:1rem!important;letter-spacing:-0.3px;transition:all .3s;}
+.ai-report-wrap details summary:hover{background:linear-gradient(135deg,rgba(99,102,241,0.14),rgba(139,92,246,0.1))!important;color:#C7D2FE!important;}
+.ai-report-wrap details summary svg{color:#6366F1!important;}
+.ai-report-wrap details>div{padding:6px 8px!important;}
+.ai-report-wrap details h3{color:#C7D2FE!important;font-weight:700!important;font-size:1.05rem!important;border-bottom:1px solid rgba(99,102,241,0.1);padding-bottom:8px;margin-top:20px!important;}
+.ai-report-wrap details hr{border-color:rgba(99,102,241,0.08)!important;margin:16px 0!important;}
+.ai-report-wrap details strong{color:#E2E8F0!important;}
+.ai-report-wrap details ul,.ai-report-wrap details ol{margin:6px 0!important;}
+.ai-report-wrap details li{color:#CBD5E1!important;line-height:1.7!important;font-size:.92rem!important;}
+.ai-report-wrap details code{background:rgba(99,102,241,0.1)!important;color:#A5B4FC!important;padding:2px 6px!important;border-radius:4px!important;font-size:.85rem!important;}
+.ai-report-wrap details p{font-size:.92rem!important;line-height:1.7!important;}
+.ai-prompt-wrap details{background:rgba(10,12,20,0.7)!important;backdrop-filter:blur(12px)!important;-webkit-backdrop-filter:blur(12px)!important;border:1px solid rgba(71,85,105,0.25)!important;border-radius:12px!important;box-shadow:0 4px 16px rgba(0,0,0,0.25)!important;transition:all .3s!important;margin-top:10px!important;}
+.ai-prompt-wrap details:hover{border-color:rgba(100,116,139,0.4)!important;}
+.ai-prompt-wrap details summary{background:rgba(30,41,59,0.4)!important;padding:12px 16px!important;font-weight:600!important;color:#64748B!important;font-size:.85rem!important;transition:all .3s;}
+.ai-prompt-wrap details summary:hover{color:#94A3B8!important;}
+.ai-prompt-wrap details summary svg{color:#475569!important;}
+.ai-prompt-wrap details>div{padding:4px 8px!important;}
+.ai-prompt-wrap details pre{background:rgba(0,0,0,0.3)!important;border:1px solid rgba(71,85,105,0.15)!important;border-radius:10px!important;}
+.ai-prompt-wrap details code{color:#94A3B8!important;font-size:.78rem!important;line-height:1.5!important;}
 </style>""", unsafe_allow_html=True)
 
 # ━━━ Constants ━━━
@@ -309,11 +332,15 @@ else:
         with st.chat_message(msg["role"],avatar=av):
             if msg.get("type")=="analysis":st.markdown(msg.get("content",""),unsafe_allow_html=True);render_analysis(msg)
             elif msg.get("type")=="report":
-                with st.expander(f"{msg.get('ticker','')} AI Report",expanded=True):st.markdown(msg["content"])
-                st.download_button("Download Report",key=f"dl_{i}",data=msg["content"].encode('utf-8'),file_name=f"{msg.get('ticker','')}_V142_{datetime.now().strftime('%Y%m%d')}.md",mime="text/markdown",use_container_width=True)
+                st.markdown("<div class='ai-report-wrap'>",unsafe_allow_html=True)
+                with st.expander(f"🤖 {msg.get('ticker','')} AI 분석 리포트",expanded=True):st.markdown(msg["content"])
+                st.markdown("</div>",unsafe_allow_html=True)
+                st.download_button("📥 리포트 다운로드",key=f"dl_{i}",data=msg["content"].encode('utf-8'),file_name=f"{msg.get('ticker','')}_V142_{datetime.now().strftime('%Y%m%d')}.md",mime="text/markdown",use_container_width=True)
             else:st.markdown(msg.get("content",""))
             if msg.get("prompt") and msg.get("type")=="analysis":
-                with st.expander("프롬프트"):st.code(msg["prompt"],language="markdown");st_copy_to_clipboard(msg["prompt"],before_copy_label="📋",after_copy_label="✅")
+                st.markdown("<div class='ai-prompt-wrap'>",unsafe_allow_html=True)
+                with st.expander("📋 AI 분석 프롬프트 보기"):st.code(msg["prompt"],language="markdown");st_copy_to_clipboard(msg["prompt"],before_copy_label="📋 복사",after_copy_label="✅ 복사됨")
+                st.markdown("</div>",unsafe_allow_html=True)
     def _run_ai():
         tp=st.session_state.pending_ai_ticker;pp=st.session_state.pending_ai_prompt
         with st.chat_message("assistant",avatar="assistant"):
@@ -325,7 +352,9 @@ else:
                     for ch in model.generate_content(pp,stream=True):
                         if ch.text:col_.append(ch.text);yield ch.text
                     pb.progress(100)
-                with st.expander(f"{tp.upper()} AI리포트",expanded=True):st.write_stream(gen())
+                st.markdown("<div class='ai-report-wrap'>",unsafe_allow_html=True)
+                with st.expander(f"🤖 {tp.upper()} AI 분석 리포트",expanded=True):st.write_stream(gen())
+                st.markdown("</div>",unsafe_allow_html=True)
                 time.sleep(.3);pb.empty();st.session_state.messages.append({"role":"assistant","type":"report","ticker":tp.upper(),"content":"".join(col_)});st.session_state.pending_ai_ticker=None;st.session_state.pending_ai_prompt=None;st.rerun()
             except Exception as e:pb.empty();st.error(f"AI오류:{e}")
     def process_ticker(tv,refresh=False):
