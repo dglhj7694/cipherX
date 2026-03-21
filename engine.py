@@ -498,6 +498,12 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
         raw=ap+sp+avp+syp+pp
         if j[i] in ('NEUTRAL','MIXED'):raw=max(15,min(55,raw))
         conf[i]=np.clip(raw,5,99)
+        
+        # ⚡ 스캐너 및 속도 최적화: 텍스트 이유는 최근 7일치만 생성
+        if i < n - 7:
+            rs.append("");rd.append("");al.append("")
+            continue
+            
         cms={cm:es[i,ci] for ci,cm in enumerate(COMMITTEE_NAMES)}
         vstr=df['Veto_Flags'].iloc[i] if i<len(df) else ''
         obr=bool(obv_v[i]>obv_mav[i]) if not np.isnan(obv_mav[i]) else True
@@ -508,4 +514,11 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
         rs.append(r);rd.append(d);al.append(a)
     df['Trade_Judgment']=j;df['Judgment_Confidence']=conf;df['Buy_Agree']=bag;df['Sell_Agree']=sag
     df['Judgment_Reason']=rs;df['Judgment_Detail']=rd;df['Action_Label']=al
+    
+    # 🎯 시스템 전면 전환(Macro Flip) 시그널 추가
+    is_buy = pd.Series(j).isin(['STRONG_BUY', 'BUY', 'WATCH_BUY'])
+    is_sell = pd.Series(j).isin(['STRONG_SELL', 'SELL', 'WATCH_SELL'])
+    df['System_Turn_Bull'] = (is_buy & ~is_buy.shift(1).fillna(False)).values
+    df['System_Turn_Bear'] = (is_sell & ~is_sell.shift(1).fillna(False)).values
+    
     return df
