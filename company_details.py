@@ -137,8 +137,8 @@ def _annual_values(financials, row_candidates):
 
 def _verdict_badge(color, emoji, text):
     bg = {"green": "rgba(0,230,118,.15)", "red": "rgba(255,23,68,.15)",
-          "yellow": "rgba(255,193,7,.15)", "blue": "rgba(33,150,243,.15)", "gray": "rgba(96,125,139,.15)"}
-    bdr = {"green": "#00E676", "red": "#FF1744", "yellow": "#FFC107", "blue": "#2196F3", "gray": "#8b949e"}
+          "yellow": "rgba(255,193,7,.15)", "blue": "rgba(33,150,243,.15)", "gray": "rgba(96,125,139,.15)", "orange": "rgba(255,109,0,.15)"}
+    bdr = {"green": "#00E676", "red": "#FF1744", "yellow": "#FFC107", "blue": "#2196F3", "gray": "#8b949e", "orange": "#FF6D00"}
     return (f'<div style="background:{bg.get(color, bg["gray"])}; border:1px solid {bdr.get(color, bdr["gray"])};border-radius:12px; padding:16px 20px;margin-top:20px;text-align:center; box-shadow: 0 4px 12px {bg.get(color, bg["gray"])};">'
             f'<span style="font-size:1.1rem;font-weight:800; color:{bdr.get(color, bdr["gray"])}">{emoji} {text}</span></div>')
 
@@ -155,7 +155,7 @@ def _traffic_light(status):
 
 def _score_dot_row(items):
     cells = ""
-    colors_map = {"green": "#00E676", "yellow": "#FFC107", "red": "#FF1744", "blue": "#2196F3", "gray": "#8b949e"}
+    colors_map = {"green": "#00E676", "yellow": "#FFC107", "red": "#FF1744", "blue": "#2196F3", "gray": "#8b949e", "orange": "#FF6D00"}
     for name, color in items:
         c_code = colors_map.get(color, "#8b949e")
         cells += (f'<div style="display:inline-flex;flex-direction:column;align-items:center; min-width:60px;padding:6px 4px">'
@@ -211,7 +211,20 @@ def _get_plotly_gauge(val, color):
 # ── 분석 함수들 ─────────────────────────────────────────
 
 def _growth_stage(info, fin, bs, cf):
-    rev_g, margin, rev, div_y = info.get('revenueGrowth', 0) or 0, info.get('profitMargins', 0) or 0, info.get('totalRevenue', 0) or 0, info.get('dividendYield', 0) or 0
+    # ─── 기본 지표 추출 ───────────────────────────────────
+    rev_g    = info.get('revenueGrowth', 0) or 0
+    op_margin= info.get('operatingMargins', 0) or 0
+    margin   = info.get('profitMargins', 0) or 0
+    rev      = info.get('totalRevenue', 0) or 0
+    div_y    = info.get('dividendYield', 0) or 0
+    roe      = info.get('returnOnEquity', 0) or 0
+    mkt_cap  = info.get('marketCap', 0) or 0
+    total_debt= info.get('totalDebt', 0) or 0
+    eq       = info.get('bookValue', 0) or 0
+    shares   = info.get('sharesOutstanding', 1) or 1
+    book_val = eq * shares if eq > 0 else 1
+    debt_ratio = (total_debt / book_val) if book_val > 0 else 0
+
     op_cf = 0
     try:
         if cf is not None:
@@ -221,62 +234,182 @@ def _growth_stage(info, fin, bs, cf):
                     break
     except Exception: pass
 
+    # FCF 수익률: opCF / 시가총액
+    fcf_yield = (op_cf / mkt_cap) if mkt_cap > 0 else 0
+
+    # ─── 매출 규모 등급 (S/M/L/XL) ──────────────────────
+    if   rev < 5e8:   revenue_scale = 'S'   # ~5억달러 미만
+    elif rev < 1e10:  revenue_scale = 'M'   # 5억~100억
+    elif rev < 1e11:  revenue_scale = 'L'   # 100억~1000억
+    else:             revenue_scale = 'XL'  # 1000억 이상
+
+    # ─── 업력 추정 (상장연도 기반) ───────────────────────
+    try:
+        founded = info.get('foundedYear', None) or info.get('ipoYear', None) or 1990
+        company_age = max(2026 - int(founded), 1)
+    except Exception:
+        company_age = 20
+
+    # ─── 매출 추세 분석 (declining / rev_declining) ─────
     rev_declining = False
+    rev_series_sorted = None
     try:
         rs = _get_row_series(fin, REV_ALIASES)
         if len(rs) >= 3:
-            rd = rs.sort_index(ascending=False)
-            if sum(1 for i in range(len(rd) - 1) if rd.iloc[i] < rd.iloc[i + 1]) >= 2: rev_declining = True
+            rev_series_sorted = rs.sort_index(ascending=False)
+            if sum(1 for i in range(len(rev_series_sorted) - 1) if rev_series_sorted.iloc[i] < rev_series_sorted.iloc[i + 1]) >= 2:
+                rev_declining = True
     except Exception: pass
 
+    # ─── 3년 CAGR 산출 ───────────────────────────────────
+    rev_cagr_3y = rev_g  # fallback
+    try:
+        if rev_series_sorted is not None and len(rev_series_sorted) >= 4:
+            r_new = rev_series_sorted.iloc[0]
+            r_old = rev_series_sorted.iloc[3]
+            if r_old > 0:
+                rev_cagr_3y = (r_new / r_old) ** (1/3) - 1
+    except Exception: pass
+
+    # ─── 이익률 추세 (up / flat / down) ─────────────────
+    margin_trend = 'flat'
+    try:
+        ni_s = _get_row_series(fin, NI_ALIASES)
+        rv_s = _get_row_series(fin, REV_ALIASES)
+        common_idx = ni_s.index.intersection(rv_s.index).sort_values()
+        margins_ts = [(i, ni_s[i] / rv_s[i]) for i in common_idx if rv_s[i] != 0]
+        if len(margins_ts) >= 2:
+            delta = margins_ts[-1][1] - margins_ts[0][1]
+            if   delta >  0.02: margin_trend = 'up'
+            elif delta < -0.02: margin_trend = 'down'
+    except Exception: pass
+
+    # ─── 성장률 추세 (accel / flat / decel) ─────────────
+    growth_trend = 'flat'
+    try:
+        if rev_series_sorted is not None and len(rev_series_sorted) >= 3:
+            g_rates = [(rev_series_sorted.iloc[i] - rev_series_sorted.iloc[i+1]) / abs(rev_series_sorted.iloc[i+1])
+                       for i in range(len(rev_series_sorted)-1) if rev_series_sorted.iloc[i+1] != 0]
+            if len(g_rates) >= 2:
+                recent_g  = g_rates[0]
+                past_g    = np.mean(g_rates[1:]) if len(g_rates) > 1 else g_rates[0]
+                if   recent_g > past_g + 0.05: growth_trend = 'accel'
+                elif recent_g < past_g - 0.05: growth_trend = 'decel'
+    except Exception: pass
+
+    # ─── 연속 흑자 연수 (profit_streak) ─────────────────
+    profit_streak = 0
+    consec_loss   = 0
+    try:
+        ni_s2 = _get_row_series(fin, NI_ALIASES).sort_index(ascending=False)
+        for v in ni_s2:
+            if v > 0: profit_streak += 1
+            else: break
+        for v in ni_s2:
+            if v < 0: consec_loss += 1
+            else: break
+    except Exception: pass
+
+    net_profit = margin > 0
+
     stages = {
-        1: ("[STAGE 1] 스타트업", "매출이 1억불 미만이며 막대한 적자율로 현금을 태우는 생존 테스트 초기 단계입니다."),
-        2: ("[STAGE 2] 초기 고성장", "매출액 15% 이상 급성장 중이나 아직 뚜렷한 타격(적자율 등)을 입고 있는 시장 선점기입니다."),
-        3: ("[STAGE 3] 스케일업 & 흑자전환", "매출 15% 이상 성장하면서, 적자를 벗어나 갓 흑자(마진 0~15%)를 달성한 황금 모멘텀 단계입니다."),
-        4: ("[STAGE 4] 초고속 흑자성장", "매출 20% 이상 폭증과 이익률 15% 이상을 동시에 뽐내는 초우량 주도주입니다."),
-        5: ("[STAGE 5] 성숙 우량성장", "5~15% 수준의 안정적인 볼륨 확장과 훌륭한 두 자릿수 수익성을 지속적으로 동반하는 우량 구간입니다."),
-        6: ("[STAGE 6] 초우량 캐시카우", "매출 성장은 멈췄으나 이익률과 현금흐름이 폭발적이어서 배당과 자사주 소각에 거침이 없는 단계입니다."),
-        7: ("[STAGE 7] 애매한 정체기", "성장은 멈춰있고(0~5%), 이익도 나긴 하지만 수익성이 캐시카우급은 아닌 평범한 수익 방어 구간입니다."),
-        8: ("[STAGE 8] 초기 쇠퇴", "역성장(-성장)이 시작되었지만 그동안 벌어둔 구력으로 꾸역꾸역 흑자는 방어하며 버티고 있는 단계입니다."),
-        9: ("[STAGE 9] 구조적 쇠퇴", "완전히 트렌드를 잃고 역성장과 무서운 적자의 늪에 빠져버린 고위험군입니다."),
-        10: ("[STAGE 10] 극적 턴어라운드", "오랜 부진을 겪었으나 최근 성장을 반전 성공(성장률 > 0)하거나 강력한 대규모 구조조정에 돌입한 회생 단계입니다.")
+        1:  ("[STAGE 1] 스타트업",          "매출 규모가 작고 아직 수익 모델이 검증되지 않은 초기 생존 테스트 단계입니다."),
+        2:  ("[STAGE 2] 초기 고성장",        "30% 이상의 폭발적 매출 성장으로 시장 점유율을 빠르게 확장하고 있습니다."),
+        3:  ("[STAGE 3] 스케일업 & 흑자전환","20~50% 성장과 함께 흑자 진입에 성공한 황금 모멘텀 구간입니다."),
+        4:  ("[STAGE 4] 초고속 흑자성장",    "50% 이상 폭증과 고이익률을 동시에 달성한 초우량 주도주 입니다."),
+        5:  ("[STAGE 5] 성숙 우량성장",      "5~20% 성장과 높은 ROE를 유지하는 장기 우량주 구간입니다."),
+        6:  ("[STAGE 6] 초우량 캐시카우",    "성장이 낮아졌지만 잉여현금흐름·ROE가 탁월하며 주주환원이 강력한 단계입니다."),
+        7:  ("[STAGE 7] 애매한 정체기",      "성장이 정체(0~3%)되고 이익률 개선 모멘텀이 보이지 않는 경계 구간입니다."),
+        8:  ("[STAGE 8] 초기 쇠퇴",          "매출 역성장이 시작됐으나 이익률은 아직 방어 중인 경고 단계입니다."),
+        9:  ("[STAGE 9] 구조적 쇠퇴",        "연속 적자 + 매출 급감 + 높은 부채비율로 구조적 위기에 빠진 고위험군입니다."),
+        10: ("[STAGE 10] 극적 턴어라운드",   "과거 쇠퇴를 딛고 최근 매출/이익 개선이 확인된 회생 반등 단계입니다."),
     }
-    
     colors = {
-        1: "#E91E63", 2: "#FF5722", 3: "#FF9800", 4: "#00E676", 5: "#4CAF50", 
-        6: "#2196F3", 7: "#9C27B0", 8: "#607D8B", 9: "#F44336", 10: "#795548"
+        1: "#FF7043", 2: "#FFA726", 3: "#FF9800", 4: "#FF6D00", 5: "#00E676",
+        6: "#00C853", 7: "#E57373", 8: "#F44336", 9: "#C62828", 10: "#FFC107"
     }
 
-    # 1. 극적 턴어라운드 (과거 연속 하락이었으나 최근 매출성장률 > 0으로 반전 성공)
-    if rev_declining and rev_g > 0: s = 10
-    # 2. 극적 턴어라운드 / 대규모 구조조정 방어 (매출 규모 1억+인데 적자율 극심)
-    elif rev >= 1e8 and margin < -0.20: s = 10
-    # 3. 구조적 쇠퇴 (매출 역성장 + 완전 적자)
-    elif rev_g < 0 and margin <= 0: s = 9
-    # 4. 초기 쇠퇴 (매출 역성장 + 스리슬쩍 흑자로 버티는 중)
-    elif rev_g < 0 and margin > 0: s = 8
-    # 5. 초고속 자생성장 (초우량주: 매출 20% 이상 & 마진 15% 이상)
-    elif rev_g >= 0.20 and margin >= 0.15: s = 4
-    # 6. 스케일업/흑자 (매출 15% 이상이면서 마진 0~15%, NVDA급은 아니지만 흑자전환 성공)
-    elif rev_g >= 0.15 and margin >= 0: s = 3
-    # 7. 스타트업 (매출 기준치 미달 & 적자)
-    elif rev < 1e8 and margin < -0.10: s = 1
-    # 8. 초기 고성장 (매출 15% 이상인데 여전히 적자)
-    elif rev_g >= 0.15 and margin < 0: s = 2
-    # 9. 초우량 캐시카우 (저성장 0~5%, 마진 10% 이상 & 좋은 배당/현금흐름)
-    elif 0 <= rev_g < 0.05 and margin >= 0.10 and (div_y > 0.01 or op_cf > rev * 0.1): s = 6
-    # 10. 성숙 우량성장 (5~15% 성장 & 흑자)
-    elif 0.05 <= rev_g < 0.15 and margin > 0: s = 5
-    # 11. 애매한 정체기 (저성장 0~5%, 흑자는 남기지만 캐시카우급은 아님)
-    elif 0 <= rev_g < 0.05 and margin > 0: s = 7
-    # 12. 기타 예외 처리 (폴백)
-    elif margin > 0: s = 7
-    elif margin <= 0: s = 9
-    else: s = 7
-    
+    # ══════════════════════════════════════════════
+    # Phase 0: 턴어라운드 (최우선 판별)
+    # ══════════════════════════════════════════════
+    if rev_declining and (rev_g > 0 or margin_trend == 'up'):
+        return 10, stages[10][0], stages[10][1], colors[10]
+
+    # ══════════════════════════════════════════════
+    # Phase 1: 쇠퇴 영역 (위험 → 안전 순)
+    # ══════════════════════════════════════════════
+    if consec_loss >= 3 and rev_g < -0.15 and debt_ratio > 2.0:
+        return 9, stages[9][0], stages[9][1], colors[9]
+
+    if rev_g < -0.05 and margin_trend == 'down':
+        return 8, stages[8][0], stages[8][1], colors[8]
+
+    if -0.05 <= rev_g <= 0.03 and growth_trend == 'decel' and margin_trend in ('flat', 'down'):
+        return 7, stages[7][0], stages[7][1], colors[7]
+
+    # ══════════════════════════════════════════════
+    # Phase 2: 초기 기업
+    # ══════════════════════════════════════════════
+    if company_age <= 5 and revenue_scale == 'S' and (not net_profit or op_margin < 0.05):
+        return 1, stages[1][0], stages[1][1], colors[1]
+
+    if rev_g > 0.30 and revenue_scale in ('S', 'M') and (not net_profit or profit_streak <= 1):
+        return 2, stages[2][0], stages[2][1], colors[2]
+
+    # ══════════════════════════════════════════════
+    # Phase 3: 고성장 영역
+    # ══════════════════════════════════════════════
+    if (rev_g > 0.50
+            and revenue_scale in ('L', 'XL')
+            and net_profit
+            and op_margin > 0.15
+            and growth_trend == 'accel'):
+        return 4, stages[4][0], stages[4][1], colors[4]
+
+    if (0.20 <= rev_g <= 0.50
+            and net_profit
+            and op_margin > 0.10):
+        return 3, stages[3][0], stages[3][1], colors[3]
+
+    # ══════════════════════════════════════════════
+    # Phase 4: 성숙 우량 영역
+    # ══════════════════════════════════════════════
+    if (0.05 <= rev_g <= 0.20
+            and profit_streak >= 5
+            and roe > 0.15
+            and margin_trend in ('up', 'flat')):
+        return 5, stages[5][0], stages[5][1], colors[5]
+
+    if (0.00 <= rev_g <= 0.10
+            and profit_streak >= 10
+            and fcf_yield > 0.05
+            and roe > 0.12
+            and (div_y > 0.01 or op_cf > rev * 0.1)):
+        return 6, stages[6][0], stages[6][1], colors[6]
+
+    # ══════════════════════════════════════════════
+    # Fallback: 스코어링 매트릭스 (경계 케이스 처리)
+    # ══════════════════════════════════════════════
+    def _clamp(v, lo=0, hi=100): return max(lo, min(hi, v))
+
+    g_score = _clamp((rev_g * 200) + (rev_cagr_3y * 100) + (20 if growth_trend == 'accel' else -20 if growth_trend == 'decel' else 0))
+    p_score = _clamp((op_margin * 200) + (roe * 200) + (profit_streak * 5))
+    s_score = _clamp((-debt_ratio * 10 + 50) + (fcf_yield * 500) + (20 if margin_trend == 'up' else -10 if margin_trend == 'down' else 0))
+    m_score = _clamp(({'S':0,'M':30,'L':70,'XL':100}[revenue_scale] + min(company_age * 2, 40)) / 1.4)
+    mo_score= _clamp(50 + rev_g * 300)
+
+    total = g_score * 0.30 + p_score * 0.25 + s_score * 0.20 + m_score * 0.15 + mo_score * 0.10
+
+    if   total >= 75: s = 4 if rev_g > 0.30 else 5
+    elif total >= 55: s = 5 if net_profit else 3
+    elif total >= 40: s = 6 if div_y > 0.01 else 7
+    elif total >= 25: s = 8 if rev_g < 0 else 7
+    else:             s = 9 if consec_loss >= 2 else 8
+
     return s, stages[s][0], stages[s][1], colors[s]
 
 def _stability(financials, rc):
+
     vals, _ = _annual_values(financials, rc)
     arr = np.array([v for v in vals if v is not None and not np.isnan(v)])
     if len(arr) < 2 or np.mean(arr) == 0: return "데이터 부족", "", "gray"
@@ -512,12 +645,12 @@ def render_company_details(ticker_str: str):
     sn, sname, sdesc, scolor = _growth_stage(info, fin, bs, cf)
     
     # UI 렌더링에 필요한 색상과 라벨 매핑 (1~10단계)
-    stage_map = {1: "#E91E63", 2: "#FF5722", 3: "#FF9800", 4: "#00E676", 5: "#4CAF50", 6: "#2196F3", 7: "#9C27B0", 8: "#607D8B", 9: "#F44336", 10: "#795548"}
+    stage_map = {1: "#FF7043", 2: "#FFA726", 3: "#FF9800", 4: "#FF6D00", 5: "#00E676", 6: "#00C853", 7: "#E57373", 8: "#F44336", 9: "#C62828", 10: "#FFC107"}
     stage_lbl = {1: "스타트업", 2: "초기성장", 3: "스케일업", 4: "초고속성장", 5: "성숙성장", 6: "캐시카우", 7: "정체기", 8: "초기쇠퇴", 9: "구조적쇠퇴", 10: "턴어라운드"}
 
     bar_html = "".join([f'<div style="flex:1;background:{stage_map[i] if i == sn else "rgba(0,0,0,0.2)"};opacity:{"1" if i == sn else "0.4"};text-align:center;padding:14px 2px;font-size:.7rem;color:#ffffff;border:{"3px solid " + stage_map[i] if i == sn else "1px solid #444c56"};border-radius:{"10px 0 0 10px" if i == 1 else ("0 10px 10px 0" if i == 10 else "0")};font-weight:{"800" if i == sn else "600"};box-shadow:{"0 0 16px " + stage_map[i] + "88" if i == sn else "none"};transition:all .3s">{i}<br>{stage_lbl[i]}</div>' for i in range(1, 11)])
     
-    v1_c = "green" if sn in [4, 5] else ("blue" if sn == 6 else ("yellow" if sn in [2, 3, 7, 10] else "red"))
+    v1_c = "green" if sn in [5, 6] else ("orange" if sn in [1, 2, 3, 4, 10] else "red")
     v1_map = {
         1: "초기 — 높은 위험·생존 테스트 중", 
         2: "점유율 확대 — 적자이나 최고 속도 팽창", 

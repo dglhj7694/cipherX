@@ -9,7 +9,7 @@ from company_details import render_company_details
 def render_price_header(m):
     chg=m['price_change'];cp=m['price_change_pct'];cc='price-change-up' if chg>=0 else 'price-change-down';ci='▲' if chg>=0 else '▼'
     vr_=m['volume']/max(m['avg_volume'],1);jg=m['judgment'];cf=m['confidence'];es=m.get('ensemble_score',0)
-    jc='#34D399' if 'BUY' in jg else('#F87171' if 'SELL' in jg else '#FCD34D')
+    jc='#34D399' if 'BUY' in jg else('#F87171' if 'SELL' in jg else '#FF9800')
     act=m.get('action_label','');rsn=m.get('judgment_reason','')
     specs=[(jc,f"[{act}] {cf:.0f}%"),('ind-b' if m['wt1']<-20 else('ind-s' if m['wt1']>20 else 'ind-n'),f"WT{m['wt1']:.0f}"),('ind-b' if m['rsi']<40 else('ind-s' if m['rsi']>60 else 'ind-n'),f"RSI{m['rsi']:.0f}"),('ind-b' if vr_>1.5 else 'ind-n',f"Vol{vr_:.1f}x"),('ind-b' if m['adx']>25 else 'ind-n',f"ADX{m['adx']:.0f}"),('ind-b' if m.get('utbot_dir',0)==1 else('ind-s' if m.get('utbot_dir',0)==-1 else 'ind-n'),'[UT] B' if m.get('utbot_dir',0)==1 else('[UT] S' if m.get('utbot_dir',0)==-1 else '[UT] -')),('ind-b' if m.get('hma_rising') else 'ind-s','[HMA] UP' if m.get('hma_rising') else '[HMA] DN')]
     ih="".join([f"<span class='ind-mini {c}'>{l}</span>" for c,l in specs])
@@ -18,7 +18,7 @@ def render_price_header(m):
         <p class="price-big" style="color:#F8FAFC">${m['price']:.2f}<span class="{cc}" style="font-size:1.1rem;margin-left:10px;font-weight:700">{ci}{abs(chg):.2f}({abs(cp):.2f}%)</span></p>{rsn_html}
         <div style="margin-top:10px;display:flex;gap:4px;flex-wrap:wrap">{ih}</div></div>""",unsafe_allow_html=True)
     # Glass metric cards
-    esc='#34D399' if es>0 else('#F87171' if es<0 else '#FCD34D')
+    esc='#34D399' if es>0 else('#F87171' if es<0 else '#FF9800')
     es_pct=min(abs(es)/80*100,100)
     bt_=m['buy_total'];st_=m['sell_total'];ba_=m['buy_active'];sa_=m['sell_active']
     bt_pct=min(bt_/40*100,100);st_pct=min(st_/40*100,100)
@@ -28,13 +28,13 @@ def render_price_header(m):
         <div class='glass-metric'><p class='gm-label'>Ensemble Score</p><p class='gm-value' style='color:{esc}'>{es:+.1f}</p><p class='gm-sub'>B{m.get('buy_agree',0)} : S{m.get('sell_agree',0)}</p><div class='gm-bar'><div class='gm-bar-fill' style='width:{es_pct}%;background:{esc}'></div></div></div>
         <div class='glass-metric'><p class='gm-label'>BUY Score (10L)</p><p class='gm-value' style='color:#34D399'>{bt_:.1f}</p><p class='gm-sub'>{ba_}/10 레이어 활성</p><div class='gm-bar'><div class='gm-bar-fill' style='width:{bt_pct}%;background:#34D399'></div></div></div>
         <div class='glass-metric'><p class='gm-label'>SELL Score (10L)</p><p class='gm-value' style='color:#F87171'>{st_:.1f}</p><p class='gm-sub'>{sa_}/10 레이어 활성</p><div class='gm-bar'><div class='gm-bar-fill' style='width:{st_pct}%;background:#F87171'></div></div></div>
-        <div class='glass-metric'><p class='gm-label'>52주 가격 위치</p><p class='gm-value' style='color:#A5B4FC'>{pos52:.0f}%</p><p class='gm-sub'>${l52:.1f} — ${h52:.1f}</p><div class='gm-bar'><div class='gm-bar-fill' style='width:{pos52}%;background:linear-gradient(90deg,#F87171,#FCD34D,#34D399)'></div></div></div>
+        <div class='glass-metric'><p class='gm-label'>52주 가격 위치</p><p class='gm-value' style='color:#A5B4FC'>{pos52:.0f}%</p><p class='gm-sub'>${l52:.1f} — ${h52:.1f}</p><div class='gm-bar'><div class='gm-bar-fill' style='width:{pos52}%;background:linear-gradient(90deg,#F87171,#FF9800,#34D399)'></div></div></div>
     </div>""",unsafe_allow_html=True)
 
 def render_judgment_card(m):
     jg=m['judgment'];es=m.get('ensemble_score',0);cf=m['confidence']
     cc='score-card-buy' if 'BUY' in jg else('score-card-sell' if 'SELL' in jg else 'score-card-neutral')
-    jc='#34D399' if 'BUY' in jg else('#F87171' if 'SELL' in jg else '#FCD34D')
+    jc='#34D399' if 'BUY' in jg else('#F87171' if 'SELL' in jg else '#FF9800')
     ba=m.get('buy_agree',0);sa=m.get('sell_agree',0);veto=m.get('veto_flags','');syn=m.get('reversal_synergy',0);pred=m.get('prediction_boost',0)
     reason=m.get('judgment_reason','');detail=m.get('judgment_detail','');action=m.get('action_label','')
     circ=2*3.14159*36;offset=circ*(1-cf/100)
@@ -57,7 +57,7 @@ def render_judgment_card(m):
     if abs(pred)>3:badges+=f"<span style='background:rgba({'52,211,153' if pred>0 else '248,113,113'},.12);color:{'#34D399' if pred>0 else '#F87171'};padding:3px 8px;border-radius:6px;font-size:.72rem;font-weight:700'>PRED {pred:+.1f}</span>"
     # Ensemble gauge
     es_norm=min(max((es+80)/160*100,0),100)
-    es_c='#34D399' if es>0 else '#F87171' if es<0 else '#FCD34D'
+    es_c='#34D399' if es>0 else '#F87171' if es<0 else '#FF9800'
     # Agree ratio bar
     total_agree=max(ba+sa,1);ba_pct=ba/total_agree*100
     st.markdown(f"""<div class="score-card {cc} fade-up">
@@ -99,7 +99,7 @@ def render_committee_panel(m):
     for ci,cm in enumerate(COMMITTEE_NAMES):
         data=committee.get(cm,{});score=data.get('score',0);conv=data.get('conviction',0);vote=data.get('vote','NEUTRAL');weight=weights[ci] if ci<len(weights) else 0.2
         sc='#34D399' if score>0 else('#F87171' if score<0 else '#94A3B8')
-        vc='background:rgba(52,211,153,.15);color:#34D399' if vote=='BUY' else('background:rgba(248,113,113,.15);color:#F87171' if vote=='SELL' else('background:rgba(71,85,105,.3);color:#64748B' if vote=='ABSTAIN' else 'background:rgba(252,211,77,.15);color:#FCD34D'))
+        vc='background:rgba(52,211,153,.15);color:#34D399' if vote=='BUY' else('background:rgba(248,113,113,.15);color:#F87171' if vote=='SELL' else('background:rgba(71,85,105,.3);color:#64748B' if vote=='ABSTAIN' else 'background:rgba(255,152,0,.15);color:#FF9800'))
         bar_w=min(abs(score)/40*100,100)
         bdr=f'border-left:3px solid {sc}' if abs(score)>10 else ''
         cards_html+=f"""<div class='cm-card' style='{bdr}'>
@@ -146,13 +146,13 @@ def render_10layer_bars(m):
 
 def render_leading_lagging(m):
     lv=m['leading_verdict'];lgv=m['lagging_verdict'];ac=m['composite_accel']
-    lc='#34D399' if '상승' in lv else('#F87171' if '하락' in lv else '#FCD34D')
-    lgc='#34D399' if '상승' in lgv else('#F87171' if '하락' in lgv else '#FCD34D')
+    lc='#34D399' if '상승' in lv else('#F87171' if '하락' in lv else '#FF9800')
+    lgc='#34D399' if '상승' in lgv else('#F87171' if '하락' in lgv else '#FF9800')
     # Setup Pressure tug-of-war
     spb=m.get('setup_pressure_buy',0);sps=m.get('setup_pressure_sell',0)
     maxsp=max(spb,sps,1);bw=min(spb/maxsp*50,50);sw=min(sps/maxsp*50,50)
     tow_label=f"매수 압력 {spb:.1f}" if spb>sps else(f"매도 압력 {sps:.1f}" if sps>spb else "균형")
-    tow_color='#34D399' if spb>sps else('#F87171' if sps>spb else '#FCD34D')
+    tow_color='#34D399' if spb>sps else('#F87171' if sps>spb else '#FF9800')
     # Tech snapshot stats
     pb_=m.get('percent_b',0.5);pb_pct=pb_*100
     cmf_=m.get('cmf',0);cmf_c='#34D399' if cmf_>0.05 else('#F87171' if cmf_<-0.05 else '#94A3B8')
@@ -176,7 +176,7 @@ def render_leading_lagging(m):
             <p style='color:{lgc};font-weight:800;font-size:1.15rem;margin:0 0 8px'>{lgv}</p>
             <div style='display:flex;gap:14px'>
                 <span style='color:#94A3B8;font-size:.78rem'>Context: <b>{m['regime_label']}</b></span>
-                <span style='color:#94A3B8;font-size:.78rem'>RS: <b style='color:{"#34D399" if m["rs_ratio"]>1.03 else("#F87171" if m["rs_ratio"]<.97 else "#FCD34D")}'>{m['rs_ratio']:.3f}</b></span>
+                <span style='color:#94A3B8;font-size:.78rem'>RS: <b style='color:{"#34D399" if m["rs_ratio"]>1.03 else("#F87171" if m["rs_ratio"]<.97 else "#FF9800")}'>{m['rs_ratio']:.3f}</b></span>
             </div>
         </div>
     </div>""",unsafe_allow_html=True)
@@ -191,7 +191,7 @@ def render_leading_lagging(m):
     </div>""",unsafe_allow_html=True)
     # Tech snapshot
     st.markdown(f"""<div style='display:grid;grid-template-columns:repeat(6,1fr);gap:8px'>
-        <div class='stat-mini'><p class='sm-label'>BB %B</p><p class='sm-value' style='color:{"#34D399" if pb_<0.3 else("#F87171" if pb_>0.7 else "#FCD34D")}'>{pb_pct:.0f}%</p></div>
+        <div class='stat-mini'><p class='sm-label'>BB %B</p><p class='sm-value' style='color:{"#34D399" if pb_<0.3 else("#F87171" if pb_>0.7 else "#FF9800")}'>{pb_pct:.0f}%</p></div>
         <div class='stat-mini'><p class='sm-label'>CMF</p><p class='sm-value' style='color:{cmf_c}'>{cmf_:+.3f}</p></div>
         <div class='stat-mini'><p class='sm-label'>OBV 추세</p><p class='sm-value' style='color:{obv_c}'>{"상승" if m.get("obv_trend")=="rising" else "하락"}</p></div>
         <div class='stat-mini'><p class='sm-label'>ATR%</p><p class='sm-value' style='color:#A5B4FC'>{atr_pct:.1f}%</p></div>
@@ -203,11 +203,11 @@ def render_combined_scans(m):
     scans=m.get('combined_scans',[])
     if not scans:st.info("활성 Combined Scan 없음");return
     bn=sum(1 for s in scans if s['dir']=='buy');sn_=sum(1 for s in scans if s['dir']=='sell');t1=sum(1 for s in scans if s['tier']==1)
-    hc='#FFD700' if t1>0 else('#00E676' if bn>sn_ else('#FF1744' if sn_>bn else '#FFC107'))
+    hc='#FFD700' if t1>0 else('#00E676' if bn>sn_ else('#FF1744' if sn_>bn else '#FF6D00'))
     st.markdown(f"<div style='background:rgba(255,215,0,.06);border:1px solid {hc}33;border-radius:12px;padding:12px;margin-bottom:10px'><span style='font-size:1.2rem;font-weight:800;color:{hc}'>[COMBO] {len(scans)} Active</span> <span style='color:#94A3B8;margin-left:12px'>T1:{t1} B:{bn} S:{sn_}</span></div>",unsafe_allow_html=True)
     for s in scans:
-        tb={1:'T1',2:'T2',3:'T3'}.get(s['tier'],'T?');dc_='#34D399' if s['dir']=='buy' else('#F87171' if s['dir']=='sell' else '#FFC107')
-        bg='rgba(0,230,118,.04)' if s['dir']=='buy' else('rgba(255,23,68,.04)' if s['dir']=='sell' else 'rgba(255,193,7,.04)')
+        tb={1:'T1',2:'T2',3:'T3'}.get(s['tier'],'T?');dc_='#34D399' if s['dir']=='buy' else('#F87171' if s['dir']=='sell' else '#FF6D00')
+        bg='rgba(0,230,118,.04)' if s['dir']=='buy' else('rgba(255,23,68,.04)' if s['dir']=='sell' else 'rgba(255,152,0,.04)')
         td="<span style='background:#FFD700;color:#000;padding:2px 6px;border-radius:4px;font-size:.65rem;font-weight:700'>TODAY</span>" if s['is_today'] else f"<span style='color:#64748B;font-size:.75rem'>{s['date']}</span>"
         st.markdown(f"<div class='cs-card' style='background:{bg};border-color:{dc_}'><div style='display:flex;justify-content:space-between;align-items:center'><span style='color:{dc_};font-weight:700'>■ {s['kor']} <span style='color:#64748B;font-size:.7rem'>{tb}</span></span><div>{td} <span style='color:#4FC3F7;font-size:.65rem;margin-left:6px'>WinRate:{s['win']}</span></div></div></div>",unsafe_allow_html=True)
 

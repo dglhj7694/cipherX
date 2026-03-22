@@ -38,7 +38,7 @@ div.stButton>button[kind="secondary"]:hover{background:rgba(42,48,64,0.6)!import
 .ind-mini{display:inline-block;padding:4px 10px;margin:2px;border-radius:8px;font-size:.76rem;font-weight:600;letter-spacing:0.5px;}
 .ind-b{background:rgba(16,185,129,.12);color:#6EE7B7;border:1px solid rgba(16,185,129,0.2);}
 .ind-s{background:rgba(239,68,68,.12);color:#FCA5A5;border:1px solid rgba(239,68,68,0.2);}
-.ind-n{background:rgba(245,158,11,.10);color:#FCD34D;border:1px solid rgba(245,158,11,0.2);}
+.ind-n{background:rgba(255,152,0,.10);color:#FF9800;border:1px solid rgba(255,152,0,0.2);}
 .layer-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04);transition:all .2s;}
 .layer-row:hover{background:rgba(255,255,255,0.02);}
 .layer-bar{background:rgba(0,0,0,0.3);border-radius:4px;height:8px;flex:1;margin:0 8px;overflow:hidden;box-shadow:inset 0 1px 3px rgba(0,0,0,0.5);}
@@ -48,7 +48,7 @@ div.stButton>button[kind="secondary"]:hover{background:rgba(42,48,64,0.6)!import
 .score-card:hover{transform:translateY(-4px);box-shadow:0 12px 40px rgba(0,0,0,0.5);}
 .score-card-buy{background:linear-gradient(160deg,rgba(5,46,22,0.7),rgba(13,27,42,0.8));border:1px solid rgba(16,185,129,.3);}
 .score-card-sell{background:linear-gradient(160deg,rgba(42,14,14,0.7),rgba(27,13,27,0.8));border:1px solid rgba(239,68,68,.3);}
-.score-card-neutral{background:linear-gradient(160deg,rgba(26,22,8,0.7),rgba(27,26,13,0.8));border:1px solid rgba(245,158,11,.3);}
+.score-card-neutral{background:linear-gradient(160deg,rgba(26,22,8,0.7),rgba(27,26,13,0.8));border:1px solid rgba(255,152,0,.3);}
 .cs-card{border-radius:12px;padding:12px 16px;margin:6px 0;border-left:4px solid;background:rgba(255,255,255,0.02);backdrop-filter:blur(8px);transition:all .3s;}
 .cs-card:hover{background:rgba(255,255,255,0.05);transform:translateX(2px);}
 .reason-card{background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,0.05);border-radius:12px;padding:14px 18px;margin-top:14px;text-align:left;backdrop-filter:blur(8px);}
@@ -316,11 +316,11 @@ if current_mode=='스캐너':
             scan_total=len(tickers) if tickers else st.session_state.get('scan_total',0)
             st.markdown(f"<div style='display:flex;gap:12px;margin-bottom:12px'><div style='flex:1;background:rgba(0,230,118,.06);border:1px solid #10B98133;border-radius:10px;padding:10px;text-align:center'><span style='color:#34D399;font-weight:800;font-size:1.3rem'>{len(bt)}</span><span style='color:#64748B;font-size:.8rem'> 매수</span></div><div style='flex:1;background:rgba(255,23,68,.06);border:1px solid #EF444433;border-radius:10px;padding:10px;text-align:center'><span style='color:#F87171;font-weight:800;font-size:1.3rem'>{len(st_)}</span><span style='color:#64748B;font-size:.8rem'> 매도</span></div><div style='flex:1;background:rgba(99,102,241,.06);border:1px solid #6366F133;border-radius:10px;padding:10px;text-align:center'><span style='color:#A5B4FC;font-weight:800;font-size:1.3rem'>{len(results)}</span><span style='color:#64748B;font-size:.8rem'>/{scan_total}</span></div></div>",unsafe_allow_html=True)
             for r in results:
-                chc='#34D399' if r['chg']>=0 else '#F87171';chi='▲' if r['chg']>=0 else '▼';jc='#34D399' if 'BUY' in r['jg'] else('#F87171' if 'SELL' in r['jg'] else '#FCD34D')
-                sh="".join([f"<div style='display:flex;gap:6px;padding:2px 0'><span style='color:{'#34D399' if s['dir']=='buy' else '#F87171' if s['dir']=='sell' else '#FFC107'}'>{s.get('icon') or '■'}</span><span style='color:#E8ECF1;font-size:.82rem'>{s['kor']}</span><span style='color:#64748B;font-size:.7rem'>{s['date']}</span></div>" for s in r['scans']]) if r['scans'] else "<span style='color:#475569;font-size:.8rem'>—</span>"
-                esc='#34D399' if r['es']>10 else('#F87171' if r['es']<-10 else '#FCD34D');bd='#1E293B' if r['scans'] else '#0F172A';op='1' if r['scans'] else '.6'
+                chc='#34D399' if r['chg']>=0 else '#F87171';chi='▲' if r['chg']>=0 else '▼';jc='#34D399' if 'BUY' in r['jg'] else('#F87171' if 'SELL' in r['jg'] else '#FF9800')
+                sh="".join([f"<div style='display:flex;gap:6px;padding:2px 0'><span style='color:{'#34D399' if s['dir']=='buy' else '#F87171' if s['dir']=='sell' else '#FF6D00'}'>{s.get('icon') or '■'}</span><span style='color:#E8ECF1;font-size:.82rem'>{s['kor']}</span><span style='color:#64748B;font-size:.7rem'>{s['date']}</span></div>" for s in r['scans']]) if r['scans'] else "<span style='color:#475569;font-size:.8rem'>—</span>"
+                esc='#34D399' if r['es']>10 else('#F87171' if r['es']<-10 else '#FF9800');bd='#1E293B' if r['scans'] else '#0F172A';op='1' if r['scans'] else '.6'
                 rh=""
-                if r.get('reason'):rc='#6EE7B7' if 'BUY' in r['jg'] else('#FCA5A5' if 'SELL' in r['jg'] else '#FCD34D');rh=f"<div style='padding:4px 0;border-top:1px solid rgba(255,255,255,.04);margin-top:4px'><span style='color:{rc};font-size:.78rem'>💬 {r['reason'][:80]}</span></div>"
+                if r.get('reason'):rc='#6EE7B7' if 'BUY' in r['jg'] else('#FCA5A5' if 'SELL' in r['jg'] else '#FF9800');rh=f"<div style='padding:4px 0;border-top:1px solid rgba(255,255,255,.04);margin-top:4px'><span style='color:{rc};font-size:.78rem'>💬 {r['reason'][:80]}</span></div>"
                 st.markdown(f"<div style='background:linear-gradient(160deg,#0F1320,#141926);border:1px solid {bd};border-radius:14px;padding:14px 18px;margin:6px 0;opacity:{op}'><div style='display:flex;justify-content:space-between;margin-bottom:8px'><span style='color:#A5B4FC;font-weight:800;font-size:1.15rem'>{r['ticker']}</span><div style='display:flex;align-items:center;gap:8px'><span style='color:{esc};font-size:.75rem;font-weight:700'>ES:{r['es']:+.0f}</span><span style='color:{jc};font-size:.8rem;font-weight:600'>{r['jg']}({r['cf']:.0f}%)</span><span style='color:{chc};font-size:.8rem'>{chi}{abs(r['chg']):.1f}%</span></div></div>{sh}{rh}</div>",unsafe_allow_html=True)
                 if st.button(f"{r['ticker']} 분석",key=f"sc_{r['ticker']}",use_container_width=True):st.session_state['_mode']='분석';st.session_state['_auto']=r['ticker'];st.rerun()
 else:
