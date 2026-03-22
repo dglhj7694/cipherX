@@ -243,10 +243,14 @@ def _growth_stage(info, fin, bs, cf):
     elif rev < 1e11:  revenue_scale = 'L'   # 100억~1000억
     else:             revenue_scale = 'XL'  # 1000억 이상
 
-    # ─── 업력 추정 (상장연도 기반) ───────────────────────
+    # ─── 업력 추정 (IPO 연도 기반 / yfinance 실제 지원 키 사용) ────
     try:
-        founded = info.get('foundedYear', None) or info.get('ipoYear', None) or 1990
-        company_age = max(2026 - int(founded), 1)
+        ipo_ts = info.get('firstTradeDateEpochUtc') or info.get('firstTradeDateMilliseconds')
+        if ipo_ts:
+            ipo_year = datetime.utcfromtimestamp(int(str(ipo_ts)[:10])).year
+        else:
+            ipo_year = info.get('ipoYear') or info.get('foundedYear') or 2000
+        company_age = max(2026 - int(ipo_year), 1)
     except Exception:
         company_age = 20
 
@@ -329,47 +333,61 @@ def _growth_stage(info, fin, bs, cf):
         6: "#00C853", 7: "#E57373", 8: "#F44336", 9: "#C62828", 10: "#FFC107"
     }
 
+    # algo_ctx는 모든 return 경로에서 공통으로 포함됩니다
+    def _mk_ctx():
+        return {
+            'revenue_scale': revenue_scale,
+            'profit_streak': profit_streak,
+            'consec_loss': consec_loss,
+            'roe': roe,
+            'margin_trend': margin_trend,
+            'growth_trend': growth_trend,
+            'rev_cagr_3y': rev_cagr_3y,
+            'rev_g': rev_g,
+        }
+
     # ══════════════════════════════════════════════
     # Phase 0: 턴어라운드 (최우선 판별)
     # ══════════════════════════════════════════════
     if rev_declining and (rev_g > 0 or margin_trend == 'up'):
-        return 10, stages[10][0], stages[10][1], colors[10]
+        return 10, stages[10][0], stages[10][1], colors[10], _mk_ctx()
 
     # ══════════════════════════════════════════════
     # Phase 1: 쇠퇴 영역 (위험 → 안전 순)
     # ══════════════════════════════════════════════
     if consec_loss >= 3 and rev_g < -0.15 and debt_ratio > 2.0:
-        return 9, stages[9][0], stages[9][1], colors[9]
+        return 9, stages[9][0], stages[9][1], colors[9], _mk_ctx()
 
     if rev_g < -0.05 and margin_trend == 'down':
-        return 8, stages[8][0], stages[8][1], colors[8]
+        return 8, stages[8][0], stages[8][1], colors[8], _mk_ctx()
 
     if -0.05 <= rev_g <= 0.03 and growth_trend == 'decel' and margin_trend in ('flat', 'down'):
-        return 7, stages[7][0], stages[7][1], colors[7]
+        return 7, stages[7][0], stages[7][1], colors[7], _mk_ctx()
 
     # ══════════════════════════════════════════════
     # Phase 2: 초기 기업
     # ══════════════════════════════════════════════
     if company_age <= 5 and revenue_scale == 'S' and (not net_profit or op_margin < 0.05):
-        return 1, stages[1][0], stages[1][1], colors[1]
+        return 1, stages[1][0], stages[1][1], colors[1], _mk_ctx()
 
     if rev_g > 0.30 and revenue_scale in ('S', 'M') and (not net_profit or profit_streak <= 1):
-        return 2, stages[2][0], stages[2][1], colors[2]
+        return 2, stages[2][0], stages[2][1], colors[2], _mk_ctx()
 
     # ══════════════════════════════════════════════
     # Phase 3: 고성장 영역
     # ══════════════════════════════════════════════
+    # 초고속 성장: accel이 아닌 경우도 감속 추세만 아니면 인정 (ex. 고성장 유지 중)
     if (rev_g > 0.50
             and revenue_scale in ('L', 'XL')
             and net_profit
             and op_margin > 0.15
-            and growth_trend == 'accel'):
-        return 4, stages[4][0], stages[4][1], colors[4]
+            and growth_trend != 'decel'):
+        return 4, stages[4][0], stages[4][1], colors[4], _mk_ctx()
 
     if (0.20 <= rev_g <= 0.50
             and net_profit
             and op_margin > 0.10):
-        return 3, stages[3][0], stages[3][1], colors[3]
+        return 3, stages[3][0], stages[3][1], colors[3], _mk_ctx()
 
     # ══════════════════════════════════════════════
     # Phase 4: 성숙 우량 영역
@@ -378,14 +396,15 @@ def _growth_stage(info, fin, bs, cf):
             and profit_streak >= 5
             and roe > 0.15
             and margin_trend in ('up', 'flat')):
-        return 5, stages[5][0], stages[5][1], colors[5]
+        return 5, stages[5][0], stages[5][1], colors[5], _mk_ctx()
 
     if (0.00 <= rev_g <= 0.10
             and profit_streak >= 10
             and fcf_yield > 0.05
             and roe > 0.12
             and (div_y > 0.01 or op_cf > rev * 0.1)):
-        return 6, stages[6][0], stages[6][1], colors[6]
+        return 6, stages[6][0], stages[6][1], colors[6], _mk_ctx()
+
 
     # ══════════════════════════════════════════════
     # Fallback: 스코어링 매트릭스 (경계 케이스 처리)
@@ -406,17 +425,26 @@ def _growth_stage(info, fin, bs, cf):
     elif total >= 25: s = 8 if rev_g < 0 else 7
     else:             s = 9 if consec_loss >= 2 else 8
 
-    return s, stages[s][0], stages[s][1], colors[s]
+    algo_ctx = {
+        'revenue_scale': revenue_scale,
+        'profit_streak': profit_streak,
+        'consec_loss': consec_loss,
+        'roe': roe,
+        'margin_trend': margin_trend,
+        'growth_trend': growth_trend,
+        'rev_cagr_3y': rev_cagr_3y,
+        'rev_g': rev_g,
+    }
+    return s, stages[s][0], stages[s][1], colors[s], algo_ctx
 
 def _stability(financials, rc):
-
     vals, _ = _annual_values(financials, rc)
     arr = np.array([v for v in vals if v is not None and not np.isnan(v)])
     if len(arr) < 2 or np.mean(arr) == 0: return "데이터 부족", "", "gray"
     cv = np.std(arr) / abs(np.mean(arr))
     if   cv < 0.10: return "매우 안정적 ✅", f"CV {cv:.3f}", "green"
     elif cv < 0.25: return "안정적 ✅",     f"CV {cv:.3f}", "green"
-    elif cv < 0.50: return "보통 ⚠️",       f"CV {cv:.3f}", "yellow"
+    elif cv < 0.50: return "보통 ⚠️",       f"CV {cv:.3f}", "orange"
     else:           return "불안정 ❌",      f"CV {cv:.3f}", "red"
 
 def _margin_trend(fin):
@@ -450,7 +478,7 @@ def _debt_trend(bs_df):
                 chg = (latest - oldest) / abs(oldest)
                 if   chg < -0.10: return f"감소 추세 ✅ ({chg * 100:.1f}%)", "green"
                 elif chg >  0.10: return f"증가 추세 ⚠️ (+{chg * 100:.1f}%)", "red"
-                else:             return f"안정 유지 [FLAT] ({chg * 100:.1f}%)", "yellow"
+                else:             return f"안정 유지 [FLAT] ({chg * 100:.1f}%)", "orange"
     return "데이터 부족", "gray"
 
 def _interest_burden(fin, info):
@@ -642,13 +670,21 @@ def render_company_details(ticker_str: str):
     # ═══════════════════════════════════════════════════
     # 01 성장 사이클
     # ═══════════════════════════════════════════════════
-    sn, sname, sdesc, scolor = _growth_stage(info, fin, bs, cf)
+    sn, sname, sdesc, scolor, algo_ctx = _growth_stage(info, fin, bs, cf)
+    revenue_scale = algo_ctx.get('revenue_scale', '')
+    profit_streak = algo_ctx.get('profit_streak', 0)
+    consec_loss   = algo_ctx.get('consec_loss', 0)
+    roe           = algo_ctx.get('roe', 0)
+    margin_trend  = algo_ctx.get('margin_trend', 'flat')
+    growth_trend  = algo_ctx.get('growth_trend', 'flat')
+    rev_cagr_3y   = algo_ctx.get('rev_cagr_3y', 0)
+    rev_g_stage   = algo_ctx.get('rev_g', 0)
     
     # UI 렌더링에 필요한 색상과 라벨 매핑 (1~10단계)
     stage_map = {1: "#FF7043", 2: "#FFA726", 3: "#FF9800", 4: "#FF6D00", 5: "#00E676", 6: "#00C853", 7: "#E57373", 8: "#F44336", 9: "#C62828", 10: "#FFC107"}
     stage_lbl = {1: "스타트업", 2: "초기성장", 3: "스케일업", 4: "초고속성장", 5: "성숙성장", 6: "캐시카우", 7: "정체기", 8: "초기쇠퇴", 9: "구조적쇠퇴", 10: "턴어라운드"}
 
-    bar_html = "".join([f'<div style="flex:1;background:{stage_map[i] if i == sn else "rgba(0,0,0,0.2)"};opacity:{"1" if i == sn else "0.4"};text-align:center;padding:14px 2px;font-size:.7rem;color:#ffffff;border:{"3px solid " + stage_map[i] if i == sn else "1px solid #444c56"};border-radius:{"10px 0 0 10px" if i == 1 else ("0 10px 10px 0" if i == 10 else "0")};font-weight:{"800" if i == sn else "600"};box-shadow:{"0 0 16px " + stage_map[i] + "88" if i == sn else "none"};transition:all .3s">{i}<br>{stage_lbl[i]}</div>' for i in range(1, 11)])
+    bar_html = "".join([f'<div style="flex:1;background:{stage_map[i] if i == sn else "rgba(0,0,0,0.2)"};opacity:{"1" if i == sn else (str(0.25 + i * 0.02))};text-align:center;padding:14px 2px;font-size:.7rem;color:#ffffff;border:{"3px solid " + stage_map[i] if i == sn else "1px solid #444c56"};border-radius:{"10px 0 0 10px" if i == 1 else ("0 10px 10px 0" if i == 10 else "0")};font-weight:{"800" if i == sn else "600"};box-shadow:{"0 0 16px " + stage_map[i] + "88" if i == sn else "none"};transition:all .3s">{i}<br>{stage_lbl[i]}</div>' for i in range(1, 11)])
     
     v1_c = "green" if sn in [5, 6] else ("orange" if sn in [1, 2, 3, 4, 10] else "red")
     v1_map = {
@@ -665,11 +701,25 @@ def render_company_details(ticker_str: str):
     }
     all_verdicts.append(("성장사이클", v1_c))
 
+    # 알고리즘 판단 근거 인포박스
+    _algo_hints = []
+    if revenue_scale: _algo_hints.append(f"규모 {revenue_scale}")
+    if profit_streak > 0: _algo_hints.append(f"연속흑자 {profit_streak}년")
+    if consec_loss > 0: _algo_hints.append(f"연속적자 {consec_loss}년")
+    if roe > 0: _algo_hints.append(f"ROE {roe*100:.1f}%")
+    if margin_trend != 'flat': _algo_hints.append(f"이익률추세 {'↑' if margin_trend == 'up' else '↓'}")
+    if growth_trend != 'flat': _algo_hints.append(f"성장추세 {'가속' if growth_trend == 'accel' else '감속'}")
+    if rev_cagr_3y and rev_cagr_3y != rev_g_stage: _algo_hints.append(f"3Y CAGR {rev_cagr_3y*100:.1f}%")
+    algo_hint_html = (f"<div style='background:rgba(255,109,0,0.06);border:1px solid rgba(255,109,0,0.2);border-radius:8px;padding:8px 14px;margin-top:12px;font-size:.8rem;color:#adbac7;font-weight:600'>" +
+                      f"<span style='color:#FF9800;font-weight:800'>⚙️ 알고리즘 판단 근거:</span> " +
+                      " · ".join(_algo_hints) + "</div>") if _algo_hints else ""
+
     with st.container(border=True):
         html_s1 = (
             f'<div class="s-title"><span class="s-num">01</span> 이 회사, 지금 어느 단계인가요?</div>'
             f'<div style="display:flex;gap:3px;margin-bottom:24px">{bar_html}</div>'
             f'<div style="text-align:center;margin:20px 0"><span style="display:inline-block;padding:12px 32px;border-radius:24px;font-weight:800;background:{scolor};color:#fff;font-size:1.2rem;box-shadow:0 6px 20px {scolor}66">{sname}</span><div style="font-size:1rem;color:#e6edf3;font-weight:700;margin-top:16px;line-height:1.7">{sdesc}</div></div>'
+            f'{algo_hint_html}'
             f'<div class="divider"></div>'
             f'<div class="two-col"><div>'
             f'{_metric_row("최근 연간 매출성장 (YoY)", _fmt_pct(ann_rev_g))}'
@@ -1230,6 +1280,7 @@ def render_company_details(ticker_str: str):
             valid_count += 1
             if   c == "green":  total_score += 100
             elif c == "blue":   total_score += 85
+            elif c == "orange": total_score += 65   # 주황 = 잠재력 있는 고성장 구간
             elif c == "yellow": total_score += 50
             elif c == "red":    total_score += 20
 
