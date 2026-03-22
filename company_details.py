@@ -229,34 +229,50 @@ def _growth_stage(info, fin, bs, cf):
             if sum(1 for i in range(len(rd) - 1) if rd.iloc[i] < rd.iloc[i + 1]) >= 2: rev_declining = True
     except Exception: pass
 
-    stages = {1: ("[STAGE 1] 스타트업 / 개발", "매출 미미·R&D 집중. 시장 검증 전, 높은 리스크·높은 잠재력."), 2: ("[STAGE 2] 초기 고성장", "매출 폭발적 증가, 아직 적자. 시장점유율 확대에 올인하는 단계."), 3: ("[STAGE 3] 고성장 흑자전환", "높은 매출 성장 + 이익 창출 시작. 성장·수익 균형점 진입."), 4: ("[STAGE 4] 성숙한 성장", "안정적 매출 성장 + 높은 수익성. 우량 성장주의 전형."), 5: ("[STAGE 5] 캐시카우", "성장 둔화, 현금 창출 극대화. 배당·자사주매입 등 주주환원 활발."), 6: ("[STAGE 6] 정체기", "매출 성장 멈춤, 이익 유지. 새 성장 동력이 필요한 시점."), 7: ("[STAGE 7] 쇠퇴기", "매출·이익 동반 하락. 구조적 변화 없이는 위험 증가."), 8: ("[STAGE 8] 구조조정 / 턴어라운드", "적극적 사업 재편·회생 시도. 과거 부진 딛고 최근 반등 또는 대규모 구조조정 단계.")}
-    colors = {1: "#9C27B0", 2: "#FF5722", 3: "#FF9800", 4: "#4CAF50", 5: "#2196F3", 6: "#607D8B", 7: "#F44336", 8: "#795548"}
+    stages = {
+        1: ("[STAGE 1] 스타트업", "매출이 1억불 미만이며 막대한 적자율로 현금을 태우는 생존 테스트 초기 단계입니다."),
+        2: ("[STAGE 2] 초기 고성장", "매출액 15% 이상 급성장 중이나 아직 뚜렷한 타격(적자율 등)을 입고 있는 시장 선점기입니다."),
+        3: ("[STAGE 3] 스케일업 & 흑자전환", "매출 15% 이상 성장하면서, 적자를 벗어나 갓 흑자(마진 0~15%)를 달성한 황금 모멘텀 단계입니다."),
+        4: ("[STAGE 4] 초고속 흑자성장", "매출 20% 이상 폭증과 이익률 15% 이상을 동시에 뽐내는 초우량 주도주입니다."),
+        5: ("[STAGE 5] 성숙 우량성장", "5~15% 수준의 안정적인 볼륨 확장과 훌륭한 두 자릿수 수익성을 지속적으로 동반하는 우량 구간입니다."),
+        6: ("[STAGE 6] 초우량 캐시카우", "매출 성장은 멈췄으나 이익률과 현금흐름이 폭발적이어서 배당과 자사주 소각에 거침이 없는 단계입니다."),
+        7: ("[STAGE 7] 애매한 정체기", "성장은 멈춰있고(0~5%), 이익도 나긴 하지만 수익성이 캐시카우급은 아닌 평범한 수익 방어 구간입니다."),
+        8: ("[STAGE 8] 초기 쇠퇴", "역성장(-성장)이 시작되었지만 그동안 벌어둔 구력으로 꾸역꾸역 흑자는 방어하며 버티고 있는 단계입니다."),
+        9: ("[STAGE 9] 구조적 쇠퇴", "완전히 트렌드를 잃고 역성장과 무서운 적자의 늪에 빠져버린 고위험군입니다."),
+        10: ("[STAGE 10] 극적 턴어라운드", "오랜 부진을 겪었으나 최근 성장을 반전 성공(성장률 > 0)하거나 강력한 대규모 구조조정에 돌입한 회생 단계입니다.")
+    }
+    
+    colors = {
+        1: "#E91E63", 2: "#FF5722", 3: "#FF9800", 4: "#00E676", 5: "#4CAF50", 
+        6: "#2196F3", 7: "#9C27B0", 8: "#607D8B", 9: "#F44336", 10: "#795548"
+    }
 
-    # --- 개선된 기업 성장 단계 분류 로직 ---
-    # 1. 턴어라운드 시그널 (과거 하락세였으나 최근 매출 성장이 양수로 돌아선 경우)
-    if rev_declining and rev_g > 0: s = 8
-    # 2. 스타트업 (매출 1억불 미만 & 극심한 적자)
-    elif rev < 1e8 and margin < -0.20: s = 1
-    # 3. 구조조정/대규모 적자 (규모가 큰데도 -15% 이상의 큰 적자 발생)
-    elif margin < -0.15 and rev >= 1e8: s = 8
-    # 4. 쇠퇴기 (역성장 지속 & 적자 상태)
-    elif rev_g < 0 and margin <= 0: s = 7
-    # 5. 초기 고성장 (매출성장 15% 이상, 아직 적자)
-    elif rev_g >= 0.15 and margin <= 0: s = 2
-    # 6. 고성장 폭발 (매출성장 15% 이상, 흑자 진입)
-    elif rev_g >= 0.15 and margin > 0: s = 3
-    # 7. 성숙한 성장 (5% ~ 15% 성장 & 흑자)
-    elif 0.05 <= rev_g < 0.15 and margin > 0: s = 4
-    # 8. 역성장 & 흑자 (성장은 마이너스지만 돈은 벌고 있는 방어적 상태)
-    elif rev_g < 0 and margin > 0: s = 6
-    # 9. 캐시카우 (0~5% 저성장 + 마진 10% 이상 + 높은 배당 혹은 막강한 잉여현금흐름)
-    elif 0 <= rev_g < 0.05 and margin > 0.10 and (div_y > 0.01 or op_cf > rev * 0.1): s = 5
-    # 10. 정체기 (저성장 0~5%, 흑자지만 캐시카우급은 아님)
-    elif 0 <= rev_g < 0.05 and margin > 0: s = 6
-    # 11. 예외 (위의 모든 로직을 벗어난 경우 기본값 방어망)
-    elif margin > 0: s = 6
-    elif margin <= 0: s = 7
-    else: s = 6
+    # 1. 극적 턴어라운드 (과거 연속 하락이었으나 최근 매출성장률 > 0으로 반전 성공)
+    if rev_declining and rev_g > 0: s = 10
+    # 2. 극적 턴어라운드 / 대규모 구조조정 방어 (매출 규모 1억+인데 적자율 극심)
+    elif rev >= 1e8 and margin < -0.20: s = 10
+    # 3. 구조적 쇠퇴 (매출 역성장 + 완전 적자)
+    elif rev_g < 0 and margin <= 0: s = 9
+    # 4. 초기 쇠퇴 (매출 역성장 + 스리슬쩍 흑자로 버티는 중)
+    elif rev_g < 0 and margin > 0: s = 8
+    # 5. 초고속 자생성장 (초우량주: 매출 20% 이상 & 마진 15% 이상)
+    elif rev_g >= 0.20 and margin >= 0.15: s = 4
+    # 6. 스케일업/흑자 (매출 15% 이상이면서 마진 0~15%, NVDA급은 아니지만 흑자전환 성공)
+    elif rev_g >= 0.15 and margin >= 0: s = 3
+    # 7. 스타트업 (매출 기준치 미달 & 적자)
+    elif rev < 1e8 and margin < -0.10: s = 1
+    # 8. 초기 고성장 (매출 15% 이상인데 여전히 적자)
+    elif rev_g >= 0.15 and margin < 0: s = 2
+    # 9. 초우량 캐시카우 (저성장 0~5%, 마진 10% 이상 & 좋은 배당/현금흐름)
+    elif 0 <= rev_g < 0.05 and margin >= 0.10 and (div_y > 0.01 or op_cf > rev * 0.1): s = 6
+    # 10. 성숙 우량성장 (5~15% 성장 & 흑자)
+    elif 0.05 <= rev_g < 0.15 and margin > 0: s = 5
+    # 11. 애매한 정체기 (저성장 0~5%, 흑자는 남기지만 캐시카우급은 아님)
+    elif 0 <= rev_g < 0.05 and margin > 0: s = 7
+    # 12. 기타 예외 처리 (폴백)
+    elif margin > 0: s = 7
+    elif margin <= 0: s = 9
+    else: s = 7
     
     return s, stages[s][0], stages[s][1], colors[s]
 
@@ -494,12 +510,26 @@ def render_company_details(ticker_str: str):
     # 01 성장 사이클
     # ═══════════════════════════════════════════════════
     sn, sname, sdesc, scolor = _growth_stage(info, fin, bs, cf)
-    stage_map = {1: "#9C27B0", 2: "#FF5722", 3: "#FF9800", 4: "#4CAF50", 5: "#2196F3", 6: "#607D8B", 7: "#F44336", 8: "#795548"}
-    stage_lbl = {1: "스타트업", 2: "초기성장", 3: "고성장", 4: "성숙성장", 5: "캐시카우", 6: "정체", 7: "쇠퇴", 8: "턴어라운드"}
+    
+    # UI 렌더링에 필요한 색상과 라벨 매핑 (1~10단계)
+    stage_map = {1: "#E91E63", 2: "#FF5722", 3: "#FF9800", 4: "#00E676", 5: "#4CAF50", 6: "#2196F3", 7: "#9C27B0", 8: "#607D8B", 9: "#F44336", 10: "#795548"}
+    stage_lbl = {1: "스타트업", 2: "초기성장", 3: "스케일업", 4: "초고속성장", 5: "성숙성장", 6: "캐시카우", 7: "정체기", 8: "초기쇠퇴", 9: "구조적쇠퇴", 10: "턴어라운드"}
 
-    bar_html = "".join([f'<div style="flex:1;background:{stage_map[i] if i == sn else "rgba(0,0,0,0.2)"};opacity:{"1" if i == sn else "0.4"};text-align:center;padding:14px 2px;font-size:.7rem;color:#ffffff;border:{"3px solid " + stage_map[i] if i == sn else "1px solid #444c56"};border-radius:{"10px 0 0 10px" if i == 1 else ("0 10px 10px 0" if i == 8 else "0")};font-weight:{"800" if i == sn else "600"};box-shadow:{"0 0 16px " + stage_map[i] + "88" if i == sn else "none"};transition:all .3s">{i}<br>{stage_lbl[i]}</div>' for i in range(1, 9)])
-    v1_c = "green" if sn in [3, 4] else ("blue" if sn == 5 else ("yellow" if sn in [1, 2, 6] else "red"))
-    v1_map = {1: "초기 — 높은 리스크·높은 잠재력", 2: "폭풍 성장 중 — 적자이지만 매출 급증", 3: "성장+이익 = 최적 타이밍 가능", 4: "안정 성장 우량주 — 핵심 보유 후보", 5: "현금 창출 극대화 — 배당·안정성", 6: "새 성장 동력 필요", 7: "위험 — 구조적 하락 주의", 8: "턴어라운드 성공 여부가 핵심"}
+    bar_html = "".join([f'<div style="flex:1;background:{stage_map[i] if i == sn else "rgba(0,0,0,0.2)"};opacity:{"1" if i == sn else "0.4"};text-align:center;padding:14px 2px;font-size:.7rem;color:#ffffff;border:{"3px solid " + stage_map[i] if i == sn else "1px solid #444c56"};border-radius:{"10px 0 0 10px" if i == 1 else ("0 10px 10px 0" if i == 10 else "0")};font-weight:{"800" if i == sn else "600"};box-shadow:{"0 0 16px " + stage_map[i] + "88" if i == sn else "none"};transition:all .3s">{i}<br>{stage_lbl[i]}</div>' for i in range(1, 11)])
+    
+    v1_c = "green" if sn in [4, 5] else ("blue" if sn == 6 else ("yellow" if sn in [2, 3, 7, 10] else "red"))
+    v1_map = {
+        1: "초기 — 높은 위험·생존 테스트 중", 
+        2: "점유율 확대 — 적자이나 최고 속도 팽창", 
+        3: "흑자 모멘텀 — 스케일업 파워 폭발", 
+        4: "주도권 획득 — 무결점의 초우량 흑자성장", 
+        5: "안정적 우량주 — 성장/수익 증명", 
+        6: "현금 창출 극대화 — 자사주 매입/안정성", 
+        7: "수익 방어 — 정체된 매출, 새 대안 필요", 
+        8: "위험 — 역성장이나 흑자로 겨우 버티기", 
+        9: "심각 — 구조적 하락장과 심대한 타격", 
+        10: "역발상 기회 — 턴어라운드(V자반등) 돌입"
+    }
     all_verdicts.append(("성장사이클", v1_c))
 
     with st.container(border=True):
