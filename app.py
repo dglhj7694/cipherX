@@ -124,8 +124,13 @@ if current_mode=='스캐너':
                 if st.button(f"{sn}\n({len(SECTOR_GROUPS[sn])})",key=f"sec_{rs+i}",use_container_width=True,type="primary" if selected_sector==sn else "secondary"):st.session_state['selected_sector']=sn;st.session_state['scan_tickers_override']=SECTOR_GROUPS[sn];st.rerun()
     if st.button(f"🌐 전체종목\n({len(all_universe)})",key="sec_all",use_container_width=True,type="primary" if selected_sector=='🌐 전체' else "secondary"):st.session_state['selected_sector']='🌐 전체';st.session_state['scan_tickers_override']=all_universe;st.rerun()
     if selected_sector:
-        sel_cnt=len(st.session_state.get('scan_tickers_override',[])) if selected_sector=='🌐 전체' else len(SECTOR_GROUPS.get(selected_sector,[]))
+        sel_list=st.session_state.get('scan_tickers_override',[]) if selected_sector=='🌐 전체' else SECTOR_GROUPS.get(selected_sector,[])
+        sel_list=list(dict.fromkeys([str(t).strip().upper() for t in sel_list if str(t).strip()]))
+        sel_cnt=len(sel_list)
         st.markdown(f"<div style='background:rgba(99,102,241,.08);border:1px solid #6366F133;border-radius:10px;padding:10px 14px;margin:8px 0'><span style='color:#A5B4FC;font-weight:700'>{selected_sector}</span><span style='color:#64748B;margin-left:8px'>{sel_cnt}종목</span><span style='color:#64748B;margin-left:8px'>· 점수 높은 순 정렬</span></div>",unsafe_allow_html=True)
+        if sel_list:
+            chips="".join([f"<span style='display:inline-block;margin:3px 4px 0 0;padding:3px 8px;border-radius:999px;background:rgba(30,41,59,.8);border:1px solid #334155;color:#CBD5E1;font-size:.76rem;font-weight:600'>{t}</span>" for t in sel_list])
+            st.markdown(f"<div style='background:rgba(15,23,42,.55);border:1px solid #1E293B;border-radius:10px;padding:10px 12px;margin:6px 0 10px'><p style='margin:0 0 6px;color:#94A3B8;font-size:.74rem;font-weight:700'>선택 종목 목록</p><div style='max-height:110px;overflow:auto'>{chips}</div></div>",unsafe_allow_html=True)
     st.markdown("#### ✏️ 직접 입력");ci=st.text_input("티커",placeholder="NVDA,TSLA...",key="scan_in")
     if ci and ci.strip():tickers=[t.strip().upper() for t in ci.split(',') if t.strip()];scan_source="직접"
     elif st.session_state.get('scan_tickers_override'):tickers=st.session_state['scan_tickers_override'];scan_source=selected_sector or "섹터"
