@@ -43,6 +43,31 @@ div.stButton>button[kind="secondary"]{background-color:#12161F!important;color:#
 .score-card-buy{background:linear-gradient(160deg,#052E16,#0D1B2A);border:1px solid rgba(16,185,129,.25)}
 .score-card-sell{background:linear-gradient(160deg,#2A0E0E,#1B0D1B);border:1px solid rgba(239,68,68,.25)}
 .score-card-neutral{background:linear-gradient(160deg,#1A1608,#1B1A0D);border:1px solid rgba(245,158,11,.2)}
+.fade-up{animation:fadeUp .35s ease both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.conf-ring{position:relative;width:80px;height:80px;display:inline-block}
+.conf-ring svg{width:80px;height:80px;transform:rotate(-90deg)}
+.ring-bg{fill:none;stroke:rgba(148,163,184,.2);stroke-width:8}
+.ring-fg{fill:none;stroke-width:8;stroke-linecap:round}
+.ring-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:.92rem;font-weight:800}
+.vote-dot{width:8px;height:8px;border-radius:999px;display:inline-block}
+.vote-dot.buy{background:#34D399;box-shadow:0 0 7px rgba(52,211,153,.65)}
+.vote-dot.sell{background:#F87171;box-shadow:0 0 7px rgba(248,113,113,.65)}
+.vote-dot.neutral{background:#FF9800;box-shadow:0 0 7px rgba(255,152,0,.55)}
+.vote-dot.abstain{background:#64748B}
+.cm-card{background:rgba(255,255,255,.03);border:1px solid rgba(148,163,184,.12);border-radius:10px;padding:10px}
+.cm-name{color:#94A3B8;font-size:.7rem;font-weight:700;margin:0 0 4px}
+.cm-score{font-size:1.15rem;font-weight:800;margin:0 0 6px}
+.cm-vote{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.65rem;font-weight:700}
+.cm-mini-bar{height:4px;background:rgba(148,163,184,.18);border-radius:999px;overflow:hidden;margin-top:6px}
+.cm-mini-fill{height:100%;border-radius:999px}
+.tow-bar{position:relative;height:14px;border-radius:999px;background:rgba(148,163,184,.15);overflow:hidden}
+.tow-buy{position:absolute;right:50%;top:0;bottom:0;background:linear-gradient(90deg,#065F46,#34D399)}
+.tow-sell{position:absolute;left:50%;top:0;bottom:0;background:linear-gradient(90deg,#F87171,#7F1D1D)}
+.tow-center{position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(226,232,240,.55)}
+.stat-mini{background:rgba(255,255,255,.03);border:1px solid #1E293B;border-radius:10px;padding:10px 8px;text-align:center}
+.sm-label{color:#64748B;font-size:.66rem;font-weight:700;margin:0 0 4px}
+.sm-value{color:#E2E8F0;font-size:1rem;font-weight:800;margin:0}
 .cs-card{border-radius:10px;padding:10px 14px;margin:5px 0;border-left:4px solid}
 .reason-card{background:rgba(255,255,255,.04);border-radius:10px;padding:12px 16px;margin-top:12px;text-align:left}
 div[data-baseweb="select"]>div{background-color:#12161F!important;border-color:#2A3040!important;color:#E8ECF1!important}

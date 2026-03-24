@@ -56,33 +56,101 @@ def _render_ensemble_gauge(es):
     st.plotly_chart(gauge,use_container_width=True,theme=None,config={'displayModeBar':False})
 
 def render_price_header(m):
-    chg=m['price_change'];cp=m['price_change_pct'];cc='price-change-up' if chg>=0 else 'price-change-down';ci='▲' if chg>=0 else '▼'
-    vr_=m['volume']/max(m['avg_volume'],1);jg=m['judgment'];cf=m['confidence'];es=m.get('ensemble_score',0)
-    jc='#34D399' if 'BUY' in jg else('#F87171' if 'SELL' in jg else '#FF9800')
-    act=m.get('action_label','');rsn=m.get('judgment_reason','')
-    specs=[(jc,f"[{act}] {cf:.0f}%","최종 액션과 신뢰도"),('ind-b' if m['wt1']<-20 else('ind-s' if m['wt1']>20 else 'ind-n'),f"WT{m['wt1']:.0f}","WaveTrend: 과매수/과매도 압력"),('ind-b' if m['rsi']<40 else('ind-s' if m['rsi']>60 else 'ind-n'),f"RSI{m['rsi']:.0f}","RSI: 추세 과열도"),('ind-b' if vr_>1.5 else 'ind-n',f"Vol{vr_:.1f}x","평균 대비 거래량 배수"),('ind-b' if m['adx']>25 else 'ind-n',f"ADX{m['adx']:.0f}","추세 강도"),('ind-b' if m.get('utbot_dir',0)==1 else('ind-s' if m.get('utbot_dir',0)==-1 else 'ind-n'),'[UT] B' if m.get('utbot_dir',0)==1 else('[UT] S' if m.get('utbot_dir',0)==-1 else '[UT] -'),"UTBot 방향"),('ind-b' if m.get('hma_rising') else 'ind-s','[HMA] UP' if m.get('hma_rising') else '[HMA] DN',"Hull MA 방향")]
-    ih="".join([f"<span class='ind-mini {c}' title='{tip}'>{l}</span>" for c,l,tip in specs])
-    rsn_html=f"<p style='color:#94A3B8;font-size:.82rem;margin:6px 0 0'>{rsn}</p>" if rsn else ""
-    st.markdown(f"<div style='background:rgba(99,102,241,.10);border:1px solid rgba(99,102,241,.32);border-radius:12px;padding:12px 14px;margin-bottom:10px;color:#E2E8F0;font-weight:700'>{_bottom_line_text(m)}</div>",unsafe_allow_html=True)
-    st.markdown(f"<div style='background:rgba(15,23,42,.55);border:1px solid rgba(148,163,184,.18);border-radius:12px;padding:10px 12px;margin-bottom:12px;color:#CBD5E1;font-size:.86rem'>{_narrative_text(m)}</div>",unsafe_allow_html=True)
-    st.markdown(f"""<div class="price-header fade-up"><p style="color:#64748B;font-size:.8rem;margin:0">■ {m['ticker']} · {m['last_date']} · <b style="color:#A5B4FC">{m['regime_label']}</b> · <span style='color:#A5B4FC'>[CTX] {m.get('context_label','기본')}</span></p>
-        <p class="price-big" style="color:#F8FAFC">${m['price']:.2f}<span class="{cc}" style="font-size:1.1rem;margin-left:10px;font-weight:700">{ci}{abs(chg):.2f}({abs(cp):.2f}%)</span></p>{rsn_html}
-        <div style="margin-top:10px;display:flex;gap:4px;flex-wrap:wrap">{ih}</div></div>""",unsafe_allow_html=True)
-    # Glass metric cards
-    esc='#34D399' if es>0 else('#F87171' if es<0 else '#FF9800')
-    es_pct=min(abs(es)/80*100,100)
-    bt_=m['buy_total'];st_=m['sell_total'];ba_=m['buy_active'];sa_=m['sell_active']
-    bt_pct=min(bt_/40*100,100);st_pct=min(st_/40*100,100)
-    # 52w position bar
-    h52=m.get('high_52w',m['price']);l52=m.get('low_52w',m['price']);rng=max(h52-l52,0.01);pos52=min(max((m['price']-l52)/rng*100,0),100)
-    st.markdown(f"""<div style='display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px'>
-        <div class='glass-metric'><p class='gm-label'>Ensemble Score</p><p class='gm-value' style='color:{esc}'>{es:+.1f}</p><p class='gm-sub'>B{m.get('buy_agree',0)} : S{m.get('sell_agree',0)}</p><div class='gm-bar'><div class='gm-bar-fill' style='width:{es_pct}%;background:{esc}'></div></div></div>
-        <div class='glass-metric'><p class='gm-label'>BUY Score (10L)</p><p class='gm-value' style='color:#34D399'>{bt_:.1f}</p><p class='gm-sub'>{ba_}/10 레이어 활성</p><div class='gm-bar'><div class='gm-bar-fill' style='width:{bt_pct}%;background:#34D399'></div></div></div>
-        <div class='glass-metric'><p class='gm-label'>SELL Score (10L)</p><p class='gm-value' style='color:#F87171'>{st_:.1f}</p><p class='gm-sub'>{sa_}/10 레이어 활성</p><div class='gm-bar'><div class='gm-bar-fill' style='width:{st_pct}%;background:#F87171'></div></div></div>
-        <div class='glass-metric'><p class='gm-label'>52주 가격 위치</p><p class='gm-value' style='color:#A5B4FC'>{pos52:.0f}%</p><p class='gm-sub'>${l52:.1f} — ${h52:.1f}</p><div class='gm-bar'><div class='gm-bar-fill' style='width:{pos52}%;background:linear-gradient(90deg,#F87171,#FF9800,#34D399)'></div></div></div>
-    </div>""",unsafe_allow_html=True)
-    _render_ensemble_gauge(es)
+    chg = m['price_change']
+    cp = m['price_change_pct']
+    cc = 'price-change-up' if chg >= 0 else 'price-change-down'
+    ci = '+' if chg >= 0 else '-'
 
+    vr_ = m['volume'] / max(m['avg_volume'], 1)
+    jg = m['judgment']
+    cf = m['confidence']
+    es = float(m.get('ensemble_score', 0))
+    jc = '#34D399' if 'BUY' in jg else ('#F87171' if 'SELL' in jg else '#FF9800')
+
+    act = m.get('action_label', '')
+    rsn = m.get('judgment_reason', '')
+    specs = [
+        (jc, f"[{act}] {cf:.0f}%", "Final action and confidence"),
+        ('ind-b' if m['wt1'] < -20 else ('ind-s' if m['wt1'] > 20 else 'ind-n'), f"WT{m['wt1']:.0f}", "WaveTrend pressure"),
+        ('ind-b' if m['rsi'] < 40 else ('ind-s' if m['rsi'] > 60 else 'ind-n'), f"RSI{m['rsi']:.0f}", "RSI momentum"),
+        ('ind-b' if vr_ > 1.5 else 'ind-n', f"Vol{vr_:.1f}x", "Volume vs average"),
+        ('ind-b' if m['adx'] > 25 else 'ind-n', f"ADX{m['adx']:.0f}", "Trend strength"),
+        ('ind-b' if m.get('utbot_dir', 0) == 1 else ('ind-s' if m.get('utbot_dir', 0) == -1 else 'ind-n'), '[UT] B' if m.get('utbot_dir', 0) == 1 else ('[UT] S' if m.get('utbot_dir', 0) == -1 else '[UT] -'), "UT direction"),
+        ('ind-b' if m.get('hma_rising') else 'ind-s', '[HMA] UP' if m.get('hma_rising') else '[HMA] DN', "Hull direction"),
+    ]
+    ih = "".join([f"<span class='ind-mini {c}' title='{tip}'>{l}</span>" for c, l, tip in specs])
+    rsn_html = f"<p style='color:#94A3B8;font-size:.82rem;margin:6px 0 0'>{rsn}</p>" if rsn else ""
+
+    bottom = _bottom_line_text(m).strip()
+    narrative = _narrative_text(m).strip()
+    insight_body = f"<p style='margin:0;color:#F8FAFC;font-weight:700'>{bottom}</p>"
+    if narrative and narrative not in bottom:
+        insight_body += f"<p style='margin:6px 0 0;color:#CBD5E1;font-size:.86rem;font-weight:500'>{narrative}</p>"
+
+    st.markdown(
+        f"""
+        <div style='background:linear-gradient(140deg,rgba(99,102,241,.15),rgba(15,23,42,.75));border:1px solid rgba(99,102,241,.35);border-radius:12px;padding:12px 14px;margin-bottom:12px'>
+            {insight_body}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        f"""
+        <div class="price-header fade-up">
+            <p style="color:#64748B;font-size:.8rem;margin:0">{m['ticker']} - {m['last_date']} - <b style="color:#A5B4FC">{m['regime_label']}</b> - <span style='color:#A5B4FC'>[CTX] {m.get('context_label', 'default')}</span></p>
+            <p class="price-big" style="color:#F8FAFC">${m['price']:.2f}<span class="{cc}" style="font-size:1.1rem;margin-left:10px;font-weight:700">{ci}{abs(chg):.2f}({abs(cp):.2f}%)</span></p>
+            {rsn_html}
+            <div style="margin-top:10px;display:flex;gap:4px;flex-wrap:wrap">{ih}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    esc = '#34D399' if es > 0 else ('#F87171' if es < 0 else '#FF9800')
+    es_pct = min(abs(es) / 80 * 100, 100)
+    bt_ = float(m.get('buy_total', 0))
+    st_ = float(m.get('sell_total', 0))
+    ba_ = int(m.get('buy_active', 0))
+    sa_ = int(m.get('sell_active', 0))
+    bt_pct = min(bt_ / 40 * 100, 100)
+    st_pct = min(st_ / 40 * 100, 100)
+
+    h52 = float(m.get('high_52w', m['price']))
+    l52 = float(m.get('low_52w', m['price']))
+    rng = max(h52 - l52, 0.01)
+    pos52 = min(max((m['price'] - l52) / rng * 100, 0), 100)
+
+    def metric_card(title, value, sub, color, fill, bar_color):
+        return f"""
+        <div style='background:linear-gradient(165deg,rgba(15,23,42,.92),rgba(2,6,23,.86));border:1px solid rgba(148,163,184,.18);border-left:3px solid {color};border-radius:12px;padding:12px 14px;min-height:108px'>
+            <p style='margin:0 0 6px;color:#94A3B8;font-size:.74rem;font-weight:700;letter-spacing:.2px'>{title}</p>
+            <p style='margin:0;color:{color};font-size:1.55rem;font-weight:800;line-height:1.1'>{value}</p>
+            <p style='margin:4px 0 8px;color:#CBD5E1;font-size:.78rem'>{sub}</p>
+            <div style='height:7px;background:rgba(148,163,184,.15);border-radius:999px;overflow:hidden'>
+                <div style='height:100%;width:{fill:.1f}%;background:{bar_color};border-radius:999px;box-shadow:0 0 10px rgba(148,163,184,.25)'></div>
+            </div>
+        </div>
+        """
+
+    metric_html = "".join([
+        metric_card('Ensemble Score', f"{es:+.1f}", f"B{m.get('buy_agree', 0)} : S{m.get('sell_agree', 0)}", esc, es_pct, esc),
+        metric_card('BUY Score (10L)', f"{bt_:.1f}", f"{ba_}/10 layers active", '#34D399', bt_pct, 'linear-gradient(90deg,#065F46,#34D399)'),
+        metric_card('SELL Score (10L)', f"{st_:.1f}", f"{sa_}/10 layers active", '#F87171', st_pct, 'linear-gradient(90deg,#F87171,#7F1D1D)'),
+        metric_card('52W Price Position', f"{pos52:.0f}%", f"${l52:.1f} - ${h52:.1f}", '#A5B4FC', pos52, 'linear-gradient(90deg,#F87171,#FF9800,#34D399)'),
+    ])
+
+    st.markdown(
+        f"""
+        <div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px'>
+            {metric_html}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    _render_ensemble_gauge(es)
 def render_judgment_card(m):
     jg=m['judgment'];es=m.get('ensemble_score',0);cf=m['confidence']
     cc='score-card-buy' if 'BUY' in jg else('score-card-sell' if 'SELL' in jg else 'score-card-neutral')
@@ -168,34 +236,56 @@ def render_committee_panel(m):
     if abs(syn)>5:st.info(f"**[SYNERGY]** {syn:+.1f}")
 
 def render_10layer_bars(m):
-    LN=['Trend','Momentum','Candle','BB','Volume','MF','Pattern','Combined','Leading','Lagging']
-    bd=m['buy_layers'];sd=m['sell_layers']
-    max_val=12
-    rows_html=""
-    for n in LN:
-        bv=max(bd.get(n,0),0);sv=max(sd.get(n,0),0)
-        bpct=min(bv/max_val*50,50);spct=min(sv/max_val*50,50)
-        bop='1' if bv>0 else '.35';sop='1' if sv>0 else '.35'
-        glow=''
-        if abs(bv-sv)>4:glow='box-shadow:0 0 8px rgba(99,102,241,.2);'
-        rows_html+=f"""<div class='dual-layer' style='{glow}'>
-            <span class='dl-val' style='color:#34D399;opacity:{bop}'>{bv:.1f}</span>
-            <div class='dl-bar-wrap'>
-                <div class='dl-fill-b' style='width:{bpct}%;opacity:{bop}'></div>
-                <div class='dl-fill-s' style='width:{spct}%;opacity:{sop}'></div>
-                <div class='dl-center'></div>
-            </div>
-            <span class='dl-name'>{n}</span>
-            <span class='dl-val' style='color:#F87171;opacity:{sop}'>{sv:.1f}</span>
-        </div>"""
-    ba_=m['buy_active'];sa_=m['sell_active']
-    st.markdown(f"""<div style='background:rgba(15,19,32,.5);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.05);border-radius:14px;padding:18px;margin-bottom:12px'>
-        <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:14px'>
-            <span style='color:#34D399;font-weight:700;font-size:.85rem'>▲ BUY ({ba_}/10)</span>
-            <span style='color:#94A3B8;font-size:.75rem;font-weight:600'>10-Layer 매수/매도 비교</span>
-            <span style='color:#F87171;font-weight:700;font-size:.85rem'>▼ SELL ({sa_}/10)</span>
-        </div>{rows_html}</div>""",unsafe_allow_html=True)
+    layer_names = ['Trend', 'Momentum', 'Candle', 'BB', 'Volume', 'MF', 'Pattern', 'Combined', 'Leading', 'Lagging']
+    buy_layers = m.get('buy_layers', {})
+    sell_layers = m.get('sell_layers', {})
+    max_val = 12.0
 
+    rows = []
+    for name in layer_names:
+        bv = max(float(buy_layers.get(name, 0)), 0.0)
+        sv = max(float(sell_layers.get(name, 0)), 0.0)
+        bpct = min((bv / max_val) * 50.0, 50.0)
+        spct = min((sv / max_val) * 50.0, 50.0)
+        bop = 1.0 if bv > 0 else 0.35
+        sop = 1.0 if sv > 0 else 0.35
+        row_glow = "box-shadow:0 0 10px rgba(99,102,241,.18);" if abs(bv - sv) >= 4 else ""
+
+        rows.append(
+            f"""
+            <div style='display:grid;grid-template-columns:58px 1fr 58px;gap:10px;align-items:center;margin-bottom:8px;padding:2px;border-radius:10px;{row_glow}'>
+                <div style='text-align:right;color:#34D399;font-size:.88rem;font-weight:700;opacity:{bop:.2f}'>{bv:.1f}</div>
+                <div style='position:relative;height:30px;border-radius:10px;border:1px solid rgba(148,163,184,.2);background:linear-gradient(90deg,rgba(16,185,129,.08),rgba(148,163,184,.04),rgba(239,68,68,.08));overflow:hidden'>
+                    <div style='position:absolute;left:{50.0 - bpct:.2f}%;top:4px;bottom:4px;width:{bpct:.2f}%;background:linear-gradient(90deg,#065F46,#34D399);border-radius:6px 0 0 6px;opacity:{bop:.2f}'></div>
+                    <div style='position:absolute;left:50%;top:4px;bottom:4px;width:{spct:.2f}%;background:linear-gradient(90deg,#F87171,#7F1D1D);border-radius:0 6px 6px 0;opacity:{sop:.2f}'></div>
+                    <div style='position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(226,232,240,.55)'></div>
+                    <div style='position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:.72rem;color:#CBD5E1;font-weight:700;background:rgba(2,6,23,.78);padding:2px 8px;border-radius:999px;border:1px solid rgba(148,163,184,.25)'>{name}</div>
+                </div>
+                <div style='text-align:left;color:#F87171;font-size:.88rem;font-weight:700;opacity:{sop:.2f}'>{sv:.1f}</div>
+            </div>
+            """
+        )
+
+    buy_active = int(m.get('buy_active', 0))
+    sell_active = int(m.get('sell_active', 0))
+
+    st.markdown(
+        f"""
+        <div style='background:rgba(15,19,32,.55);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px 14px;margin-bottom:12px'>
+            <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px'>
+                <span style='color:#34D399;font-weight:800;font-size:.86rem'>BUY ({buy_active}/10)</span>
+                <span style='color:#94A3B8;font-size:.76rem;font-weight:700'>10-Layer Buy/Sell comparison</span>
+                <span style='color:#F87171;font-weight:800;font-size:.86rem'>SELL ({sell_active}/10)</span>
+            </div>
+            <div style='display:flex;justify-content:center;gap:10px;margin:0 0 10px'>
+                <span style='color:#34D399;font-size:.7rem'>left = buy pressure</span>
+                <span style='color:#F87171;font-size:.7rem'>right = sell pressure</span>
+            </div>
+            {''.join(rows)}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 def render_leading_lagging(m):
     lv=m['leading_verdict'];lgv=m['lagging_verdict'];ac=m['composite_accel']
     lc='#34D399' if '상승' in lv else('#F87171' if '하락' in lv else '#FF9800')
