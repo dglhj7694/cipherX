@@ -9,7 +9,7 @@ from datetime import datetime
 from st_copy_to_clipboard import st_copy_to_clipboard
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from sectors import SECTOR_GROUPS
-from config import GEMINI_API_KEY, COMBINED_SCAN_REGISTRY, CTX_KOR
+from config import GEMINI_API_KEY, COMBINED_SCAN_REGISTRY, CTX_KOR, SIGNAL_REGISTRY
 from utils import _valid_fmt, _sf, fetch_fundamentals, validate_ticker, compute_and_cache, _compute_cached
 from chart import build_chart, build_metadata
 from ui import render_analysis
@@ -153,16 +153,32 @@ if current_mode=='스캐너':
             'Hull_Turn_Bull':{'label':'HULL 전환▲','icon':'🟢','dir':'buy'},
             'Hull_Turn_Bear':{'label':'HULL 전환▼','icon':'🔴','dir':'sell'},
         }
-        multi_cols=['UTBot_Buy','UTBot_Sell','Hull_Turn_Bull','Hull_Turn_Bear','MACD_Cross_Buy','MACD_Cross_Sell','StochRSI_Cross_Buy','StochRSI_Cross_Sell','Squeeze_Mom_Cross_Up','Squeeze_Mom_Cross_Down']
+        multi_cfg={
+            'UTBot_Buy':{'label':'UTBot 전환▲','icon':'🤖','dir':'buy'},
+            'UTBot_Sell':{'label':'UTBot 전환▼','icon':'🤖','dir':'sell'},
+            'Hull_Turn_Bull':{'label':'HULL 전환▲','icon':'🟢','dir':'buy'},
+            'Hull_Turn_Bear':{'label':'HULL 전환▼','icon':'🔴','dir':'sell'},
+            'MACD_Cross_Buy':{'label':'MACD 골든','icon':'📈','dir':'buy'},
+            'MACD_Cross_Sell':{'label':'MACD 데드','icon':'📉','dir':'sell'},
+            'StochRSI_Cross_Buy':{'label':'StochRSI 매수','icon':'🔄','dir':'buy'},
+            'StochRSI_Cross_Sell':{'label':'StochRSI 매도','icon':'🔄','dir':'sell'},
+            'Squeeze_Mom_Cross_Up':{'label':'SqMom 상향','icon':'💥','dir':'buy'},
+            'Squeeze_Mom_Cross_Down':{'label':'SqMom 하향','icon':'💥','dir':'sell'},
+        }
         def _so(t):
             try:
                 df_=_compute_cached(t,f"{t}_{sts}")
                 if df_ is None or len(df_)<50:return None
-                dc_=df_.tail(63);acs=[];lsd=None;trs=[]
+                dc_=df_.tail(63);acs=[];lsd=None;trs=[];mhits=[]
                 for cn,ccfg in COMBINED_SCAN_REGISTRY.items():
                     if cn in dc_.columns and dc_[cn].tail(5).any():ld=dc_[cn].tail(5)[dc_[cn].tail(5)].index[-1];acs.append({'icon':ccfg['icon'],'kor':ccfg['kor'],'dir':ccfg['dir'],'tier':ccfg['tier'],'date':ld.strftime('%m/%d')});lsd=ld if lsd is None or ld>lsd else lsd
                 for sn,cfg in trans_cfg.items():
                     if sn in dc_.columns and dc_[sn].tail(5).any():td=dc_[sn].tail(5)[dc_[sn].tail(5)].index[-1];trs.append({'icon':cfg['icon'],'label':cfg['label'],'dir':cfg['dir'],'date':td.strftime('%m/%d')})
+                for sn,cfg in multi_cfg.items():
+                    if sn in dc_.columns and dc_[sn].tail(3).any():
+                        md=dc_[sn].tail(3)[dc_[sn].tail(3)].index[-1]
+                        lb=cfg.get('label') or SIGNAL_REGISTRY.get(sn,{}).get('kor',sn)
+                        mhits.append({'icon':cfg.get('icon','●'),'label':lb,'dir':cfg.get('dir','neutral'),'date':md.strftime('%m/%d')})
                 lt=dc_.iloc[-1];ch=_sf((lt['Close']-dc_.iloc[-2]['Close'])/dc_.iloc[-2]['Close']*100) if len(dc_)>=2 else 0
                 bt=_sf(lt.get('Buy_Total',0));stt=_sf(lt.get('Sell_Total',0));ba=int(_sf(lt.get('Buy_Agree',0)));sa=int(_sf(lt.get('Sell_Agree',0)))
                 t1b=sum(1 for s in acs if s['tier']==1 and s['dir']=='buy');t1s=sum(1 for s in acs if s['tier']==1 and s['dir']=='sell')
@@ -170,8 +186,8 @@ if current_mode=='스캐너':
                 es=_sf(lt.get('Ensemble_Score',0));cf=_sf(lt.get('Judgment_Confidence',0))
                 scan_score=es+((bt-stt)*0.55)+((ba-sa)*2.5)+(t1b*4.0)-(t1s*4.0)+(t2b*1.6)-(t2s*1.6)+(cf*0.04)
                 strength=abs(es)+((bt+stt)*0.35)+(abs(ba-sa)*1.8)+((t1b+t1s)*3.0)+(cf*0.02)
-                mcnt=sum(1 for c in multi_cols if c in dc_.columns and dc_[c].tail(3).any());mflag=(mcnt>=3) or ((t1b+t1s)>=1 and mcnt>=2)
-                return {'ticker':t,'price':_sf(lt['Close']),'chg':ch,'scans':sorted(acs,key=lambda x:x['tier']),'transitions':trs,'multi_sig':bool(mflag),'multi_cnt':int(mcnt),'jg':str(lt.get('Trade_Judgment','N/A')),'cf':cf,'es':es,'ctx':CTX_KOR.get(int(_sf(lt.get('Market_Context',0))),'기본'),'ba':ba,'sa':sa,'buy_total':bt,'sell_total':stt,'scan_score':_sf(scan_score),'strength':_sf(strength),'latest_sig':lsd.strftime('%Y-%m-%d') if lsd else '9999-99-99','latest_sig_ts':lsd.timestamp() if lsd else 0.0,'reason':str(lt.get('Judgment_Reason','')),'action':str(lt.get('Action_Label',''))}
+                mcnt=len(mhits);mflag=(mcnt>=3) or ((t1b+t1s)>=1 and mcnt>=2)
+                return {'ticker':t,'price':_sf(lt['Close']),'chg':ch,'scans':sorted(acs,key=lambda x:x['tier']),'transitions':trs,'multi_sig':bool(mflag),'multi_cnt':int(mcnt),'multi_hits':mhits,'jg':str(lt.get('Trade_Judgment','N/A')),'cf':cf,'es':es,'ctx':CTX_KOR.get(int(_sf(lt.get('Market_Context',0))),'기본'),'ba':ba,'sa':sa,'buy_total':bt,'sell_total':stt,'scan_score':_sf(scan_score),'strength':_sf(strength),'latest_sig':lsd.strftime('%Y-%m-%d') if lsd else '9999-99-99','latest_sig_ts':lsd.timestamp() if lsd else 0.0,'reason':str(lt.get('Judgment_Reason','')),'action':str(lt.get('Action_Label',''))}
             except:return None
         with ThreadPoolExecutor(max_workers=min(16,max(4,len(tickers)//8),len(tickers))) as ex:
             futs={ex.submit(_so,t):t for t in tickers}
@@ -191,11 +207,12 @@ if current_mode=='스캐너':
             chc='#34D399' if r['chg']>=0 else '#F87171';chi='▲' if r['chg']>=0 else '▼';jc='#34D399' if 'BUY' in r['jg'] else('#F87171' if 'SELL' in r['jg'] else '#FCD34D')
             sh="".join([f"<div style='display:flex;gap:6px;padding:2px 0'><span style='color:{'#34D399' if s['dir']=='buy' else '#F87171' if s['dir']=='sell' else '#FFC107'}'>●</span><span style='color:#E8ECF1;font-size:.82rem'>{s['icon']}{s['kor']}</span><span style='color:#64748B;font-size:.7rem'>{s['date']}</span></div>" for s in r['scans']]) if r['scans'] else "<span style='color:#475569;font-size:.8rem'>—</span>"
             th="".join([f"<span style='display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;background:rgba({ '52,211,153' if t['dir']=='buy' else '248,113,113' },.12);color:{'#34D399' if t['dir']=='buy' else '#F87171'};font-size:.72rem;font-weight:700;margin-right:6px'>{t['icon']} {t['label']} {t['date']}</span>" for t in r.get('transitions',[])]) if r.get('transitions') else "<span style='color:#475569;font-size:.78rem'>UT/HULL 전환 없음</span>"
-            mh=f"<div style='margin:6px 0 2px'><span style='display:inline-block;padding:2px 8px;border-radius:999px;background:rgba({ '52,211,153' if r.get('multi_sig') else '148,163,184' },.16);color:{'#34D399' if r.get('multi_sig') else '#94A3B8'};font-size:.72rem;font-weight:700'>MULTI-SIGNAL {'ON' if r.get('multi_sig') else 'OFF'} ({r.get('multi_cnt',0)})</span></div>"
+            mh=f"<div style='margin:6px 0 2px'><span style='display:inline-block;padding:2px 8px;border-radius:999px;background:rgba({ '52,211,153' if r.get('multi_sig') else '148,163,184' },.16);color:{'#34D399' if r.get('multi_sig') else '#94A3B8'};font-size:.72rem;font-weight:700'>MULTI-SIGNAL {'ON' if r.get('multi_sig') else 'OFF'} ({r.get('multi_cnt',0)})</span><span style='color:#64748B;font-size:.7rem;margin-left:6px'>기준: 3개 이상 또는 T1+2개</span></div>"
+            mx="".join([f"<span style='display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:999px;background:rgba({ '52,211,153' if m['dir']=='buy' else '248,113,113' if m['dir']=='sell' else '148,163,184' },.10);border:1px solid rgba(148,163,184,.25);color:{'#86EFAC' if m['dir']=='buy' else '#FCA5A5' if m['dir']=='sell' else '#CBD5E1'};font-size:.7rem;font-weight:600;margin:2px 4px 2px 0'>{m['icon']} {m['label']} {m['date']}</span>" for m in r.get('multi_hits',[])]) if r.get('multi_hits') else "<span style='color:#475569;font-size:.74rem'>최근 3일 다중시그널 후보 없음</span>"
             esc='#34D399' if r['es']>10 else('#F87171' if r['es']<-10 else '#FCD34D');bd='#1E293B' if r['scans'] else '#0F172A';op='1' if r['scans'] else '.6';sc='#34D399' if r['scan_score']>0 else('#F87171' if r['scan_score']<0 else '#FCD34D')
             rh=""
             if r.get('reason'):rc='#6EE7B7' if 'BUY' in r['jg'] else('#FCA5A5' if 'SELL' in r['jg'] else '#FCD34D');rh=f"<div style='padding:4px 0;border-top:1px solid rgba(255,255,255,.04);margin-top:4px'><span style='color:{rc};font-size:.78rem'>💬 {r['reason'][:80]}</span></div>"
-            st.markdown(f"<div style='background:linear-gradient(160deg,#0F1320,#141926);border:1px solid {bd};border-radius:14px;padding:14px 18px;margin:6px 0;opacity:{op}'><div style='display:flex;justify-content:space-between;margin-bottom:8px'><span style='color:#A5B4FC;font-weight:800;font-size:1.15rem'>#{rk} {r['ticker']}</span><div style='display:flex;align-items:center;gap:8px'><span style='color:{sc};font-size:.75rem;font-weight:700'>SCAN:{r['scan_score']:+.1f}</span><span style='color:{esc};font-size:.75rem;font-weight:700'>ES:{r['es']:+.0f}</span><span style='color:{jc};font-size:.8rem;font-weight:600'>{r['jg']}({r['cf']:.0f}%)</span><span style='color:{chc};font-size:.8rem'>{chi}{abs(r['chg']):.1f}%</span></div></div><div style='margin:4px 0 8px'>{th}</div>{mh}{sh}{rh}</div>",unsafe_allow_html=True)
+            st.markdown(f"<div style='background:linear-gradient(160deg,#0F1320,#141926);border:1px solid {bd};border-radius:14px;padding:14px 18px;margin:6px 0;opacity:{op}'><div style='display:flex;justify-content:space-between;margin-bottom:8px'><span style='color:#A5B4FC;font-weight:800;font-size:1.15rem'>#{rk} {r['ticker']}</span><div style='display:flex;align-items:center;gap:8px'><span style='color:{sc};font-size:.75rem;font-weight:700'>SCAN:{r['scan_score']:+.1f}</span><span style='color:{esc};font-size:.75rem;font-weight:700'>ES:{r['es']:+.0f}</span><span style='color:{jc};font-size:.8rem;font-weight:600'>{r['jg']}({r['cf']:.0f}%)</span><span style='color:{chc};font-size:.8rem'>{chi}{abs(r['chg']):.1f}%</span></div></div><div style='margin:4px 0 8px'>{th}</div>{mh}<div style='margin:2px 0 7px'>{mx}</div>{sh}{rh}</div>",unsafe_allow_html=True)
             if st.button(f"{r['ticker']} 분석",key=f"sc_{r['ticker']}",use_container_width=True):st.session_state['_mode']='분석';st.session_state['_auto']=r['ticker'];st.rerun()
 else:
     st.markdown("<h2 style='text-align:center;color:#fff;margin-bottom:4px'>🚦 CipherX V14.2</h2>",unsafe_allow_html=True)
