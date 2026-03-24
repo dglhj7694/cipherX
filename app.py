@@ -1,6 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
-import time, json, re, math
+import time, json, re, math, os
 from datetime import datetime
 from st_copy_to_clipboard import st_copy_to_clipboard
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -212,7 +212,7 @@ if current_mode=='스캐너':
     
     all_tickers = []
     for v in SECTOR_GROUPS.values(): all_tickers.extend(v)
-    all_tickers = list(set(all_tickers))
+    all_tickers = sorted(set(all_tickers))
     if st.button(f"🌐 전체 종목 ALL\n({len(all_tickers)})", use_container_width=True, type="primary" if selected_sector=="ALL" else "secondary"):
         st.session_state['selected_sector']="ALL"
         st.session_state['scan_tickers_override']=all_tickers
@@ -222,7 +222,7 @@ if current_mode=='스캐너':
         ri=sector_names[rs:rs+3];cols=st.columns(3)
         for i,sn in enumerate(ri):
             with cols[i]:
-                if st.button(f"{sn}\n({len(SECTOR_GROUPS[sn])})",key=f"sec_{rs+i}",use_container_width=True,type="primary" if selected_sector==sn else "secondary"):st.session_state['selected_sector']=sn;st.session_state['scan_tickers_override']=SECTOR_GROUPS[sn];st.rerun()
+                if st.button(f"{sn}\n({len(SECTOR_GROUPS[sn])})",key=f"sec_{rs+i}",use_container_width=True,type="primary" if selected_sector==sn else "secondary"):st.session_state['selected_sector']=sn;st.session_state['scan_tickers_override']=sorted(set(SECTOR_GROUPS[sn]));st.rerun()
 
     if selected_sector:
         tkrs = st.session_state.get('scan_tickers_override', [])
@@ -245,6 +245,8 @@ if current_mode=='스캐너':
             # yfinance는 리스트 형식을 지원하고, 내부적으로 multithreading을 돌립니다.
             bulk_data = yf.download(tickers, period="2y", group_by='ticker', threads=True, progress=False)
             
+        from engine import detect_all_signals
+        from indicators import compute_indicators
         def _so_bulk(t):
             try:
                 # 2. Extract specific ticker data from bulk
@@ -258,8 +260,6 @@ if current_mode=='스캐너':
                 if df.empty or len(df) < 50: return None
                 
                 # 3. 계산 (네트워크 통신 없이 순수 CPU 연산만)
-                from engine import detect_all_signals
-                from indicators import compute_indicators
                 df_ = detect_all_signals(compute_indicators(df))
                 if df_ is None or df_.empty: return None
                 
@@ -278,12 +278,13 @@ if current_mode=='스캐너':
                 lt=dc_.iloc[-1];ch=_sf((lt['Close']-dc_.iloc[-2]['Close'])/dc_.iloc[-2]['Close']*100) if len(dc_)>=2 else 0
                 return {'ticker':t,'price':_sf(lt['Close']),'chg':ch,'scans':sorted(acs,key=lambda x:x['tier']),'jg':str(lt.get('Trade_Judgment','N/A')),'cf':_sf(lt.get('Judgment_Confidence',0)),'es':_sf(lt.get('Ensemble_Score',0)),'ctx':CTX_KOR.get(int(_sf(lt.get('Market_Context',0))),'기본'),'ba':int(_sf(lt.get('Buy_Agree',0))),'sa':int(_sf(lt.get('Sell_Agree',0))),'latest_sig':lsd.strftime('%Y-%m-%d') if lsd else '9999-99-99','reason':str(lt.get('Judgment_Reason','')),'action':str(lt.get('Action_Label',''))}
             except Exception as e:
-                # print(f"Bulk Err {t}: {e}")
+                print(f"[SCAN_ERR] {t}: {e}")
                 return None
                 
         # 4. CPU 연산 분산 처리
         st_info = st.empty()
-        with ThreadPoolExecutor(max_workers=min(32,len(tickers))) as ex:
+        max_workers = min(len(tickers), max(4, (os.cpu_count() or 8)))
+        with ThreadPoolExecutor(max_workers=max_workers) as ex:
             futs={ex.submit(_so_bulk,t):t for t in tickers}
             for idx_f,f in enumerate(as_completed(futs)):
                 pb.progress((idx_f+1)/len(tickers))
@@ -300,7 +301,7 @@ if current_mode=='스캐너':
             jg_score = {'STRONG BUY':7, 'BUY':6, 'WATCH BUY':5, 'NEUTRAL':4, 'MIXED':3, 'WATCH SELL':2, 'SELL':1, 'STRONG SELL':0}.get(str(x.get('jg')).replace('_', ' ').upper(), -1)
             has_scans = 0 if x.get('scans') else 1
             latest_ts = -dt_.strptime(x['latest_sig'],'%Y-%m-%d').timestamp() if x.get('latest_sig')!='9999-99-99' else 0
-            return (0 if has_macro_buy else 1, -buy_count, -jg_score, has_scans, latest_ts)
+            return (-_sf(x.get('es', 0)), 0 if has_macro_buy else 1, -buy_count, -jg_score, has_scans, latest_ts)
         results.sort(key=_sk)
         st.session_state['scan_results']=results;st.session_state['scan_source']=scan_source;st.session_state['scan_total']=len(tickers)
     results=st.session_state.get('scan_results',[])

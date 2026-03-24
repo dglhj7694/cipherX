@@ -262,6 +262,8 @@ COMBINED_SCAN_REGISTRY={
     'CS_MA_Breakdown_Sell':{'name':'📉 MABreak','kor':'MA붕괴','dir':'sell','tier':2,'icon':'','color':'#FF5252','desc':'데스+역배열','win':'60-70%'},
     'CS_Cooper_Setup_Sell':{'name':'🃏 CooperSell','kor':'쿠퍼매도','dir':'sell','tier':2,'icon':'','color':'#FF3D00','desc':'ADX+쿠퍼매도','win':'60-70%'},
     'CS_Gap_Failure_Sell':{'name':'⏬ GapFail','kor':'갭실패','dir':'sell','tier':2,'icon':'','color':'#FF1744','desc':'갭업후약세반전','win':'60-70%'},
+    'CS_Bottom_Fishing_Buy':{'name':'🪝 BottomFish','kor':'바닥낚시반전','dir':'buy','tier':2,'icon':'','color':'#00E676','desc':'심과매도+반전확인','win':'62-74%'},
+    'CS_Top_Fishing_Sell':{'name':'🎣 TopFish','kor':'천장낚시반전','dir':'sell','tier':2,'icon':'','color':'#FF5252','desc':'심과매수+반전확인','win':'62-74%'},
     'CS_Oversold_Bounce_Buy':{'name':'🏓 OSBounce','kor':'과매도반등','dir':'buy','tier':3,'icon':'','color':'#69F0AE','desc':'Stoch과매도+캔들','win':'55-65%'},
     'CS_Momentum_Accel_Buy':{'name':'⚡ MomAcc','kor':'모멘텀가속','dir':'buy','tier':3,'icon':'','color':'#76FF03','desc':'RSI+WT+MACD가속','win':'55-65%'},
     'CS_Structure_Support_Buy':{'name':'🏗️ Support','kor':'구조적지지','dir':'buy','tier':3,'icon':'','color':'#4FC3F7','desc':'VP+BB지지','win':'55-65%'},

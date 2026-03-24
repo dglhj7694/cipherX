@@ -168,6 +168,14 @@ def detect_combined_scans(df,vol_ratio,hma_rising):
     dsc_=F('Bear_Divergence').astype(int)+F('RSI_Bear_Divergence').astype(int)+F('MF_Bear_Div').astype(int)+F('OBV_Div_Sell').astype(int)
     mr_=N('MACD_Hist')>N('MACD_Hist').shift(1);mf_=N('MACD_Hist')<N('MACD_Hist').shift(1);wr_=N('WT1')>N('WT1').shift(1);wf_=N('WT1')<N('WT1').shift(1)
     llw_=(pd.concat([C,O],axis=1).min(axis=1)-L)>(H-L)*.6;luw_=(H-pd.concat([C,O],axis=1).max(axis=1))>(H-L)*.6
+    ma20=N('MA20');ma50=N('MA50')
+    d20=(C-ma20)/(ma20+1e-10);d50=(C-ma50)/(ma50+1e-10)
+    deep_os=(N('WT1')<-65)|(N('RSI')<30)|(N('StochK')<15)
+    deep_ob=(N('WT1')>65)|(N('RSI')>70)|(N('StochK')>85)
+    down_stretch=(d20<-0.06)|(d50<-0.1)|(C<=N('BB_Low')*0.985)
+    up_stretch=(d20>0.06)|(d50>0.1)|(C>=N('BB_Up')*1.015)
+    bull_turn=(C>O)&(C>C.shift(1))&(F('WT_Up')|F('MACD_Cross_Buy')|F('StochRSI_Cross_Buy')|F('UTBot_Buy')|F('Hull_Turn_Bull'))
+    bear_turn=(C<O)&(C<C.shift(1))&(F('WT_Down')|F('MACD_Cross_Sell')|F('StochRSI_Cross_Sell')|F('UTBot_Sell')|F('Hull_Turn_Bear'))
     ub_=(up_|(C>N('MA50'))).astype(int)+((wr_|F('WT_Up'))&(mr_|(N('MACD_Hist')>0))).astype(int)+(bc_|cb_).astype(int)+vok_.astype(int)+mfb_.astype(int)+(n50|F('BB_Squeeze_End_Bull')|n_vp).astype(int);df['CS_Ultimate_Buy']=ub_>=6
     tos_=(wos_|(N('WT1')<-60))&((N('RSI')<30)|(N('RSI')<35))&sos_;df['CS_Triple_Oversold_Reversal']=tos_&(F('WT_Up')|wr_|bc_|llw_|F('Gold_Dot')|F('Green_Dot_T1'))&vok_
     df['CS_Breakout_Momentum_Buy']=(F('New_52W_High')|F('Expansion_BO')|(C>N('BB_Up')))&adx_ok&(N('Plus_DI')>N('Minus_DI'))&vs_&mr_
@@ -190,16 +198,17 @@ def detect_combined_scans(df,vol_ratio,hma_rising):
     df['CS_Gap_Failure_Sell']=(F('Gap_Up').shift(1).fillna(False)&sc__&vok_&wf_)|(F('Gap_Up')&(C<O)&vok_)
     df['CS_Oversold_Bounce_Buy']=sos_&bc_&(n50|n_bl);df['CS_Momentum_Accel_Buy']=(N('Composite_Accel',0)>1.5)&vok_&(C>N('MA50'));df['CS_Structure_Support_Buy']=n_vp&n_bl&(C>O)
     df['CS_Overbought_Fade_Sell']=sob_&sc__&(n50|n_bu);df['CS_Volatility_Explosion']=(F('NR7_2').astype(int)+F('BB_Squeeze').astype(int)+(vr<.5).astype(int)+F('Inside_Day').astype(int))>=3
+    df['CS_Bottom_Fishing_Buy']=deep_os&down_stretch&bull_turn&(dbc_>=1)&(llw_|bc_|cb_)&vok_
+    df['CS_Top_Fishing_Sell']=deep_ob&up_stretch&bear_turn&(dsc_>=1)&(luw_|sc__|cs___)&vok_
     for sn,cfg in COMBINED_SCAN_REGISTRY.items():
         if sn in df.columns:df[sn]=_cooldown(df[sn],bars={1:5,2:7,3:10}.get(cfg.get('tier',2),7))
     return df
 
-# ━━━ 10-Layer Scores (시각화용, 코드 생략 — V14.1과 100% 동일) ━━━
-# compute_10layer_scores 는 V14.1 Part 2/4와 완전히 동일하므로 그대로 사용
-# 여기서는 지면 절약을 위해 함수 시그니처만 표시
+# ━━━ 10-Layer Scores (시각화용) ━━━
+# 추세 추종 + 바닥/천장 반전 포착을 함께 반영하도록 가중치 보강
 
 def compute_10layer_scores(df, vol_ratio, hma_r_v):
-    """10-Layer — V14.1과 동일 (시각화 참고용)"""
+    """10-Layer 점수 계산 (추세 + 반전 하이브리드)"""
     C,O,H,L=df['Close'],df['Open'],df['High'],df['Low'];idx=df.index
     N=lambda c,d=0:df.get(c,pd.Series(d,index=idx)).fillna(d);vr=vol_ratio
     a200=C>N('MA200');a50=C>N('MA50');a20=C>N('MA20');b200=C<N('MA200');b50=C<N('MA50');b20=C<N('MA20')
@@ -207,14 +216,22 @@ def compute_10layer_scores(df, vol_ratio, hma_r_v):
     rr_=N('RSI')>N('RSI').shift(1);rf_=N('RSI')<N('RSI').shift(1);wr_=N('WT1')>N('WT1').shift(1);wf_=N('WT1')<N('WT1').shift(1)
     obv=N('OBV');obvm=obv.rolling(20,min_periods=10).mean();regime=N('Regime');ca=N('Composite_Accel');pb=N('Percent_B');rmfi=N('RSI_MFI');cmf=N('CMF')
     kumo_top=pd.concat([N('Ichimoku_SenkouA'),N('Ichimoku_SenkouB')],axis=1).max(axis=1);kumo_bot=pd.concat([N('Ichimoku_SenkouA'),N('Ichimoku_SenkouB')],axis=1).min(axis=1);utbot_dir=N('UTBot_Dir')
+    wt1=N('WT1');rsi=N('RSI');stochk=N('StochK');mfi=N('MFI')
+    F=lambda c:df.get(c,pd.Series(False,index=idx)).fillna(False)
+    os_base=((wt1<-60)|(rsi<32)|(stochk<20))&(wr_|(wt1>wt1.shift(1)))
+    ob_base=((wt1>60)|(rsi>68)|(stochk>80))&(wf_|(wt1<wt1.shift(1)))
+    os_turn=F('UTBot_Buy').rolling(3,min_periods=1).max().astype(bool)|F('MACD_Cross_Buy')|F('StochRSI_Cross_Buy')|F('WT_Up')
+    ob_turn=F('UTBot_Sell').rolling(3,min_periods=1).max().astype(bool)|F('MACD_Cross_Sell')|F('StochRSI_Cross_Sell')|F('WT_Down')
+    os_rev=os_base&(os_turn|F('Bull_Divergence')|F('RSI_Bull_Divergence')|F('CS_Bottom_Fishing_Buy'))
+    ob_rev=ob_base&(ob_turn|F('Bear_Divergence')|F('RSI_Bear_Divergence')|F('CS_Top_Fishing_Sell'))
     # BUY
     # BUY
-    bt=pd.Series(0.,index=idx);bt+=a200.astype(float)*2.5+a50.astype(float)*1.5+a20.astype(float)*1;bt+=np.where(N('MA50')>N('MA200'),1.5,0)+np.where(N('Plus_DI')>N('Minus_DI'),1,0)+np.where(N('ST_Direction')==1,1,0);bt+=_sp(df,'Cross_Above_50MA',1)+_sp(df,'Golden_Cross',1.5)+np.where(b200&b50,-2.,0);df['BL_Trend']=bt.clip(-2,JT.TREND_CAP)
+    bt=pd.Series(0.,index=idx);bt+=a200.astype(float)*2.5+a50.astype(float)*1.5+a20.astype(float)*1;bt+=np.where(N('MA50')>N('MA200'),1.5,0)+np.where(N('Plus_DI')>N('Minus_DI'),1,0)+np.where(N('ST_Direction')==1,1,0);bt+=_sp(df,'Cross_Above_50MA',1)+_sp(df,'Golden_Cross',1.5)+np.where(b200&b50,-2.,0);bt+=np.where((b50|b200)&os_rev,1.8,0)-np.where((a50|a200)&ob_rev,1.2,0);df['BL_Trend']=bt.clip(-2,JT.TREND_CAP)
     bm=pd.Series(0.,index=idx)
     for s,p in [('MACD_Cross_Buy',2.5),('MACD_Zero_Cross_Buy',2),('StochRSI_Cross_Buy',2),('ADX_Momentum_Buy',2),('VWAP_Bounce_Buy',1.5)]:bm+=_sp(df,s,p)
     bm=bm.clip(upper=6);bm+=np.select([(N('MACD_Hist')>0)&mhr,(N('MACD_Hist')>0)&mhf,(N('MACD_Hist')<0)&mhr],[2,.5,1.5],default=0.);
     bm+=np.clip((40-N('RSI'))*0.15,0,3)+rr_.astype(float)+np.clip((25-N('StochK'))*0.15,0,2.5)+np.clip((-10-N('WT1'))*0.05,0,3)+wr_.astype(float)
-    bm+=_sp(df,'UTBot_Buy',2.5)+_sp(df,'StochSlow_Cross_Buy',1.5)+_sp(df,'Squeeze_Mom_Cross_Up',1.5)+np.where(hma_r_v&wr_.values,1,0);df['BL_Momentum']=bm.clip(-2,JT.MOMENTUM_CAP)
+    bm+=_sp(df,'UTBot_Buy',2.5)+_sp(df,'StochSlow_Cross_Buy',1.5)+_sp(df,'Squeeze_Mom_Cross_Up',1.5)+np.where(hma_r_v&wr_.values,1,0);bm+=np.where(os_rev,1.5,0)-np.where(ob_rev,1.0,0);df['BL_Momentum']=bm.clip(-2,JT.MOMENTUM_CAP)
     bcc=pd.Series(0.,index=idx)
     for s,p in [('Morning_Star',3.5),('Bullish_Engulfing',3),('Hammer',2.5),('Outside_Bullish',2.5),('Doji_Bullish',1),('Three_Bar_Reversal_Buy',2.5)]:bcc=np.maximum(bcc,_sp(df,s,p))
     df['BL_Candle']=pd.Series(bcc,index=idx).clip(upper=JT.CANDLE_CAP)
@@ -225,27 +242,27 @@ def compute_10layer_scores(df, vol_ratio, hma_r_v):
     bmf=pd.Series(0.,index=idx);bmf+=np.clip(-rmfi*0.2,-0.5,2)+_sp(df,'MF_Cross_Bull',2)+_sp(df,'MF_Bull_Div',2)+_sp(df,'MF_Accel_Up',1)+_sp(df,'CMF_Bull',1.5);
     bmf+=np.clip(cmf*8,-1,2);df['BL_MF']=bmf.clip(-1,JT.MF_CAP)
     bp=pd.Series(0.,index=idx);bp+=_spd(df,'Gold_Dot',4);bp+=np.where(bp==0,_spd(df,'Green_Dot_T1',2.5),0)
-    for s,p in [('Bull_Divergence',2),('Pullback_123_Bull',2.5),('Setup_180_Bull',2),('Boomer_Buy',2),('Expansion_BO',3),('Gilligans_Buy',2.5),('Lizard_Bull',2),('NonADX_123_Bull',1.5),('EMA_Pullback_Buy',2),('Momentum_Ignition_Buy',3),('SuperTrend_Buy',2),('Parabolic_Bottom_Buy',3),('Kumo_Breakout_Bull',2.5),('Reversal_New_Highs',2.5),('Slingshot_Bull',2),('Jack_In_Box_Bull',2),('Relative_Strength_Buy',2.5),('VP_VAL_Support',1.5),('VuManChu_Bull',3),('Hull_Turn_Bull',2),('Doji_Breakout_Buy',1.5),('Three_Bar_Reversal_Buy',2)]:bp+=_sp(df,s,p)
+    for s,p in [('Bull_Divergence',2),('Pullback_123_Bull',2.5),('Setup_180_Bull',2),('Boomer_Buy',2),('Expansion_BO',3),('Gilligans_Buy',2.5),('Lizard_Bull',2),('NonADX_123_Bull',1.5),('EMA_Pullback_Buy',2),('Momentum_Ignition_Buy',3),('SuperTrend_Buy',2),('Parabolic_Bottom_Buy',3),('Kumo_Breakout_Bull',2.5),('Reversal_New_Highs',2.5),('Slingshot_Bull',2),('Jack_In_Box_Bull',2),('Relative_Strength_Buy',2.5),('VP_VAL_Support',1.5),('VuManChu_Bull',3),('Hull_Turn_Bull',2),('Doji_Breakout_Buy',1.5),('Three_Bar_Reversal_Buy',2),('CS_Bottom_Fishing_Buy',3),('CS_Oversold_Bounce_Buy',1.5)]:bp+=_sp(df,s,p)
     df['BL_Pattern']=bp.clip(upper=JT.PATTERN_CAP)
     bcs=pd.Series(0.,index=idx)
     for cn,cfg in COMBINED_SCAN_REGISTRY.items():
         if cfg['dir']!='buy' or cn not in df.columns:continue
         bcs+=np.where(df[cn].fillna(False),{1:JT.COMBO_T1,2:JT.COMBO_T2,3:JT.COMBO_T3}.get(cfg['tier'],1),0.)
     df['BL_Combined']=bcs.clip(upper=JT.COMBINED_CAP)
-    bl_=pd.Series(0.,index=idx);bl_+=np.clip(ca*2.5,-1,3.5)+_sp(df,'Setup_Squeeze_Bull',1.5)+_sp(df,'Momentum_Accel_Buy',2)+_sp(df,'WT_Convergence_Bull',1.5)+_sp(df,'Volume_Dry_Up',.5)
+    bl_=pd.Series(0.,index=idx);bl_+=np.clip(ca*2.5,-1,3.5)+_sp(df,'Setup_Squeeze_Bull',1.5)+_sp(df,'Momentum_Accel_Buy',2)+_sp(df,'WT_Convergence_Bull',1.5)+_sp(df,'Volume_Dry_Up',.5)+np.where(os_rev,1.2,0)+_sp(df,'CS_Bottom_Fishing_Buy',2)
     bl_+=np.where(utbot_dir==1,1,np.where(utbot_dir==-1,-.5,0))+np.where(hma_r_v,.5,-.5)
-    sp_buy=pd.Series(0.,index=idx);sp_buy+=np.clip((10-N('WT1'))*0.05,0,2)+np.clip((45-N('RSI'))*0.1,0,2)+np.clip((35-N('StochK'))*0.1,0,1)+np.clip(ca*1.5,0,2)
+    sp_buy=pd.Series(0.,index=idx);sp_buy+=np.clip((10-N('WT1'))*0.05,0,2)+np.clip((45-N('RSI'))*0.1,0,2)+np.clip((35-N('StochK'))*0.1,0,1)+np.clip((35-mfi)*0.08,0,1.5)+np.clip(ca*1.5,0,2);sp_buy+=np.where(os_rev,1.0,0)
     df['Setup_Pressure_Buy']=sp_buy;bl_+=np.clip(sp_buy*0.4,0,3);df['BL_Leading']=bl_.clip(-1,JT.LEADING_CAP)
     blag=pd.Series(0.,index=idx);blag+=a200.astype(float)*1.0+a50.astype(float)*1.0+(N('MA50')>N('MA200')).astype(float)*1.0;
     blag+=np.clip(regime.values*1.0,-1.5,3)+np.where(C>kumo_top,1.5,np.where(C<kumo_top,-1,0))+np.clip((N('RS_Ratio',1)-1.0)*30,-1.5,2);df['BL_Lagging']=blag.clip(-2,JT.LAGGING_CAP)
     
     # SELL
-    st_=pd.Series(0.,index=idx);st_+=b200.astype(float)*2.5+b50.astype(float)*1.5+b20.astype(float)*1;st_+=np.where(N('MA50')<N('MA200'),1.5,0)+np.where(N('Minus_DI')>N('Plus_DI'),1,0)+np.where(N('ST_Direction')==-1,1,0);st_+=_sp(df,'Fell_Below_50MA',1)+_sp(df,'Death_Cross',1.5)+np.where(a200&a50,-2.,0);df['SL_Trend']=st_.clip(-2,JT.TREND_CAP)
+    st_=pd.Series(0.,index=idx);st_+=b200.astype(float)*2.5+b50.astype(float)*1.5+b20.astype(float)*1;st_+=np.where(N('MA50')<N('MA200'),1.5,0)+np.where(N('Minus_DI')>N('Plus_DI'),1,0)+np.where(N('ST_Direction')==-1,1,0);st_+=_sp(df,'Fell_Below_50MA',1)+_sp(df,'Death_Cross',1.5)+np.where(a200&a50,-2.,0);st_+=np.where((a50|a200)&ob_rev,1.8,0)-np.where((b50|b200)&os_rev,1.2,0);df['SL_Trend']=st_.clip(-2,JT.TREND_CAP)
     sm_=pd.Series(0.,index=idx)
     for s,p in [('MACD_Cross_Sell',2.5),('MACD_Zero_Cross_Sell',2),('StochRSI_Cross_Sell',2),('ADX_Momentum_Sell',2),('VWAP_Reject_Sell',1.5)]:sm_+=_sp(df,s,p)
     sm_=sm_.clip(upper=6);sm_+=np.select([(N('MACD_Hist')<0)&mhf,(N('MACD_Hist')<0)&mhr,(N('MACD_Hist')>0)&mhf],[2,.5,1.5],default=0.);
     sm_+=np.clip((N('RSI')-60)*0.15,0,3)+rf_.astype(float)+np.clip((N('StochK')-75)*0.15,0,2.5)+np.clip((N('WT1')-10)*0.05,0,3)+wf_.astype(float)
-    sm_+=_sp(df,'UTBot_Sell',2.5)+_sp(df,'StochSlow_Cross_Sell',1.5)+_sp(df,'Squeeze_Mom_Cross_Down',1.5)+np.where(~hma_r_v&wf_.values,1,0);df['SL_Momentum']=sm_.clip(-2,JT.MOMENTUM_CAP)
+    sm_+=_sp(df,'UTBot_Sell',2.5)+_sp(df,'StochSlow_Cross_Sell',1.5)+_sp(df,'Squeeze_Mom_Cross_Down',1.5)+np.where(~hma_r_v&wf_.values,1,0);sm_+=np.where(ob_rev,1.5,0)-np.where(os_rev,1.0,0);df['SL_Momentum']=sm_.clip(-2,JT.MOMENTUM_CAP)
     scc_=pd.Series(0.,index=idx)
     for s,p in [('Evening_Star',3.5),('Bearish_Engulfing',3),('Shooting_Star',2.5),('Outside_Bearish',2.5),('Doji_Bearish',1),('Three_Bar_Reversal_Sell',2.5)]:scc_=np.maximum(scc_,_sp(df,s,p))
     df['SL_Candle']=pd.Series(scc_,index=idx).clip(upper=JT.CANDLE_CAP)
@@ -256,16 +273,16 @@ def compute_10layer_scores(df, vol_ratio, hma_r_v):
     smf_=pd.Series(0.,index=idx);smf_+=np.clip(rmfi*0.2,-0.5,2)+_sp(df,'MF_Cross_Bear',2)+_sp(df,'MF_Bear_Div',2)+_sp(df,'MF_Accel_Dn',1)+_sp(df,'CMF_Bear',1.5);
     smf_+=np.clip(-cmf*8,-1,2);df['SL_MF']=smf_.clip(-1,JT.MF_CAP)
     spp_=pd.Series(0.,index=idx);spp_+=_spd(df,'Blood_Diamond',4);spp_+=np.where(spp_==0,_spd(df,'Red_Dot_T1',2.5),0)
-    for s,p in [('Bear_Divergence',2),('Pullback_123_Bear',2.5),('Setup_180_Bear',2),('Boomer_Sell',2),('Expansion_BD',3),('Gilligans_Sell',2.5),('Lizard_Bear',2),('NonADX_123_Bear',1.5),('EMA_Pullback_Sell',2),('Momentum_Ignition_Sell',3),('SuperTrend_Sell',2),('Parabolic_Top_Sell',3),('Kumo_Breakout_Bear',2.5),('Reversal_New_Lows',2.5),('Slingshot_Bear',2),('Jack_In_Box_Bear',2),('Relative_Strength_Sell',2),('VP_VAH_Resistance',1.5),('VuManChu_Bear',3),('Hull_Turn_Bear',2),('Doji_Breakout_Sell',1.5),('Three_Bar_Reversal_Sell',2)]:spp_+=_sp(df,s,p)
+    for s,p in [('Bear_Divergence',2),('Pullback_123_Bear',2.5),('Setup_180_Bear',2),('Boomer_Sell',2),('Expansion_BD',3),('Gilligans_Sell',2.5),('Lizard_Bear',2),('NonADX_123_Bear',1.5),('EMA_Pullback_Sell',2),('Momentum_Ignition_Sell',3),('SuperTrend_Sell',2),('Parabolic_Top_Sell',3),('Kumo_Breakout_Bear',2.5),('Reversal_New_Lows',2.5),('Slingshot_Bear',2),('Jack_In_Box_Bear',2),('Relative_Strength_Sell',2),('VP_VAH_Resistance',1.5),('VuManChu_Bear',3),('Hull_Turn_Bear',2),('Doji_Breakout_Sell',1.5),('Three_Bar_Reversal_Sell',2),('CS_Top_Fishing_Sell',3),('CS_Overbought_Fade_Sell',1.5)]:spp_+=_sp(df,s,p)
     df['SL_Pattern']=spp_.clip(upper=JT.PATTERN_CAP)
     scs_=pd.Series(0.,index=idx)
     for cn,cfg in COMBINED_SCAN_REGISTRY.items():
         if cfg['dir']!='sell' or cn not in df.columns:continue
         scs_+=np.where(df[cn].fillna(False),{1:JT.COMBO_T1,2:JT.COMBO_T2,3:JT.COMBO_T3}.get(cfg['tier'],1),0.)
     df['SL_Combined']=scs_.clip(upper=JT.COMBINED_CAP)
-    sl__=pd.Series(0.,index=idx);sl__+=np.clip(-ca*2.5,-1,3.5)+_sp(df,'Setup_Squeeze_Bear',1.5)+_sp(df,'Momentum_Accel_Sell',2)+_sp(df,'WT_Convergence_Bear',1.5)
+    sl__=pd.Series(0.,index=idx);sl__+=np.clip(-ca*2.5,-1,3.5)+_sp(df,'Setup_Squeeze_Bear',1.5)+_sp(df,'Momentum_Accel_Sell',2)+_sp(df,'WT_Convergence_Bear',1.5)+np.where(ob_rev,1.2,0)+_sp(df,'CS_Top_Fishing_Sell',2)
     sl__+=np.where(utbot_dir==-1,1,np.where(utbot_dir==1,-.5,0))+np.where(~hma_r_v,.5,-.5)
-    sp_sell=pd.Series(0.,index=idx);sp_sell+=np.clip((N('WT1')+10)*0.05,0,2)+np.clip((N('RSI')-55)*0.1,0,2)+np.clip((N('StochK')-65)*0.1,0,1)+np.clip(-ca*1.5,0,2)
+    sp_sell=pd.Series(0.,index=idx);sp_sell+=np.clip((N('WT1')+10)*0.05,0,2)+np.clip((N('RSI')-55)*0.1,0,2)+np.clip((N('StochK')-65)*0.1,0,1)+np.clip((mfi-65)*0.08,0,1.5)+np.clip(-ca*1.5,0,2);sp_sell+=np.where(ob_rev,1.0,0)
     df['Setup_Pressure_Sell']=sp_sell;sl__+=np.clip(sp_sell*0.4,0,3);df['SL_Leading']=sl__.clip(-1,JT.LEADING_CAP)
     slag_=pd.Series(0.,index=idx);slag_+=b200.astype(float)*1.0+b50.astype(float)*1.0+(N('MA50')<N('MA200')).astype(float)*1.0;
     slag_+=np.clip(-regime.values*1.0,-1.5,3)+np.where(C<kumo_bot,1.5,np.where(C>kumo_top,-1,0))+np.clip((1.0-N('RS_Ratio',1))*30,-1.5,2);df['SL_Lagging']=slag_.clip(-2,JT.LAGGING_CAP)
@@ -367,11 +384,14 @@ def _committee_trend(df,N):
     kt=pd.concat([N('Ichimoku_SenkouA'),N('Ichimoku_SenkouB')],axis=1).max(axis=1);kb=pd.concat([N('Ichimoku_SenkouA'),N('Ichimoku_SenkouB')],axis=1).min(axis=1)
     score+=np.where(C>kt,10,np.where(C<kb,-10,0))
     atr=N('ATR');d50=(C-N('MA50'))/(atr+1e-10);d200=(C-N('MA200'))/(atr+1e-10)
-    score += np.clip(-d50 * 5, -20, 20)
-    score += np.clip(-d200 * 3.75, -15, 15)
+    score += np.clip(-d50 * 3.2, -14, 14)
+    score += np.clip(-d200 * 2.8, -12, 12)
+    wt1=N('WT1');rsi=N('RSI')
+    score += np.where((wt1<-60)&(wt1>wt1.shift(1)),10,0)+np.where((wt1>60)&(wt1<wt1.shift(1)),-10,0)
+    score += np.where((rsi<35)&(rsi>rsi.shift(1)),6,0)+np.where((rsi>65)&(rsi<rsi.shift(1)),-6,0)
     ma50a=ma50s-ma50s.shift(5);score+=np.where((ma50s<0)&(ma50a>0.5),8,0)+np.where((ma50s>0)&(ma50a<-0.5),-8,0)
     ns=(score/JT.TREND_NORM*100).clip(-100,100);conv=np.clip(adx_val.values*2,5,95)
-    wt1=N('WT1').values;rsi=N('RSI').values;eos=np.clip((-50-wt1)/30,0,1)*.7+np.clip((30-rsi)/20,0,1)*.3;eob=np.clip((wt1-50)/30,0,1)*.7+np.clip((rsi-70)/20,0,1)*.3
+    wt1=wt1.values;rsi=rsi.values;eos=np.clip((-50-wt1)/30,0,1)*.7+np.clip((30-rsi)/20,0,1)*.3;eob=np.clip((wt1-50)/30,0,1)*.7+np.clip((rsi-70)/20,0,1)*.3
     conv=conv*(1-np.maximum(eos,eob)*0.8);conv=np.clip(conv,5,95)
     return ns,pd.Series(conv,index=idx)
 
@@ -503,6 +523,8 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
     j=np.full(n,'NEUTRAL',dtype=object);conf=np.zeros(n,dtype=float)
     rs=[];rd=[];al=[]
     obv_v=N('OBV').values;obv_mav=N('OBV').rolling(20,min_periods=10).mean().values;mhv=N('MACD_Hist').values;mhpv=np.roll(mhv,1)
+    ma50_v=N('MA50').values;ma200_v=N('MA200').values;wt1_v=N('WT1').values;rsi_v=N('RSI').values;mfi_v=N('MFI').values
+    adx_v=N('ADX').values;stoch_v=N('StochK').values;ut_v=N('UTBot_Dir').values;sq_v=df.get('Squeeze_On',pd.Series(False,index=idx)).values
     atr_norm = (N('ATR').values / (C + 1e-10)) * 100
     atr_scale = np.clip(atr_norm / 2.5, 0.75, 1.25) # Scale thresholds down for low beta, up for high beta
     for i in range(n):
@@ -515,6 +537,8 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
         elif e<=sst and sl>=(JT.STRONG_MIN_AGREE-sr):j[i]='STRONG_SELL'
         elif e<=st and sl>=(JT.BUY_MIN_AGREE-sr):j[i]='SELL'
         elif e<=wst and sl>=max(JT.WATCH_MIN_AGREE-sr,1):j[i]='WATCH_SELL'
+        elif (ctx_v[i] in (CTX_EXTREME_OS,CTX_BOTTOMING)) and ba>=2 and (sy>6 or pred[i]>5) and e>=(wbt-6):j[i]='BUY'
+        elif (ctx_v[i] in (CTX_EXTREME_OB,CTX_TOPPING)) and sl>=2 and (sy<-6 or pred[i]<-5) and e<=(wst+6):j[i]='SELL'
         elif ba>=3 and sl>=3:j[i]='MIXED'
         ae=abs(e);dm=max(ba,sl);ap=dm/NUM_COMMITTEES*35;sp=min(ae/60*30,30);avp=np.mean(ec[i])/100*20;syp=min(abs(sy)/20*10,10);pp=min(abs(pred[i])/15*5,5)
         raw=ap+sp+avp+syp+pp
@@ -529,10 +553,10 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
         cms={cm:es[i,ci] for ci,cm in enumerate(COMMITTEE_NAMES)}
         vstr=df['Veto_Flags'].iloc[i] if i<len(df) else ''
         obr=bool(obv_v[i]>obv_mav[i]) if not np.isnan(obv_mav[i]) else True
-        ma50a=bool(C[i]>N('MA50').values[i]) if not np.isnan(N('MA50').values[i]) else False
-        ma200a=bool(C[i]>N('MA200').values[i]) if not np.isnan(N('MA200').values[i]) else False
+        ma50a=bool(C[i]>ma50_v[i]) if not np.isnan(ma50_v[i]) else False
+        ma200a=bool(C[i]>ma200_v[i]) if not np.isnan(ma200_v[i]) else False
         mhu=bool(mhv[i]>mhpv[i]) if i>0 else False
-        r,d,a=_gen_reason(j[i],e,int(ctx_v[i]),vstr,sy,pred[i],ba,sl,N('WT1').values[i],N('RSI').values[i],N('MFI').values[i],N('CMF').values[i],obr,N('ADX').values[i],vol_ratio.values[i],ma50a,ma200a,mhu,N('StochK').values[i],bool(hma_r_v[i]) if i<len(hma_r_v) else False,int(N('UTBot_Dir').values[i]),bool(df.get('Squeeze_On',pd.Series(False,index=idx)).iloc[i]),cms)
+        r,d,a=_gen_reason(j[i],e,int(ctx_v[i]),vstr,sy,pred[i],ba,sl,wt1_v[i],rsi_v[i],mfi_v[i],cmf[i],obr,adx_v[i],vol_ratio.values[i],ma50a,ma200a,mhu,stoch_v[i],bool(hma_r_v[i]) if i<len(hma_r_v) else False,int(ut_v[i]),bool(sq_v[i]),cms)
         rs.append(r);rd.append(d);al.append(a)
     df['Trade_Judgment']=j;df['Judgment_Confidence']=conf;df['Buy_Agree']=bag;df['Sell_Agree']=sag
     df['Judgment_Reason']=rs;df['Judgment_Detail']=rd;df['Action_Label']=al
