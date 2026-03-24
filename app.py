@@ -565,8 +565,12 @@ else:
                     veto = meta.get('veto_flags', '')
                     if veto:
                         st.toast(f"🚫 Veto:{veto}", icon="🚫")
+                    # cs['icon']은 'REV'/'BRK'/'UP'/'DN'/'WARN' 등 텍스트일 수 있어
+                    # st.toast(icon=)은 실제 이모지만 허용하므로 별도 매핑 사용
+                    _ICON_EMOJI = {'UP':'🚀','DN':'🔻','REV':'🔄','BRK':'💥','WARN':'⚠️'}
                     for cs in [s for s in meta.get('combined_scans', []) if s['tier'] == 1 and s['is_today']]:
-                        st.toast(f"🎯 T1 {cs['kor']}!", icon=cs['icon'])
+                        _ei = _ICON_EMOJI.get(str(cs.get('icon', '')), '🎯')
+                        st.toast(f"🎯 T1 {cs['kor']}!", icon=_ei)
                     prompt = build_ai_prompt(tv, phist, fund)
                     status.update(label=f"✅ {tv} — {act}", state="complete", expanded=False)
                 else:
