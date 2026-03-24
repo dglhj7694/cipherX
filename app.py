@@ -14,6 +14,8 @@ from scipy.signal import find_peaks
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from company_details import render_company_details
 from sectors import SECTOR_GROUPS
+from indicators import compute_indicators as modular_compute_indicators
+from engine import detect_all_signals as modular_detect_all_signals
 
 st.set_page_config(page_title="CipherX V14.2", page_icon="📈", layout="wide", initial_sidebar_state="collapsed")
 
@@ -285,6 +287,8 @@ SIGNAL_REGISTRY={
     'Doji_Breakout_Sell':_sig(1.5,_S,'➕','DjBO▼','triangle-down',10,'#FF1744','High',1.5,'도지돌파매도','연속도지후방향결정'),
     'Three_Bar_Reversal_Buy':_sig(2,_B,'🔃','3BR▲','triangle-up',12,'#00BFA5','Low',-2,'3바반전매수','3연하후강한양봉'),
     'Three_Bar_Reversal_Sell':_sig(2,_S,'🔃','3BR▼','triangle-down',12,'#D50000','High',2,'3바반전매도','3연상후강한음봉'),
+    'System_Turn_Bull':_sig(3.5,_B,'','SysUp','star-diamond',16,'#00FF00','Low',-4,'System Buy Turn','Engine-wide buy judgment flip'),
+    'System_Turn_Bear':_sig(3.5,_S,'','SysDn','star-diamond',16,'#FF0000','High',4,'System Sell Turn','Engine-wide sell judgment flip'),
 }
 
 COMBINED_SCAN_REGISTRY={
@@ -315,6 +319,8 @@ COMBINED_SCAN_REGISTRY={
     'CS_MA_Breakdown_Sell':{'name':'📉 MABreak','kor':'MA붕괴','dir':'sell','tier':2,'icon':'📉','color':'#FF5252','desc':'데스+역배열','win':'60-70%'},
     'CS_Cooper_Setup_Sell':{'name':'🃏 CooperSell','kor':'쿠퍼매도','dir':'sell','tier':2,'icon':'🃏','color':'#FF3D00','desc':'ADX+쿠퍼매도','win':'60-70%'},
     'CS_Gap_Failure_Sell':{'name':'⏬ GapFail','kor':'갭실패','dir':'sell','tier':2,'icon':'⏬','color':'#FF1744','desc':'갭업후약세반전','win':'60-70%'},
+    'CS_Bottom_Fishing_Buy':{'name':'BottomFish','kor':'Bottom Fishing Reversal','dir':'buy','tier':2,'icon':'','color':'#00E676','desc':'deep oversold + reversal confirmation','win':'62-74%'},
+    'CS_Top_Fishing_Sell':{'name':'TopFish','kor':'Top Fishing Reversal','dir':'sell','tier':2,'icon':'','color':'#FF5252','desc':'deep overbought + reversal confirmation','win':'62-74%'},
     'CS_Oversold_Bounce_Buy':{'name':'🏓 OSBounce','kor':'과매도반등','dir':'buy','tier':3,'icon':'🏓','color':'#69F0AE','desc':'Stoch과매도+캔들','win':'55-65%'},
     'CS_Momentum_Accel_Buy':{'name':'⚡ MomAcc','kor':'모멘텀가속','dir':'buy','tier':3,'icon':'⚡','color':'#76FF03','desc':'RSI+WT+MACD가속','win':'55-65%'},
     'CS_Structure_Support_Buy':{'name':'🏗️ Support','kor':'구조적지지','dir':'buy','tier':3,'icon':'🏗️','color':'#4FC3F7','desc':'VP+BB지지','win':'55-65%'},
@@ -322,8 +328,8 @@ COMBINED_SCAN_REGISTRY={
     'CS_Volatility_Explosion':{'name':'💣 VolExpl','kor':'변동성폭발셋업','dir':'neutral','tier':2,'icon':'💣','color':'#FFC107','desc':'NR7+BB스퀴즈','win':'방향70%+'},
 }
 
-STRONG_BUY_SIGS={'Gold_Dot','Green_Dot_T1','Parabolic_Bottom_Buy','Volume_Climax_Buy','Momentum_Ignition_Buy','Expansion_BO','Morning_Star','Reversal_New_Highs','CS_Ultimate_Buy','CS_Triple_Oversold_Reversal','CS_Breakout_Momentum_Buy','CS_Capitulation_Bottom','CS_Triple_Confirm_Buy','CS_VuManChu_Squeeze_Buy','VuManChu_Bull'}
-STRONG_SELL_SIGS={'Blood_Diamond','Red_Dot_T1','Parabolic_Top_Sell','Volume_Climax_Sell','Momentum_Ignition_Sell','Expansion_BD','Evening_Star','Reversal_New_Lows','CS_Ultimate_Sell','CS_Triple_Overbought_Exhaustion','CS_Breakdown_Momentum_Sell','CS_Blow_Off_Top','CS_Parabolic_Exhaustion_Sell','CS_Triple_Confirm_Sell','CS_VuManChu_Squeeze_Sell','VuManChu_Bear'}
+STRONG_BUY_SIGS={'System_Turn_Bull','Gold_Dot','Green_Dot_T1','Parabolic_Bottom_Buy','Volume_Climax_Buy','Momentum_Ignition_Buy','Expansion_BO','Morning_Star','Reversal_New_Highs','CS_Ultimate_Buy','CS_Triple_Oversold_Reversal','CS_Breakout_Momentum_Buy','CS_Capitulation_Bottom','CS_Triple_Confirm_Buy','CS_VuManChu_Squeeze_Buy','VuManChu_Bull'}
+STRONG_SELL_SIGS={'System_Turn_Bear','Blood_Diamond','Red_Dot_T1','Parabolic_Top_Sell','Volume_Climax_Sell','Momentum_Ignition_Sell','Expansion_BD','Evening_Star','Reversal_New_Lows','CS_Ultimate_Sell','CS_Triple_Overbought_Exhaustion','CS_Breakdown_Momentum_Sell','CS_Blow_Off_Top','CS_Parabolic_Exhaustion_Sell','CS_Triple_Confirm_Sell','CS_VuManChu_Squeeze_Sell','VuManChu_Bear'}
 
 COOLDOWN_MAP={'Squeeze_Fire_Buy':5,'Squeeze_Fire_Sell':5,'Bullish_Engulfing':5,'Bearish_Engulfing':5,'Hammer':5,'Shooting_Star':5,'Morning_Star':7,'Evening_Star':7,'Golden_Cross':20,'Death_Cross':20,'Expansion_BO':10,'Expansion_BD':10,'Gilligans_Buy':10,'Gilligans_Sell':10,'MACD_Cross_Buy':12,'MACD_Cross_Sell':12,'Kumo_Breakout_Bull':10,'Kumo_Breakout_Bear':10,'New_52W_High':10,'New_52W_Low':10,'StochRSI_Cross_Buy':7,'StochRSI_Cross_Sell':7,'ADX_Momentum_Buy':10,'ADX_Momentum_Sell':10,'EMA_Pullback_Buy':7,'EMA_Pullback_Sell':7,'SuperTrend_Buy':10,'SuperTrend_Sell':10,'Parabolic_Bottom_Buy':5,'Parabolic_Top_Sell':5,'DMI_Cross_Bull':10,'DMI_Cross_Bear':10,'Boomer_Buy':10,'Boomer_Sell':10,'Setup_180_Bull':7,'Setup_180_Bear':7,'VWAP_Bounce_Buy':7,'VWAP_Reject_Sell':7,'Momentum_Ignition_Buy':10,'Momentum_Ignition_Sell':10,'Slingshot_Bull':7,'Slingshot_Bear':7,'MF_Cross_Bull':10,'MF_Cross_Bear':10,'Pullback_123_Bull':7,'Pullback_123_Bear':7,'UTBot_Buy':10,'UTBot_Sell':10,'Hull_Turn_Bull':7,'Hull_Turn_Bear':7,'StochSlow_Cross_Buy':7,'StochSlow_Cross_Sell':7,'Squeeze_Mom_Cross_Up':5,'Squeeze_Mom_Cross_Down':5,'VuManChu_Bull':10,'VuManChu_Bear':10,'Volume_Dry_Breakout_Buy':7,'Volume_Dry_Breakout_Sell':7,'Doji_Breakout_Buy':5,'Doji_Breakout_Sell':5,'Three_Bar_Reversal_Buy':5,'Three_Bar_Reversal_Sell':5}
 
@@ -388,7 +394,13 @@ def validate_ticker(t):
     except:return False
 @st.cache_data(ttl=300,max_entries=50,show_spinner=False)
 def _compute_cached(t,k):
-    try:df=fetch_history(t);return detect_all_signals(compute_indicators(df)) if not df.empty else None
+    try:
+        df=fetch_history(t)
+        if df.empty:return None
+        try:return modular_detect_all_signals(modular_compute_indicators(df.copy()))
+        except Exception as me:
+            print(f"[WARN] modular pipeline failed for {t}: {me}; fallback to in-file pipeline")
+            return detect_all_signals(compute_indicators(df))
     except Exception as e:print(f"[ERR]{t}:{e}");return None
 def compute_and_cache(t,ts=None):
     ck=f"{t}_{ts}" if ts else f"{t}_{math.floor(time.time()/300)}";return _compute_cached(t,ck)
