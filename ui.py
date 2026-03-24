@@ -249,40 +249,37 @@ def render_10layer_bars(m):
         row_glow = "box-shadow:0 0 10px rgba(99,102,241,.18);" if abs(bv - sv) >= 4 else ""
 
         rows.append(
-            f"""
-            <div style='display:grid;grid-template-columns:58px 1fr 58px;gap:10px;align-items:center;margin-bottom:8px;padding:2px;border-radius:10px;{row_glow}'>
-                <div style='text-align:right;color:#34D399;font-size:.88rem;font-weight:700;opacity:{bop:.2f}'>{bv:.1f}</div>
-                <div style='position:relative;height:30px;border-radius:10px;border:1px solid rgba(148,163,184,.2);background:linear-gradient(90deg,rgba(16,185,129,.08),rgba(148,163,184,.04),rgba(239,68,68,.08));overflow:hidden'>
-                    <div style='position:absolute;left:{50.0 - bpct:.2f}%;top:4px;bottom:4px;width:{bpct:.2f}%;background:linear-gradient(90deg,#065F46,#34D399);border-radius:6px 0 0 6px;opacity:{bop:.2f}'></div>
-                    <div style='position:absolute;left:50%;top:4px;bottom:4px;width:{spct:.2f}%;background:linear-gradient(90deg,#F87171,#7F1D1D);border-radius:0 6px 6px 0;opacity:{sop:.2f}'></div>
-                    <div style='position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(226,232,240,.55)'></div>
-                    <div style='position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:.72rem;color:#CBD5E1;font-weight:700;background:rgba(2,6,23,.78);padding:2px 8px;border-radius:999px;border:1px solid rgba(148,163,184,.25)'>{name}</div>
-                </div>
-                <div style='text-align:left;color:#F87171;font-size:.88rem;font-weight:700;opacity:{sop:.2f}'>{sv:.1f}</div>
-            </div>
-            """
+            f"<div style='display:grid;grid-template-columns:58px 1fr 58px;gap:10px;align-items:center;margin-bottom:8px;padding:2px;border-radius:10px;{row_glow}'>"
+            f"<div style='text-align:right;color:#34D399;font-size:.88rem;font-weight:700;opacity:{bop:.2f}'>{bv:.1f}</div>"
+            "<div style='position:relative;height:30px;border-radius:10px;border:1px solid rgba(148,163,184,.2);background:linear-gradient(90deg,rgba(16,185,129,.08),rgba(148,163,184,.04),rgba(239,68,68,.08));overflow:hidden'>"
+            f"<div style='position:absolute;left:{50.0 - bpct:.2f}%;top:4px;bottom:4px;width:{bpct:.2f}%;background:linear-gradient(90deg,#065F46,#34D399);border-radius:6px 0 0 6px;opacity:{bop:.2f}'></div>"
+            f"<div style='position:absolute;left:50%;top:4px;bottom:4px;width:{spct:.2f}%;background:linear-gradient(90deg,#F87171,#7F1D1D);border-radius:0 6px 6px 0;opacity:{sop:.2f}'></div>"
+            "<div style='position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(226,232,240,.55)'></div>"
+            f"<div style='position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:.72rem;color:#CBD5E1;font-weight:700;background:rgba(2,6,23,.78);padding:2px 8px;border-radius:999px;border:1px solid rgba(148,163,184,.25)'>{name}</div>"
+            "</div>"
+            f"<div style='text-align:left;color:#F87171;font-size:.88rem;font-weight:700;opacity:{sop:.2f}'>{sv:.1f}</div>"
+            "</div>"
         )
 
     buy_active = int(m.get('buy_active', 0))
     sell_active = int(m.get('sell_active', 0))
 
-    st.markdown(
-        f"""
-        <div style='background:rgba(15,19,32,.55);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px 14px;margin-bottom:12px'>
-            <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px'>
-                <span style='color:#34D399;font-weight:800;font-size:.86rem'>BUY ({buy_active}/10)</span>
-                <span style='color:#94A3B8;font-size:.76rem;font-weight:700'>10-Layer Buy/Sell comparison</span>
-                <span style='color:#F87171;font-weight:800;font-size:.86rem'>SELL ({sell_active}/10)</span>
-            </div>
-            <div style='display:flex;justify-content:center;gap:10px;margin:0 0 10px'>
-                <span style='color:#34D399;font-size:.7rem'>left = buy pressure</span>
-                <span style='color:#F87171;font-size:.7rem'>right = sell pressure</span>
-            </div>
-            {''.join(rows)}
-        </div>
-        """,
-        unsafe_allow_html=True,
+    rows_html = "".join(rows)
+    panel_html = (
+        "<div style='background:rgba(15,19,32,.55);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px 14px;margin-bottom:12px'>"
+        "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px'>"
+        f"<span style='color:#34D399;font-weight:800;font-size:.86rem'>BUY ({buy_active}/10)</span>"
+        "<span style='color:#94A3B8;font-size:.76rem;font-weight:700'>10-Layer Buy/Sell comparison</span>"
+        f"<span style='color:#F87171;font-weight:800;font-size:.86rem'>SELL ({sell_active}/10)</span>"
+        "</div>"
+        "<div style='display:flex;justify-content:center;gap:10px;margin:0 0 10px'>"
+        "<span style='color:#34D399;font-size:.7rem'>left = buy pressure</span>"
+        "<span style='color:#F87171;font-size:.7rem'>right = sell pressure</span>"
+        "</div>"
+        f"{rows_html}"
+        "</div>"
     )
+    st.markdown(panel_html, unsafe_allow_html=True)
 def render_leading_lagging(m):
     lv=m['leading_verdict'];lgv=m['lagging_verdict'];ac=m['composite_accel']
     lc='#34D399' if '상승' in lv else('#F87171' if '하락' in lv else '#FF9800')
