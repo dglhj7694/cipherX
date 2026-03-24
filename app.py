@@ -178,7 +178,7 @@ else:
     for i,msg in enumerate(st.session_state.messages):
         av="✨" if msg["role"]=="assistant" else "🧑‍💻"
         with st.chat_message(msg["role"],avatar=av):
-            if msg.get("type")=="analysis":st.markdown(msg.get("content",""));render_analysis(msg)
+            if msg.get("type")=="analysis":render_analysis(msg)
             elif msg.get("type")=="report":
                 with st.expander(f"{msg.get('ticker','')} AI리포트",expanded=True):st.markdown(msg["content"])
                 st.download_button("📥",key=f"dl_{i}",data=msg["content"].encode('utf-8'),file_name=f"{msg.get('ticker','')}_V142_{datetime.now().strftime('%Y%m%d')}.md",mime="text/markdown",use_container_width=True)

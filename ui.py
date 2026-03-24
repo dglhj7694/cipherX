@@ -68,7 +68,6 @@ def render_price_header(m):
     jc = '#34D399' if 'BUY' in jg else ('#F87171' if 'SELL' in jg else '#FF9800')
 
     act = m.get('action_label', '')
-    rsn = m.get('judgment_reason', '')
     specs = [
         (jc, f"[{act}] {cf:.0f}%", "Final action and confidence"),
         ('ind-b' if m['wt1'] < -20 else ('ind-s' if m['wt1'] > 20 else 'ind-n'), f"WT{m['wt1']:.0f}", "WaveTrend pressure"),
@@ -79,7 +78,6 @@ def render_price_header(m):
         ('ind-b' if m.get('hma_rising') else 'ind-s', '[HMA] UP' if m.get('hma_rising') else '[HMA] DN', "Hull direction"),
     ]
     ih = "".join([f"<span class='ind-mini {c}' title='{tip}'>{l}</span>" for c, l, tip in specs])
-    rsn_html = f"<p style='color:#94A3B8;font-size:.82rem;margin:6px 0 0'>{rsn}</p>" if rsn else ""
 
     bottom = _bottom_line_text(m).strip()
     narrative = _narrative_text(m).strip()
@@ -101,7 +99,6 @@ def render_price_header(m):
         <div class="price-header fade-up">
             <p style="color:#64748B;font-size:.8rem;margin:0">{m['ticker']} - {m['last_date']} - <b style="color:#A5B4FC">{m['regime_label']}</b> - <span style='color:#A5B4FC'>[CTX] {m.get('context_label', 'default')}</span></p>
             <p class="price-big" style="color:#F8FAFC">${m['price']:.2f}<span class="{cc}" style="font-size:1.1rem;margin-left:10px;font-weight:700">{ci}{abs(chg):.2f}({abs(cp):.2f}%)</span></p>
-            {rsn_html}
             <div style="margin-top:10px;display:flex;gap:4px;flex-wrap:wrap">{ih}</div>
         </div>
         """,
