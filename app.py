@@ -299,16 +299,19 @@ if current_mode == '스캐너':
                     + cf * 0.02
                 )
 
-                # ── 5. Multi-Signal badge: 엔진 컬럼 단독 사용 ────────────────
-                #   engine.py detect_combined_scans() 가 이미 오늘(마지막 행) 기준으로
-                #   CS_Multi_Signal_On / CS_Multi_Count / CS_Buy_Count 등을 계산해 둠.
-                #   스캐너에서 재계산하지 않고 그 값을 그대로 읽는다.
-                mflag = bool(lt.get('CS_Multi_Signal_On', False))
-                mcnt  = int(_sf(lt.get('CS_Multi_Count',    0)))
-                mbc   = int(_sf(lt.get('CS_Buy_Count',      0)))
-                msc   = int(_sf(lt.get('CS_Sell_Count',     0)))
-                mnc   = int(_sf(lt.get('CS_Neutral_Count',  0)))
-                mimb  = _sf(lt.get('CS_Multi_Imbalance',    0))
+                # ── 5. Multi-Signal badge: acs 기반 (5일 윈도우) ──────────────
+                #   엔진의 CS_Multi_Count 는 오늘 하루 기준이므로
+                #   표시 중인 acs (최근 5일) 와 숫자가 불일치함.
+                #   화면에 보이는 시그널 목록과 배지 카운트를 일치시키기 위해
+                #   acs 를 직접 집계하는 것으로 통일.
+                mbc   = sum(1 for s in acs if s['dir'] == 'buy')
+                msc   = sum(1 for s in acs if s['dir'] == 'sell')
+                mnc   = sum(1 for s in acs if s['dir'] == 'neutral')
+                mcnt  = len(acs)
+                mimb  = mbc - msc
+                # ON 조건: tier-1 이상 1개 이상이면서 총 2개↑, 또는 총 3개↑
+                has_t1 = any(s['tier'] == 1 for s in acs)
+                mflag  = (mcnt >= 3) or (has_t1 and mcnt >= 2)
 
                 # ── 6. multi_hits: 최근 3일 이내 발화 콤보 (표시용, acs 기반) ──
                 recent = sorted(
@@ -396,14 +399,7 @@ if current_mode == '스캐너':
             chi = '▲' if r['chg'] >= 0 else '▼'
             jc  = '#34D399' if 'BUY' in r['jg'] else ('#F87171' if 'SELL' in r['jg'] else '#FCD34D')
 
-            # 콤보 스캔 목록
-            sh = "".join([
-                f"<div style='display:flex;gap:6px;padding:2px 0'>"
-                f"<span style='color:{'#34D399' if s['dir']=='buy' else '#F87171' if s['dir']=='sell' else '#FFC107'}'>●</span>"
-                f"<span style='color:#E8ECF1;font-size:.82rem'>{s['icon']}{s['kor']}</span>"
-                f"<span style='color:#64748B;font-size:.7rem'>{s['date']}</span></div>"
-                for s in r['scans']
-            ]) if r['scans'] else "<span style='color:#475569;font-size:.8rem'>—</span>"
+            # 콤보 스캔 목록은 mx 배지 태그로만 표시 — 불릿 리스트(sh) 제거
 
             # UT/Hull 전환 배지
             th = "".join([
@@ -463,7 +459,7 @@ if current_mode == '스캐너':
                 f"<div style='margin:4px 0 8px'>{th}</div>"
                 f"{mh}"
                 f"<div style='margin:2px 0 7px'>{mx}</div>"
-                f"{sh}{rh}</div>",
+                f"{rh}</div>",
                 unsafe_allow_html=True
             )
 
