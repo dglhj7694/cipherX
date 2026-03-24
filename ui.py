@@ -6,14 +6,65 @@ from config import *
 from chart import build_metadata, build_chart
 from company_details import render_company_details
 
+def _bottom_line_text(m):
+    action=m.get('action_label','').strip() or m.get('judgment','NEUTRAL')
+    es=float(m.get('ensemble_score',0));ctx=m.get('context_label','기본')
+    if 'BUY' in str(m.get('judgment','')):
+        return f"결론: {action}. 지금은 매수 우위 구간이며, 분할 진입 관점이 유효합니다. (ES {es:+.1f}, {ctx})"
+    if 'SELL' in str(m.get('judgment','')):
+        return f"결론: {action}. 지금은 매도/리스크 관리 우위 구간이며, 비중 축소가 우선입니다. (ES {es:+.1f}, {ctx})"
+    if str(m.get('judgment',''))=='MIXED':
+        return f"결론: {action}. 방향성 혼재 구간이라 신규 진입보다 관망이 유리합니다. (ES {es:+.1f}, {ctx})"
+    return f"결론: {action}. 확정 신호가 약해 관망 후 확인 진입이 적절합니다. (ES {es:+.1f}, {ctx})"
+
+def _narrative_text(m):
+    rsi=float(m.get('rsi',50));wt=float(m.get('wt1',0));mom=float(m.get('buy_layers',{}).get('Momentum',0)-m.get('sell_layers',{}).get('Momentum',0))
+    cmf=float(m.get('cmf',0));bbp=float(m.get('percent_b',0.5))
+    if rsi>=70 and mom>0:
+        return "RSI가 과매수권이지만 모멘텀 레이어가 여전히 우세해 추세 관성은 살아 있습니다."
+    if rsi<=30 and mom<0:
+        return "RSI가 과매도권이며 모멘텀도 약세라, 반등은 확인 신호 동반 시에만 유효합니다."
+    if wt<-55 and cmf>0:
+        return "WaveTrend 과매도와 자금 유입(CMF+)이 겹쳐 바닥 반전 시나리오 확률이 높아지는 구간입니다."
+    if wt>55 and cmf<0:
+        return "WaveTrend 과매수와 자금 이탈(CMF-)이 동반되어 고점 소진 가능성을 경계해야 합니다."
+    if bbp<0.2 and mom>0:
+        return "가격이 밴드 하단 근처이면서 모멘텀이 개선되어 눌림 이후 재상승 구조로 해석됩니다."
+    if bbp>0.8 and mom<0:
+        return "가격이 밴드 상단에 위치한 상태에서 모멘텀이 둔화되어 단기 조정 리스크가 커졌습니다."
+    return "추세·모멘텀·자금흐름이 뚜렷하게 한쪽으로 쏠리진 않아, 확인형 대응이 유리합니다."
+
+def _render_ensemble_gauge(es):
+    gauge=go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=es,
+        number={'suffix':'', 'font':{'size':28}},
+        gauge={
+            'axis':{'range':[-100,100], 'tickwidth':1, 'tickcolor':'#64748B'},
+            'bar':{'color':'#A5B4FC', 'thickness':0.35},
+            'bgcolor':'rgba(0,0,0,0)',
+            'borderwidth':0,
+            'steps':[
+                {'range':[-100,-30],'color':'rgba(248,113,113,0.35)'},
+                {'range':[-30,30],'color':'rgba(255,152,0,0.25)'},
+                {'range':[30,100],'color':'rgba(52,211,153,0.35)'},
+            ],
+            'threshold':{'line':{'color':'#E2E8F0','width':2},'thickness':0.8,'value':es}
+        }
+    ))
+    gauge.update_layout(height=180,margin=dict(l=6,r=6,t=8,b=8),paper_bgcolor='rgba(0,0,0,0)',font=dict(color='#E2E8F0'))
+    st.plotly_chart(gauge,use_container_width=True,theme=None,config={'displayModeBar':False})
+
 def render_price_header(m):
     chg=m['price_change'];cp=m['price_change_pct'];cc='price-change-up' if chg>=0 else 'price-change-down';ci='▲' if chg>=0 else '▼'
     vr_=m['volume']/max(m['avg_volume'],1);jg=m['judgment'];cf=m['confidence'];es=m.get('ensemble_score',0)
     jc='#34D399' if 'BUY' in jg else('#F87171' if 'SELL' in jg else '#FF9800')
     act=m.get('action_label','');rsn=m.get('judgment_reason','')
-    specs=[(jc,f"[{act}] {cf:.0f}%"),('ind-b' if m['wt1']<-20 else('ind-s' if m['wt1']>20 else 'ind-n'),f"WT{m['wt1']:.0f}"),('ind-b' if m['rsi']<40 else('ind-s' if m['rsi']>60 else 'ind-n'),f"RSI{m['rsi']:.0f}"),('ind-b' if vr_>1.5 else 'ind-n',f"Vol{vr_:.1f}x"),('ind-b' if m['adx']>25 else 'ind-n',f"ADX{m['adx']:.0f}"),('ind-b' if m.get('utbot_dir',0)==1 else('ind-s' if m.get('utbot_dir',0)==-1 else 'ind-n'),'[UT] B' if m.get('utbot_dir',0)==1 else('[UT] S' if m.get('utbot_dir',0)==-1 else '[UT] -')),('ind-b' if m.get('hma_rising') else 'ind-s','[HMA] UP' if m.get('hma_rising') else '[HMA] DN')]
-    ih="".join([f"<span class='ind-mini {c}'>{l}</span>" for c,l in specs])
+    specs=[(jc,f"[{act}] {cf:.0f}%","최종 액션과 신뢰도"),('ind-b' if m['wt1']<-20 else('ind-s' if m['wt1']>20 else 'ind-n'),f"WT{m['wt1']:.0f}","WaveTrend: 과매수/과매도 압력"),('ind-b' if m['rsi']<40 else('ind-s' if m['rsi']>60 else 'ind-n'),f"RSI{m['rsi']:.0f}","RSI: 추세 과열도"),('ind-b' if vr_>1.5 else 'ind-n',f"Vol{vr_:.1f}x","평균 대비 거래량 배수"),('ind-b' if m['adx']>25 else 'ind-n',f"ADX{m['adx']:.0f}","추세 강도"),('ind-b' if m.get('utbot_dir',0)==1 else('ind-s' if m.get('utbot_dir',0)==-1 else 'ind-n'),'[UT] B' if m.get('utbot_dir',0)==1 else('[UT] S' if m.get('utbot_dir',0)==-1 else '[UT] -'),"UTBot 방향"),('ind-b' if m.get('hma_rising') else 'ind-s','[HMA] UP' if m.get('hma_rising') else '[HMA] DN',"Hull MA 방향")]
+    ih="".join([f"<span class='ind-mini {c}' title='{tip}'>{l}</span>" for c,l,tip in specs])
     rsn_html=f"<p style='color:#94A3B8;font-size:.82rem;margin:6px 0 0'>{rsn}</p>" if rsn else ""
+    st.markdown(f"<div style='background:rgba(99,102,241,.10);border:1px solid rgba(99,102,241,.32);border-radius:12px;padding:12px 14px;margin-bottom:10px;color:#E2E8F0;font-weight:700'>{_bottom_line_text(m)}</div>",unsafe_allow_html=True)
+    st.markdown(f"<div style='background:rgba(15,23,42,.55);border:1px solid rgba(148,163,184,.18);border-radius:12px;padding:10px 12px;margin-bottom:12px;color:#CBD5E1;font-size:.86rem'>{_narrative_text(m)}</div>",unsafe_allow_html=True)
     st.markdown(f"""<div class="price-header fade-up"><p style="color:#64748B;font-size:.8rem;margin:0">■ {m['ticker']} · {m['last_date']} · <b style="color:#A5B4FC">{m['regime_label']}</b> · <span style='color:#A5B4FC'>[CTX] {m.get('context_label','기본')}</span></p>
         <p class="price-big" style="color:#F8FAFC">${m['price']:.2f}<span class="{cc}" style="font-size:1.1rem;margin-left:10px;font-weight:700">{ci}{abs(chg):.2f}({abs(cp):.2f}%)</span></p>{rsn_html}
         <div style="margin-top:10px;display:flex;gap:4px;flex-wrap:wrap">{ih}</div></div>""",unsafe_allow_html=True)
@@ -30,6 +81,7 @@ def render_price_header(m):
         <div class='glass-metric'><p class='gm-label'>SELL Score (10L)</p><p class='gm-value' style='color:#F87171'>{st_:.1f}</p><p class='gm-sub'>{sa_}/10 레이어 활성</p><div class='gm-bar'><div class='gm-bar-fill' style='width:{st_pct}%;background:#F87171'></div></div></div>
         <div class='glass-metric'><p class='gm-label'>52주 가격 위치</p><p class='gm-value' style='color:#A5B4FC'>{pos52:.0f}%</p><p class='gm-sub'>${l52:.1f} — ${h52:.1f}</p><div class='gm-bar'><div class='gm-bar-fill' style='width:{pos52}%;background:linear-gradient(90deg,#F87171,#FF9800,#34D399)'></div></div></div>
     </div>""",unsafe_allow_html=True)
+    _render_ensemble_gauge(es)
 
 def render_judgment_card(m):
     jg=m['judgment'];es=m.get('ensemble_score',0);cf=m['confidence']
@@ -205,11 +257,35 @@ def render_combined_scans(m):
     bn=sum(1 for s in scans if s['dir']=='buy');sn_=sum(1 for s in scans if s['dir']=='sell');t1=sum(1 for s in scans if s['tier']==1)
     hc='#FFD700' if t1>0 else('#00E676' if bn>sn_ else('#FF1744' if sn_>bn else '#FF6D00'))
     st.markdown(f"<div style='background:rgba(255,215,0,.06);border:1px solid {hc}33;border-radius:12px;padding:12px;margin-bottom:10px'><span style='font-size:1.2rem;font-weight:800;color:{hc}'>[COMBO] {len(scans)} Active</span> <span style='color:#94A3B8;margin-left:12px'>T1:{t1} B:{bn} S:{sn_}</span></div>",unsafe_allow_html=True)
+    cards=[]
     for s in scans:
-        tb={1:'T1',2:'T2',3:'T3'}.get(s['tier'],'T?');dc_='#34D399' if s['dir']=='buy' else('#F87171' if s['dir']=='sell' else '#FF6D00')
-        bg='rgba(0,230,118,.04)' if s['dir']=='buy' else('rgba(255,23,68,.04)' if s['dir']=='sell' else 'rgba(255,152,0,.04)')
-        td="<span style='background:#FFD700;color:#000;padding:2px 6px;border-radius:4px;font-size:.65rem;font-weight:700'>TODAY</span>" if s['is_today'] else f"<span style='color:#64748B;font-size:.75rem'>{s['date']}</span>"
-        st.markdown(f"<div class='cs-card' style='background:{bg};border-color:{dc_}'><div style='display:flex;justify-content:space-between;align-items:center'><span style='color:{dc_};font-weight:700'>■ {s['kor']} <span style='color:#64748B;font-size:.7rem'>{tb}</span></span><div>{td} <span style='color:#4FC3F7;font-size:.65rem;margin-left:6px'>WinRate:{s['win']}</span></div></div></div>",unsafe_allow_html=True)
+        tb={1:'T1',2:'T2',3:'T3'}.get(s['tier'],'T?');is_buy=s['dir']=='buy';is_sell=s['dir']=='sell'
+        dc_='#34D399' if is_buy else('#F87171' if is_sell else '#FF9800')
+        bg='linear-gradient(160deg,rgba(5,46,22,.55),rgba(15,23,42,.6))' if is_buy else('linear-gradient(160deg,rgba(69,10,10,.55),rgba(30,41,59,.6))' if is_sell else 'linear-gradient(160deg,rgba(120,53,15,.5),rgba(30,41,59,.6))')
+        ic='🟢' if is_buy else('🔴' if is_sell else '🟠')
+        td="<span style='background:#FFD700;color:#111827;padding:2px 6px;border-radius:999px;font-size:.64rem;font-weight:800'>TODAY</span>" if s['is_today'] else f"<span style='color:#94A3B8;font-size:.72rem'>{s['date']}</span>"
+        cards.append(f"""<div style='background:{bg};border:1px solid {dc_}55;border-radius:14px;padding:12px 12px 10px;box-shadow:0 8px 24px rgba(0,0,0,.25)'>
+            <div style='display:flex;justify-content:space-between;align-items:center;gap:8px'>
+                <span style='color:{dc_};font-weight:800'>{ic} {s['kor']}</span>
+                <span style='color:#E2E8F0;font-size:.68rem;background:rgba(15,23,42,.6);padding:2px 8px;border-radius:999px'>{tb}</span>
+            </div>
+            <div style='margin-top:8px;display:flex;justify-content:space-between;align-items:center'>
+                <span style='color:#60A5FA;font-size:.72rem'>WinRate {s['win']}</span>
+                {td}
+            </div>
+        </div>""")
+    st.markdown(f"<div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px'>{''.join(cards)}</div>",unsafe_allow_html=True)
+
+def render_indicator_help():
+    with st.expander("ℹ️ 지표 도움말 (마우스 오버용 요약)"):
+        st.markdown(
+            "- `WT`: 과매수/과매도 반전 압력\n"
+            "- `RSI`: 70↑ 과열, 30↓ 침체\n"
+            "- `ADX`: 추세 강도(방향 아님)\n"
+            "- `CMF`: 자금 유입/이탈 강도\n"
+            "- `Ensemble Score`: -100~+100 종합 방향 점수\n"
+            "- `10-Layer`: 추세, 모멘텀, 구조, 자금 등 레이어별 점수"
+        )
 
 def render_analysis(msg):
     m,fj=msg.get('meta'),msg.get('fig_json')
@@ -217,7 +293,7 @@ def render_analysis(msg):
     if m or fj:
         t0,t1,t2,t3,t4=st.tabs(["차트","종합판단","10-Layer","콤보스캔","기업정보"])
         with t0:
-            if fj:fig=go.Figure(json.loads(fj));st.plotly_chart(fig,use_container_width=True,theme=None,config={'displaylogo':False,'modeBarButtonsToRemove':['lasso2d','select2d']});st.caption("*차트에 마우스를 올리면 상세 판단 사유 및 위원회 투표 현황 툴팁이 표시됩니다.")
+            if fj:fig=go.Figure(json.loads(fj));st.plotly_chart(fig,use_container_width=True,theme=None,config={'displaylogo':False,'modeBarButtonsToRemove':['lasso2d','select2d']});st.caption("*캔들 오버 시 툴팁, 강/약 시그널 캔들 하이라이트, 우측 매물대(VP) 오버레이를 함께 제공합니다.")
         with t1:
             if m:
                 render_judgment_card(m)
@@ -225,6 +301,7 @@ def render_analysis(msg):
                 render_committee_panel(m)
                 st.markdown("---")
                 render_leading_lagging(m)
+                render_indicator_help()
         with t2:
             if m:render_10layer_bars(m)
         with t3:

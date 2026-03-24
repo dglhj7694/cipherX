@@ -99,6 +99,41 @@ def _collect_strong_markers(dc):
         if sn in dc.columns:ss|=dc[sn].fillna(False)
     return sb,ss
 
+def _add_signal_boxes(fig,dc,strong_buy,strong_sell):
+    half=pd.Timedelta(hours=12)
+    for ts in dc.index[strong_buy.fillna(False)]:
+        fig.add_vrect(x0=ts-half,x1=ts+half,fillcolor='rgba(16,185,129,.10)',line_width=0,row=1,col=1,layer='below')
+    for ts in dc.index[strong_sell.fillna(False)]:
+        fig.add_vrect(x0=ts-half,x1=ts+half,fillcolor='rgba(239,68,68,.10)',line_width=0,row=1,col=1,layer='below')
+
+def _add_volume_profile_overlay(fig,dc):
+    if dc.empty:return
+    low=float(dc['Low'].min());high=float(dc['High'].max())
+    if not np.isfinite(low) or not np.isfinite(high) or high<=low:return
+    bins=24;edges=np.linspace(low,high,bins+1);prof=np.zeros(bins,dtype=float)
+    tp=((dc['High']+dc['Low']+dc['Close'])/3).values
+    vol=dc['Volume'].fillna(0).values.astype(float)
+    bidx=np.clip(np.digitize(tp,edges)-1,0,bins-1)
+    for bi,v in zip(bidx,vol):
+        if np.isfinite(v) and v>0:prof[int(bi)]+=float(v)
+    vmax=float(prof.max()) if len(prof)>0 else 0.0
+    if vmax<=0:return
+    span=max(int((dc.index[-1]-dc.index[0]).days),20)
+    x_right=dc.index[-1]+pd.Timedelta(days=3)
+    max_width=pd.Timedelta(days=max(4,int(span*0.18)))
+    for bi,pv in enumerate(prof):
+        if pv<=0:continue
+        f=float(pv/vmax);alpha=min(.30,max(.08,.08+.22*f))
+        fig.add_shape(type='rect',x0=x_right-max_width*f,x1=x_right,y0=float(edges[bi]),y1=float(edges[bi+1]),
+            fillcolor=f'rgba(99,102,241,{alpha})',line=dict(width=0),row=1,col=1,layer='below')
+    vp_colors=[('VP_POC','#A5B4FC','dot'),('VP_VAH','#60A5FA','dash'),('VP_VAL','#34D399','dash')]
+    for col,clr,sty in vp_colors:
+        if col in dc.columns:
+            val=float(dc[col].iloc[-1])
+            if np.isfinite(val):fig.add_hline(y=val,line_color=clr,line_dash=sty,line_width=1,row=1,col=1)
+    fig.add_trace(go.Scatter(x=[x_right],y=[dc['Close'].iloc[-1]],mode='markers',marker=dict(size=.1,color='rgba(0,0,0,0)'),hoverinfo='skip',showlegend=False),row=1,col=1)
+    fig.add_annotation(x=x_right,y=high,text='VP',showarrow=False,font=dict(size=9,color='#94A3B8'),xanchor='right',yanchor='top',row=1,col=1)
+
 def _sig_marker(fig,dc,sn,row,y,clr,sym,sz,lbl):
     reg=SIGNAL_REGISTRY.get(sn) or COMBINED_SCAN_REGISTRY.get(sn,{})
     if sn not in dc.columns:return
@@ -132,6 +167,8 @@ def build_chart(dc,ticker):
         yoff=dc['Low']-dc['ATR']*(0.8 if 'Hull' in sn else 1.2 if 'UTBot' in sn else 1.8) if 'Bull' in sn or 'Buy' in sn else dc['High']+dc['ATR']*(0.8 if 'Hull' in sn else 1.2 if 'UTBot' in sn else 1.8)
         _sig_marker(fig,dc,sn,1,yoff,clr,sym,sz,lbl)
     sb,ss=_collect_strong_markers(dc)
+    _add_signal_boxes(fig,dc,sb,ss)
+    _add_volume_profile_overlay(fig,dc)
     if sb.any():
         sr=dc[sb];yv=sr['Low']-sr['ATR']*2;ht=[]
         for bi in sr.index:
@@ -147,13 +184,13 @@ def build_chart(dc,ticker):
     # R2 Vol
     bb=dc['Close']<dc['Open'];fig.add_trace(go.Bar(x=dc.index,y=dc['Volume'],marker_color=np.where(bb,'rgba(255,23,68,.5)','rgba(0,230,118,.5)').tolist(),name="Vol",opacity=.8,hoverinfo='skip',showlegend=False),row=2,col=1)
     # R3 WT
-    fig.add_trace(go.Scatter(x=dc.index,y=dc['WT1'],line=dict(color='#00E676',width=2),name="WT1",hovertemplate="WT1:%{y:.1f}<extra></extra>"),row=3,col=1)
+    fig.add_trace(go.Scatter(x=dc.index,y=dc['WT1'],line=dict(color='#00E676',width=2),name="WT1",hovertemplate="WT1:%{y:.1f}<br><span style='color:#94A3B8'>과매수/과매도 압력 지표</span><extra></extra>"),row=3,col=1)
     fig.add_trace(go.Scatter(x=dc.index,y=dc['WT2'],line=dict(color='#FF1744',width=1.5,dash='dot'),hoverinfo='skip',showlegend=False),row=3,col=1)
     wd=dc['WT1']-dc['WT2'];fig.add_trace(go.Bar(x=dc.index,y=wd,marker_color=np.where(wd>=0,'rgba(0,230,118,.25)','rgba(255,23,68,.25)').tolist(),hoverinfo='skip',showlegend=False),row=3,col=1)
     for y_,c_,d_ in [(OB1,'#FF5252','solid'),(0,'#475569','dot'),(OS1,'#4FC3F7','solid')]:fig.add_hline(y=y_,line_dash=d_,line_color=c_,line_width=1,row=3,col=1)
     for sn,clr,sym,sz,lbl in [('Gold_Dot','#FFD700','star',14,'🏆Gold'),('Green_Dot_T1','#00E676','circle',10,'🟢T1'),('Green_Dot_T2','#69F0AE','circle',8,'🟩T2'),('Blood_Diamond','#DC143C','star',14,'🩸Blood'),('Red_Dot_T1','#FF1744','circle',10,'🔴T1'),('Red_Dot_T2','#FF5252','circle',8,'🟥T2'),('Bull_Divergence','#AA00FF','triangle-up',10,'📈BullDiv'),('Bear_Divergence','#AA00FF','triangle-down',10,'📉BearDiv'),('RSI_Bull_Divergence','#CE93D8','triangle-up',8,'📊RSIDiv▲'),('RSI_Bear_Divergence','#CE93D8','triangle-down',8,'📊RSIDiv▼')]:_sig_marker(fig,dc,sn,3,dc['WT1'],clr,sym,sz,lbl)
     # R4 MACD
-    fig.add_trace(go.Scatter(x=dc.index,y=dc['MACD_Line'],line=dict(color='#29B6F6',width=1.5),name="MACD",hovertemplate="MACD:%{y:.3f}<extra></extra>"),row=4,col=1)
+    fig.add_trace(go.Scatter(x=dc.index,y=dc['MACD_Line'],line=dict(color='#29B6F6',width=1.5),name="MACD",hovertemplate="MACD:%{y:.3f}<br><span style='color:#94A3B8'>0 상향이면 상승 모멘텀 우위</span><extra></extra>"),row=4,col=1)
     fig.add_trace(go.Scatter(x=dc.index,y=dc['MACD_Signal'],line=dict(color='#FFA726',width=1.5),hoverinfo='skip',showlegend=False),row=4,col=1)
     mh_=dc['MACD_Hist'];fig.add_trace(go.Bar(x=dc.index,y=mh_,marker_color=np.where(mh_>=0,'#26A69A','#EF5350').tolist(),opacity=.7,hoverinfo='skip',showlegend=False),row=4,col=1)
     fig.add_hline(y=0,line_color="#475569",line_width=1,row=4,col=1)
@@ -161,13 +198,13 @@ def build_chart(dc,ticker):
     # R5 MFI
     mfr=dc.get('MFI',pd.Series(50,index=dc.index));mfc=mfr-50;rmfi=dc.get('RSI_MFI',pd.Series(0,index=dc.index))
     fig.add_trace(go.Bar(x=dc.index,y=rmfi,marker_color=np.where(rmfi>=0,'rgba(0,230,118,.35)','rgba(255,23,68,.35)').tolist(),opacity=.7,hoverinfo='skip',showlegend=False),row=5,col=1)
-    fig.add_trace(go.Scatter(x=dc.index,y=mfc,line=dict(color='#AB47BC',width=2.5),name="MFI",hovertemplate="MFI:%{customdata:.1f}<extra></extra>",customdata=mfr.values),row=5,col=1)
+    fig.add_trace(go.Scatter(x=dc.index,y=mfc,line=dict(color='#AB47BC',width=2.5),name="MFI",hovertemplate="MFI:%{customdata:.1f}<br><span style='color:#94A3B8'>자금 유입/이탈 강도</span><extra></extra>",customdata=mfr.values),row=5,col=1)
     fig.add_hrect(y0=30,y1=50,fillcolor="rgba(239,68,68,.08)",line_width=0,row=5,col=1);fig.add_hrect(y0=-50,y1=-30,fillcolor="rgba(16,185,129,.08)",line_width=0,row=5,col=1)
     for y_,c_,d_ in [(30,'#FF5252','dash'),(-30,'#4FC3F7','dash'),(0,'#475569','solid')]:fig.add_hline(y=y_,line_dash=d_,line_color=c_,line_width=1,row=5,col=1)
     for sn,clr,sym,sz,lbl in [('MF_Cross_Bull','#00E676','triangle-up',10,'💰MF▲'),('MF_Cross_Bear','#FF1744','triangle-down',10,'💸MF▼'),('MF_Bull_Div','#7C4DFF','diamond',10,'💹MFDiv▲'),('MF_Bear_Div','#E040FB','diamond',10,'💹MFDiv▼'),('CMF_Bull','#00BCD4','circle',8,'🌀CMF▲'),('CMF_Bear','#FF5722','circle',8,'🌀CMF▼')]:_sig_marker(fig,dc,sn,5,mfc,clr,sym,sz,lbl)
     # R6 Stoch
     slk=dc.get('SlowK',pd.Series(50,index=dc.index));sld=dc.get('SlowD',pd.Series(50,index=dc.index))
-    fig.add_trace(go.Scatter(x=dc.index,y=slk,line=dict(color='#00BCD4',width=2),name="SlowK",hovertemplate="SlK:%{y:.1f}<extra></extra>"),row=6,col=1)
+    fig.add_trace(go.Scatter(x=dc.index,y=slk,line=dict(color='#00BCD4',width=2),name="SlowK",hovertemplate="SlK:%{y:.1f}<br><span style='color:#94A3B8'>20↓ 과매도, 80↑ 과매수</span><extra></extra>"),row=6,col=1)
     fig.add_trace(go.Scatter(x=dc.index,y=sld,line=dict(color='#FF9800',width=1.5,dash='dot'),hoverinfo='skip',showlegend=False),row=6,col=1)
     fig.add_hrect(y0=80,y1=100,fillcolor="rgba(239,68,68,.08)",line_width=0,row=6,col=1);fig.add_hrect(y0=0,y1=20,fillcolor="rgba(16,185,129,.08)",line_width=0,row=6,col=1)
     for y_,c_,d_ in [(80,'#FF5252','dash'),(20,'#4FC3F7','dash'),(50,'#475569','dot')]:fig.add_hline(y=y_,line_dash=d_,line_color=c_,line_width=1,row=6,col=1)
@@ -175,7 +212,7 @@ def build_chart(dc,ticker):
     # R7 SqMom
     sqm=dc.get('Squeeze_Momentum',pd.Series(0,index=dc.index));sqr=dc.get('Squeeze_Mom_Rising',pd.Series(False,index=dc.index)).fillna(False);sqp=dc.get('Squeeze_Mom_Positive',pd.Series(False,index=dc.index)).fillna(False);sqo=dc.get('Squeeze_On',pd.Series(False,index=dc.index)).fillna(False)
     sqc=np.where(sqp&sqr,'#00E676',np.where(sqp&~sqr,'#69F0AE',np.where(~sqp&sqr,'#FF8A80','#FF1744')))
-    fig.add_trace(go.Bar(x=dc.index,y=sqm,marker_color=sqc.tolist(),name="SqMom",opacity=.85,hovertemplate="SqMom:%{y:.3f}<extra></extra>"),row=7,col=1)
+    fig.add_trace(go.Bar(x=dc.index,y=sqm,marker_color=sqc.tolist(),name="SqMom",opacity=.85,hovertemplate="SqMom:%{y:.3f}<br><span style='color:#94A3B8'>스퀴즈 에너지 방향</span><extra></extra>"),row=7,col=1)
     fig.add_hline(y=0,line_color="#475569",line_width=1,row=7,col=1)
     if sqo.any():
         smn=float(sqm.min()) if len(sqm)>0 else -0.1;dy=smn*1.1 if smn<0 else -0.05
