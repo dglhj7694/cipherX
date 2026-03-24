@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import plotly.graph_objects as go
 import json
@@ -87,19 +88,13 @@ def render_price_header(m):
 
     st.markdown(
         f"""
-        <div style='background:linear-gradient(140deg,rgba(99,102,241,.15),rgba(15,23,42,.75));border:1px solid rgba(99,102,241,.35);border-radius:12px;padding:12px 14px;margin-bottom:12px'>
-            {insight_body}
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(
-        f"""
         <div class="price-header fade-up">
             <p style="color:#64748B;font-size:.8rem;margin:0">{m['ticker']} - {m['last_date']} - <b style="color:#A5B4FC">{m['regime_label']}</b> - <span style='color:#A5B4FC'>[CTX] {m.get('context_label', 'default')}</span></p>
             <p class="price-big" style="color:#F8FAFC">${m['price']:.2f}<span class="{cc}" style="font-size:1.1rem;margin-left:10px;font-weight:700">{ci}{abs(chg):.2f}({abs(cp):.2f}%)</span></p>
             <div style="margin-top:10px;display:flex;gap:4px;flex-wrap:wrap">{ih}</div>
+            <div style='margin-top:12px;background:linear-gradient(140deg,rgba(99,102,241,.13),rgba(15,23,42,.75));border:1px solid rgba(99,102,241,.28);border-radius:10px;padding:10px 12px'>
+                {insight_body}
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -154,6 +149,11 @@ def render_judgment_card(m):
     jc='#34D399' if 'BUY' in jg else('#F87171' if 'SELL' in jg else '#FF9800')
     ba=m.get('buy_agree',0);sa=m.get('sell_agree',0);veto=m.get('veto_flags','');syn=m.get('reversal_synergy',0);pred=m.get('prediction_boost',0)
     reason=m.get('judgment_reason','');detail=m.get('judgment_detail','');action=m.get('action_label','')
+    detail_text=(detail or '').strip() or (reason or '').strip()
+    detail_html=f"""<div style="margin:16px 0;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:14px 18px;border-left:3px solid {jc}">
+            <p style="color:#94A3B8;font-size:.72rem;font-weight:700;margin:0 0 6px">근거 요약</p>
+            <p style="color:#CBD5E1;font-size:.82rem;margin:0">{detail_text}</p>
+        </div>""" if detail_text else ""
     circ=2*3.14159*36;offset=circ*(1-cf/100)
     # Committee vote dots
     committee=m.get('committee',{})
@@ -185,10 +185,7 @@ def render_judgment_card(m):
                 {dots_html}
             </div>
         </div>
-        <div style="margin:16px 0;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:14px 18px;border-left:3px solid {jc}">
-            <p style="color:#E2E8F0;font-size:.9rem;font-weight:600;margin:0 0 6px">{reason}</p>
-            <p style="color:#64748B;font-size:.78rem;margin:0">{detail}</p>
-        </div>
+        {detail_html}
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:14px">
             <div style="background:rgba(255,255,255,.03);border-radius:10px;padding:12px;text-align:center">
                 <p style="color:#64748B;font-size:.68rem;font-weight:700;margin:0 0 4px">Ensemble</p>
@@ -279,7 +276,9 @@ def render_10layer_bars(m):
         f"{rows_html}"
         "</div>"
     )
-    st.markdown(panel_html, unsafe_allow_html=True)
+    panel_h=max(430,120+len(layer_names)*44)
+    html_doc=f"""<!doctype html><html><head><meta charset='utf-8'></head><body style='margin:0;background:transparent;color:#E2E8F0;font-family:Pretendard,system-ui,sans-serif'>{panel_html}</body></html>"""
+    components.html(html_doc,height=panel_h,scrolling=False)
 def render_leading_lagging(m):
     lv=m['leading_verdict'];lgv=m['lagging_verdict'];ac=m['composite_accel']
     lc='#34D399' if '상승' in lv else('#F87171' if '하락' in lv else '#FF9800')

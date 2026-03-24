@@ -4,6 +4,86 @@ from config import *
 from utils import _volf, _recent, _cd_dir, _cooldown, _vs, _sp, _spd, _sf, _cs_str
 from indicators import detect_pivot_div, compute_indicators, compute_hull_ma, compute_ut_bot, compute_stochastic_slow, compute_squeeze_mom_enh
 
+def _ensure_runtime_combo_registry():
+    """
+    Register additional practical combo scans at runtime.
+    This keeps config.py stable while allowing faster algorithm iteration.
+    """
+    runtime_combos = {
+        'CS_Trend_Continuation_Buy': {
+            'name': 'Trend Continuation Buy',
+            'kor': 'Trend continuation buy',
+            'dir': 'buy',
+            'tier': 2,
+            'icon': 'UP',
+            'color': '#34D399',
+            'desc': 'Trend pullback hold + momentum restart',
+            'win': '60-72%',
+        },
+        'CS_Trend_Continuation_Sell': {
+            'name': 'Trend Continuation Sell',
+            'kor': 'Trend continuation sell',
+            'dir': 'sell',
+            'tier': 2,
+            'icon': 'DN',
+            'color': '#F87171',
+            'desc': 'Bear trend bounce fail + momentum rollover',
+            'win': '60-72%',
+        },
+        'CS_Reversal_Cluster_Buy': {
+            'name': 'Reversal Cluster Buy',
+            'kor': 'Reversal cluster buy',
+            'dir': 'buy',
+            'tier': 1,
+            'icon': 'REV',
+            'color': '#22C55E',
+            'desc': 'Divergence + oversold + turn signal cluster',
+            'win': '68-80%',
+        },
+        'CS_Reversal_Cluster_Sell': {
+            'name': 'Reversal Cluster Sell',
+            'kor': 'Reversal cluster sell',
+            'dir': 'sell',
+            'tier': 1,
+            'icon': 'REV',
+            'color': '#EF4444',
+            'desc': 'Divergence + overbought + turn signal cluster',
+            'win': '68-80%',
+        },
+        'CS_Breakout_Confirm_Buy': {
+            'name': 'Breakout Confirm Buy',
+            'kor': 'Breakout confirm buy',
+            'dir': 'buy',
+            'tier': 2,
+            'icon': 'BRK',
+            'color': '#60A5FA',
+            'desc': 'Breakout with volume and ADX/momentum confirmation',
+            'win': '62-74%',
+        },
+        'CS_Breakout_Confirm_Sell': {
+            'name': 'Breakout Confirm Sell',
+            'kor': 'Breakdown confirm sell',
+            'dir': 'sell',
+            'tier': 2,
+            'icon': 'BRK',
+            'color': '#F97316',
+            'desc': 'Breakdown with volume and ADX/momentum confirmation',
+            'win': '62-74%',
+        },
+        'CS_Conflict_Warning': {
+            'name': 'Conflict Warning',
+            'kor': 'Direction conflict warning',
+            'dir': 'neutral',
+            'tier': 3,
+            'icon': 'WARN',
+            'color': '#F59E0B',
+            'desc': 'Strong buy/sell conditions fired together',
+            'win': 'N/A',
+        },
+    }
+    for key, value in runtime_combos.items():
+        COMBINED_SCAN_REGISTRY.setdefault(key, value)
+
 def det_123pb(h,l,c,adx,pdi,mdi):
     sb=(adx>30)&(pdi>mdi);sbe=(adx>30)&(mdi>pdi);ins=(h<h.shift(1))&(l>l.shift(1))
     l1,l2,l3=l<l.shift(1),l.shift(1)<l.shift(2),l.shift(2)<l.shift(3);tl=l1&l2&l3;tli=(l1&l2&ins.shift(2))|(l1&ins.shift(1)&l2.shift(1))|(ins&l1&l2)
@@ -42,6 +122,7 @@ def det_bb(c,o,h,l,bbu,bbl,bbw,kcu,kcl):
 
 # ━━━ detect_all_signals ━━━
 def detect_all_signals(df):
+    _ensure_runtime_combo_registry()
     H,L,C,O,V=df['High'],df['Low'],df['Close'],df['Open'],df['Volume']
     e8,e21=df['EMA8'],df['EMA21'];m10,m20,m50,m200=df['MA10'],df['MA20'],df['MA50'],df['MA200']
     wt1,wt2,atr=df['WT1'],df['WT2'],df['ATR'];adx,pdi,mdi=df['ADX'],df['Plus_DI'],df['Minus_DI']
@@ -196,10 +277,32 @@ def detect_combined_scans(df,vol_ratio,hma_rising):
     df['CS_Trend_Rejection_Sell']=dn_&(n50|(H>=N('MA20'))&(C<N('MA20')))&(sc__|(C<O))&mfs_;df['CS_Squeeze_Breakdown_Sell']=(F('BB_Squeeze_End_Bear')|(F('BB_Squeeze').shift(1)&(C<N('BB_Mid'))&(C<O)))&vok_&mf_
     df['CS_MA_Breakdown_Sell']=((N('MA50')<N('MA200'))&(N('MA50')<N('MA50').shift(5)))&(F('MACD_Cross_Sell')|mf_)&vok_&(C<N('MA50'));df['CS_Cooper_Setup_Sell']=cs___&adx_ok&(N('Minus_DI')>N('Plus_DI'))&vok_&(C<N('MA50'))
     df['CS_Gap_Failure_Sell']=(F('Gap_Up').shift(1).fillna(False)&sc__&vok_&wf_)|(F('Gap_Up')&(C<O)&vok_)
-    df['CS_Oversold_Bounce_Buy']=sos_&bc_&(n50|n_bl);df['CS_Momentum_Accel_Buy']=(N('Composite_Accel',0)>1.5)&vok_&(C>N('MA50'));df['CS_Structure_Support_Buy']=n_vp&n_bl&(C>O)
-    df['CS_Overbought_Fade_Sell']=sob_&sc__&(n50|n_bu);df['CS_Volatility_Explosion']=(F('NR7_2').astype(int)+F('BB_Squeeze').astype(int)+(vr<.5).astype(int)+F('Inside_Day').astype(int))>=3
+    os_ctx=(N('WT1')<-55)|(N('RSI')<35)|(N('StochK')<25)
+    ob_ctx=(N('WT1')>55)|(N('RSI')>65)|(N('StochK')>75)
+    trend_favor_buy=(N('Plus_DI')>=N('Minus_DI'))|(N('ADX')<25)
+    trend_favor_sell=(N('Minus_DI')>=N('Plus_DI'))|(N('ADX')<25)
+
+    # Lower-tier mean-reversion setups tightened with momentum confirmation
+    df['CS_Oversold_Bounce_Buy']=sos_&bc_&(n50|n_bl)&(wr_|mr_|mfb_)&trend_favor_buy
+    df['CS_Overbought_Fade_Sell']=sob_&sc__&(n50|n_bu)&(wf_|mf_|mfs_)&trend_favor_sell
+
+    # New practical combo families
+    df['CS_Trend_Continuation_Buy']=up_&(C>N('MA20'))&(F('EMA_Pullback_Buy')|F('MA20_Support')|F('MA50_Support'))&(wr_|mr_)&(vr>=1.0)&(N('ADX')>=18)
+    df['CS_Trend_Continuation_Sell']=dn_&(C<N('MA20'))&(F('EMA_Pullback_Sell')|F('MA20_Resistance')|F('MA50_Resistance'))&(wf_|mf_)&(vr>=1.0)&(N('ADX')>=18)
+    df['CS_Reversal_Cluster_Buy']=(dbc_>=2)&os_ctx&(bc_|llw_|F('Parabolic_Bottom_Buy')|F('Volume_Climax_Buy'))&(wr_|F('UTBot_Buy')|F('Hull_Turn_Bull'))&vok_
+    df['CS_Reversal_Cluster_Sell']=(dsc_>=2)&ob_ctx&(sc__|luw_|F('Parabolic_Top_Sell')|F('Volume_Climax_Sell'))&(wf_|F('UTBot_Sell')|F('Hull_Turn_Bear'))&vok_
+    df['CS_Breakout_Confirm_Buy']=(F('Expansion_BO')|F('Kumo_Breakout_Bull')|F('BB_Upper_Break')|F('New_52W_High'))&(vr>=1.4)&(N('ADX')>=20)&(N('MACD_Hist')>N('MACD_Hist').shift(1))
+    df['CS_Breakout_Confirm_Sell']=(F('Expansion_BD')|F('Kumo_Breakout_Bear')|F('BB_Lower_Break')|F('New_52W_Low'))&(vr>=1.4)&(N('ADX')>=20)&(N('MACD_Hist')<N('MACD_Hist').shift(1))
+
+    df['CS_Momentum_Accel_Buy']=(N('Composite_Accel',0)>1.5)&vok_&(C>N('MA50'))
+    df['CS_Structure_Support_Buy']=n_vp&n_bl&(C>O)
+    df['CS_Volatility_Explosion']=(F('NR7_2').astype(int)+F('BB_Squeeze').astype(int)+(vr<.5).astype(int)+F('Inside_Day').astype(int))>=3
     df['CS_Bottom_Fishing_Buy']=deep_os&down_stretch&bull_turn&(dbc_>=1)&(llw_|bc_|cb_)&vok_
     df['CS_Top_Fishing_Sell']=deep_ob&up_stretch&bear_turn&(dsc_>=1)&(luw_|sc__|cs___)&vok_
+
+    buy_cluster=(df['CS_Reversal_Cluster_Buy']|df['CS_Trend_Continuation_Buy']|df['CS_Breakout_Confirm_Buy'])
+    sell_cluster=(df['CS_Reversal_Cluster_Sell']|df['CS_Trend_Continuation_Sell']|df['CS_Breakout_Confirm_Sell'])
+    df['CS_Conflict_Warning']=buy_cluster&sell_cluster
     for sn,cfg in COMBINED_SCAN_REGISTRY.items():
         if sn in df.columns:df[sn]=_cooldown(df[sn],bars={1:5,2:7,3:10}.get(cfg.get('tier',2),7))
     return df
@@ -287,8 +390,29 @@ def compute_10layer_scores(df, vol_ratio, hma_r_v):
     slag_=pd.Series(0.,index=idx);slag_+=b200.astype(float)*1.0+b50.astype(float)*1.0+(N('MA50')<N('MA200')).astype(float)*1.0;
     slag_+=np.clip(-regime.values*1.0,-1.5,3)+np.where(C<kumo_bot,1.5,np.where(C>kumo_top,-1,0))+np.clip((1.0-N('RS_Ratio',1))*30,-1.5,2);df['SL_Lagging']=slag_.clip(-2,JT.LAGGING_CAP)
     LN=['Trend','Momentum','Candle','BB','Volume','MF','Pattern','Combined','Leading','Lagging']
-    df['Buy_Total']=sum(df[f'BL_{n}'].clip(lower=0) for n in LN);df['Sell_Total']=sum(df[f'SL_{n}'].clip(lower=0) for n in LN)
-    df['Buy_Active_Layers']=sum((df[f'BL_{n}']>0).astype(int) for n in LN);df['Sell_Active_Layers']=sum((df[f'SL_{n}']>0).astype(int) for n in LN)
+    buy_raw=sum(df[f'BL_{n}'].clip(lower=0) for n in LN)
+    sell_raw=sum(df[f'SL_{n}'].clip(lower=0) for n in LN)
+    df['Buy_Active_Layers']=sum((df[f'BL_{n}']>0).astype(int) for n in LN)
+    df['Sell_Active_Layers']=sum((df[f'SL_{n}']>0).astype(int) for n in LN)
+
+    # Cross-layer conflict/quality modeling for more realistic trade scoring.
+    conflict_layers=sum(((df[f'BL_{n}']>0)&(df[f'SL_{n}']>0)).astype(int) for n in LN)
+    buy_core=(df['BL_Trend']+df['BL_Momentum']+df['BL_Leading']).clip(lower=0)
+    sell_core=(df['SL_Trend']+df['SL_Momentum']+df['SL_Leading']).clip(lower=0)
+    buy_quality=(1.0+np.clip((buy_core-sell_core)/36.0,-0.20,0.35)).astype(float)
+    sell_quality=(1.0+np.clip((sell_core-buy_core)/36.0,-0.20,0.35)).astype(float)
+    conflict_penalty=np.clip(conflict_layers*0.7,0,6).astype(float)
+
+    t1_buy_cols=[cn for cn,cfg in COMBINED_SCAN_REGISTRY.items() if cfg.get('dir')=='buy' and cfg.get('tier')==1 and cn in df.columns]
+    t1_sell_cols=[cn for cn,cfg in COMBINED_SCAN_REGISTRY.items() if cfg.get('dir')=='sell' and cfg.get('tier')==1 and cn in df.columns]
+    t1_buy_boost=sum(df[col].fillna(False).astype(float) for col in t1_buy_cols) if t1_buy_cols else pd.Series(0.,index=idx)
+    t1_sell_boost=sum(df[col].fillna(False).astype(float) for col in t1_sell_cols) if t1_sell_cols else pd.Series(0.,index=idx)
+
+    df['Signal_Conflict_Layers']=conflict_layers
+    df['Buy_Quality_Factor']=buy_quality
+    df['Sell_Quality_Factor']=sell_quality
+    df['Buy_Total']=((buy_raw*buy_quality)+(t1_buy_boost*0.8)-conflict_penalty).clip(lower=0)
+    df['Sell_Total']=((sell_raw*sell_quality)+(t1_sell_boost*0.8)-conflict_penalty).clip(lower=0)
     ls_=df['BL_Leading']-df['SL_Leading'];lgs=df['BL_Lagging']-df['SL_Lagging']
     df['Leading_Verdict']=np.select([ls_>3,ls_>1,ls_<-3,ls_<-1],['강한 상승 가속','상승 임박','강한 하락 가속','하락 임박'],default='중립')
     df['Lagging_Verdict']=np.select([lgs>3,lgs>1,lgs<-3,lgs<-1],['강한 상승 추세','상승 추세','강한 하락 추세','하락 추세'],default='비추세/횡보')
@@ -512,6 +636,15 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
     mb=np.where(mu.values>=3,8,np.where(md.values>=3,-8,0));stk=N('StochK');sb=np.where((stk.values<20)&(stk.values>N('StochD').values),5,np.where((stk.values>80)&(stk.values<N('StochD').values),-5,0))
     pred=ab+mb+sb;df['Prediction_Boost']=pred
     contribs=es*(ec/100.)*wa;ens=contribs.sum(axis=1)+syn+pred
+    # Blend in 10-layer totals to reduce committee-only bias.
+    buy_total_arr=N('Buy_Total').values;sell_total_arr=N('Sell_Total').values
+    ba_layers=N('Buy_Active_Layers').values;sa_layers=N('Sell_Active_Layers').values
+    layer_edge=buy_total_arr-sell_total_arr
+    ens+=np.clip(layer_edge*0.55,-24,24)
+    ens+=np.where((ba_layers>=7)&(sa_layers<=2),5,0)
+    ens-=np.where((sa_layers>=7)&(ba_layers<=2),5,0)
+    conflict_adj=np.clip(np.minimum(ba_layers,sa_layers)*1.3,0,8)
+    ens-=np.where(np.abs(layer_edge)<6,conflict_adj,conflict_adj*0.4)
     for ci,cm in enumerate(COMMITTEE_NAMES):
         s=es[:,ci];c=ec[:,ci];v=np.full(n,0,dtype=int);v=np.where((s>15)&(c>=25),1,v);v=np.where((s<-15)&(c>=25),-1,v);v=np.where(c<15,-99,v)
         df[f'CM_{cm}_Vote']=v;df[f'CM_{cm}_EffScore']=es[:,ci];df[f'CM_{cm}_EffConv']=ec[:,ci]
@@ -519,6 +652,8 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
     # 판단
     bag=np.zeros(n,dtype=int);sag=np.zeros(n,dtype=int)
     for ci in range(NUM_COMMITTEES):bag+=((es[:,ci]>15)&(ec[:,ci]>=25)).astype(int);sag+=((es[:,ci]<-15)&(ec[:,ci]>=25)).astype(int)
+    bag+=((ba_layers>=6)&(buy_total_arr>=20)).astype(int)
+    sag+=((sa_layers>=6)&(sell_total_arr>=20)).astype(int)
     cth=np.zeros(n);cth=np.where(ctx_v==CTX_EXTREME_OS,-10,cth);cth=np.where(ctx_v==CTX_EXTREME_OB,10,cth);cth=np.where(ctx_v==CTX_STRONG_UP,5,cth);cth=np.where(ctx_v==CTX_STRONG_DN,-5,cth);cth=np.where(ctx_v==CTX_BOTTOMING,-8,cth);cth=np.where(ctx_v==CTX_TOPPING,8,cth)
     j=np.full(n,'NEUTRAL',dtype=object);conf=np.zeros(n,dtype=float)
     rs=[];rd=[];al=[]
@@ -542,6 +677,14 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
         elif ba>=3 and sl>=3:j[i]='MIXED'
         ae=abs(e);dm=max(ba,sl);ap=dm/NUM_COMMITTEES*35;sp=min(ae/60*30,30);avp=np.mean(ec[i])/100*20;syp=min(abs(sy)/20*10,10);pp=min(abs(pred[i])/15*5,5)
         raw=ap+sp+avp+syp+pp
+        layer_conf=0.
+        if j[i] in ('STRONG_BUY','BUY','WATCH_BUY'):
+            layer_conf=min((ba_layers[i]*1.6)+(buy_total_arr[i]*0.22),14)
+        elif j[i] in ('STRONG_SELL','SELL','WATCH_SELL'):
+            layer_conf=min((sa_layers[i]*1.6)+(sell_total_arr[i]*0.22),14)
+        raw+=layer_conf
+        if min(ba_layers[i],sa_layers[i])>=4:
+            raw-=5
         if j[i] in ('NEUTRAL','MIXED'):raw=max(15,min(55,raw))
         conf[i]=np.clip(raw,5,99)
         

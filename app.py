@@ -7,7 +7,6 @@ import streamlit as st, google.generativeai as genai
 import time, re, math, json
 from datetime import datetime
 from st_copy_to_clipboard import st_copy_to_clipboard
-import numpy as np
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from sectors import SECTOR_GROUPS
 from config import GEMINI_API_KEY, COMBINED_SCAN_REGISTRY, CTX_KOR
@@ -116,56 +115,65 @@ with st.sidebar:
 current_mode=st.session_state.get('_mode','분석')
 if current_mode=='스캐너':
     st.markdown("<h2 style='text-align:center;color:#fff'>🔍 Scanner</h2>",unsafe_allow_html=True)
+    all_universe=sorted({str(t).strip().upper() for ts in SECTOR_GROUPS.values() for t in ts if str(t).strip()})
     st.markdown("#### 📂 섹터 선택");sector_names=list(SECTOR_GROUPS.keys());selected_sector=st.session_state.get('selected_sector',None)
     for rs in range(0,len(sector_names),3):
         ri=sector_names[rs:rs+3];cols=st.columns(3)
         for i,sn in enumerate(ri):
             with cols[i]:
                 if st.button(f"{sn}\n({len(SECTOR_GROUPS[sn])})",key=f"sec_{rs+i}",use_container_width=True,type="primary" if selected_sector==sn else "secondary"):st.session_state['selected_sector']=sn;st.session_state['scan_tickers_override']=SECTOR_GROUPS[sn];st.rerun()
-    if selected_sector:st.markdown(f"<div style='background:rgba(99,102,241,.08);border:1px solid #6366F133;border-radius:10px;padding:10px 14px;margin:8px 0'><span style='color:#A5B4FC;font-weight:700'>{selected_sector}</span><span style='color:#64748B;margin-left:8px'>{len(SECTOR_GROUPS.get(selected_sector,[]))}종목</span></div>",unsafe_allow_html=True)
+    if st.button(f"🌐 전체종목\n({len(all_universe)})",key="sec_all",use_container_width=True,type="primary" if selected_sector=='🌐 전체' else "secondary"):st.session_state['selected_sector']='🌐 전체';st.session_state['scan_tickers_override']=all_universe;st.rerun()
+    if selected_sector:
+        sel_cnt=len(st.session_state.get('scan_tickers_override',[])) if selected_sector=='🌐 전체' else len(SECTOR_GROUPS.get(selected_sector,[]))
+        st.markdown(f"<div style='background:rgba(99,102,241,.08);border:1px solid #6366F133;border-radius:10px;padding:10px 14px;margin:8px 0'><span style='color:#A5B4FC;font-weight:700'>{selected_sector}</span><span style='color:#64748B;margin-left:8px'>{sel_cnt}종목</span><span style='color:#64748B;margin-left:8px'>· 점수 높은 순 정렬</span></div>",unsafe_allow_html=True)
     st.markdown("#### ✏️ 직접 입력");ci=st.text_input("티커",placeholder="NVDA,TSLA...",key="scan_in")
     if ci and ci.strip():tickers=[t.strip().upper() for t in ci.split(',') if t.strip()];scan_source="직접"
     elif st.session_state.get('scan_tickers_override'):tickers=st.session_state['scan_tickers_override'];scan_source=selected_sector or "섹터"
     else:tickers=[];scan_source="직접"
+    tickers=list(dict.fromkeys([t for t in tickers if t]))
     cb1,cb2=st.columns([3,1])
     with cb1:scan_btn=st.button(f"🚀 스캔({len(tickers)})",type="primary",use_container_width=True)
     with cb2:
         if st.button("🗑️",use_container_width=True,key="sr"):st.session_state.pop('selected_sector',None);st.session_state.pop('scan_tickers_override',None);st.session_state['scan_results']=[];st.rerun()
     if scan_btn and tickers:
-        pb=st.progress(0);results=[];sts=math.floor(time.time()/300)
+        pb=st.progress(0);results=[];sts=math.floor(time.time()/300);combo_items=list(COMBINED_SCAN_REGISTRY.items())
         def _so(t):
             try:
-                time.sleep(np.random.uniform(0.1, 0.5)) # API Rate Limit 회피용 지터링 추가
                 df_=_compute_cached(t,f"{t}_{sts}")
                 if df_ is None or len(df_)<50:return None
                 dc_=df_.tail(63);acs=[];lsd=None
-                for cn,ccfg in COMBINED_SCAN_REGISTRY.items():
+                for cn,ccfg in combo_items:
                     if cn in dc_.columns and dc_[cn].tail(5).any():ld=dc_[cn].tail(5)[dc_[cn].tail(5)].index[-1];acs.append({'icon':ccfg['icon'],'kor':ccfg['kor'],'dir':ccfg['dir'],'tier':ccfg['tier'],'date':ld.strftime('%m/%d')});lsd=ld if lsd is None or ld>lsd else lsd
                 lt=dc_.iloc[-1];ch=_sf((lt['Close']-dc_.iloc[-2]['Close'])/dc_.iloc[-2]['Close']*100) if len(dc_)>=2 else 0
-                return {'ticker':t,'price':_sf(lt['Close']),'chg':ch,'scans':sorted(acs,key=lambda x:x['tier']),'jg':str(lt.get('Trade_Judgment','N/A')),'cf':_sf(lt.get('Judgment_Confidence',0)),'es':_sf(lt.get('Ensemble_Score',0)),'ctx':CTX_KOR.get(int(_sf(lt.get('Market_Context',0))),'기본'),'ba':int(_sf(lt.get('Buy_Agree',0))),'sa':int(_sf(lt.get('Sell_Agree',0))),'latest_sig':lsd.strftime('%Y-%m-%d') if lsd else '9999-99-99','reason':str(lt.get('Judgment_Reason','')),'action':str(lt.get('Action_Label',''))}
+                bt=_sf(lt.get('Buy_Total',0));stt=_sf(lt.get('Sell_Total',0));ba=int(_sf(lt.get('Buy_Agree',0)));sa=int(_sf(lt.get('Sell_Agree',0)))
+                t1b=sum(1 for s in acs if s['tier']==1 and s['dir']=='buy');t1s=sum(1 for s in acs if s['tier']==1 and s['dir']=='sell')
+                t2b=sum(1 for s in acs if s['tier']==2 and s['dir']=='buy');t2s=sum(1 for s in acs if s['tier']==2 and s['dir']=='sell')
+                es=_sf(lt.get('Ensemble_Score',0));cf=_sf(lt.get('Judgment_Confidence',0))
+                scan_score=es+((bt-stt)*0.55)+((ba-sa)*2.5)+(t1b*4.0)-(t1s*4.0)+(t2b*1.6)-(t2s*1.6)+(cf*0.04)
+                strength=abs(es)+((bt+stt)*0.35)+(abs(ba-sa)*1.8)+((t1b+t1s)*3.0)+(cf*0.02)
+                return {'ticker':t,'price':_sf(lt['Close']),'chg':ch,'scans':sorted(acs,key=lambda x:x['tier']),'jg':str(lt.get('Trade_Judgment','N/A')),'cf':cf,'es':es,'ctx':CTX_KOR.get(int(_sf(lt.get('Market_Context',0))),'기본'),'ba':ba,'sa':sa,'buy_total':bt,'sell_total':stt,'scan_score':_sf(scan_score),'strength':_sf(strength),'latest_sig':lsd.strftime('%Y-%m-%d') if lsd else '9999-99-99','latest_sig_ts':lsd.timestamp() if lsd else 0.0,'reason':str(lt.get('Judgment_Reason','')),'action':str(lt.get('Action_Label',''))}
             except:return None
-        with ThreadPoolExecutor(max_workers=min(8,len(tickers))) as ex:
+        with ThreadPoolExecutor(max_workers=min(16,max(4,len(tickers)//8),len(tickers))) as ex:
             futs={ex.submit(_so,t):t for t in tickers}
             for idx_f,f in enumerate(as_completed(futs)):
                 pb.progress((idx_f+1)/len(tickers))
                 r=f.result()
                 if r:results.append(r)
         pb.empty()
-        from datetime import datetime as dt_
-        results.sort(key=lambda x:(0 if x['scans'] else 1,-dt_.strptime(x['latest_sig'],'%Y-%m-%d').timestamp() if x['latest_sig']!='9999-99-99' else 0,-sum(1 for s in x['scans'] if s['tier']==1)))
+        results.sort(key=lambda x:(-x['scan_score'],-x['strength'],-x['latest_sig_ts'],x['ticker']))
         st.session_state['scan_results']=results;st.session_state['scan_source']=scan_source;st.session_state['scan_total']=len(tickers)
     results=st.session_state.get('scan_results',[])
     if results:
         bt=[r for r in results if 'BUY' in r['jg']];st_=[r for r in results if 'SELL' in r['jg']]
         scan_total=st.session_state.get('scan_total',0)  # ★ 미리 추출
         st.markdown(f"<div style='display:flex;gap:12px;margin-bottom:12px'><div style='flex:1;background:rgba(0,230,118,.06);border:1px solid #10B98133;border-radius:10px;padding:10px;text-align:center'><span style='color:#34D399;font-weight:800;font-size:1.3rem'>{len(bt)}</span><span style='color:#64748B;font-size:.8rem'> 매수</span></div><div style='flex:1;background:rgba(255,23,68,.06);border:1px solid #EF444433;border-radius:10px;padding:10px;text-align:center'><span style='color:#F87171;font-weight:800;font-size:1.3rem'>{len(st_)}</span><span style='color:#64748B;font-size:.8rem'> 매도</span></div><div style='flex:1;background:rgba(99,102,241,.06);border:1px solid #6366F133;border-radius:10px;padding:10px;text-align:center'><span style='color:#A5B4FC;font-weight:800;font-size:1.3rem'>{len(results)}</span><span style='color:#64748B;font-size:.8rem'>/{scan_total}</span></div></div>",unsafe_allow_html=True)
-        for r in results:
+        for rk,r in enumerate(results,start=1):
             chc='#34D399' if r['chg']>=0 else '#F87171';chi='▲' if r['chg']>=0 else '▼';jc='#34D399' if 'BUY' in r['jg'] else('#F87171' if 'SELL' in r['jg'] else '#FCD34D')
             sh="".join([f"<div style='display:flex;gap:6px;padding:2px 0'><span style='color:{'#34D399' if s['dir']=='buy' else '#F87171' if s['dir']=='sell' else '#FFC107'}'>●</span><span style='color:#E8ECF1;font-size:.82rem'>{s['icon']}{s['kor']}</span><span style='color:#64748B;font-size:.7rem'>{s['date']}</span></div>" for s in r['scans']]) if r['scans'] else "<span style='color:#475569;font-size:.8rem'>—</span>"
-            esc='#34D399' if r['es']>10 else('#F87171' if r['es']<-10 else '#FCD34D');bd='#1E293B' if r['scans'] else '#0F172A';op='1' if r['scans'] else '.6'
+            esc='#34D399' if r['es']>10 else('#F87171' if r['es']<-10 else '#FCD34D');bd='#1E293B' if r['scans'] else '#0F172A';op='1' if r['scans'] else '.6';sc='#34D399' if r['scan_score']>0 else('#F87171' if r['scan_score']<0 else '#FCD34D')
             rh=""
             if r.get('reason'):rc='#6EE7B7' if 'BUY' in r['jg'] else('#FCA5A5' if 'SELL' in r['jg'] else '#FCD34D');rh=f"<div style='padding:4px 0;border-top:1px solid rgba(255,255,255,.04);margin-top:4px'><span style='color:{rc};font-size:.78rem'>💬 {r['reason'][:80]}</span></div>"
-            st.markdown(f"<div style='background:linear-gradient(160deg,#0F1320,#141926);border:1px solid {bd};border-radius:14px;padding:14px 18px;margin:6px 0;opacity:{op}'><div style='display:flex;justify-content:space-between;margin-bottom:8px'><span style='color:#A5B4FC;font-weight:800;font-size:1.15rem'>{r['ticker']}</span><div style='display:flex;align-items:center;gap:8px'><span style='color:{esc};font-size:.75rem;font-weight:700'>ES:{r['es']:+.0f}</span><span style='color:{jc};font-size:.8rem;font-weight:600'>{r['jg']}({r['cf']:.0f}%)</span><span style='color:{chc};font-size:.8rem'>{chi}{abs(r['chg']):.1f}%</span></div></div>{sh}{rh}</div>",unsafe_allow_html=True)
+            st.markdown(f"<div style='background:linear-gradient(160deg,#0F1320,#141926);border:1px solid {bd};border-radius:14px;padding:14px 18px;margin:6px 0;opacity:{op}'><div style='display:flex;justify-content:space-between;margin-bottom:8px'><span style='color:#A5B4FC;font-weight:800;font-size:1.15rem'>#{rk} {r['ticker']}</span><div style='display:flex;align-items:center;gap:8px'><span style='color:{sc};font-size:.75rem;font-weight:700'>SCAN:{r['scan_score']:+.1f}</span><span style='color:{esc};font-size:.75rem;font-weight:700'>ES:{r['es']:+.0f}</span><span style='color:{jc};font-size:.8rem;font-weight:600'>{r['jg']}({r['cf']:.0f}%)</span><span style='color:{chc};font-size:.8rem'>{chi}{abs(r['chg']):.1f}%</span></div></div>{sh}{rh}</div>",unsafe_allow_html=True)
             if st.button(f"{r['ticker']} 분석",key=f"sc_{r['ticker']}",use_container_width=True):st.session_state['_mode']='분석';st.session_state['_auto']=r['ticker'];st.rerun()
 else:
     st.markdown("<h2 style='text-align:center;color:#fff;margin-bottom:4px'>🚦 CipherX V14.2</h2>",unsafe_allow_html=True)
