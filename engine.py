@@ -305,6 +305,30 @@ def detect_combined_scans(df,vol_ratio,hma_rising):
     df['CS_Conflict_Warning']=buy_cluster&sell_cluster
     for sn,cfg in COMBINED_SCAN_REGISTRY.items():
         if sn in df.columns:df[sn]=_cooldown(df[sn],bars={1:5,2:7,3:10}.get(cfg.get('tier',2),7))
+
+    # Engine-level multi-signal summary for scanner/metadata reuse.
+    buy_cols=[sn for sn,cfg in COMBINED_SCAN_REGISTRY.items() if sn in df.columns and cfg.get('dir')=='buy']
+    sell_cols=[sn for sn,cfg in COMBINED_SCAN_REGISTRY.items() if sn in df.columns and cfg.get('dir')=='sell']
+    neutral_cols=[sn for sn,cfg in COMBINED_SCAN_REGISTRY.items() if sn in df.columns and cfg.get('dir')=='neutral']
+    t1_cols=[sn for sn,cfg in COMBINED_SCAN_REGISTRY.items() if sn in df.columns and cfg.get('tier')==1]
+    t2_cols=[sn for sn,cfg in COMBINED_SCAN_REGISTRY.items() if sn in df.columns and cfg.get('tier')==2]
+    t3_cols=[sn for sn,cfg in COMBINED_SCAN_REGISTRY.items() if sn in df.columns and cfg.get('tier')==3]
+    bcnt=sum(df[c].fillna(False).astype(int) for c in buy_cols) if buy_cols else pd.Series(0,index=idx,dtype=int)
+    scnt=sum(df[c].fillna(False).astype(int) for c in sell_cols) if sell_cols else pd.Series(0,index=idx,dtype=int)
+    ncnt=sum(df[c].fillna(False).astype(int) for c in neutral_cols) if neutral_cols else pd.Series(0,index=idx,dtype=int)
+    t1cnt=sum(df[c].fillna(False).astype(int) for c in t1_cols) if t1_cols else pd.Series(0,index=idx,dtype=int)
+    t2cnt=sum(df[c].fillna(False).astype(int) for c in t2_cols) if t2_cols else pd.Series(0,index=idx,dtype=int)
+    t3cnt=sum(df[c].fillna(False).astype(int) for c in t3_cols) if t3_cols else pd.Series(0,index=idx,dtype=int)
+    mcnt=bcnt+scnt+ncnt
+    df['CS_Buy_Count']=bcnt
+    df['CS_Sell_Count']=scnt
+    df['CS_Neutral_Count']=ncnt
+    df['CS_T1_Count']=t1cnt
+    df['CS_T2_Count']=t2cnt
+    df['CS_T3_Count']=t3cnt
+    df['CS_Multi_Count']=mcnt
+    df['CS_Multi_Imbalance']=bcnt-scnt
+    df['CS_Multi_Signal_On']=(mcnt>=3)|((t1cnt>=1)&(mcnt>=2))
     return df
 
 # ━━━ 10-Layer Scores (시각화용) ━━━
