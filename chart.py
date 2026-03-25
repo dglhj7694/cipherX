@@ -113,7 +113,7 @@ def _add_signal_boxes(fig,dc,strong_buy,strong_sell):
     for ts in dc.index[strong_sell.fillna(False)]:
         fig.add_vrect(x0=ts-half,x1=ts+half,fillcolor='rgba(239,68,68,.10)',line_width=0,row=1,col=1,layer='below')
 
-def _add_volume_profile_overlay(fig,dc):
+def _add_volume_profile_overlay(fig,dc,default_visible='legendonly'):
     if dc.empty:return
     low=float(dc['Low'].min());high=float(dc['High'].max())
     if not np.isfinite(low) or not np.isfinite(high) or high<=low:return
@@ -128,23 +128,35 @@ def _add_volume_profile_overlay(fig,dc):
     span=max(int((dc.index[-1]-dc.index[0]).days),20)
     x_right=dc.index[-1]+pd.Timedelta(days=3)
     max_width=pd.Timedelta(days=max(4,int(span*0.18)))
+    first_profile=True
     for bi,pv in enumerate(prof):
         if pv<=0:continue
         f=float(pv/vmax);alpha=min(.30,max(.08,.08+.22*f))
-        fig.add_shape(type='rect',x0=x_right-max_width*f,x1=x_right,y0=float(edges[bi]),y1=float(edges[bi+1]),
-            fillcolor=f'rgba(99,102,241,{alpha})',line=dict(width=0),row=1,col=1,layer='below')
-    fig.add_trace(go.Scatter(x=[None],y=[None],mode='lines',line=dict(color='rgba(99,102,241,.35)',width=6),name='Volume Profile',legendgroup='vp_profile',hoverinfo='skip'),row=1,col=1)
+        x0=x_right-max_width*f;x1=x_right;y0=float(edges[bi]);y1=float(edges[bi+1])
+        fig.add_trace(go.Scatter(
+            x=[x0,x1,x1,x0,x0],
+            y=[y0,y0,y1,y1,y0],
+            mode='lines',
+            line=dict(width=0,color='rgba(0,0,0,0)'),
+            fill='toself',
+            fillcolor=f'rgba(99,102,241,{alpha})',
+            name='Volume Profile',
+            legendgroup='vp_profile',
+            hoverinfo='skip',
+            showlegend=first_profile,
+            visible=default_visible
+        ),row=1,col=1)
+        first_profile=False
     vp_colors=[('VP_POC','#A5B4FC','dot','POC'),('VP_VAH','#60A5FA','dash','VAH'),('VP_VAL',SOFT_GREEN,'dash','VAL')]
     for col,clr,sty,label in vp_colors:
         if col in dc.columns:
             val=float(dc[col].iloc[-1])
             if np.isfinite(val):
-                fig.add_hline(y=val,line_color=clr,line_dash=sty,line_width=1,row=1,col=1)
-                fig.add_trace(go.Scatter(x=[None],y=[None],mode='lines',line=dict(color=clr,width=1.5,dash=sty),name=label,legendgroup=f'vp_{label.lower()}',hoverinfo='skip'),row=1,col=1)
+                fig.add_trace(go.Scatter(x=[dc.index[0],x_right],y=[val,val],mode='lines',line=dict(color=clr,width=1.5,dash=sty),name=label,legendgroup=f'vp_{label.lower()}',hoverinfo='skip',showlegend=True,visible=default_visible),row=1,col=1)
     fig.add_trace(go.Scatter(x=[x_right],y=[dc['Close'].iloc[-1]],mode='markers',marker=dict(size=.1,color='rgba(0,0,0,0)'),hoverinfo='skip',showlegend=False),row=1,col=1)
-    fig.add_annotation(x=x_right,y=high,text='VP',showarrow=False,font=dict(size=9,color='#94A3B8'),xanchor='right',yanchor='top',row=1,col=1)
+    fig.add_trace(go.Scatter(x=[x_right],y=[high],mode='text',text=['VP'],textfont=dict(size=9,color='#94A3B8'),name='VP Label',legendgroup='vp_profile',hoverinfo='skip',showlegend=False,visible=default_visible),row=1,col=1)
 
-def _sig_marker(fig,dc,sn,row,y,clr,sym,sz,lbl):
+def _sig_marker(fig,dc,sn,row,y,clr,sym,sz,lbl,legendgroup=None,showlegend=False,visible=True,legend_name=None):
     reg=SIGNAL_REGISTRY.get(sn) or COMBINED_SCAN_REGISTRY.get(sn,{})
     if sn not in dc.columns:return
     mask=dc[sn].fillna(False)
@@ -154,7 +166,9 @@ def _sig_marker(fig,dc,sn,row,y,clr,sym,sz,lbl):
     if not valid.any():return
     sr=sr[valid];yv=yv[valid];kor=reg.get('kor','');desc=reg.get('desc','')
     ht=f"<b>{lbl}</b> ({kor})<br><span style='color:#94A3B8'>{desc}</span><br>%{{x|%Y-%m-%d}}<extra></extra>" if kor else f"<b>{lbl}</b><br>%{{x|%Y-%m-%d}}<extra></extra>"
-    fig.add_trace(go.Scatter(x=sr.index,y=yv,mode='markers',marker=dict(symbol=sym,size=sz,color=clr,line=dict(width=1.5,color='#FFF'),opacity=.95),name=lbl,showlegend=False,hovertemplate=ht),row=row,col=1)
+    if row==1 and legendgroup is None and visible is True:
+        visible='legendonly'
+    fig.add_trace(go.Scatter(x=sr.index,y=yv,mode='markers',marker=dict(symbol=sym,size=sz,color=clr,line=dict(width=1.5,color='#FFF'),opacity=.95),name=legend_name or lbl,legendgroup=legendgroup,showlegend=showlegend,visible=visible,hovertemplate=ht),row=row,col=1)
 
 def _trendline_atr(dc):
     atr=dc.get('ATR',pd.Series(index=dc.index,dtype=float)).astype(float).replace([np.inf,-np.inf],np.nan)
@@ -276,7 +290,7 @@ def _trendline_hover(line,label):
         f"Current projected price: {line['projected_price']:.2f}{channel_text}<extra></extra>"
     )
 
-def _add_trendline_overlays(fig,dc,max_per_side=2):
+def _add_trendline_overlays(fig,dc,max_per_side=2,default_visible='legendonly'):
     supports,resistances=_compute_trendlines(dc,max_per_side=max_per_side)
     palette={
         'support':['#2DD4BF','#6EE7B7'],
@@ -298,6 +312,7 @@ def _add_trendline_overlays(fig,dc,max_per_side=2):
                 name='Parallel Channel',
                 legendgroup='parallel_channel',
                 showlegend=(idx==1),
+                visible=default_visible,
                 hovertemplate=_trendline_hover(line,f'Channel S{idx}')
             ),row=1,col=1)
         fig.add_trace(go.Scatter(
@@ -308,6 +323,7 @@ def _add_trendline_overlays(fig,dc,max_per_side=2):
             name='Trend Support',
             legendgroup='trend_support',
             showlegend=(idx==1),
+            visible=default_visible,
             hovertemplate=_trendline_hover(line,f'Trendline S{idx}'),
             fill='tonexty' if 'channel_values' in line else None,
             fillcolor='rgba(45,212,191,0.06)' if 'channel_values' in line else None
@@ -327,6 +343,7 @@ def _add_trendline_overlays(fig,dc,max_per_side=2):
             name='Trend Resistance',
             legendgroup='trend_resistance',
             showlegend=(idx==1),
+            visible=default_visible,
             hovertemplate=_trendline_hover(line,f'Trendline R{idx}')
         ),row=1,col=1)
         if 'channel_values' in line:
@@ -338,6 +355,7 @@ def _add_trendline_overlays(fig,dc,max_per_side=2):
                 name='Parallel Channel',
                 legendgroup='parallel_channel',
                 showlegend=False,
+                visible=default_visible,
                 hovertemplate=_trendline_hover(line,f'Channel R{idx}'),
                 fill='tonexty',
                 fillcolor='rgba(251,113,133,0.05)'
@@ -493,7 +511,7 @@ def _pattern_hover(pattern,boundary_name):
         f"Lower projected: {pattern['lower_projected_price']:.2f}<extra></extra>"
     )
 
-def _add_pattern_overlay(fig,dc,pattern):
+def _add_pattern_overlay(fig,dc,pattern,default_visible='legendonly'):
     if pattern is None:return
     xs=dc.index[pattern['start_idx']:]
     lower_vals=pattern['lower_line'][pattern['start_idx']:]
@@ -507,6 +525,7 @@ def _add_pattern_overlay(fig,dc,pattern):
         name='Pattern',
         legendgroup='pattern_overlay',
         showlegend=False,
+        visible=default_visible,
         hovertemplate=_pattern_hover(pattern,'Lower'),
     ),row=1,col=1)
     fig.add_trace(go.Scatter(
@@ -517,6 +536,7 @@ def _add_pattern_overlay(fig,dc,pattern):
         name='Pattern',
         legendgroup='pattern_overlay',
         showlegend=True,
+        visible=default_visible,
         hovertemplate=_pattern_hover(pattern,'Upper'),
         fill='tonexty',
         fillcolor=fill_color,
@@ -526,6 +546,7 @@ def _add_pattern_overlay(fig,dc,pattern):
         y=float(max(pattern['upper_projected_price'],pattern['lower_projected_price'])),
         text=f"{pattern['name']} · {pattern['state']}",
         showarrow=False,
+        visible=False,
         font=dict(size=10,color=edge_color,family='Pretendard'),
         bgcolor='rgba(15,23,42,0.78)',
         bordercolor=edge_color,
@@ -542,40 +563,49 @@ def build_chart(dc,ticker,show_trendlines=True,show_patterns=True):
     fig=make_subplots(rows=8,cols=1,shared_xaxes=True,vertical_spacing=0.02,row_heights=[.32,.04,.09,.09,.09,.09,.09,.19],subplot_titles=(ticker,"Vol","WaveTrend","MACD","Money Flow","Stoch Slow","Squeeze Mom","5-Committee Ensemble"))
     hover=_build_candle_hover(dc)
     fig.add_trace(go.Candlestick(x=dc.index,open=dc['Open'],high=dc['High'],low=dc['Low'],close=dc['Close'],name="Price",increasing_line_color=SOFT_GREEN,decreasing_line_color=SOFT_RED,increasing_fillcolor=SOFT_GREEN_FILL,decreasing_fillcolor=SOFT_RED_FILL,text=hover,hoverinfo='text',hoverlabel=dict(bgcolor='rgba(11,14,20,.97)',bordercolor='#334155',font=dict(size=11,family='Pretendard',color='#F1F5F9'),align='left')),row=1,col=1)
-    for mp in [20,50,200]:fig.add_trace(go.Scatter(x=dc.index,y=dc[f'MA{mp}'],line=dict(color=mac[mp],width=1.2),name=f'{mp}MA',legendgroup='moving_average',hoverinfo='skip',showlegend=True),row=1,col=1)
-    for mc,clr,nm in [(dc['ST_Direction']==1,SOFT_GREEN,'ST▲'),(dc['ST_Direction']==-1,SOFT_RED,'ST▼')]:fig.add_trace(go.Scatter(x=dc.index,y=dc['SuperTrend'].where(mc),line=dict(color=clr,width=2),name=nm,legendgroup='supertrend',connectgaps=False,hoverinfo='skip',showlegend=False),row=1,col=1)
-    fig.add_trace(go.Scatter(x=dc.index,y=dc['BB_Up'],line=dict(color='#475569',width=1,dash='dot'),name='Bollinger Band',legendgroup='bollinger_band',hoverinfo='skip',showlegend=True),row=1,col=1)
-    fig.add_trace(go.Scatter(x=dc.index,y=dc['BB_Low'],line=dict(color='#475569',width=1,dash='dot'),legendgroup='bollinger_band',fill='tonexty',fillcolor='rgba(71,85,105,.06)',hoverinfo='skip',showlegend=False),row=1,col=1)
+    for mp in [20,50,200]:fig.add_trace(go.Scatter(x=dc.index,y=dc[f'MA{mp}'],line=dict(color=mac[mp],width=1.2),name=f'{mp}MA',legendgroup='moving_average',hoverinfo='skip',showlegend=True,visible='legendonly'),row=1,col=1)
+    for idx,(mc,clr) in enumerate([(dc['ST_Direction']==1,SOFT_GREEN),(dc['ST_Direction']==-1,SOFT_RED)],start=1):fig.add_trace(go.Scatter(x=dc.index,y=dc['SuperTrend'].where(mc),line=dict(color=clr,width=2),name='SuperTrend',legendgroup='supertrend',connectgaps=False,hoverinfo='skip',showlegend=(idx==1),visible='legendonly'),row=1,col=1)
+    fig.add_trace(go.Scatter(x=dc.index,y=dc['BB_Up'],line=dict(color='#475569',width=1,dash='dot'),name='Bollinger Band',legendgroup='bollinger_band',hoverinfo='skip',showlegend=True,visible='legendonly'),row=1,col=1)
+    fig.add_trace(go.Scatter(x=dc.index,y=dc['BB_Low'],line=dict(color='#475569',width=1,dash='dot'),legendgroup='bollinger_band',fill='tonexty',fillcolor='rgba(71,85,105,.06)',hoverinfo='skip',showlegend=False,visible='legendonly'),row=1,col=1)
     if 'HMA' in dc.columns:
         hup=dc.get('HMA_Rising',pd.Series(False,index=dc.index)).fillna(False)
-        fig.add_trace(go.Scatter(x=dc.index,y=dc['HMA'].where(hup),line=dict(color=SOFT_GREEN,width=2.5),name='Hull MA',legendgroup='hull_ma',connectgaps=False,hoverinfo='skip',showlegend=True),row=1,col=1)
-        fig.add_trace(go.Scatter(x=dc.index,y=dc['HMA'].where(~hup),line=dict(color=SOFT_RED,width=2.5),legendgroup='hull_ma',connectgaps=False,hoverinfo='skip',showlegend=False),row=1,col=1)
+        fig.add_trace(go.Scatter(x=dc.index,y=dc['HMA'].where(hup),line=dict(color=SOFT_GREEN,width=2.5),name='Hull MA',legendgroup='hull_ma',connectgaps=False,hoverinfo='skip',showlegend=True,visible=True),row=1,col=1)
+        fig.add_trace(go.Scatter(x=dc.index,y=dc['HMA'].where(~hup),line=dict(color=SOFT_RED,width=2.5),legendgroup='hull_ma',connectgaps=False,hoverinfo='skip',showlegend=False,visible=True),row=1,col=1)
     if 'UTBot_Stop' in dc.columns:
         ub=dc['UTBot_Dir']==1;us=dc['UTBot_Dir']==-1
-        fig.add_trace(go.Scatter(x=dc.index,y=dc['UTBot_Stop'].where(ub),line=dict(color='rgba(126,216,182,.5)',width=2,dash='dot'),name='UTBot▲',legendgroup='utbot_stop',connectgaps=False,hoverinfo='skip',showlegend=False),row=1,col=1)
-        fig.add_trace(go.Scatter(x=dc.index,y=dc['UTBot_Stop'].where(us),line=dict(color='rgba(243,165,165,.5)',width=2,dash='dot'),name='UTBot▼',legendgroup='utbot_stop',connectgaps=False,hoverinfo='skip',showlegend=False),row=1,col=1)
+        fig.add_trace(go.Scatter(x=dc.index,y=dc['UTBot_Stop'].where(ub),line=dict(color='rgba(126,216,182,.5)',width=2,dash='dot'),name='UTBot Stop',legendgroup='utbot_stop',connectgaps=False,hoverinfo='skip',showlegend=True,visible='legendonly'),row=1,col=1)
+        fig.add_trace(go.Scatter(x=dc.index,y=dc['UTBot_Stop'].where(us),line=dict(color='rgba(243,165,165,.5)',width=2,dash='dot'),name='UTBot Stop',legendgroup='utbot_stop',connectgaps=False,hoverinfo='skip',showlegend=False,visible='legendonly'),row=1,col=1)
     for sn,clr,sym,sz,lbl in [('Hull_Turn_Bull',SOFT_GREEN,'circle',8,'🟢Hull▲'),('Hull_Turn_Bear',SOFT_RED,'circle',8,'🔴Hull▼'),('UTBot_Buy',SOFT_GREEN,'triangle-up',12,'🤖UTBot▲'),('UTBot_Sell',SOFT_RED,'triangle-down',12,'🤖UTBot▼'),('VuManChu_Bull',SOFT_GREEN,'diamond',12,'💎VuMC▲'),('VuManChu_Bear',SOFT_RED,'diamond',12,'💎VuMC▼')]:
         yoff=dc['Low']-dc['ATR']*(0.8 if 'Hull' in sn else 1.2 if 'UTBot' in sn else 1.8) if 'Bull' in sn or 'Buy' in sn else dc['High']+dc['ATR']*(0.8 if 'Hull' in sn else 1.2 if 'UTBot' in sn else 1.8)
         _sig_marker(fig,dc,sn,1,yoff,clr,sym,sz,lbl)
+    for sn,clr,sym,sz,lbl,legendgroup,showlegend,visible in [
+        ('Hull_Turn_Bull',SOFT_GREEN,'circle',8,'Hull Turn','hull_signal',True,True),
+        ('Hull_Turn_Bear',SOFT_RED,'circle',8,'Hull Turn','hull_signal',False,True),
+        ('UTBot_Buy',SOFT_GREEN,'triangle-up',12,'UTBot Signal','utbot_signal',True,'legendonly'),
+        ('UTBot_Sell',SOFT_RED,'triangle-down',12,'UTBot Signal','utbot_signal',False,'legendonly'),
+        ('VuManChu_Bull',SOFT_GREEN,'diamond',12,'VuManChu Signal','vumanchu_signal',True,'legendonly'),
+        ('VuManChu_Bear',SOFT_RED,'diamond',12,'VuManChu Signal','vumanchu_signal',False,'legendonly')
+    ]:
+        yoff=dc['Low']-dc['ATR']*(0.8 if 'Hull' in sn else 1.2 if 'UTBot' in sn else 1.8) if 'Bull' in sn or 'Buy' in sn else dc['High']+dc['ATR']*(0.8 if 'Hull' in sn else 1.2 if 'UTBot' in sn else 1.8)
+        _sig_marker(fig,dc,sn,1,yoff,clr,sym,sz,lbl,legendgroup=legendgroup,showlegend=showlegend,visible=visible)
     sb,ss=_collect_strong_markers(dc)
-    _add_signal_boxes(fig,dc,sb,ss)
     if show_trendlines:
-        _add_trendline_overlays(fig,dc,max_per_side=2)
+        _add_trendline_overlays(fig,dc,max_per_side=2,default_visible='legendonly')
     if show_patterns:
-        _add_pattern_overlay(fig,dc,_detect_active_pattern(dc))
-    _add_volume_profile_overlay(fig,dc)
+        _add_pattern_overlay(fig,dc,_detect_active_pattern(dc),default_visible='legendonly')
+    _add_volume_profile_overlay(fig,dc,default_visible='legendonly')
     if sb.any():
         sr=dc[sb];yv=sr['Low']-sr['ATR']*2;ht=[]
         for bi in sr.index:
             br=[SIGNAL_REGISTRY.get(s,COMBINED_SCAN_REGISTRY.get(s,{})).get('kor',s) for s in STRONG_BUY_SIGS if s in dc.columns and dc.loc[bi,s]]
             ht.append(f"<b>⭐강력매수</b><br><span style='color:#94A3B8'>{', '.join(br[:5]) or '다중강세'}</span><br>{bi.strftime('%Y-%m-%d')}")
-        fig.add_trace(go.Scatter(x=sr.index,y=yv,mode='markers',marker=dict(symbol='star',size=8,color='#E8C56C',line=dict(width=2,color=SOFT_GREEN),opacity=.95),name='⭐강력매수',hovertemplate="%{text}<extra></extra>",text=ht,showlegend=False),row=1,col=1)
+        fig.add_trace(go.Scatter(x=sr.index,y=yv,mode='markers',marker=dict(symbol='star',size=8,color='#E8C56C',line=dict(width=2,color=SOFT_GREEN),opacity=.95),name='Strong Buy',legendgroup='strong_buy',hovertemplate="%{text}<extra></extra>",text=ht,showlegend=True,visible='legendonly'),row=1,col=1)
     if ss.any():
         sr=dc[ss];yv=sr['High']+sr['ATR']*2;ht=[]
         for bi in sr.index:
             br=[SIGNAL_REGISTRY.get(s,COMBINED_SCAN_REGISTRY.get(s,{})).get('kor',s) for s in STRONG_SELL_SIGS if s in dc.columns and dc.loc[bi,s]]
             ht.append(f"<b>⭐강력매도</b><br><span style='color:#94A3B8'>{', '.join(br[:5]) or '다중약세'}</span><br>{bi.strftime('%Y-%m-%d')}")
-        fig.add_trace(go.Scatter(x=sr.index,y=yv,mode='markers',marker=dict(symbol='star',size=8,color='#E8C56C',line=dict(width=2,color=SOFT_RED),opacity=.95),name='⭐강력매도',hovertemplate="%{text}<extra></extra>",text=ht,showlegend=False),row=1,col=1)
+        fig.add_trace(go.Scatter(x=sr.index,y=yv,mode='markers',marker=dict(symbol='star',size=8,color='#E8C56C',line=dict(width=2,color=SOFT_RED),opacity=.95),name='Strong Sell',legendgroup='strong_sell',hovertemplate="%{text}<extra></extra>",text=ht,showlegend=True,visible='legendonly'),row=1,col=1)
     # R2 Vol
     bb=dc['Close']<dc['Open'];fig.add_trace(go.Bar(x=dc.index,y=dc['Volume'],marker_color=np.where(bb,'rgba(243,165,165,.5)','rgba(126,216,182,.5)').tolist(),name="Vol",opacity=.8,hoverinfo='skip',showlegend=False),row=2,col=1)
     # R3 WT
@@ -632,7 +662,7 @@ def build_chart(dc,ticker,show_trendlines=True,show_patterns=True):
                 ss_=ci;pc=cur
         if pc in ctx_colors:fig.add_vrect(x0=dc.index[ss_],x1=dc.index[-1],fillcolor=ctx_colors[pc],line_width=0,row=8,col=1)
     chart_height = 1360 if len(dc) <= 126 else 1460
-    fig.update_layout(template="plotly_dark",paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",margin=dict(l=2,r=2,t=40,b=2),height=chart_height,showlegend=True,hovermode="closest",legend=dict(orientation="h",yanchor="bottom",y=1.02,xanchor="center",x=.5,font=dict(size=8,color='#94A3B8'),bgcolor='rgba(0,0,0,0)',traceorder='normal'))
+    fig.update_layout(template="plotly_dark",paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",margin=dict(l=2,r=2,t=40,b=2),height=chart_height,showlegend=True,hovermode="closest",legend=dict(orientation="h",yanchor="bottom",y=1.02,xanchor="center",x=.5,font=dict(size=8,color='#94A3B8'),bgcolor='rgba(0,0,0,0)',traceorder='normal',groupclick='togglegroup'))
     for i in range(1,9):fig.update_layout(**{(f'yaxis{i}' if i>1 else 'yaxis'):dict(gridcolor='rgba(51,65,85,.3)',tickfont=dict(size=9,color='#64748B'))})
     fig.update_yaxes(range=[-50,50],row=5,col=1);fig.update_yaxes(range=[0,100],row=6,col=1)
     ad=pd.date_range(start=dc.index[0],end=dc.index[-1],freq='D');nt=ad.difference(dc.index.normalize())
