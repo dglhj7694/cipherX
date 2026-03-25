@@ -65,6 +65,67 @@ def _fmt_pct(num):
     try: return f"{float(num) * 100:.2f}%"
     except Exception: return "N/A"
 
+def _first_valid_number(*values):
+    for val in values:
+        if val is None:
+            continue
+        try:
+            if pd.isna(val):
+                continue
+        except Exception:
+            pass
+        if isinstance(val, (int, float, np.integer, np.floating)):
+            return float(val)
+    return None
+
+def _normalize_ratio_value(val):
+    numeric = _first_valid_number(val)
+    if numeric is None:
+        return None
+    if 1 < numeric <= 100:
+        return numeric / 100
+    return numeric
+
+def _resolve_dividend_yield(info, price=None):
+    raw_yield = _normalize_ratio_value(
+        info.get('dividendYield'),
+    )
+    if raw_yield is None:
+        raw_yield = _normalize_ratio_value(info.get('trailingAnnualDividendYield'))
+    if raw_yield is None:
+        raw_yield = _normalize_ratio_value(info.get('fiveYearAvgDividendYield'))
+    if raw_yield is not None and raw_yield >= 0:
+        return raw_yield
+
+    dividend_rate = _first_valid_number(
+        info.get('dividendRate'),
+        info.get('trailingAnnualDividendRate'),
+    )
+    ref_price = _first_valid_number(
+        price,
+        info.get('currentPrice'),
+        info.get('regularMarketPrice'),
+        info.get('previousClose'),
+    )
+    if dividend_rate is not None and ref_price and ref_price > 0:
+        return max(dividend_rate / ref_price, 0)
+    return None
+
+def _resolve_peg_ratio(info, *growth_candidates):
+    peg = _first_valid_number(info.get('pegRatio'))
+    if peg is not None and peg > 0:
+        return peg
+
+    pe_val = _first_valid_number(info.get('forwardPE'), info.get('trailingPE'))
+    if pe_val is None or pe_val <= 0:
+        return None
+
+    for growth in [info.get('earningsGrowth'), info.get('revenueGrowth'), *growth_candidates]:
+        growth_val = _normalize_ratio_value(growth)
+        if growth_val is not None and growth_val > 0:
+            return pe_val / (growth_val * 100)
+    return None
+
 def _safe(val, fallback="N/A"):
     if val is None or (isinstance(val, float) and np.isnan(val)): return fallback
     return val
@@ -836,10 +897,41 @@ html, body, [class*="css"] { font-family:'Pretendard', sans-serif !important; }
 .score-pillar-label{color:#94A3B8;font-size:.72rem;font-weight:800;margin:0 0 6px}
 .score-pillar-value{color:#F8FAFC;font-size:1.28rem;font-weight:900;margin:0}
 .score-pillar-sub{color:#CBD5E1;font-size:.76rem;font-weight:600;line-height:1.45;margin:6px 0 0}
+.section-lead{color:#CBD5E1;font-size:.88rem;line-height:1.7;font-weight:600;margin:-6px 0 14px}
+.cluster-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:16px}
+.cluster-card{padding:14px 15px;border-radius:16px;background:linear-gradient(160deg,rgba(15,23,42,.92),rgba(15,23,42,.76));border:1px solid rgba(148,163,184,.12)}
+.cluster-title{color:#F8FAFC;font-size:.96rem;font-weight:900;margin:0 0 6px}
+.cluster-sub{color:#94A3B8;font-size:.76rem;font-weight:700;margin:0 0 10px}
+.compact-chip-row{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 0}
+.compact-chip{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid rgba(148,163,184,.12);color:#E5E7EB;font-size:.76rem;font-weight:800}
+.compact-chip b{color:#F8FAFC}
+.consensus-scale{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:16px 0 14px}
+.consensus-step{padding:12px 8px;border-radius:14px;background:linear-gradient(160deg,rgba(15,23,42,.92),rgba(15,23,42,.74));border:1px solid rgba(148,163,184,.12);text-align:center}
+.consensus-step-label{display:block;color:#CBD5E1;font-size:.72rem;font-weight:800;line-height:1.3}
+.consensus-step-score{display:block;color:#94A3B8;font-size:.68rem;font-weight:700;margin-top:4px}
+.consensus-step.active{box-shadow:0 0 0 1px rgba(248,250,252,.05) inset,0 12px 24px rgba(2,6,23,.18)}
+.consensus-step.active.buy{border-color:rgba(99,217,162,.34)}
+.consensus-step.active.hold{border-color:rgba(246,195,94,.34)}
+.consensus-step.active.sell{border-color:rgba(255,143,150,.34)}
+.range-strip{position:relative;height:14px;border-radius:999px;background:linear-gradient(90deg,rgba(255,143,150,.24),rgba(246,195,94,.2),rgba(99,217,162,.24));border:1px solid rgba(148,163,184,.12);overflow:hidden;margin:14px 0 12px}
+.range-marker{position:absolute;top:-5px;width:14px;height:24px;border-radius:999px;border:2px solid #F8FAFC;transform:translateX(-50%);box-shadow:0 0 0 5px rgba(15,23,42,.38)}
+.range-marker.low{background:#94A3B8}
+.range-marker.high{background:#CBD5E1}
+.range-marker.mean{background:#38BDF8}
+.range-marker.median{background:#63D9A2}
+.range-marker.current{background:#F6C35E}
+.range-legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
+.range-legend-item{padding:10px 11px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(148,163,184,.12)}
+.range-legend-item p{margin:0}
+.range-legend-label{color:#94A3B8;font-size:.7rem;font-weight:800}
+.range-legend-value{color:#F8FAFC;font-size:.92rem;font-weight:900;margin-top:4px}
+.range-legend-sub{color:#CBD5E1;font-size:.72rem;font-weight:700;margin-top:4px}
 @media(max-width:900px){
   .hero-bento{grid-template-columns:1fr}
   .meta-grid{grid-template-columns:1fr}
   .invest-hero{grid-template-columns:1fr}
+  .cluster-grid{grid-template-columns:1fr}
+  .consensus-scale{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 </style>
 """
@@ -854,8 +946,6 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     with st.spinner(f"{ticker_str} 기업 정보를 정리하고 있습니다..."):
         bundle = _fetch_company_bundle(ticker_str)
         info = bundle.get("info") or {}
-        if False and bundle.get("rate_limited"):
-            st.error(f"❌ 데이터를 불러올 수 없습니다 — {e}"); return
         if bundle.get("rate_limited"):
             st.warning("Yahoo 요청이 잠시 제한되었습니다. 잠시 후 다시 시도하거나 뉴스 같은 부가 데이터를 나중에 불러와 주세요."); return
         if bundle.get("error") and not info:
@@ -905,6 +995,15 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
             if len(q_rs) >= 5 and q_rs.iloc[4] > 0: yoy_q_rev_g = (q_rs.iloc[0] / q_rs.iloc[4]) - 1
         except Exception: pass
 
+        dividend_yield = _resolve_dividend_yield(info, price)
+        peg_resolved = _resolve_peg_ratio(info, cagr_eps, cagr_ni, yoy_q_rev_g, ann_rev_g)
+        target_mean = _first_valid_number(info.get('targetMeanPrice'))
+        target_median = _first_valid_number(info.get('targetMedianPrice'))
+        target_high = _first_valid_number(info.get('targetHighPrice'))
+        target_low = _first_valid_number(info.get('targetLowPrice'))
+        upside_ref_top = target_median if target_median is not None else target_mean
+        upside_pct_top = ((upside_ref_top - price) / price * 100) if isinstance(upside_ref_top, (int, float)) and price else None
+
     # ═══════════════════════════════════════════════════
     # 🏷️ 헤더
     # ═══════════════════════════════════════════════════
@@ -926,10 +1025,10 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
         unsafe_allow_html=True,
     )
     summary_items = [
-        ("Market Cap", _fmt_num(info.get('marketCap'))),
-        ("Trailing P/E", f"{info.get('trailingPE'):.2f}" if isinstance(info.get('trailingPE'), (int, float)) else "N/A"),
-        ("Beta", f"{info.get('beta'):.2f}" if isinstance(info.get('beta'), (int, float)) else "N/A"),
-        ("Dividend", _fmt_pct(info.get('dividendYield'))),
+        ("시가총액", _fmt_num(info.get('marketCap'))),
+        ("PEG 비율", f"{peg_resolved:.2f}" if isinstance(peg_resolved, (int, float)) else "N/A"),
+        ("배당수익률", _fmt_pct(dividend_yield)),
+        ("목표가 여력", f"{upside_pct_top:+.1f}%" if isinstance(upside_pct_top, (int, float)) else "N/A"),
     ]
     summary_html = "".join([
         f"<div class='cd-chip'><p class='cd-chip-label'>{label}</p><p class='cd-chip-value'>{value}</p></div>"
@@ -954,7 +1053,6 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     headquarters = f"{city}, {country}" if city else country
     analyst_count = info.get('numberOfAnalystOpinions') or 0
     inst_hold = info.get('heldPercentInstitutions')
-    target_mean = info.get('targetMeanPrice')
 
     coverage_specs = [
         ("연간 재무", fin is not None and not fin.empty),
@@ -980,7 +1078,7 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     hero_html = (
         f"<div class='hero-bento'>"
         f"<div class='hero-card'>"
-        f"<span class='hero-kicker'>Company Brief</span>"
+        f"<span class='hero-kicker'>회사 브리프</span>"
         f"<div class='hero-headline'>{_esc(info.get('shortName', ticker_str))}의 사업 구조와 핵심 지표를 빠르게 읽을 수 있도록 요약했습니다.</div>"
         f"<div class='hero-copy'>{summary_preview}</div>"
         f"<div class='meta-grid'>"
@@ -991,9 +1089,9 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
         f"</div>"
         f"</div>"
         f"<div class='signal-stack'>"
-        f"<div class='signal-card'><p class='signal-label'>Cash Generation</p><p class='signal-value'>{_fmt_num(fcf)}</p><p class='signal-sub'>Free Cash Flow {'' if fcf is not None else '데이터 부족'}</p></div>"
-        f"<div class='signal-card'><p class='signal-label'>Operating Cash Flow</p><p class='signal-value'>{_fmt_num(ocf)}</p><p class='signal-sub'>영업현금흐름</p></div>"
-        f"<div class='signal-card'><p class='signal-label'>Street Coverage</p><p class='signal-value'>{analyst_count or 0}명</p><p class='signal-sub'>Target Mean {f'${target_mean:,.2f}' if isinstance(target_mean, (int, float)) else 'N/A'} · 기관보유 {_fmt_pct(inst_hold) if inst_hold is not None else 'N/A'}</p></div>"
+        f"<div class='signal-card'><p class='signal-label'>현금 창출력</p><p class='signal-value'>{_fmt_num(fcf)}</p><p class='signal-sub'>잉여현금흐름 {'' if fcf is not None else '데이터 부족'}</p></div>"
+        f"<div class='signal-card'><p class='signal-label'>영업활동 현금흐름</p><p class='signal-value'>{_fmt_num(ocf)}</p><p class='signal-sub'>본업 현금흐름</p></div>"
+        f"<div class='signal-card'><p class='signal-label'>애널리스트 커버리지</p><p class='signal-value'>{analyst_count or 0}명</p><p class='signal-sub'>평균 목표가 {f'${target_mean:,.2f}' if isinstance(target_mean, (int, float)) else 'N/A'} · 기관보유 {_fmt_pct(inst_hold) if inst_hold is not None else 'N/A'}</p></div>"
         f"</div>"
         f"</div>"
     )
@@ -1001,8 +1099,7 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     st.markdown(f"<div class='coverage-wrap'><div class='coverage-grid'>{coverage_html}</div></div>", unsafe_allow_html=True)
     st.markdown(f"<div class='section-nav'>{nav_html}</div>", unsafe_allow_html=True)
 
-    upside_ref = info.get('targetMedianPrice') or info.get('targetMeanPrice')
-    upside_pct_top = ((upside_ref - price) / price * 100) if isinstance(upside_ref, (int, float)) and price else None
+    upside_ref = upside_ref_top
     short_float_top = info.get('shortPercentOfFloat')
     debt_ratio_top = info.get('debtToEquity')
 
@@ -1010,7 +1107,7 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     if isinstance(cagr_rev, float):
         thesis_points.append("매출 성장 유지" if cagr_rev > 0.12 else "저성장 구간" if cagr_rev > 0 else "매출 둔화")
     if isinstance(fcf, (int, float)):
-        thesis_points.append("FCF 플러스" if fcf > 0 else "FCF 마이너스")
+        thesis_points.append("잉여현금흐름 플러스" if fcf > 0 else "잉여현금흐름 마이너스")
     if isinstance(debt_ratio_top, (int, float)):
         thesis_points.append("저레버리지" if debt_ratio_top < 80 else "레버리지 부담" if debt_ratio_top > 150 else "레버리지 보통")
     if isinstance(upside_pct_top, (int, float)):
@@ -1028,15 +1125,15 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     invest_html = (
         f"<div class='invest-hero'>"
         f"<div class='invest-card'>"
-        f"<span class='invest-kicker'>Investment Snapshot</span>"
+        f"<span class='invest-kicker'>투자 스냅샷</span>"
         f"<div class='invest-title'>{_esc(info.get('shortName', ticker_str))} 한줄 요약: {thesis_line}</div>"
         f"<div class='invest-copy'>{summary_preview}</div>"
         f"<div class='invest-points'>{invest_points_html}</div>"
         f"</div>"
         f"<div class='invest-grid'>"
-        f"<div class='invest-metric'><p class='invest-label'>Street Upside</p><p class='invest-value'>{f'{upside_pct_top:+.1f}%' if isinstance(upside_pct_top, (int, float)) else 'N/A'}</p><p class='invest-sub'>중앙/평균 목표가 기준 기대 여력</p></div>"
-        f"<div class='invest-metric'><p class='invest-label'>Cash Flow Quality</p><p class='invest-value'>{cash_flow_label}</p><p class='invest-sub'>OCF {_fmt_num(ocf)} · FCF {_fmt_num(fcf)}</p></div>"
-        f"<div class='invest-metric'><p class='invest-label'>Positioning</p><p class='invest-value'>{_fmt_pct(inst_hold) if inst_hold is not None else 'N/A'}</p><p class='invest-sub'>{positioning_note}</p></div>"
+        f"<div class='invest-metric'><p class='invest-label'>목표가 기대여력</p><p class='invest-value'>{f'{upside_pct_top:+.1f}%' if isinstance(upside_pct_top, (int, float)) else 'N/A'}</p><p class='invest-sub'>중앙값·평균 목표가 기준 기대 여력</p></div>"
+        f"<div class='invest-metric'><p class='invest-label'>현금흐름 품질</p><p class='invest-value'>{cash_flow_label}</p><p class='invest-sub'>영업현금흐름 {_fmt_num(ocf)} · 잉여현금흐름 {_fmt_num(fcf)}</p></div>"
+        f"<div class='invest-metric'><p class='invest-label'>수급 포지셔닝</p><p class='invest-value'>{_fmt_pct(inst_hold) if inst_hold is not None else 'N/A'}</p><p class='invest-sub'>{positioning_note}</p></div>"
         f"</div>"
         f"</div>"
     )
@@ -1105,7 +1202,7 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
             f'</div><div>'
             f'{_metric_row("순이익률", _fmt_pct(info.get("profitMargins")))}'
             f'{_metric_row("ROE", _fmt_pct(info.get("returnOnEquity")))}'
-            f'{_metric_row("배당수익률", _fmt_pct(info.get("dividendYield")))}'
+            f'{_metric_row("배당수익률", _fmt_pct(dividend_yield))}'
             f'</div></div>'
             f'{_verdict_badge(v1_c, "", f"종합: {v1_map.get(sn, "")}")}'
         )
@@ -1214,13 +1311,7 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     retention, sust_g = max(0, 1 - payout), (roe_v * max(0, 1 - payout) if roe_v else None)
     eg = info.get('earningsGrowth')
     
-    peg = info.get('pegRatio')
-    if peg is None or pd.isna(peg):
-        pe_val = f_pe if (f_pe and not pd.isna(f_pe)) else t_pe
-        growth_val = eg
-        if (growth_val is None or growth_val <= 0) and isinstance(cagr_eps, float) and cagr_eps > 0: growth_val = cagr_eps
-        if (growth_val is None or growth_val <= 0) and isinstance(cagr_ni, float) and cagr_ni > 0: growth_val = cagr_ni
-        if pe_val and growth_val and growth_val > 0: peg = pe_val / (growth_val * 100)
+    peg = peg_resolved
 
     if peg and not pd.isna(peg):
         if peg < 0.5: peg_txt, peg_cls = f"{peg:.2f} (매우 저평가)", "m-blue"
@@ -1337,64 +1428,76 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     v5_pill_cls = "pill-green" if v5_c == "green" else ("pill-amber" if v5_c == "yellow" else "pill-red")
     dl_pill_cls = "pill-green" if dl_c == "green" else ("pill-amber" if dl_c == "yellow" else "pill-red")
 
-    if False and option_snapshot.get("rate_limited"):
-        vol_warning += "<div style='color:#F8DE9A; font-size:.85rem; margin-top:8px; font-weight:700;'>옵션 데이터 요청이 일시 제한되어 일부 값이 비어 있을 수 있습니다.</div>"
+    debt_value = _first_valid_number(info_total_debt)
+    cash_value = _first_valid_number(cash)
+    net_cash = (cash_value - debt_value) if cash_value is not None and debt_value is not None else None
+    cash_to_debt = (cash_value / debt_value) if cash_value is not None and debt_value not in (None, 0) else None
+    cash_to_debt_text = f"{cash_to_debt:.2f}x" if isinstance(cash_to_debt, (int, float)) else "N/A"
+    net_cash_text = _fmt_num(net_cash) if isinstance(net_cash, (int, float)) else "N/A"
+    net_cash_cls = "m-green" if isinstance(net_cash, (int, float)) and net_cash >= 0 else "m-red"
+    ocf_cls = "m-green" if isinstance(ocf, (int, float)) and ocf > 0 else "m-red"
+    fcf_cls = "m-green" if isinstance(fcf, (int, float)) and fcf > 0 else "m-red"
 
-    if False and option_snapshot.get("rate_limited"):
-        vol_warning += "<div style='color:#F8DE9A; font-size:.85rem; margin-top:8px; font-weight:700;'>옵션 데이터 요청이 일시 제한되어 일부 값이 비어 있을 수 있습니다.</div>"
     with st.container(border=True):
         col1, col2 = st.columns([1.1, 1])
         debt_ratio_text = f"{dte:.1f}%" if isinstance(dte, (int, float)) else "N/A"
         s5_spotlight = (
             f"<div class='spotlight-grid'>"
-            f"<div class='spotlight-card'><p class='spotlight-label'>보유 현금</p><p class='spotlight-value' style='color:#63D9A2'>{_fmt_num(cash)}</p><p class='spotlight-sub'>현금 완충력</p></div>"
-            f"<div class='spotlight-card'><p class='spotlight-label'>총 부채</p><p class='spotlight-value'>{debt_display}</p><p class='spotlight-sub'>레버리지 규모</p></div>"
-            f"<div class='spotlight-card'><p class='spotlight-label'>부채/자본 비율</p><p class='spotlight-value' style='color:{'#B8F1D5' if dl_c == 'green' else '#F8DE9A' if dl_c == 'yellow' else '#FFD2D7'}'>{debt_ratio_text}</p><p class='spotlight-sub'>{dl}</p></div>"
-            f"</div>"
-        )
-        html_s5_1 = (
-            f'<div class="s-title"><span class="s-num">05</span> 회사에 돈이 얼마나 있나요? <span style="font-size:.8rem;color:#768390">SEC + Yahoo</span></div>'
-            f"<div style='display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px'><span class='section-pill {v5_pill_cls}'>{v5_t}</span><span class='section-pill {dl_pill_cls}'>D/E {dl}</span></div>"
-            f'{s5_spotlight}'
-            f'{_metric_row("보유 현금", _fmt_num(cash), "m-value m-green m-big")}'
-            f'{_metric_row("순 자산 (자본)", na_display, "m-green" if (na and na > 0) else "m-red")}'
-            f'<div class="divider"></div>'
-            f'{_metric_row("총 부채", debt_display, "m-value")}'
-            f'{_metric_row("부채 수준 (D/E)", dl)}'
-            f'{_metric_row("부채 추세", dt_trend)}'
-            f'{_metric_row("이자 부담 (ICR)", ib_txt)}'
-            f'{_metric_row("부채/자본 비율", f"{dte:.1f}%" if isinstance(dte, (int, float)) else "N/A")}'
-            f'<div class="note-box">※ <b>부채/자본 비율</b> = (위 표시된 총 부채 ÷ 순 자산) × 100 으로 직접 교차 계산됩니다.<br>※ 순자산(총자산-총부채)과 자본(주주지분)은 이론상 같으나, 비지배지분 등에 의해 차이가 날 수 있습니다.</div>'
-        )
-        s5_spotlight = (
-            f"<div class='spotlight-grid'>"
             f"<div class='spotlight-card'><p class='spotlight-label'>보유 현금</p><p class='spotlight-value' style='color:#63D9A2'>{_fmt_num(cash)}</p><p class='spotlight-sub'>현금 및 현금성 자산</p></div>"
-            f"<div class='spotlight-card'><p class='spotlight-label'>영업현금흐름</p><p class='spotlight-value'>{_fmt_num(ocf)}</p><p class='spotlight-sub'>Operating Cash Flow</p></div>"
-            f"<div class='spotlight-card'><p class='spotlight-label'>잉여현금흐름</p><p class='spotlight-value'>{_fmt_num(fcf)}</p><p class='spotlight-sub'>Free Cash Flow</p></div>"
+            f"<div class='spotlight-card'><p class='spotlight-label'>영업현금흐름</p><p class='spotlight-value' style='color:{'#B8F1D5' if ocf_cls == 'm-green' else '#FFD2D7'}'>{_fmt_num(ocf)}</p><p class='spotlight-sub'>본업에서 버는 현금</p></div>"
+            f"<div class='spotlight-card'><p class='spotlight-label'>잉여현금흐름</p><p class='spotlight-value' style='color:{'#B8F1D5' if fcf_cls == 'm-green' else '#FFD2D7'}'>{_fmt_num(fcf)}</p><p class='spotlight-sub'>투자 후 남는 현금</p></div>"
             f"<div class='spotlight-card'><p class='spotlight-label'>부채/자본 비율</p><p class='spotlight-value' style='color:{'#B8F1D5' if dl_c == 'green' else '#F8DE9A' if dl_c == 'yellow' else '#FFD2D7'}'>{debt_ratio_text}</p><p class='spotlight-sub'>{dl}</p></div>"
+            f"</div>"
+        )
+        s5_chip_row = (
+            f"<div class='compact-chip-row'>"
+            f"<span class='compact-chip'>현금/부채 {cash_to_debt_text}</span>"
+            f"<span class='compact-chip'>순현금 {net_cash_text}</span>"
+            f"<span class='compact-chip'>이자 부담 {_esc(ib_txt)}</span>"
             f"</div>"
         )
         html_s5_1 = (
             f'<div class="s-title"><span class="s-num">05</span> 회사에 돈이 얼마나 있나요? <span style="font-size:.8rem;color:#768390">SEC + Yahoo</span></div>'
             f"<div style='display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px'><span class='section-pill {v5_pill_cls}'>{v5_t}</span><span class='section-pill {dl_pill_cls}'>D/E {dl}</span></div>"
             f'{s5_spotlight}'
+            f"{s5_chip_row}"
+            f"<div class='cluster-grid'>"
+            f"<div class='cluster-card'>"
+            f"<div class='cluster-title'>유동성 / 현금창출</div>"
+            f"<div class='cluster-sub'>당장 버틸 수 있는지와, 본업이 실제 현금을 만들어내는지를 같이 봅니다.</div>"
             f'{_metric_row("보유 현금", _fmt_num(cash), "m-value m-green m-big")}'
-            f'{_metric_row("순자산(자본)", na_display, "m-green" if (na and na > 0) else "m-red")}'
-            f'<div class="divider"></div>'
+            f'{_metric_row("영업활동 현금흐름", _fmt_num(ocf), ocf_cls)}'
+            f'{_metric_row("잉여현금흐름", _fmt_num(fcf), fcf_cls)}'
+            f'{_metric_row("현금/부채", cash_to_debt_text, "m-green" if isinstance(cash_to_debt, (int, float)) and cash_to_debt >= 1 else "m-value")}'
+            f'{_metric_row("순현금", net_cash_text, net_cash_cls)}'
+            f"</div>"
+            f"<div class='cluster-card'>"
+            f"<div class='cluster-title'>레버리지 / 상환부담</div>"
+            f"<div class='cluster-sub'>총부채 규모보다 상환 여력과 추세가 더 중요합니다.</div>"
             f'{_metric_row("총 부채", debt_display, "m-value")}'
+            f'{_metric_row("순자산(자본)", na_display, "m-green" if (na and na > 0) else "m-red")}'
             f'{_metric_row("부채 수준(D/E)", dl)}'
             f'{_metric_row("부채 추세", dt_trend)}'
             f'{_metric_row("이자 부담(ICR)", ib_txt)}'
-            f'{_metric_row("영업현금흐름", _fmt_num(ocf))}'
-            f'{_metric_row("잉여현금흐름", _fmt_num(fcf), "m-green" if isinstance(fcf, (int, float)) and fcf > 0 else "m-value")}'
-            f'{_metric_row("부채/자본 비율", debt_ratio_text)}'
-            f'<div class="note-box">※ <b>부채/자본 비율</b>은 총부채를 순자산으로 나눈 값으로 직접 교차 계산합니다.<br>※ 현금 잔고와 함께 영업현금흐름, 잉여현금흐름까지 같이 봐야 재무 체력을 제대로 읽을 수 있습니다.</div>'
+            f"</div>"
+            f"</div>"
+            f'<div class="note-box">※ <b>부채/자본 비율</b>은 총부채를 순자산으로 나눈 값으로 직접 교차 계산합니다.<br>※ 현금 잔고와 함께 영업활동 현금흐름, 잉여현금흐름까지 같이 봐야 재무 체력을 제대로 읽을 수 있습니다.</div>'
+        )
+        s5_read_html = (
+            f"<div class='cluster-card' style='margin-top:14px'>"
+            f"<div class='cluster-title'>해석 포인트</div>"
+            f"<div class='cluster-sub'>현금이 많아도 현금흐름이 마이너스면 빠르게 소진될 수 있고, 부채가 있어도 영업활동 현금흐름이 안정적이면 부담이 낮아집니다.</div>"
+            f"{_metric_row('차입 상환 완충력', cash_to_debt_text, 'm-green' if isinstance(cash_to_debt, (int, float)) and cash_to_debt >= 1 else 'm-value')}"
+            f"{_metric_row('실질 재무 포지션', '순현금 우위' if isinstance(net_cash, (int, float)) and net_cash >= 0 else '순부채 구조', net_cash_cls)}"
+            f"{_metric_row('핵심 체크', '현금흐름 지속성 > 현금 절대규모', 'm-value')}"
+            f"</div>"
         )
         with col1:
             st.markdown(html_s5_1, unsafe_allow_html=True)
         with col2:
             if fig5: st.plotly_chart(fig5, use_container_width=True, config={'displayModeBar': False}, key=f"{key_prefix}_fig5")
             else: st.markdown("<div class='note-box'>※ 자산/부채 데이터를 모두 불러올 수 없어 차트가 생략되었습니다.</div>", unsafe_allow_html=True)
+            st.markdown(s5_read_html, unsafe_allow_html=True)
         st.markdown(_verdict_badge(v5_c, "", v5_t), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
@@ -1524,33 +1627,103 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     else: con, cc = "N/A", "gray"
     all_verdicts.append(("전문가", cc))
 
-    t_mean, t_median, t_high, t_low = info.get('targetMeanPrice'), info.get('targetMedianPrice'), info.get('targetHighPrice'), info.get('targetLowPrice')
+    t_mean, t_median, t_high, t_low = target_mean, target_median, target_high, target_low
     n_ana = info.get('numberOfAnalystOpinions', 0)
-    up_pct = ((t_median - price) / price * 100) if t_median and price else 0
-    up_str = f"{'[UP]' if up_pct > 0 else '[DOWN]'} {up_pct:+.1f}%" if up_pct else "N/A"
+    up_ref = t_median if t_median is not None else t_mean
+    up_pct = ((up_ref - price) / price * 100) if isinstance(up_ref, (int, float)) and price else None
+    up_str = f"{up_pct:+.1f}%" if isinstance(up_pct, (int, float)) else "N/A"
 
     fig9 = _get_plotly_target_price(price, t_low, t_mean, t_median, t_high)
+    cc_pill_cls = "pill-green" if cc == "green" else ("pill-amber" if cc == "yellow" else "pill-red")
+    if isinstance(rm, (int, float)):
+        if rm <= 1.5: scale_idx = 0
+        elif rm <= 2.0: scale_idx = 1
+        elif rm <= 3.0: scale_idx = 2
+        elif rm <= 4.0: scale_idx = 3
+        else: scale_idx = 4
+    else:
+        scale_idx = None
+    scale_items = [
+        ("강력 매수", "1.0-1.5"),
+        ("매수", "1.6-2.0"),
+        ("보유", "2.1-3.0"),
+        ("매도", "3.1-4.0"),
+        ("강력 매도", "4.1-5.0"),
+    ]
+    scale_html = "".join(
+        f"<div class='consensus-step {'active' if scale_idx == idx else ''}'><strong>{label}</strong><span>{band}</span></div>"
+        for idx, (label, band) in enumerate(scale_items)
+    )
+    range_values = [v for v in [price, t_low, t_median, t_mean, t_high] if isinstance(v, (int, float))]
+    range_floor = min(range_values) if range_values else None
+    range_ceiling = max(range_values) if range_values else None
+
+    def _marker_pos(val):
+        if not isinstance(val, (int, float)) or range_floor is None or range_ceiling is None or range_ceiling == range_floor:
+            return None
+        return max(2.0, min(98.0, ((val - range_floor) / (range_ceiling - range_floor)) * 100))
+
+    marker_specs = [
+        ("low", "저가", t_low),
+        ("median", "중앙값", t_median),
+        ("current", "현재가", price),
+        ("high", "고가", t_high),
+    ]
+    range_markers_html = "".join(
+        f"<div class='range-marker {cls}' style='left:{pos:.1f}%'><span>{label}</span></div>"
+        for cls, label, value in marker_specs
+        for pos in [_marker_pos(value)]
+        if pos is not None
+    )
+    range_legend_html = "".join(
+        f"<div class='range-legend-item'><span>{label}</span><strong>{f'${value:,.2f}' if isinstance(value, (int, float)) else 'N/A'}</strong></div>"
+        for label, value in [("현재가", price), ("저가", t_low), ("평균", t_mean), ("중앙값", t_median), ("고가", t_high)]
+    )
 
     with st.container(border=True):
         st.markdown('<div class="s-title"><span class="s-num">09</span> 전문가들의 의견 <span style="font-size:.8rem;color:#768390">Yahoo</span></div>', unsafe_allow_html=True)
         col1, col2 = st.columns([1, 1.3])
+        s9_spotlight = (
+            f"<div class='spotlight-grid'>"
+            f"<div class='spotlight-card'><p class='spotlight-label'>컨센서스</p><p class='spotlight-value'>{con}</p><p class='spotlight-sub'>평균 의견 {f'{rm:.2f}/5.0' if isinstance(rm, (int, float)) else 'N/A'}</p></div>"
+            f"<div class='spotlight-card'><p class='spotlight-label'>목표가 기대여력</p><p class='spotlight-value' style='color:{'#63D9A2' if isinstance(up_pct, (int, float)) and up_pct >= 0 else '#FF8F96'}'>{up_str}</p><p class='spotlight-sub'>중앙값 또는 평균 목표가 기준</p></div>"
+            f"<div class='spotlight-card'><p class='spotlight-label'>커버리지 수</p><p class='spotlight-value'>{n_ana}명</p><p class='spotlight-sub'>의견을 낸 애널리스트 수</p></div>"
+            f"</div>"
+        )
         html_s9_1 = (
-            f'{_metric_row("컨센서스 등급", rk, "m-value m-blue m-big")}'
-            f'{_metric_row("평균 의견 (1~5)", f"{rm:.2f}" if isinstance(rm, (int, float)) else "N/A")}'
-            f'{_metric_row("종합 의견", con)}'
-            f'{_metric_row("참여 애널리스트", f"{n_ana}명")}'
-            f'<div class="divider"></div>'
-            f'{_metric_row("최저 목표가", f"${_safe(t_low)}")}'
-            f'{_metric_row("중앙값 목표가", f"${_safe(t_median)}")}'
-            f'{_metric_row("최고 목표가", f"${_safe(t_high)}")}'
-            f'<div style="text-align:center;margin-top:20px;padding:16px;background:rgba(0,0,0,.3);border-radius:12px;border:1px solid #3b424a">'
-            f'<div style="font-size:.9rem;color:#adbac7;font-weight:700">목표가(중앙값) 대비 여력</div>'
-            f'<div style="font-size:1.8rem;font-weight:900;color:{"#63D9A2" if up_pct > 0 else "#FF8F96"};margin-top:6px">{up_str}</div></div>'
+            f"<div style='display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px'><span class='section-pill {cc_pill_cls}'>{con}</span><span class='section-pill pill-amber'>{rk}</span></div>"
+            f"{s9_spotlight}"
+            f"<div class='cluster-card' style='margin-top:14px'>"
+            f"<div class='cluster-title'>컨센서스 스케일</div>"
+            f"<div class='cluster-sub'>1.0에 가까울수록 강한 매수, 5.0에 가까울수록 강한 매도 의견입니다.</div>"
+            f"<div class='consensus-scale'>{scale_html}</div>"
+            f"</div>"
+            f"<div class='cluster-card' style='margin-top:14px'>"
+            f"<div class='cluster-title'>목표가 범위</div>"
+            f"<div class='cluster-sub'>현재가가 애널리스트 목표가 범위의 어느 위치에 있는지 빠르게 읽을 수 있습니다.</div>"
+            f"<div class='range-strip'>{range_markers_html}</div>"
+            f"<div class='range-legend'>{range_legend_html}</div>"
+            f"{_metric_row('최저 목표가', f'${t_low:,.2f}' if isinstance(t_low, (int, float)) else 'N/A')}"
+            f"{_metric_row('평균 목표가', f'${t_mean:,.2f}' if isinstance(t_mean, (int, float)) else 'N/A')}"
+            f"{_metric_row('중앙값 목표가', f'${t_median:,.2f}' if isinstance(t_median, (int, float)) else 'N/A')}"
+            f"{_metric_row('최고 목표가', f'${t_high:,.2f}' if isinstance(t_high, (int, float)) else 'N/A')}"
+            f"</div>"
+        )
+        s9_read_html = (
+            f"<div class='cluster-card' style='margin-top:14px'>"
+            f"<div class='cluster-title'>읽는 법</div>"
+            f"<div class='cluster-sub'>컨센서스는 가격 방향의 힌트일 뿐 확정 신호는 아닙니다. 현재가가 목표가 하단에 가까우면 기대여력이 남아 있을 수 있고, 상단에 가까우면 이미 기대가 상당 부분 반영됐을 수 있습니다.</div>"
+            f"{_metric_row('현재가 vs 목표가', up_str, 'm-green' if isinstance(up_pct, (int, float)) and up_pct >= 0 else 'm-red')}"
+            f"{_metric_row('참여 애널리스트', f'{n_ana}명', 'm-value')}"
+            f"{_metric_row('추천 키', rk, 'm-value m-blue')}"
+            f"</div>"
         )
         with col1:
             st.markdown(html_s9_1, unsafe_allow_html=True)
         with col2:
             if fig9: st.plotly_chart(fig9, use_container_width=True, config={'displayModeBar': False}, key=f"{key_prefix}_fig9")
+            else: st.markdown("<div class='note-box'>※ 목표가 데이터가 충분하지 않아 차트가 생략되었습니다.</div>", unsafe_allow_html=True)
+            st.markdown(s9_read_html, unsafe_allow_html=True)
         st.markdown(_verdict_badge(cc, "", f"애널리스트 {n_ana}명 {rk} (목표가 {up_str})"), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
