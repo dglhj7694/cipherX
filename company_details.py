@@ -746,9 +746,31 @@ html, body, [class*="css"] { font-family:'Pretendard', sans-serif !important; }
 .n-title{display:block;color:#F8FAFC !important;font-size:.96rem;font-weight:800;line-height:1.55;text-decoration:none !important}
 .n-title:hover{color:#C7D2FE !important}
 .n-meta{margin-top:8px;color:#94A3B8;font-size:.76rem;font-weight:700}
+.hero-bento,.coverage-wrap,.section-nav{display:none}
+.invest-hero{max-width:960px;margin:0 auto 20px;display:grid;grid-template-columns:1.45fr .95fr;gap:14px}
+.invest-card{background:
+    linear-gradient(180deg,rgba(99,102,241,.08),rgba(99,102,241,0) 34%),
+    linear-gradient(160deg,rgba(10,14,24,.96),rgba(16,24,39,.88));
+    border:1px solid rgba(99,102,241,.16);border-radius:18px;padding:18px 18px 16px;box-shadow:0 16px 32px rgba(2,6,23,.16)}
+.invest-kicker{display:inline-flex;align-items:center;gap:8px;padding:5px 10px;border-radius:999px;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.22);color:#C7D2FE;font-size:.72rem;font-weight:900}
+.invest-title{font-size:1.14rem;font-weight:900;color:#F8FAFC;line-height:1.45;margin:14px 0 8px}
+.invest-copy{color:#CBD5E1;font-size:.92rem;line-height:1.7;font-weight:500}
+.invest-points{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.invest-point{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border-radius:999px;background:rgba(255,255,255,.03);border:1px solid rgba(148,163,184,.12);color:#E5E7EB;font-size:.78rem;font-weight:800}
+.invest-grid{display:grid;grid-template-columns:1fr;gap:10px}
+.invest-metric{padding:13px 14px;border-radius:14px;background:linear-gradient(160deg,rgba(15,23,42,.9),rgba(15,23,42,.74));border:1px solid rgba(148,163,184,.12)}
+.invest-label{color:#94A3B8;font-size:.72rem;font-weight:800;margin:0 0 6px}
+.invest-value{color:#F8FAFC;font-size:1.22rem;font-weight:900;line-height:1.15;margin:0}
+.invest-sub{color:#CBD5E1;font-size:.78rem;font-weight:600;line-height:1.5;margin:6px 0 0}
+.score-pillar-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:18px 0 0}
+.score-pillar{background:linear-gradient(160deg,rgba(15,23,42,.9),rgba(15,23,42,.72));border:1px solid rgba(148,163,184,.12);border-radius:14px;padding:13px 14px}
+.score-pillar-label{color:#94A3B8;font-size:.72rem;font-weight:800;margin:0 0 6px}
+.score-pillar-value{color:#F8FAFC;font-size:1.28rem;font-weight:900;margin:0}
+.score-pillar-sub{color:#CBD5E1;font-size:.76rem;font-weight:600;line-height:1.45;margin:6px 0 0}
 @media(max-width:900px){
   .hero-bento{grid-template-columns:1fr}
   .meta-grid{grid-template-columns:1fr}
+  .invest-hero{grid-template-columns:1fr}
 }
 </style>
 """
@@ -916,6 +938,47 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     st.markdown(hero_html, unsafe_allow_html=True)
     st.markdown(f"<div class='coverage-wrap'><div class='coverage-grid'>{coverage_html}</div></div>", unsafe_allow_html=True)
     st.markdown(f"<div class='section-nav'>{nav_html}</div>", unsafe_allow_html=True)
+
+    upside_ref = info.get('targetMedianPrice') or info.get('targetMeanPrice')
+    upside_pct_top = ((upside_ref - price) / price * 100) if isinstance(upside_ref, (int, float)) and price else None
+    short_float_top = info.get('shortPercentOfFloat')
+    debt_ratio_top = info.get('debtToEquity')
+
+    thesis_points = []
+    if isinstance(cagr_rev, float):
+        thesis_points.append("매출 성장 유지" if cagr_rev > 0.12 else "저성장 구간" if cagr_rev > 0 else "매출 둔화")
+    if isinstance(fcf, (int, float)):
+        thesis_points.append("FCF 플러스" if fcf > 0 else "FCF 마이너스")
+    if isinstance(debt_ratio_top, (int, float)):
+        thesis_points.append("저레버리지" if debt_ratio_top < 80 else "레버리지 부담" if debt_ratio_top > 150 else "레버리지 보통")
+    if isinstance(upside_pct_top, (int, float)):
+        thesis_points.append(f"스트리트 여력 {upside_pct_top:+.0f}%")
+    if isinstance(short_float_top, (int, float)) and short_float_top > 0.10:
+        thesis_points.append(f"숏비중 {_fmt_pct(short_float_top)}")
+    thesis_line = " · ".join(thesis_points[:4]) if thesis_points else "핵심 투자 포인트를 계산 중입니다."
+
+    cash_flow_label = "플러스" if isinstance(fcf, (int, float)) and fcf > 0 else "부담" if isinstance(fcf, (int, float)) and fcf < 0 else "확인 필요"
+    positioning_note = f"기관보유 {_fmt_pct(inst_hold) if inst_hold is not None else 'N/A'}"
+    if isinstance(short_float_top, (int, float)):
+        positioning_note += f" · 공매도 {_fmt_pct(short_float_top)}"
+
+    invest_points_html = "".join([f"<span class='invest-point'>{_esc(point)}</span>" for point in thesis_points[:5]])
+    invest_html = (
+        f"<div class='invest-hero'>"
+        f"<div class='invest-card'>"
+        f"<span class='invest-kicker'>Investment Snapshot</span>"
+        f"<div class='invest-title'>{_esc(info.get('shortName', ticker_str))} 한줄 요약: {thesis_line}</div>"
+        f"<div class='invest-copy'>{summary_preview}</div>"
+        f"<div class='invest-points'>{invest_points_html}</div>"
+        f"</div>"
+        f"<div class='invest-grid'>"
+        f"<div class='invest-metric'><p class='invest-label'>Street Upside</p><p class='invest-value'>{f'{upside_pct_top:+.1f}%' if isinstance(upside_pct_top, (int, float)) else 'N/A'}</p><p class='invest-sub'>중앙/평균 목표가 기준 기대 여력</p></div>"
+        f"<div class='invest-metric'><p class='invest-label'>Cash Flow Quality</p><p class='invest-value'>{cash_flow_label}</p><p class='invest-sub'>OCF {_fmt_num(ocf)} · FCF {_fmt_num(fcf)}</p></div>"
+        f"<div class='invest-metric'><p class='invest-label'>Positioning</p><p class='invest-value'>{_fmt_pct(inst_hold) if inst_hold is not None else 'N/A'}</p><p class='invest-sub'>{positioning_note}</p></div>"
+        f"</div>"
+        f"</div>"
+    )
+    st.markdown(invest_html, unsafe_allow_html=True)
 
     all_verdicts = []
 
@@ -1584,7 +1647,52 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
             elif c == "red":    total_score += 20
 
     pct = (total_score / valid_count) if valid_count > 0 else 0
-    
+
+    score_map = {"green": 88, "blue": 78, "orange": 66, "yellow": 54, "red": 28}
+    weight_map = {
+        "성장사이클": 0.75, "수익성": 1.20, "과거성적": 1.10, "성장성": 0.95,
+        "재무건전": 1.25, "거래량": 0.45, "변동성": 0.45, "밸류에이션": 1.00,
+        "전문가": 0.55, "지분구조": 0.60, "옵션": 0.35, "공매도": 0.50,
+    }
+    pillar_map = {
+        "성장사이클": "퀄리티", "수익성": "퀄리티", "과거성적": "퀄리티", "재무건전": "퀄리티",
+        "성장성": "성장", "밸류에이션": "밸류", "전문가": "밸류",
+        "거래량": "포지셔닝", "변동성": "포지셔닝", "지분구조": "포지셔닝", "옵션": "포지셔닝", "공매도": "포지셔닝",
+    }
+    pillar_sums = {"퀄리티": 0.0, "성장": 0.0, "밸류": 0.0, "포지셔닝": 0.0}
+    pillar_weights = {"퀄리티": 0.0, "성장": 0.0, "밸류": 0.0, "포지셔닝": 0.0}
+    weighted_sum, used_weight, possible_weight = 0.0, 0.0, 0.0
+    for label, color in all_verdicts:
+        weight = weight_map.get(label, 0.6)
+        possible_weight += weight
+        if color == "gray":
+            continue
+        score = score_map.get(color)
+        if score is None:
+            continue
+        weighted_sum += score * weight
+        used_weight += weight
+        pillar = pillar_map.get(label, "포지셔닝")
+        pillar_sums[pillar] += score * weight
+        pillar_weights[pillar] += weight
+    pct = (weighted_sum / used_weight) if used_weight > 0 else pct
+    confidence = (used_weight / possible_weight * 100) if possible_weight > 0 else 0
+    pillar_scores = {
+        key: (pillar_sums[key] / pillar_weights[key]) if pillar_weights[key] > 0 else None
+        for key in pillar_sums
+    }
+    pillar_cards = "".join(
+        f"<div class='score-pillar'><p class='score-pillar-label'>{label}</p><p class='score-pillar-value'>{pillar_scores[label]:.0f}</p><p class='score-pillar-sub'>{desc}</p></div>"
+        if pillar_scores[label] is not None else
+        f"<div class='score-pillar'><p class='score-pillar-label'>{label}</p><p class='score-pillar-value'>N/A</p><p class='score-pillar-sub'>{desc}</p></div>"
+        for label, desc in [
+            ("퀄리티", "수익성·실적·재무체력"),
+            ("성장", "향후 성장 여지"),
+            ("밸류", "가격 대비 매력도"),
+            ("포지셔닝", "수급·옵션·공매도"),
+        ]
+    ) + f"<div class='score-pillar'><p class='score-pillar-label'>데이터 신뢰도</p><p class='score-pillar-value'>{confidence:.0f}</p><p class='score-pillar-sub'>점수화 가능한 항목 커버리지</p></div>"
+
     if   pct >= 80: oc, oe, ot = "#63D9A2", "🟢", "매우 양호"
     elif pct >= 60: oc, oe, ot = "#F6C35E", "🟡", "양호/보통"
     elif pct >= 40: oc, oe, ot = "#FFAB66", "🟠", "주의 필요"
@@ -1596,7 +1704,8 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
             f'<div style="text-align:center;margin:8px 0 24px"><span style="font-size:2.8rem;font-weight:900;color:{oc}">{oe} {pct:.0f}</span><span style="font-size:1.4rem;color:{oc}"> / 100점</span><br><span style="font-size:1.25rem;color:{oc};font-weight:800">{ot}</span></div>'
             f'<div style="background:rgba(0,0,0,0.4);border-radius:10px;height:16px;overflow:hidden;margin:0 40px;border:1px solid #3b424a"><div style="width:{pct:.1f}%;height:100%;background:{oc};border-radius:10px;transition:width 1s;box-shadow:0 0 10px {oc}"></div></div>'
             f'<div style="margin-top:24px">{_score_dot_row(all_verdicts)}</div>'
-            f'<div class="note-box" style="margin-top:20px;text-align:center">수집 가능한 분석 항목들(🟢=100점, 🔵=85점, 🟡=50점, 🔴=20점)의 평균으로 산출한 종합 점수입니다.<br>(데이터가 누락된 항목은 점수 산정에서 제외됩니다.)</div>'
+            f"<div class='score-pillar-grid'>{pillar_cards}</div>"
+            f'<div class="note-box" style="margin-top:20px;text-align:center">종합점수는 단순 평균이 아니라 가중 평균입니다.<br>재무건전·수익성·과거실적은 더 크게, 옵션·공매도·거래량 같은 전술 항목은 더 작게 반영하고, 데이터 누락 정도는 별도 신뢰도로 표시합니다.</div>'
         )
         st.markdown(html_s14, unsafe_allow_html=True)
     st.caption("⚠️ 본 분석은 참고용 지표이며 어떠한 경우에도 투자 조언이 아닙니다. 투자에 대한 최종 결정은 본인의 판단과 책임 하에 이루어져야 합니다.")
