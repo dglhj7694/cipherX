@@ -3,6 +3,7 @@ import streamlit.components.v1 as components
 import pandas as pd
 import plotly.graph_objects as go
 import json
+from textwrap import dedent
 from config import *
 from chart import build_metadata, build_chart
 from company_details import render_company_details
@@ -229,7 +230,8 @@ def render_judgment_card(m):
     es_c=SOFT_GREEN if es>0 else SOFT_RED if es<0 else SOFT_AMBER
     # Agree ratio bar
     total_agree=max(ba+sa,1);ba_pct=ba/total_agree*100
-    st.markdown(f"""<div class="score-card {cc} fade-up">
+    card_html = dedent(f"""
+    <div class="score-card {cc} fade-up">
         <div style="display:flex;align-items:center;justify-content:center;gap:28px;flex-wrap:wrap">
             <div class="conf-ring"><svg viewBox="0 0 80 80"><circle class="ring-bg" cx="40" cy="40" r="36"/><circle class="ring-fg" cx="40" cy="40" r="36" stroke="{jc}" stroke-dasharray="{circ:.1f}" stroke-dashoffset="{offset:.1f}"/></svg><span class="ring-text" style="color:{jc}">{cf:.0f}%</span></div>
             <div>
@@ -256,7 +258,10 @@ def render_judgment_card(m):
                 <div style="height:3px;background:rgba(165,180,252,.15);border-radius:2px;margin-top:6px;overflow:hidden"><div style="height:100%;width:100%;background:#A5B4FC;border-radius:2px;opacity:.4"></div></div>
             </div>
         </div>
-        <div style='margin-top:10px;display:flex;justify-content:center;gap:8px;flex-wrap:wrap'>{badges}</div>{veto_html}</div>""",unsafe_allow_html=True)
+        <div style='margin-top:10px;display:flex;justify-content:center;gap:8px;flex-wrap:wrap'>{badges}</div>{veto_html}
+    </div>
+    """).strip()
+    st.markdown(card_html, unsafe_allow_html=True)
 
 def render_committee_panel(m):
     committee=m.get('committee',{})
