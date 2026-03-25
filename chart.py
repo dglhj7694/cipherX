@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from scipy.signal import find_peaks
 from config import *
 from utils import _sf
 
@@ -152,7 +153,144 @@ def _sig_marker(fig,dc,sn,row,y,clr,sym,sz,lbl):
     ht=f"<b>{lbl}</b> ({kor})<br><span style='color:#94A3B8'>{desc}</span><br>%{{x|%Y-%m-%d}}<extra></extra>" if kor else f"<b>{lbl}</b><br>%{{x|%Y-%m-%d}}<extra></extra>"
     fig.add_trace(go.Scatter(x=sr.index,y=yv,mode='markers',marker=dict(symbol=sym,size=sz,color=clr,line=dict(width=1.5,color='#FFF'),opacity=.95),name=lbl,showlegend=False,hovertemplate=ht),row=row,col=1)
 
-def build_chart(dc,ticker):
+def _trendline_atr(dc):
+    atr=dc.get('ATR',pd.Series(index=dc.index,dtype=float)).astype(float).replace([np.inf,-np.inf],np.nan)
+    fallback=((dc['High']-dc['Low']).replace([np.inf,-np.inf],np.nan)).rolling(14,min_periods=1).mean()
+    atr=atr.fillna(fallback)
+    atr_med=float(atr.median()) if len(atr)>0 else 0.0
+    if not np.isfinite(atr_med) or atr_med<=0:
+        atr_med=max(float((dc['Close'].astype(float).median() if 'Close' in dc.columns else 1.0)*0.01),1e-6)
+    return atr.fillna(atr_med).clip(lower=max(atr_med*0.15,1e-6))
+
+def _line_values(length,start_idx,start_price,end_idx,end_price):
+    xs=np.arange(length,dtype=float)
+    slope=(float(end_price)-float(start_price))/max(float(end_idx-start_idx),1.0)
+    return float(start_price)+(xs-float(start_idx))*slope
+
+def _score_trendline(length,start_idx,end_idx,intrusion_ratio):
+    if length<=1:return 0.0
+    recency=float(end_idx)/float(length-1)
+    span=float(end_idx-start_idx)/float(length-1)
+    cleanliness=max(0.0,1.0-min(float(intrusion_ratio)/0.2,1.0))
+    return recency*0.45+span*0.35+cleanliness*0.20
+
+def _collect_trendline_candidates(dc,column,kind):
+    if dc.empty or column not in dc.columns:return []
+    values=dc[column].astype(float).values
+    if len(values)<12:return []
+    atr=_trendline_atr(dc)
+    atr_values=atr.values.astype(float)
+    distance=max(5,len(dc)//18)
+    prominence=max(float(np.nanmedian(atr_values))*0.35,float(np.nanmedian(np.abs(values)))*0.001,1e-6)
+    series=values if kind=='resistance' else -values
+    pivots,_=find_peaks(series,distance=distance,prominence=prominence)
+    if len(pivots)<2:return []
+    candidates=[]
+    for left_pos in range(len(pivots)-1):
+        start_idx=int(pivots[left_pos]);start_price=float(values[start_idx])
+        for right_pos in range(left_pos+1,len(pivots)):
+            end_idx=int(pivots[right_pos]);end_price=float(values[end_idx])
+            if end_idx-start_idx<distance:continue
+            if kind=='support' and end_price<=start_price:continue
+            if kind=='resistance' and end_price>=start_price:continue
+            line_vals=_line_values(len(dc),start_idx,start_price,end_idx,end_price)
+            window=slice(start_idx,end_idx+1)
+            line_window=line_vals[window]
+            tol=atr_values[window]*0.35
+            price_window=values[window]
+            if kind=='support':
+                intrusions=price_window<(line_window-tol)
+            else:
+                intrusions=price_window>(line_window+tol)
+            intrusion_ratio=float(np.mean(intrusions)) if len(price_window)>0 else 1.0
+            if intrusion_ratio>0.20:continue
+            projected=float(line_vals[-1]);current_tol=float(atr_values[-1]*0.35)
+            current_close=float(dc['Close'].iloc[-1])
+            is_active=current_close>=projected-current_tol if kind=='support' else current_close<=projected+current_tol
+            candidates.append({
+                'kind':kind,
+                'start_idx':start_idx,
+                'end_idx':end_idx,
+                'start_price':start_price,
+                'end_price':end_price,
+                'line_values':line_vals,
+                'intrusion_ratio':intrusion_ratio,
+                'projected_price':projected,
+                'active':bool(is_active),
+                'score':_score_trendline(len(dc),start_idx,end_idx,intrusion_ratio),
+            })
+    return candidates
+
+def _select_trendlines(candidates,limit,spacing):
+    selected=[]
+    for cand in sorted(candidates,key=lambda x:(x['score'],x['end_idx']),reverse=True):
+        too_close=False
+        for chosen in selected:
+            if cand['start_idx']==chosen['start_idx'] or cand['end_idx']==chosen['end_idx']:
+                too_close=True
+                break
+            if abs(cand['projected_price']-chosen['projected_price'])<=spacing:
+                too_close=True
+                break
+        if too_close:continue
+        selected.append(cand)
+        if len(selected)>=limit:break
+    return selected
+
+def _compute_trendlines(dc,max_per_side=2):
+    atr=_trendline_atr(dc)
+    spacing=max(float(np.nanmedian(atr.values))*0.5,1e-6)
+    supports=_select_trendlines(_collect_trendline_candidates(dc,'Low','support'),max_per_side,spacing)
+    resistances=_select_trendlines(_collect_trendline_candidates(dc,'High','resistance'),max_per_side,spacing)
+    return supports,resistances
+
+def _trendline_hover(line,label):
+    kind='Support' if line['kind']=='support' else 'Resistance'
+    start_date=line['start_date'].strftime('%Y-%m-%d')
+    end_date=line['end_date'].strftime('%Y-%m-%d')
+    return (
+        f"<b>{label}</b><br>"
+        f"Type: {kind}<br>"
+        f"Anchors: {start_date} ({line['start_price']:.2f}) -> {end_date} ({line['end_price']:.2f})<br>"
+        f"Projected: %{{y:.2f}}<br>"
+        f"Current projected price: {line['projected_price']:.2f}<extra></extra>"
+    )
+
+def _add_trendline_overlays(fig,dc,max_per_side=2):
+    supports,resistances=_compute_trendlines(dc,max_per_side=max_per_side)
+    palette={
+        'support':['#2DD4BF','#6EE7B7'],
+        'resistance':['#FB7185','#FDBA74'],
+    }
+    for idx,line in enumerate(supports,1):
+        line['start_date']=dc.index[line['start_idx']]
+        line['end_date']=dc.index[line['end_idx']]
+        xs=dc.index[line['start_idx']:]
+        ys=line['line_values'][line['start_idx']:]
+        fig.add_trace(go.Scatter(
+            x=xs,
+            y=ys,
+            mode='lines',
+            line=dict(color=palette['support'][min(idx-1,len(palette['support'])-1)],width=2,dash='solid' if line['active'] else 'dot'),
+            name=f'Trendline S{idx}',
+            hovertemplate=_trendline_hover(line,f'Trendline S{idx}')
+        ),row=1,col=1)
+    for idx,line in enumerate(resistances,1):
+        line['start_date']=dc.index[line['start_idx']]
+        line['end_date']=dc.index[line['end_idx']]
+        xs=dc.index[line['start_idx']:]
+        ys=line['line_values'][line['start_idx']:]
+        fig.add_trace(go.Scatter(
+            x=xs,
+            y=ys,
+            mode='lines',
+            line=dict(color=palette['resistance'][min(idx-1,len(palette['resistance'])-1)],width=2,dash='solid' if line['active'] else 'dot'),
+            name=f'Trendline R{idx}',
+            hovertemplate=_trendline_hover(line,f'Trendline R{idx}')
+        ),row=1,col=1)
+    return supports,resistances
+
+def build_chart(dc,ticker,show_trendlines=True):
     mac={20:'#f1c40f',50:'#e74c3c',200:'#2ecc71'}
     fig=make_subplots(rows=8,cols=1,shared_xaxes=True,vertical_spacing=0.02,row_heights=[.32,.04,.09,.09,.09,.09,.09,.19],subplot_titles=(ticker,"Vol","WaveTrend","MACD","Money Flow","Stoch Slow","Squeeze Mom","5-Committee Ensemble"))
     hover=_build_candle_hover(dc)
@@ -175,6 +313,8 @@ def build_chart(dc,ticker):
     sb,ss=_collect_strong_markers(dc)
     _add_signal_boxes(fig,dc,sb,ss)
     _add_volume_profile_overlay(fig,dc)
+    if show_trendlines:
+        _add_trendline_overlays(fig,dc,max_per_side=2)
     if sb.any():
         sr=dc[sb];yv=sr['Low']-sr['ATR']*2;ht=[]
         for bi in sr.index:
