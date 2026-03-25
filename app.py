@@ -220,7 +220,7 @@ def get_gemini_model():
         genai.configure(api_key=GEMINI_API_KEY)
     return genai.GenerativeModel('gemini-flash-latest')
 
-def analyze(ticker, chart_days=252, refresh=False, show_trendlines=True, show_patterns=True):
+def analyze(ticker, chart_days=252, refresh=False):
     try:
         ts = int(time.time()) if refresh else None
         df = compute_and_cache(ticker, ts)
@@ -230,7 +230,7 @@ def analyze(ticker, chart_days=252, refresh=False, show_trendlines=True, show_pa
         if dc.empty:
             return None, "차트 데이터 부족", None
         meta = build_metadata(dc, ticker)
-        return build_chart(dc, ticker, show_trendlines=show_trendlines, show_patterns=show_patterns).to_json(), build_prompt_text(dc, meta), meta
+        return build_chart(dc, ticker).to_json(), build_prompt_text(dc, meta), meta
     except Exception as e:
         import traceback
         print(f"[ERR]{ticker}:\n{traceback.format_exc()}")
@@ -462,8 +462,6 @@ with st.sidebar:
     app_mode = st.radio("모드", ['분석', '스캐너'], index=_mi)
     st.session_state['_mode'] = app_mode
     chart_period = st.radio("기간", ['3개월', '6개월', '1년'], index=0, horizontal=True, key="period")
-    show_trendlines = st.checkbox("자동 빗각/채널 표시", value=True, key="show_trendlines")
-    show_patterns = st.checkbox("패턴 오버레이 표시", value=True, key="show_patterns")
     chart_days = {'3개월': 63, '6개월': 126, '1년': 252}[chart_period]
     if st.button("🗑️ 초기화", use_container_width=True, type="secondary"):
         reset_session()
@@ -942,7 +940,7 @@ else:
                 fund = fetch_fundamentals(tv)
                 status.update(label=f"📊 {tv} 가격·지표 계산 중...", state="running", expanded=True)
                 st.write("3. 가격 데이터, 기술 지표, 위원회 점수, 차트 메타데이터를 계산합니다.")
-                fj, phist, meta = analyze(tv, chart_days, refresh, show_trendlines=show_trendlines, show_patterns=show_patterns)
+                fj, phist, meta = analyze(tv, chart_days, refresh)
                 if fj and meta:
                     jg  = meta['judgment']
                     act = meta.get('action_label', '')

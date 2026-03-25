@@ -296,6 +296,7 @@ def _add_trendline_overlays(fig,dc,max_per_side=2,default_visible='legendonly'):
         'support':['#2DD4BF','#6EE7B7'],
         'resistance':['#FB7185','#FDBA74'],
     }
+    trend_legend_shown=False
     for idx,line in enumerate(supports,1):
         line['start_date']=dc.index[line['start_idx']]
         line['end_date']=dc.index[line['end_idx']]
@@ -309,25 +310,27 @@ def _add_trendline_overlays(fig,dc,max_per_side=2,default_visible='legendonly'):
                 y=line['channel_values'][line['start_idx']:],
                 mode='lines',
                 line=dict(color=channel_color,width=1.3,dash='dash'),
-                name='Parallel Channel',
-                legendgroup='parallel_channel',
-                showlegend=(idx==1),
+                name='Trend Overlay',
+                legendgroup='trend_overlay',
+                showlegend=not trend_legend_shown,
                 visible=default_visible,
                 hovertemplate=_trendline_hover(line,f'Channel S{idx}')
             ),row=1,col=1)
+            trend_legend_shown=True
         fig.add_trace(go.Scatter(
             x=xs,
             y=ys,
             mode='lines',
             line=dict(color=channel_color,width=2,dash=channel_dash),
-            name='Trend Support',
-            legendgroup='trend_support',
-            showlegend=(idx==1),
+            name='Trend Overlay',
+            legendgroup='trend_overlay',
+            showlegend=not trend_legend_shown,
             visible=default_visible,
             hovertemplate=_trendline_hover(line,f'Trendline S{idx}'),
             fill='tonexty' if 'channel_values' in line else None,
             fillcolor='rgba(45,212,191,0.06)' if 'channel_values' in line else None
         ),row=1,col=1)
+        trend_legend_shown=True
     for idx,line in enumerate(resistances,1):
         line['start_date']=dc.index[line['start_idx']]
         line['end_date']=dc.index[line['end_idx']]
@@ -340,20 +343,21 @@ def _add_trendline_overlays(fig,dc,max_per_side=2,default_visible='legendonly'):
             y=ys,
             mode='lines',
             line=dict(color=channel_color,width=2,dash=channel_dash),
-            name='Trend Resistance',
-            legendgroup='trend_resistance',
-            showlegend=(idx==1),
+            name='Trend Overlay',
+            legendgroup='trend_overlay',
+            showlegend=not trend_legend_shown,
             visible=default_visible,
             hovertemplate=_trendline_hover(line,f'Trendline R{idx}')
         ),row=1,col=1)
+        trend_legend_shown=True
         if 'channel_values' in line:
             fig.add_trace(go.Scatter(
                 x=xs,
                 y=line['channel_values'][line['start_idx']:],
                 mode='lines',
                 line=dict(color=channel_color,width=1.3,dash='dash'),
-                name='Parallel Channel',
-                legendgroup='parallel_channel',
+                name='Trend Overlay',
+                legendgroup='trend_overlay',
                 showlegend=False,
                 visible=default_visible,
                 hovertemplate=_trendline_hover(line,f'Channel R{idx}'),
@@ -522,7 +526,7 @@ def _add_pattern_overlay(fig,dc,pattern,default_visible='legendonly'):
         y=lower_vals,
         mode='lines',
         line=dict(color=edge_color,width=2,dash='dash'),
-        name='Pattern',
+        name='Pattern Overlay',
         legendgroup='pattern_overlay',
         showlegend=False,
         visible=default_visible,
@@ -533,7 +537,7 @@ def _add_pattern_overlay(fig,dc,pattern,default_visible='legendonly'):
         y=upper_vals,
         mode='lines',
         line=dict(color=edge_color,width=2,dash='dash'),
-        name='Pattern',
+        name='Pattern Overlay',
         legendgroup='pattern_overlay',
         showlegend=True,
         visible=default_visible,
@@ -541,24 +545,21 @@ def _add_pattern_overlay(fig,dc,pattern,default_visible='legendonly'):
         fill='tonexty',
         fillcolor=fill_color,
     ),row=1,col=1)
-    fig.add_annotation(
-        x=dc.index[-1],
-        y=float(max(pattern['upper_projected_price'],pattern['lower_projected_price'])),
-        text=f"{pattern['name']} · {pattern['state']}",
-        showarrow=False,
-        visible=False,
-        font=dict(size=10,color=edge_color,family='Pretendard'),
-        bgcolor='rgba(15,23,42,0.78)',
-        bordercolor=edge_color,
-        borderwidth=1,
-        borderpad=4,
-        xanchor='right',
-        yanchor='bottom',
-        row=1,
-        col=1
-    )
+    fig.add_trace(go.Scatter(
+        x=[dc.index[-1]],
+        y=[float(max(pattern['upper_projected_price'],pattern['lower_projected_price']))],
+        mode='text',
+        text=[f"{pattern['name']} · {pattern['state']}"],
+        textposition='top right',
+        textfont=dict(size=10,color=edge_color,family='Pretendard'),
+        name='Pattern Overlay',
+        legendgroup='pattern_overlay',
+        showlegend=False,
+        visible=default_visible,
+        hoverinfo='skip'
+    ),row=1,col=1)
 
-def build_chart(dc,ticker,show_trendlines=True,show_patterns=True):
+def build_chart(dc,ticker):
     mac={20:'#f1c40f',50:'#e74c3c',200:'#2ecc71'}
     fig=make_subplots(rows=8,cols=1,shared_xaxes=True,vertical_spacing=0.02,row_heights=[.32,.04,.09,.09,.09,.09,.09,.19],subplot_titles=(ticker,"Vol","WaveTrend","MACD","Money Flow","Stoch Slow","Squeeze Mom","5-Committee Ensemble"))
     hover=_build_candle_hover(dc)
@@ -589,10 +590,8 @@ def build_chart(dc,ticker,show_trendlines=True,show_patterns=True):
         yoff=dc['Low']-dc['ATR']*(0.8 if 'Hull' in sn else 1.2 if 'UTBot' in sn else 1.8) if 'Bull' in sn or 'Buy' in sn else dc['High']+dc['ATR']*(0.8 if 'Hull' in sn else 1.2 if 'UTBot' in sn else 1.8)
         _sig_marker(fig,dc,sn,1,yoff,clr,sym,sz,lbl,legendgroup=legendgroup,showlegend=showlegend,visible=visible)
     sb,ss=_collect_strong_markers(dc)
-    if show_trendlines:
-        _add_trendline_overlays(fig,dc,max_per_side=2,default_visible='legendonly')
-    if show_patterns:
-        _add_pattern_overlay(fig,dc,_detect_active_pattern(dc),default_visible='legendonly')
+    _add_trendline_overlays(fig,dc,max_per_side=2,default_visible='legendonly')
+    _add_pattern_overlay(fig,dc,_detect_active_pattern(dc),default_visible='legendonly')
     _add_volume_profile_overlay(fig,dc,default_visible='legendonly')
     if sb.any():
         sr=dc[sb];yv=sr['Low']-sr['ATR']*2;ht=[]
