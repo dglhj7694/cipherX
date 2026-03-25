@@ -11,8 +11,14 @@ from sectors import SECTOR_GROUPS
 from config import GEMINI_API_KEY, COMBINED_SCAN_REGISTRY, CTX_KOR
 from utils import _valid_fmt, _sf, fetch_fundamentals, validate_ticker, compute_and_cache, _compute_cached
 from chart import build_chart, build_metadata
-from ui import render_analysis
+from ui_localized import render_analysis
 from ai_agent import build_prompt_text, build_ai_prompt
+from localization import (
+    localize_action_label,
+    localize_combo,
+    localize_context_label,
+    localize_judgment_label,
+)
 st.set_page_config(page_title="CipherX V14.2", page_icon="📈", layout="wide", initial_sidebar_state="collapsed")
 
 # ━━━ CSS ━━━
@@ -209,7 +215,7 @@ div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] blockquote{
 INITIAL_MESSAGE = {
     "role": "assistant",
     "type": "text",
-    "content": "🚦 **CipherX V14.2**\n티커를 입력하거나 사이드바에서 **스캐너 모드**로 여러 종목을 먼저 훑어보세요.",
+    "content": "🚦 **CipherX V14.2**\n티커를 입력하거나 사이드바의 **스캐너**에서 여러 종목을 먼저 살펴보세요.",
 }
 
 
@@ -358,15 +364,15 @@ def _render_analysis_sidebar_nav():
     row = ctx['row']
     labels = _build_scan_nav_labels(ctx['results'])
     st.markdown("---")
-    st.markdown("#### Scan Navigator")
-    st.caption(f"{ctx['source']} scan · {idx + 1}/{ctx['total']} · {row['ticker']}")
-    st.caption(f"Judgment {row.get('jg', 'N/A')} · ES {row.get('es', 0):+.0f} · Scan {row.get('scan_score', 0):+.1f}")
+    st.markdown("#### 스캔 내비게이터")
+    st.caption(f"{ctx['source']} 스캔 · {idx + 1}/{ctx['total']} · {row['ticker']}")
+    st.caption(f"판단 {row.get('jg', 'N/A')} · ES {row.get('es', 0):+.0f} · 스캔 점수 {row.get('scan_score', 0):+.1f}")
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("Prev", key="scan_nav_prev_sb", use_container_width=True, disabled=idx <= 0):
+        if st.button("이전", key="scan_nav_prev_sb", use_container_width=True, disabled=idx <= 0):
             _queue_scan_navigation(idx - 1)
     with c2:
-        if st.button("Next", key="scan_nav_next_sb", use_container_width=True, disabled=idx >= ctx['total'] - 1):
+        if st.button("다음", key="scan_nav_next_sb", use_container_width=True, disabled=idx >= ctx['total'] - 1):
             _queue_scan_navigation(idx + 1)
 
     current_select = st.session_state.get('scan_nav_select_idx')
@@ -381,29 +387,29 @@ def _render_analysis_sidebar_nav():
         on_change=_handle_scan_jump,
         label_visibility="collapsed",
     )
-    if st.button("Back To Scanner", key="scan_nav_back_sb", use_container_width=True):
+    if st.button("스캐너로 돌아가기", key="scan_nav_back_sb", use_container_width=True):
         st.session_state['_mode'] = '스캐너'
         st.rerun()
 
 def _show_analysis_toasts(ticker, meta):
     judgment = str(meta.get('judgment', 'NEUTRAL'))
-    action = str(meta.get('action_label', '')).strip() or judgment
+    action = str(meta.get('action_label', '')).strip() or localize_judgment_label(judgment)
     ensemble = float(meta.get('ensemble_score', 0))
     primary_icon = '🟢' if 'BUY' in judgment else ('🔴' if 'SELL' in judgment else '🟡')
-    st.toast(f"{ticker} {action} | ES {ensemble:+.1f}", icon=primary_icon)
+    st.toast(f"{ticker} {action} · ES {ensemble:+.1f}", icon=primary_icon)
 
     warning_parts = []
     veto = str(meta.get('veto_flags', '')).strip()
     if veto:
-        warning_parts.append(f"Veto {veto}")
+        warning_parts.append(f"제한 조건 {veto}")
     contrast = str(meta.get('contrast_notes', '')).strip()
     if contrast:
         warning_parts.append(contrast.split(';')[0][:90])
     tier1 = [str(s.get('kor', '')).strip() for s in meta.get('combined_scans', []) if s.get('tier') == 1 and s.get('is_today')]
     if tier1:
-        warning_parts.append(f"T1 {', '.join(tier1[:2])}")
+        warning_parts.append(f"핵심 콤보 {', '.join(tier1[:2])}")
     if warning_parts:
-        st.toast(" | ".join(warning_parts[:2]), icon='⚠️')
+        st.toast(" · ".join(warning_parts[:2]), icon='⚠️')
 
 def _render_scanner_guide(tickers, scan_source):
     target_count = len(tickers)
@@ -411,7 +417,7 @@ def _render_scanner_guide(tickers, scan_source):
     st.markdown(
         f"""
         <div class="guide-card fade-up">
-            <p class="guide-kicker">Scanner Guide</p>
+            <p class="guide-kicker">Scanner Guide · 스캐너 안내</p>
             <div class="guide-grid">
                 <div class="guide-step">
                     <p class="guide-step-title">1. 유니버스 선택</p>
@@ -419,11 +425,11 @@ def _render_scanner_guide(tickers, scan_source):
                 </div>
                 <div class="guide-step">
                     <p class="guide-step-title">2. 점수와 강도 확인</p>
-                    <p class="guide-step-copy"><b>SCAN</b>은 우선순위, <b>ES</b>는 방향성입니다. 멀티시그널과 최근 콤보가 겹칠수록 상단에 배치됩니다.</p>
+                    <p class="guide-step-copy"><b>스캔 점수</b>는 우선순위, <b>ES</b>는 방향성입니다. 멀티 시그널과 최근 콤보가 겹칠수록 상단에 배치됩니다.</p>
                 </div>
                 <div class="guide-step">
                     <p class="guide-step-title">3. 바로 분석으로 이동</p>
-                    <p class="guide-step-copy">카드의 <b>분석</b> 버튼을 누르면 분석 모드로 넘어가고, 사이드바의 Scan Navigator로 이전/다음 종목을 빠르게 넘길 수 있습니다.</p>
+                    <p class="guide-step-copy">카드의 <b>분석</b> 버튼을 누르면 분석 모드로 넘어가고, 사이드바의 스캔 내비게이터에서 이전/다음 종목을 빠르게 넘길 수 있습니다.</p>
                 </div>
             </div>
         </div>
@@ -435,19 +441,19 @@ def _render_analysis_guide():
     st.markdown(
         """
         <div class="guide-card fade-up">
-            <p class="guide-kicker">How To Read</p>
+            <p class="guide-kicker">How To Use · 사용 방법</p>
             <div class="guide-grid">
                 <div class="guide-step">
-                    <p class="guide-step-title">1. Action / Confidence</p>
-                    <p class="guide-step-copy">먼저 최종 액션과 신뢰도를 보고, 그 아래 근거 요약으로 방향성의 중심 논리를 빠르게 확인합니다.</p>
+                    <p class="guide-step-title">1. 최종 판단 / 신뢰도</p>
+                    <p class="guide-step-copy">먼저 최종 판단과 신뢰도를 보고, 그 아래 근거 요약으로 방향성의 중심 논리를 빠르게 확인합니다.</p>
                 </div>
                 <div class="guide-step">
-                    <p class="guide-step-title">2. Risk Check</p>
-                    <p class="guide-step-copy">스마트 머니 다이버전스, R:R, 저거래량, 과열 위험이 있으면 여기서 먼저 경고를 확인하세요.</p>
+                    <p class="guide-step-title">2. 위험 점검</p>
+                    <p class="guide-step-copy">스마트 머니 다이버전스, 손익비, 저거래량, 과열 위험이 있으면 여기서 먼저 경고를 확인하세요.</p>
                 </div>
                 <div class="guide-step">
                     <p class="guide-step-title">3. 차트와 AI 리포트</p>
-                    <p class="guide-step-copy">차트 탭에서 VP/강신호/캔들 툴팁으로 타이밍을 보고, AI 리포트는 마지막 정리용 보조 의견으로 활용하면 좋습니다.</p>
+                    <p class="guide-step-copy">차트 탭에서 거래량 프로파일(VP), 패턴, 캔들 툴팁으로 타이밍을 보고, AI 리포트는 마지막 정리용 보조 의견으로 활용하면 좋습니다.</p>
                 </div>
             </div>
         </div>
@@ -461,7 +467,7 @@ with st.sidebar:
     _mi = 0 if st.session_state.get('_mode', '분석') == '분석' else 1
     app_mode = st.radio("모드", ['분석', '스캐너'], index=_mi)
     st.session_state['_mode'] = app_mode
-    chart_period = st.radio("기간", ['3개월', '6개월', '1년', '2년'], index=1, horizontal=True, key="period")
+    chart_period = st.radio("기간", ['3개월', '6개월', '1년', '2년'], index=2, horizontal=True, key="period")
     chart_days = {'3개월': 63, '6개월': 126, '1년': 252, '2년': 504}[chart_period]
     if st.button("🗑️ 초기화", use_container_width=True, type="secondary"):
         reset_session()
@@ -594,9 +600,10 @@ if current_mode == '스캐너':
                 for cn, ccfg in COMBINED_SCAN_REGISTRY.items():
                     if cn in dc_.columns and dc_[cn].tail(5).any():
                         ld = dc_[cn].tail(5)[dc_[cn].tail(5)].index[-1]
+                        combo_kor, _ = localize_combo(cn, ccfg.get('kor'), ccfg.get('desc'))
                         acs.append({
                             'icon':     ccfg['icon'],
-                            'kor':      ccfg['kor'],
+                            'kor':      combo_kor,
                             'dir':      ccfg['dir'],
                             'tier':     ccfg['tier'],
                             'date':     ld.strftime('%m/%d'),
@@ -687,10 +694,10 @@ if current_mode == '스캐너':
                     # 표시용 최근 콤보
                     'multi_hits':   mhits,
                     # 판단
-                    'jg':           str(lt.get('Trade_Judgment', 'N/A')),
+                    'jg':           localize_judgment_label(str(lt.get('Trade_Judgment', 'N/A'))),
                     'cf':           cf,
                     'es':           es,
-                    'ctx':          CTX_KOR.get(int(_sf(lt.get('Market_Context', 0))), '기본'),
+                    'ctx':          localize_context_label(int(_sf(lt.get('Market_Context', 0)))),
                     'ba':           ba,
                     'sa':           sa,
                     'buy_total':    bt,
@@ -700,7 +707,7 @@ if current_mode == '스캐너':
                     'latest_sig':   lsd.strftime('%Y-%m-%d') if lsd else '9999-99-99',
                     'latest_sig_ts': lsd.timestamp() if lsd else 0.0,
                     'reason':       str(lt.get('Judgment_Reason', '')),
-                    'action':       str(lt.get('Action_Label', '')),
+                    'action':       localize_action_label(str(lt.get('Action_Label', ''))),
                 }
             except Exception:
                 return None
@@ -738,7 +745,7 @@ if current_mode == '스캐너':
         bt_  = [r for r in results if 'BUY'  in r['jg']]
         st_  = [r for r in results if 'SELL' in r['jg']]
         scan_total = st.session_state.get('scan_total', 0)
-        st.caption("정렬 기준: Scan Score → Strength → 최근 시그널 순서입니다.")
+        st.caption("정렬 기준: 스캔 점수 → 강도 → 최근 시그널 순서입니다.")
 
         st.markdown(
             f"<div style='display:flex;gap:12px;margin-bottom:12px'>"
@@ -834,7 +841,7 @@ if current_mode == '스캐너':
 # ══════════════════════════════════════════════════════════════
 else:
     st.markdown("<h2 style='text-align:center;color:#fff;margin-bottom:4px'>🚦 CipherX V14.2</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align:center;color:#64748B;margin-bottom:16px'>5-Committee Ensemble + Prediction + Auto Reason</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center;color:#64748B;margin-bottom:16px'>5위원회 종합 판단 + 예측 보정 + 자동 해설</p>", unsafe_allow_html=True)
     _render_analysis_guide()
 
     if not st.session_state.last_ticker:
@@ -857,7 +864,7 @@ else:
                 if is_latest_analysis:
                     render_analysis(msg, key_prefix=f"analysis_{i}_{msg.get('ticker', 'na')}")
                 else:
-                    with st.expander(f"{msg.get('ticker', '')} 이전 분석", expanded=False):
+                    with st.expander(f"{msg.get('ticker', '')} 지난 분석", expanded=False):
                         render_analysis(msg, key_prefix=f"analysis_{i}_{msg.get('ticker', 'na')}")
             elif msg.get("type") == "report":
                 with st.expander(f"{msg.get('ticker', '')} AI 리포트", expanded=i == latest_report_idx):
@@ -988,8 +995,8 @@ else:
     if st.session_state.get('quick'):
         process_ticker(st.session_state.pop('quick'))
     if st.session_state.pending_ai_ticker and st.session_state.pending_ai_prompt:
-        st.caption("AI 리포트는 보통 10~20초 정도 걸립니다. 시스템 판단을 요약하고 반론 포인트도 함께 정리합니다.")
-        if st.button(f"🚀 {st.session_state.pending_ai_ticker.upper()} AI 분석", type="primary", use_container_width=True):
+        st.caption("AI 리포트는 보통 10~20초 정도 걸립니다. 시스템 판단 요약과 반론 포인트를 함께 정리합니다.")
+        if st.button(f"🚀 {st.session_state.pending_ai_ticker.upper()} AI 리포트 만들기", type="primary", use_container_width=True):
             _run_ai()
     if ti := st.chat_input("티커 입력 (예: TSLA, AAPL, QQQ)"):
         process_ticker(ti)

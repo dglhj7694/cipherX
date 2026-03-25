@@ -28,9 +28,10 @@ CTX_VOL_DRY=10;CTX_POST_EXPLOSION=11
 CTX_LABELS={0:'default',1:'extreme_oversold',2:'extreme_overbought',3:'strong_trend_up',
     4:'strong_trend_down',5:'accumulation',6:'distribution',7:'ranging',
     8:'bottoming',9:'topping',10:'vol_dry',11:'post_explosion'}
-CTX_KOR={0:'기본',1:'극과매도',2:'극과매수',3:'강한상승추세',4:'강한하락추세',
-    5:'매집구간',6:'분배구간',7:'횡보구간',8:'바닥다지기',9:'천장형성',
-    10:'거래량고갈',11:'폭발직후'}
+CTX_KOR={0:'기본',1:'극과매도',2:'극과매수',3:'강한 상승 추세',4:'강한 하락 추세',
+    5:'매집 구간',6:'분산 구간',7:'횡보 구간',8:'바닥 다지기',9:'천장 형성',
+    10:'거래량 감소',11:'급등락 직후'}
+
 CONTEXT_WEIGHTS={
     'extreme_oversold':[.05,.30,.20,.15,.30],'extreme_overbought':[.05,.30,.20,.15,.30],
     'strong_trend_up':[.30,.25,.15,.10,.20],'strong_trend_down':[.30,.25,.15,.10,.20],

@@ -5,6 +5,19 @@ from plotly.subplots import make_subplots
 from scipy.signal import find_peaks
 from config import *
 from utils import _sf
+from localization import (
+    localize_action_label,
+    localize_combo,
+    localize_context_label,
+    localize_judgment_label,
+    localize_legend_name,
+    localize_pattern_name,
+    localize_pattern_state,
+    localize_regime_label,
+    localize_signal,
+    localize_subplot_title,
+    translate_chart_text,
+)
 
 SOFT_GREEN = '#63D9A2'
 SOFT_GREEN_FILL = 'rgba(99,217,162,.8)'
@@ -20,7 +33,7 @@ def _build_candle_hover(dc):
         if sn not in dc.columns:continue
         vals=dc[sn].fillna(False).values
         if not vals.any():continue
-        ix=np.flatnonzero(vals);lbl=f"{cfg['icon']}{cfg['kor']}";desc=cfg['desc'];isb=sn in STRONG_BUY_SIGS;iss=sn in STRONG_SELL_SIGS
+        label_text,desc=localize_signal(sn,cfg.get('kor'),cfg.get('desc'));ix=np.flatnonzero(vals);lbl=f"{cfg['icon']}{label_text}";isb=sn in STRONG_BUY_SIGS;iss=sn in STRONG_SELL_SIGS
         if cfg['dir']=='buy':
             for i in ix:bar_buy[i].append((lbl,desc));
             if isb:
@@ -35,7 +48,7 @@ def _build_candle_hover(dc):
         if cn not in dc.columns:continue
         vals=dc[cn].fillna(False).values
         if not vals.any():continue
-        ix=np.flatnonzero(vals);lbl=f"{ccfg['icon']}{ccfg['kor']}";desc=ccfg['desc']
+        label_text,desc=localize_combo(cn,ccfg.get('kor'),ccfg.get('desc'));ix=np.flatnonzero(vals);lbl=f"{ccfg['icon']}{label_text}"
         for i in ix:
             bar_cs[i].append((lbl,desc,ccfg['dir']))
             if cn in STRONG_BUY_SIGS:bar_sb[i].append((lbl,desc))
@@ -278,16 +291,16 @@ def _compute_trendlines(dc,max_per_side=2):
     return supports,resistances
 
 def _trendline_hover(line,label):
-    kind='Support' if line['kind']=='support' else 'Resistance'
+    kind='지지 추세선' if line['kind']=='support' else '저항 추세선'
     start_date=line['start_date'].strftime('%Y-%m-%d')
     end_date=line['end_date'].strftime('%Y-%m-%d')
-    channel_text=f"<br>Channel projected price: {line['channel_projected_price']:.2f}" if 'channel_projected_price' in line else ''
+    channel_text=f"<br>채널 예상가: {line['channel_projected_price']:.2f}" if 'channel_projected_price' in line else ''
     return (
-        f"<b>{label}</b><br>"
-        f"Type: {kind}<br>"
-        f"Anchors: {start_date} ({line['start_price']:.2f}) -> {end_date} ({line['end_price']:.2f})<br>"
-        f"Projected: %{{y:.2f}}<br>"
-        f"Current projected price: {line['projected_price']:.2f}{channel_text}<extra></extra>"
+        f"<b>{translate_chart_text(label)}</b><br>"
+        f"유형: {kind}<br>"
+        f"기준점: {start_date} ({line['start_price']:.2f}) -> {end_date} ({line['end_price']:.2f})<br>"
+        f"현재 값: %{{y:.2f}}<br>"
+        f"최종 예상가: {line['projected_price']:.2f}{channel_text}<extra></extra>"
     )
 
 def _add_trendline_overlays(fig,dc,max_per_side=2,default_visible='legendonly'):
@@ -507,12 +520,12 @@ def _pattern_style(pattern):
 
 def _pattern_hover(pattern,boundary_name):
     return (
-        f"<b>{pattern['name']}</b><br>"
-        f"Boundary: {boundary_name}<br>"
-        f"State: {pattern['state']}<br>"
-        f"Window: {pattern['start_date'].strftime('%Y-%m-%d')} -> {pattern['end_date'].strftime('%Y-%m-%d')}<br>"
-        f"Upper projected: {pattern['upper_projected_price']:.2f}<br>"
-        f"Lower projected: {pattern['lower_projected_price']:.2f}<extra></extra>"
+        f"<b>{localize_pattern_name(pattern['name'])}</b><br>"
+        f"경계: {'하단' if boundary_name=='Lower' else '상단'}<br>"
+        f"상태: {localize_pattern_state(pattern['state'])}<br>"
+        f"기간: {pattern['start_date'].strftime('%Y-%m-%d')} -> {pattern['end_date'].strftime('%Y-%m-%d')}<br>"
+        f"상단 예상가: {pattern['upper_projected_price']:.2f}<br>"
+        f"하단 예상가: {pattern['lower_projected_price']:.2f}<extra></extra>"
     )
 
 def _add_pattern_overlay(fig,dc,pattern,default_visible='legendonly'):
@@ -549,7 +562,7 @@ def _add_pattern_overlay(fig,dc,pattern,default_visible='legendonly'):
         x=[dc.index[-1]],
         y=[float(max(pattern['upper_projected_price'],pattern['lower_projected_price']))],
         mode='text',
-        text=[f"{pattern['name']} · {pattern['state']}"],
+        text=[f"{localize_pattern_name(pattern['name'])} · {localize_pattern_state(pattern['state'])}"],
         textposition='top right',
         textfont=dict(size=10,color=edge_color,family='Pretendard'),
         name='Pattern Overlay',
@@ -676,15 +689,20 @@ def build_metadata(dc,ticker):
     acs=[]
     for cn,ccfg in COMBINED_SCAN_REGISTRY.items():
         if cn in dc.columns and dc[cn].tail(5).any():
-            ld=dc[cn].tail(5)[dc[cn].tail(5)].index[-1];acs.append({'name':ccfg['name'],'kor':ccfg['kor'],'dir':ccfg['dir'],'tier':ccfg['tier'],'icon':ccfg['icon'],'color':ccfg['color'],'win':ccfg['win'],'date':ld.strftime('%m/%d'),'is_today':(dc.index[-1]-ld).days==0,'days_ago':(dc.index[-1]-ld).days})
+            combo_kor,combo_desc=localize_combo(cn,ccfg.get('kor'),ccfg.get('desc'))
+            ld=dc[cn].tail(5)[dc[cn].tail(5)].index[-1];acs.append({'key':cn,'name':ccfg['name'],'kor':combo_kor,'desc':combo_desc,'dir':ccfg['dir'],'tier':ccfg['tier'],'icon':ccfg['icon'],'color':ccfg['color'],'win':ccfg['win'],'date':ld.strftime('%m/%d'),'is_today':(dc.index[-1]-ld).days==0,'days_ago':(dc.index[-1]-ld).days})
     acs.sort(key=lambda x:(x['tier'],x['days_ago']))
     recent=[]
     for ir,row in dc.tail(15).iterrows():
         ds=ir.strftime('%m/%d')
         for col,cfg in SIGNAL_REGISTRY.items():
-            if col in dc.columns and row.get(col,False):recent.append((cfg['icon'],cfg['kor'],ds,cfg['dir'],False))
+            if col in dc.columns and row.get(col,False):
+                signal_kor,_=localize_signal(col,cfg.get('kor'),cfg.get('desc'))
+                recent.append((cfg['icon'],signal_kor,ds,cfg['dir'],False))
         for col,cfg in COMBINED_SCAN_REGISTRY.items():
-            if col in dc.columns and row.get(col,False):recent.append((cfg['icon'],cfg['kor'],ds,cfg['dir'],True))
+            if col in dc.columns and row.get(col,False):
+                combo_kor,_=localize_combo(col,cfg.get('kor'),cfg.get('desc'))
+                recent.append((cfg['icon'],combo_kor,ds,cfg['dir'],True))
     rg=int(lat.get('Regime',0));rl={2:'STRONG BULL 🟢🟢',1:'BULL 🟢',0:'NEUTRAL ⚪',-1:'BEAR 🔴',-2:'STRONG BEAR 🔴🔴'}.get(rg,'N/A')
     committee={}
     for cm in COMMITTEE_NAMES:vv=int(_sf(lat.get(f'CM_{cm}_Vote',0)));committee[cm]={'score':_sf(lat.get(f'CM_{cm}_EffScore',0)),'conviction':_sf(lat.get(f'CM_{cm}_EffConv',0)),'vote':'BUY' if vv==1 else('SELL' if vv==-1 else('ABSTAIN' if vv==-99 else 'NEUTRAL')),'vote_int':vv}
@@ -713,5 +731,91 @@ def build_metadata(dc,ticker):
         'high_52w':float(dc['High'].max()),'low_52w':float(dc['Low'].min()),
         'ma50_dist':round((_sf(lat['Close'])-_sf(lat.get('MA50',_sf(lat['Close']))))/_sf(lat['Close'])*100,2) if _sf(lat.get('MA50')) else 0,
         'ma200_dist':round((_sf(lat['Close'])-_sf(lat.get('MA200',_sf(lat['Close']))))/_sf(lat['Close'])*100,2) if _sf(lat.get('MA200')) else 0}
+
+
+def _trendline_hover(line,label):
+    kind='지지 추세선' if line['kind']=='support' else '저항 추세선'
+    start_date=line['start_date'].strftime('%Y-%m-%d')
+    end_date=line['end_date'].strftime('%Y-%m-%d')
+    channel_text=f"<br>채널 예상 가격: {line['channel_projected_price']:.2f}" if 'channel_projected_price' in line else ''
+    return (
+        f"<b>{translate_chart_text(label)}</b><br>"
+        f"유형: {kind}<br>"
+        f"기준점: {start_date} ({line['start_price']:.2f}) → {end_date} ({line['end_price']:.2f})<br>"
+        f"현재 값: %{{y:.2f}}<br>"
+        f"예상 가격: {line['projected_price']:.2f}{channel_text}<extra></extra>"
+    )
+
+
+def _pattern_hover(pattern,boundary_name):
+    return (
+        f"<b>{localize_pattern_name(pattern['name'])}</b><br>"
+        f"경계: {'하단' if boundary_name=='Lower' else '상단'}<br>"
+        f"상태: {localize_pattern_state(pattern['state'])}<br>"
+        f"기간: {pattern['start_date'].strftime('%Y-%m-%d')} → {pattern['end_date'].strftime('%Y-%m-%d')}<br>"
+        f"상단 예상 가격: {pattern['upper_projected_price']:.2f}<br>"
+        f"하단 예상 가격: {pattern['lower_projected_price']:.2f}<extra></extra>"
+    )
+
+
+def _localize_chart_figure(fig):
+    legend_hover_map = {
+        "웨이브트렌드(WT1)": "웨이브트렌드(WT1): %{y:.1f}<br><span style='color:#94A3B8'>과매수/과매도 압력 지표</span><extra></extra>",
+        "MACD": "MACD: %{y:.3f}<br><span style='color:#94A3B8'>0 위면 상승 모멘텀이, 0 아래면 하락 모멘텀이 우세합니다.</span><extra></extra>",
+        "자금 흐름(MFI)": "자금 흐름(MFI): %{customdata:.1f}<br><span style='color:#94A3B8'>자금 유입과 이탈 강도를 보여줍니다.</span><extra></extra>",
+        "스토캐스틱 SlowK": "스토캐스틱 SlowK: %{y:.1f}<br><span style='color:#94A3B8'>20 아래는 과매도, 80 위는 과매수 구간으로 봅니다.</span><extra></extra>",
+        "스퀴즈 모멘텀(SqMom)": "스퀴즈 모멘텀(SqMom): %{y:.3f}<br><span style='color:#94A3B8'>스퀴즈 이후 에너지 방향을 보여줍니다.</span><extra></extra>",
+    }
+    for trace in fig.data:
+        if getattr(trace, 'name', None):
+            trace.name=localize_legend_name(trace.name)
+        if getattr(trace, 'name', '') in legend_hover_map:
+            trace.hovertemplate=legend_hover_map[trace.name]
+        elif getattr(trace,'hovertemplate',None):
+            trace.hovertemplate=translate_chart_text(trace.hovertemplate)
+        text_value=getattr(trace,'text',None)
+        if text_value is not None:
+            if isinstance(text_value,(list,tuple,np.ndarray,pd.Series)):
+                trace.text=[translate_chart_text(v) for v in list(text_value)]
+            else:
+                trace.text=translate_chart_text(text_value)
+    for ann in getattr(fig.layout,'annotations',[]) or []:
+        if getattr(ann,'text',None):
+            translated=translate_chart_text(ann.text)
+            ann.text=localize_subplot_title(translated)
+    return fig
+
+
+_build_chart_base = build_chart
+
+
+def build_chart(dc,ticker):
+    fig=_build_chart_base(dc,ticker)
+    return _localize_chart_figure(fig)
+
+
+_build_metadata_base = build_metadata
+
+
+def build_metadata(dc,ticker):
+    meta=_build_metadata_base(dc,ticker)
+    meta['regime_label']=localize_regime_label(meta.get('regime'), meta.get('regime_label'))
+    meta['context_label']=localize_context_label(meta.get('context'))
+    meta['judgment']=localize_judgment_label(meta.get('judgment'))
+    meta['action_label']=localize_action_label(meta.get('action_label') or meta.get('judgment'))
+    meta['leading_verdict']=translate_chart_text(meta.get('leading_verdict'))
+    meta['lagging_verdict']=translate_chart_text(meta.get('lagging_verdict'))
+    meta['judgment_reason']=translate_chart_text(meta.get('judgment_reason'))
+    meta['judgment_detail']=translate_chart_text(meta.get('judgment_detail'))
+    meta['contrast_notes']=translate_chart_text(meta.get('contrast_notes'))
+    localized_scans=[]
+    for scan in meta.get('combined_scans',[]):
+        label,desc=localize_combo(scan.get('key', scan.get('name','')), scan.get('kor'), scan.get('desc'))
+        item=dict(scan)
+        item['kor']=label
+        item['desc']=desc
+        localized_scans.append(item)
+    meta['combined_scans']=localized_scans
+    return meta
 
 # ━━━ UI ━━━
