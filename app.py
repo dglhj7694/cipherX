@@ -99,58 +99,97 @@ border:1px solid rgba(99,102,241,.28);border-radius:16px;padding:14px 16px;margi
 .guide-step-title{color:#F8FAFC;font-size:.84rem;font-weight:800;margin:0 0 4px}
 .guide-step-copy{color:#94A3B8;font-size:.77rem;line-height:1.55;margin:0}
 .soft-note{color:#94A3B8;font-size:.76rem;line-height:1.55;margin-top:10px}
-details[data-testid="stExpander"]{background:linear-gradient(160deg,rgba(15,23,42,.94),rgba(17,24,39,.86))!important;border:1px solid rgba(148,163,184,.16)!important;border-radius:14px!important;overflow:hidden!important}
-details[data-testid="stExpander"] summary{background:transparent!important}
-details[data-testid="stExpander"] summary p{color:#E8ECF1!important;font-weight:700!important}
-details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] p{color:#E8ECF1!important}
-details[data-testid="stExpander"] pre,details[data-testid="stExpander"] code{background:#0F172A!important}
-details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"]{font-size:.95rem!important;line-height:1.72!important}
-details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h1,
-details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h2,
-details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h3,
-details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h4,
-details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h5,
-details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h6{
+div[data-testid="stExpander"]{
+  background:linear-gradient(160deg,rgba(15,23,42,.94),rgba(17,24,39,.86))!important;
+  border:1px solid rgba(148,163,184,.16)!important;
+  border-radius:14px!important;
+  overflow:hidden!important;
+}
+div[data-testid="stExpander"] details{
+  background:transparent!important;
+  border:none!important;
+}
+div[data-testid="stExpander"] summary{
+  background:transparent!important;
+}
+div[data-testid="stExpander"] summary > div,
+div[data-testid="stExpander"] summary > div > div{
+  background:transparent!important;
+}
+div[data-testid="stExpander"] summary:hover{
+  background:rgba(255,255,255,.02)!important;
+}
+div[data-testid="stExpander"] summary p{
+  color:#E8ECF1!important;
+  font-weight:700!important;
+}
+div[data-testid="stExpander"] summary svg{
+  color:#CBD5E1!important;
+  fill:#CBD5E1!important;
+}
+div[data-testid="stExpander"] div[data-testid="stExpanderDetails"]{
+  background:linear-gradient(180deg,rgba(15,23,42,.86),rgba(15,23,42,.72))!important;
+  border-top:1px solid rgba(148,163,184,.12)!important;
+}
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] p,
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] span,
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] li{
+  color:#E8ECF1!important;
+}
+div[data-testid="stExpander"] pre,
+div[data-testid="stExpander"] code{
+  background:#0F172A!important;
+}
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"]{
+  font-size:.95rem!important;
+  line-height:1.72!important;
+}
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h1,
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h2,
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h3,
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h4,
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h5,
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h6{
   color:#F8FAFC!important;
   font-weight:800!important;
   letter-spacing:-.01em!important;
   line-height:1.35!important;
   margin:1.05rem 0 .55rem!important;
 }
-details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h1{font-size:1.16rem!important}
-details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h2{font-size:1.08rem!important}
-details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h3{font-size:1.01rem!important}
-details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h4,
-details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h5,
-details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h6{font-size:.96rem!important}
-details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] p,
-details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] li{
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h1{font-size:1.12rem!important}
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h2{font-size:1.05rem!important}
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h3{font-size:.99rem!important}
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h4,
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h5,
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h6{font-size:.95rem!important}
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] p,
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] li{
   color:#E5E7EB!important;
   font-size:.95rem!important;
   line-height:1.72!important;
   margin:.2rem 0 .62rem!important;
 }
-details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] ul,
-details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] ol{
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] ul,
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] ol{
   padding-left:1.15rem!important;
   margin:.25rem 0 .8rem!important;
 }
-details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] strong,
-details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] b{
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] strong,
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] b{
   color:#F8FAFC!important;
   font-size:inherit!important;
   font-weight:800!important;
 }
-details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] em{
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] em{
   color:#CBD5E1!important;
   font-size:inherit!important;
 }
-details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] hr{
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] hr{
   border:none!important;
   border-top:1px solid rgba(148,163,184,.18)!important;
   margin:.95rem 0!important;
 }
-details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] blockquote{
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] blockquote{
   border-left:3px solid rgba(99,102,241,.45)!important;
   background:rgba(15,23,42,.55)!important;
   color:#CBD5E1!important;
