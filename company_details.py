@@ -138,14 +138,14 @@ def _annual_values(financials, row_candidates):
 def _verdict_badge(color, emoji, text):
     bg = {"green": "rgba(126,216,182,.15)", "red": "rgba(243,165,165,.15)",
           "yellow": "rgba(245,199,123,.15)", "blue": "rgba(33,150,243,.15)", "gray": "rgba(96,125,139,.15)", "orange": "rgba(255,171,102,.15)"}
-    bdr = {"green": "#7ED8B6", "red": "#F3A5A5", "yellow": "#F5C77B", "blue": "#2196F3", "gray": "#8b949e", "orange": "#FFAB66"}
+    bdr = {"green": "#63D9A2", "red": "#FF8F96", "yellow": "#F6C35E", "blue": "#2196F3", "gray": "#8b949e", "orange": "#FFAB66"}
     return (f'<div style="background:{bg.get(color, bg["gray"])}; border:1px solid {bdr.get(color, bdr["gray"])};border-radius:12px; padding:16px 20px;margin-top:20px;text-align:center; box-shadow: 0 4px 12px {bg.get(color, bg["gray"])};">'
             f'<span style="font-size:1.1rem;font-weight:800; color:{bdr.get(color, bdr["gray"])}">{emoji} {text}</span></div>')
 
 def _metric_row(label, value, value_class="m-value"):
     return f'<div class="m-row"><span class="m-label">{label}</span><span class="{value_class}">{value}</span></div>'
 
-def _gauge_bar(pct, color="#7ED8B6", height=8):
+def _gauge_bar(pct, color="#63D9A2", height=8):
     pct = max(0, min(100, pct))
     return (f'<div style="background:rgba(255,255,255,0.1);border-radius:{height}px; height:{height}px;overflow:hidden;margin:6px 0">'
             f'<div style="width:{pct:.1f}%;height:100%;background:{color}; border-radius:{height}px;transition:width .8s"></div></div>')
@@ -155,7 +155,7 @@ def _traffic_light(status):
 
 def _score_dot_row(items):
     cells = ""
-    colors_map = {"green": "#7ED8B6", "yellow": "#F5C77B", "red": "#F3A5A5", "blue": "#2196F3", "gray": "#8b949e", "orange": "#FFAB66"}
+    colors_map = {"green": "#63D9A2", "yellow": "#F6C35E", "red": "#FF8F96", "blue": "#2196F3", "gray": "#8b949e", "orange": "#FFAB66"}
     for name, color in items:
         c_code = colors_map.get(color, "#8b949e")
         cells += (f'<div style="display:inline-flex;flex-direction:column;align-items:center; min-width:60px;padding:6px 4px">'
@@ -170,8 +170,8 @@ def _get_plotly_combo_chart(rv, nv, rd):
 
     fig = go.Figure()
     fig.add_trace(go.Bar(x=labels, y=rv_rev, name='매출', marker_color='#2196F3', opacity=0.9, text=[_fmt_num(v, False) for v in rv_rev], textposition='auto', textfont=dict(color='white', size=13, weight='bold')))
-    fig.add_trace(go.Scatter(x=labels, y=nv_rev, name='순이익', mode='lines+markers+text', line=dict(color='#7ED8B6', width=4), marker=dict(size=10, color='white', line=dict(color='#7ED8B6', width=2)), yaxis='y2', text=[_fmt_num(v, False) for v in nv_rev], textposition='top center', textfont=dict(color='#7ED8B6', size=13, weight='bold')))
-    fig.update_layout(title=dict(text="<b>연도별 재무 추이</b>", font=dict(size=16, color='white', family="Arial")), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white', size=13, weight='bold'), margin=dict(l=10, r=10, t=40, b=10), height=320, xaxis=dict(showgrid=False, tickfont=dict(color='white')), yaxis=dict(showgrid=True, gridcolor='rgba(255, 255, 255, 0.15)', zeroline=False, tickfont=dict(color='white')), yaxis2=dict(overlaying='y', side='right', showgrid=False, tickfont=dict(color='#7ED8B6')), legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1))
+    fig.add_trace(go.Scatter(x=labels, y=nv_rev, name='순이익', mode='lines+markers+text', line=dict(color='#63D9A2', width=4), marker=dict(size=10, color='white', line=dict(color='#63D9A2', width=2)), yaxis='y2', text=[_fmt_num(v, False) for v in nv_rev], textposition='top center', textfont=dict(color='#63D9A2', size=13, weight='bold')))
+    fig.update_layout(title=dict(text="<b>연도별 재무 추이</b>", font=dict(size=16, color='white', family="Arial")), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white', size=13, weight='bold'), margin=dict(l=10, r=10, t=40, b=10), height=320, xaxis=dict(showgrid=False, tickfont=dict(color='white')), yaxis=dict(showgrid=True, gridcolor='rgba(255, 255, 255, 0.15)', zeroline=False, tickfont=dict(color='white')), yaxis2=dict(overlaying='y', side='right', showgrid=False, tickfont=dict(color='#63D9A2')), legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1))
     return fig
 
 def _get_plotly_yearly_bar(dates, y1, y2, name1, name2, c1, c2):
@@ -187,7 +187,7 @@ def _get_plotly_target_price(curr, low, mean, median, high):
     if not low or not high: return None
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=[low, high], y=[0, 0], mode='lines', line=dict(color='#768390', width=6), showlegend=False, hoverinfo='skip'))
-    pts = [(low, '최저가', '#adbac7', 12, 'bottom center'), (high, '최고가', '#adbac7', 12, 'bottom center'), (mean, '평균', '#2196F3', 14, 'bottom center'), (median, '중앙값', '#7ED8B6', 16, 'top center'), (curr, '현재가', '#F5C77B', 22, 'top center')]
+    pts = [(low, '최저가', '#adbac7', 12, 'bottom center'), (high, '최고가', '#adbac7', 12, 'bottom center'), (mean, '평균', '#2196F3', 14, 'bottom center'), (median, '중앙값', '#63D9A2', 16, 'top center'), (curr, '현재가', '#F6C35E', 22, 'top center')]
     for val, name, color, size, pos in pts:
         if val: fig.add_trace(go.Scatter(x=[val], y=[0], mode='markers+text', marker=dict(color=color, size=size, symbol='star' if name=='현재가' else 'circle', line=dict(width=2 if name=='현재가' else 1, color='white')), text=[f"<b>{name}</b><br>${val:,.2f}"], textposition=pos, textfont=dict(color=color if name in ['현재가', '중앙값'] else 'white', size=13, weight='bold'), name=name))
     fig.update_layout(title=dict(text="<b>목표가 범위 및 현재가 위치</b>", font=dict(size=16, color='white', family="Arial")), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white', size=13, weight='bold'), height=260, margin=dict(l=20, r=20, t=50, b=20), xaxis=dict(showgrid=False, zeroline=False, showticklabels=False), yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[-1.2, 1.2]), legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5, font=dict(color='white')))
@@ -580,9 +580,9 @@ CSS = """
 .m-row:last-child{border-bottom:none}
 .m-label{color:#94A3B8;font-weight:600}
 .m-value{color:#F8FAFC;font-weight:800;text-align:right;max-width:55%}
-.m-green{color:#7ED8B6 !important;font-weight:800}
-.m-red{color:#F3A5A5 !important;font-weight:800}
-.m-yellow{color:#F5D79A !important;font-weight:800}
+.m-green{color:#63D9A2 !important;font-weight:800}
+.m-red{color:#FF8F96 !important;font-weight:800}
+.m-yellow{color:#F8DE9A !important;font-weight:800}
 .m-blue{color:#38BDF8 !important;font-weight:800}
 .m-big{font-size:1.15rem;font-weight:900}
 .divider{border-top:1px dashed rgba(255,255,255,0.05);margin:20px 0}
@@ -640,7 +640,7 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
         price = info.get('currentPrice') or info.get('regularMarketPrice') or 0
         prev_c = info.get('previousClose') or price or 1
         day_chg = ((price - prev_c) / prev_c * 100) if prev_c else 0
-        chg_c, chg_s = ("#7ED8B6" if day_chg >= 0 else "#F3A5A5"), ("+" if day_chg >= 0 else "")
+        chg_c, chg_s = ("#63D9A2" if day_chg >= 0 else "#FF8F96"), ("+" if day_chg >= 0 else "")
 
         if price == 0: st.warning("⚠️ 현재가를 불러올 수 없습니다. 일부 데이터가 정확하지 않을 수 있습니다.")
 

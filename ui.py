@@ -7,12 +7,12 @@ from config import *
 from chart import build_metadata, build_chart
 from company_details import render_company_details
 
-SOFT_GREEN = '#7ED8B6'
-SOFT_GREEN_TEXT = '#A7E7CF'
-SOFT_RED = '#F3A5A5'
-SOFT_RED_TEXT = '#F6C2C2'
-SOFT_AMBER = '#F5C77B'
-SOFT_AMBER_TEXT = '#F5D79A'
+SOFT_GREEN = '#63D9A2'
+SOFT_GREEN_TEXT = '#B8F1D5'
+SOFT_RED = '#FF8F96'
+SOFT_RED_TEXT = '#FFD2D7'
+SOFT_AMBER = '#F6C35E'
+SOFT_AMBER_TEXT = '#F8DE9A'
 SOFT_BLUE = '#A5B4FC'
 
 def _mini_stat_card(label, value, color, tooltip):
@@ -21,34 +21,6 @@ def _mini_stat_card(label, value, color, tooltip):
         f"<p class='sm-label'>{label}</p>"
         f"<p class='sm-value' style='color:{color}'>{value}</p>"
         "</div>"
-    )
-
-def _render_analysis_reading_guide(m):
-    ticker = m.get('ticker', '')
-    last_date = m.get('last_date', '')
-    context = m.get('context_label', '기본')
-    st.markdown(
-        f"""
-        <div class="guide-card">
-            <p class="guide-kicker">Reading Map</p>
-            <div class="guide-grid">
-                <div class="guide-step">
-                    <p class="guide-step-title">Quick Read</p>
-                    <p class="guide-step-copy"><b>{ticker}</b>의 현재 액션과 신뢰도를 먼저 보고, 그 아래 근거 요약으로 왜 그런 판단이 나왔는지 짧게 확인합니다.</p>
-                </div>
-                <div class="guide-step">
-                    <p class="guide-step-title">Risk First</p>
-                    <p class="guide-step-copy">Risk Check에는 수급 다이버전스, R:R, 저거래량, 과열 위험이 먼저 모입니다. 액션보다 이 경고를 우선해서 보시면 실수가 줄어듭니다.</p>
-                </div>
-                <div class="guide-step">
-                    <p class="guide-step-title">Timing</p>
-                    <p class="guide-step-copy">차트 탭에서 강신호 캔들, VP 레벨, Hover 툴팁을 함께 확인하면 진입·관망·축소 판단이 더 쉬워집니다.</p>
-                </div>
-            </div>
-            <p class="soft-note">데이터 기준일은 <b style="color:#F8FAFC">{last_date}</b>, 시장 컨텍스트는 <b style="color:#F8FAFC">{context}</b>입니다. 모바일에서는 판단 카드와 Risk Check를 먼저 보고 차트를 여는 흐름이 가장 편합니다.</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
     )
 
 def _bottom_line_text(m):
@@ -172,9 +144,9 @@ def render_price_header(m, key_prefix="analysis"):
 
     metric_html = "".join([
         metric_card('Ensemble Score', f"{es:+.1f}", f"B{m.get('buy_agree', 0)} : S{m.get('sell_agree', 0)}", esc, es_pct, esc),
-        metric_card('BUY Score (10L)', f"{bt_:.1f}", f"{ba_}/10 layers active", SOFT_GREEN, bt_pct, 'linear-gradient(90deg,#3E6D60,#7ED8B6)'),
-        metric_card('SELL Score (10L)', f"{st_:.1f}", f"{sa_}/10 layers active", SOFT_RED, st_pct, 'linear-gradient(90deg,#F3A5A5,#7A4D4D)'),
-        metric_card('52W Price Position', f"{pos52:.0f}%", f"${l52:.1f} - ${h52:.1f}", '#A5B4FC', pos52, 'linear-gradient(90deg,#F3A5A5,#F5C77B,#7ED8B6)'),
+        metric_card('BUY Score (10L)', f"{bt_:.1f}", f"{ba_}/10 layers active", SOFT_GREEN, bt_pct, 'linear-gradient(90deg,#237650,#63D9A2)'),
+        metric_card('SELL Score (10L)', f"{st_:.1f}", f"{sa_}/10 layers active", SOFT_RED, st_pct, 'linear-gradient(90deg,#FF8F96,#8A4B54)'),
+        metric_card('52W Price Position', f"{pos52:.0f}%", f"${l52:.1f} - ${h52:.1f}", '#A5B4FC', pos52, 'linear-gradient(90deg,#FF8F96,#F6C35E,#63D9A2)'),
     ])
 
     st.markdown(
@@ -202,11 +174,13 @@ def render_judgment_card(m):
     ba=m.get('buy_agree',0);sa=m.get('sell_agree',0);veto=m.get('veto_flags','');syn=m.get('reversal_synergy',0);pred=m.get('prediction_boost',0)
     reason=m.get('judgment_reason','');detail=m.get('judgment_detail','');action=m.get('action_label','')
     detail_text=(detail or '').strip() or (reason or '').strip()
+    detail_norm=" ".join(detail_text.split())
     detail_html=f"""<div style="margin:16px 0;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:14px 18px;border-left:3px solid {jc}">
             <p style="color:#94A3B8;font-size:.72rem;font-weight:700;margin:0 0 6px">근거 요약</p>
             <p style="color:#CBD5E1;font-size:.82rem;margin:0">{detail_text}</p>
         </div>""" if detail_text else ""
     contrast=(m.get('contrast_notes','') or '').strip()
+    contrast_norm=" ".join(contrast.split())
     long_rr=float(m.get('vp_long_rr',1) or 1);short_rr=float(m.get('vp_short_rr',1) or 1)
     volume_ratio=float(m.get('volume_ratio_20',1) or 1)
     risk_tags=[]
@@ -225,7 +199,8 @@ def render_judgment_card(m):
     risk_html=""
     if contrast or risk_tags:
         chips="".join([f"<span style='display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border-radius:999px;background:{col}22;border:1px solid {col}44;color:{col};font-size:.72rem;font-weight:700'>{label}</span>" for label,col in risk_tags])
-        contrast_html=f"<p style='color:#CBD5E1;font-size:.8rem;margin:0 0 10px'>{contrast}</p>" if contrast else ""
+        show_contrast=bool(contrast) and contrast_norm not in detail_norm and detail_norm not in contrast_norm
+        contrast_html=f"<p style='color:#CBD5E1;font-size:.8rem;margin:0 0 10px'>{contrast}</p>" if show_contrast else ""
         risk_html=f"""<div style="margin:14px 0 0;background:rgba(15,23,42,.58);border:1px solid rgba(148,163,184,.14);border-radius:12px;padding:14px 16px">
             <p style="color:#94A3B8;font-size:.72rem;font-weight:700;margin:0 0 8px">Risk Check</p>
             {contrast_html}
@@ -327,8 +302,8 @@ def render_10layer_bars(m, html_key="analysis"):
             f"<div style='display:grid;grid-template-columns:58px 1fr 58px;gap:10px;align-items:center;margin-bottom:8px;padding:2px;border-radius:10px;{row_glow}'>"
             f"<div style='text-align:right;color:{SOFT_GREEN};font-size:.88rem;font-weight:700;opacity:{bop:.2f}'>{bv:.1f}</div>"
             "<div style='position:relative;height:30px;border-radius:10px;border:1px solid rgba(148,163,184,.2);background:linear-gradient(90deg,rgba(126,216,182,.08),rgba(148,163,184,.04),rgba(243,165,165,.08));overflow:hidden'>"
-            f"<div style='position:absolute;left:{50.0 - bpct:.2f}%;top:4px;bottom:4px;width:{bpct:.2f}%;background:linear-gradient(90deg,#3E6D60,#7ED8B6);border-radius:6px 0 0 6px;opacity:{bop:.2f}'></div>"
-            f"<div style='position:absolute;left:50%;top:4px;bottom:4px;width:{spct:.2f}%;background:linear-gradient(90deg,#F3A5A5,#7A4D4D);border-radius:0 6px 6px 0;opacity:{sop:.2f}'></div>"
+            f"<div style='position:absolute;left:{50.0 - bpct:.2f}%;top:4px;bottom:4px;width:{bpct:.2f}%;background:linear-gradient(90deg,#237650,#63D9A2);border-radius:6px 0 0 6px;opacity:{bop:.2f}'></div>"
+            f"<div style='position:absolute;left:50%;top:4px;bottom:4px;width:{spct:.2f}%;background:linear-gradient(90deg,#FF8F96,#8A4B54);border-radius:0 6px 6px 0;opacity:{sop:.2f}'></div>"
             "<div style='position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(226,232,240,.55)'></div>"
             f"<div style='position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:.72rem;color:#CBD5E1;font-weight:700;background:rgba(2,6,23,.78);padding:2px 8px;border-radius:999px;border:1px solid rgba(148,163,184,.25)'>{name}</div>"
             "</div>"
@@ -467,7 +442,6 @@ def render_analysis(msg, key_prefix="analysis"):
     m,fj=msg.get('meta'),msg.get('fig_json')
     if m:
         render_price_header(m, key_prefix=key_prefix)
-        _render_analysis_reading_guide(m)
     if m or fj:
         t0,t1,t2,t3,t4=st.tabs(["차트","판단·리스크","10-Layer","콤보스캔","기업정보"])
         with t0:

@@ -5,11 +5,11 @@ from plotly.subplots import make_subplots
 from config import *
 from utils import _sf
 
-SOFT_GREEN = '#7ED8B6'
-SOFT_GREEN_FILL = 'rgba(126,216,182,.78)'
-SOFT_RED = '#F3A5A5'
-SOFT_RED_FILL = 'rgba(243,165,165,.78)'
-SOFT_AMBER = '#F5C77B'
+SOFT_GREEN = '#63D9A2'
+SOFT_GREEN_FILL = 'rgba(99,217,162,.8)'
+SOFT_RED = '#FF8F96'
+SOFT_RED_FILL = 'rgba(255,143,150,.8)'
+SOFT_AMBER = '#F6C35E'
 
 def _build_candle_hover(dc):
     n=len(dc)

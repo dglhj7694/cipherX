@@ -28,19 +28,19 @@ div.stButton>button[kind="primary"]{background:linear-gradient(135deg,#6366F1,#8
 div.stButton>button[kind="secondary"]{background-color:#12161F!important;color:#C4CDD8!important;border:1px solid #2A3040!important;border-radius:12px!important;width:100%}
 .price-header{background:linear-gradient(160deg,#0F1320,#141926);border:1px solid #1C2233;border-radius:16px;padding:20px 24px;margin-bottom:18px}
 .price-big{font-size:2.2rem;font-weight:800;margin:0}
-.price-change-up{color:#7ED8B6!important} .price-change-down{color:#F3A5A5!important}
+.price-change-up{color:#63D9A2!important} .price-change-down{color:#FF8F96!important}
 .ind-mini{display:inline-block;padding:4px 10px;margin:2px;border-radius:8px;font-size:.76rem;font-weight:600}
-.ind-b{background:rgba(126,216,182,.14);color:#A7E7CF}
-.ind-s{background:rgba(243,165,165,.14);color:#F6C2C2}
-.ind-n{background:rgba(245,199,123,.12);color:#F5D79A}
+.ind-b{background:rgba(99,217,162,.16);color:#B8F1D5}
+.ind-s{background:rgba(255,143,150,.16);color:#FFD2D7}
+.ind-n{background:rgba(246,195,94,.14);color:#F8DE9A}
 .layer-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)}
 .layer-bar{background:#151921;border-radius:4px;height:8px;flex:1;margin:0 8px;overflow:hidden}
-.layer-fill-b{height:8px;border-radius:4px;background:linear-gradient(90deg,#356D5E,#7ED8B6)}
-.layer-fill-s{height:8px;border-radius:4px;background:linear-gradient(90deg,#8F5A5A,#F3A5A5)}
+.layer-fill-b{height:8px;border-radius:4px;background:linear-gradient(90deg,#247A55,#63D9A2)}
+.layer-fill-s{height:8px;border-radius:4px;background:linear-gradient(90deg,#B85B65,#FF8F96)}
 .score-card{border-radius:14px;padding:20px;text-align:center;position:relative;overflow:hidden}
-.score-card-buy{background:linear-gradient(160deg,#10211C,#101C24);border:1px solid rgba(126,216,182,.22)}
-.score-card-sell{background:linear-gradient(160deg,#241515,#16131B);border:1px solid rgba(243,165,165,.22)}
-.score-card-neutral{background:linear-gradient(160deg,#1D180F,#19160F);border:1px solid rgba(245,199,123,.18)}
+.score-card-buy{background:linear-gradient(160deg,#0E261D,#101C24);border:1px solid rgba(99,217,162,.26)}
+.score-card-sell{background:linear-gradient(160deg,#281518,#16131B);border:1px solid rgba(255,143,150,.26)}
+.score-card-neutral{background:linear-gradient(160deg,#21180B,#19160F);border:1px solid rgba(246,195,94,.22)}
 .fade-up{animation:fadeUp .35s ease both}
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 .conf-ring{position:relative;width:80px;height:80px;display:inline-block}
@@ -49,9 +49,9 @@ div.stButton>button[kind="secondary"]{background-color:#12161F!important;color:#
 .ring-fg{fill:none;stroke-width:8;stroke-linecap:round}
 .ring-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:.92rem;font-weight:800}
 .vote-dot{width:8px;height:8px;border-radius:999px;display:inline-block}
-.vote-dot.buy{background:#7ED8B6;box-shadow:0 0 7px rgba(126,216,182,.5)}
-.vote-dot.sell{background:#F3A5A5;box-shadow:0 0 7px rgba(243,165,165,.5)}
-.vote-dot.neutral{background:#F5C77B;box-shadow:0 0 7px rgba(245,199,123,.45)}
+.vote-dot.buy{background:#63D9A2;box-shadow:0 0 7px rgba(99,217,162,.58)}
+.vote-dot.sell{background:#FF8F96;box-shadow:0 0 7px rgba(255,143,150,.58)}
+.vote-dot.neutral{background:#F6C35E;box-shadow:0 0 7px rgba(246,195,94,.48)}
 .vote-dot.abstain{background:#64748B}
 .cm-card{background:rgba(255,255,255,.03);border:1px solid rgba(148,163,184,.12);border-radius:10px;padding:10px}
 .cm-name{color:#94A3B8;font-size:.7rem;font-weight:700;margin:0 0 4px}
@@ -60,8 +60,8 @@ div.stButton>button[kind="secondary"]{background-color:#12161F!important;color:#
 .cm-mini-bar{height:4px;background:rgba(148,163,184,.18);border-radius:999px;overflow:hidden;margin-top:6px}
 .cm-mini-fill{height:100%;border-radius:999px}
 .tow-bar{position:relative;height:14px;border-radius:999px;background:rgba(148,163,184,.15);overflow:hidden}
-.tow-buy{position:absolute;right:50%;top:0;bottom:0;background:linear-gradient(90deg,#3E6D60,#7ED8B6)}
-.tow-sell{position:absolute;left:50%;top:0;bottom:0;background:linear-gradient(90deg,#F3A5A5,#7A4D4D)}
+.tow-buy{position:absolute;right:50%;top:0;bottom:0;background:linear-gradient(90deg,#237650,#63D9A2)}
+.tow-sell{position:absolute;left:50%;top:0;bottom:0;background:linear-gradient(90deg,#FF8F96,#8A4B54)}
 .tow-center{position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(226,232,240,.55)}
 .stat-mini{background:rgba(255,255,255,.025);border:1px solid rgba(148,163,184,.16);border-radius:10px;padding:10px 8px;text-align:center;min-height:78px;display:flex;flex-direction:column;justify-content:center}
 .sm-label{color:#64748B;font-size:.66rem;font-weight:700;margin:0 0 4px}
@@ -88,13 +88,76 @@ div[data-testid="stToast"] p{color:#E8ECF1!important;font-weight:600!important}
 .analysis-nav-sub{color:#94A3B8;font-size:.78rem}
 .analysis-nav-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.24);color:#C7D2FE;font-size:.74rem;font-weight:700}
 .prompt-caption{color:#94A3B8;font-size:.74rem;font-weight:700;margin-bottom:8px}
-.guide-card{background:linear-gradient(160deg,rgba(15,23,42,.92),rgba(15,23,42,.78));border:1px solid rgba(148,163,184,.18);border-radius:16px;padding:14px 16px;margin:0 0 14px;box-shadow:0 14px 32px rgba(2,6,23,.18)}
-.guide-kicker{color:#A5B4FC;font-size:.75rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;margin:0 0 8px}
+.guide-card{background:
+linear-gradient(180deg,rgba(99,102,241,.08),rgba(99,102,241,0) 34%),
+linear-gradient(160deg,rgba(10,14,24,.96),rgba(16,24,39,.88));
+border:1px solid rgba(99,102,241,.28);border-radius:16px;padding:14px 16px;margin:0 0 14px;box-shadow:0 16px 36px rgba(2,6,23,.22);position:relative;overflow:hidden}
+.guide-card:before{content:"";position:absolute;inset:0 0 auto 0;height:1px;background:linear-gradient(90deg,rgba(99,102,241,0),rgba(165,180,252,.8),rgba(99,102,241,0))}
+.guide-kicker{color:#C7D2FE;font-size:.75rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;margin:0 0 8px}
 .guide-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
-.guide-step{background:rgba(255,255,255,.03);border:1px solid rgba(148,163,184,.12);border-radius:12px;padding:12px 13px}
+.guide-step{background:linear-gradient(160deg,rgba(15,23,42,.9),rgba(15,23,42,.72));border:1px solid rgba(148,163,184,.14);border-radius:12px;padding:12px 13px}
 .guide-step-title{color:#F8FAFC;font-size:.84rem;font-weight:800;margin:0 0 4px}
 .guide-step-copy{color:#94A3B8;font-size:.77rem;line-height:1.55;margin:0}
 .soft-note{color:#94A3B8;font-size:.76rem;line-height:1.55;margin-top:10px}
+details[data-testid="stExpander"]{background:linear-gradient(160deg,rgba(15,23,42,.94),rgba(17,24,39,.86))!important;border:1px solid rgba(148,163,184,.16)!important;border-radius:14px!important;overflow:hidden!important}
+details[data-testid="stExpander"] summary{background:transparent!important}
+details[data-testid="stExpander"] summary p{color:#E8ECF1!important;font-weight:700!important}
+details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] p{color:#E8ECF1!important}
+details[data-testid="stExpander"] pre,details[data-testid="stExpander"] code{background:#0F172A!important}
+details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"]{font-size:.95rem!important;line-height:1.72!important}
+details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h1,
+details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h2,
+details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h3,
+details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h4,
+details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h5,
+details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h6{
+  color:#F8FAFC!important;
+  font-weight:800!important;
+  letter-spacing:-.01em!important;
+  line-height:1.35!important;
+  margin:1.05rem 0 .55rem!important;
+}
+details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h1{font-size:1.16rem!important}
+details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h2{font-size:1.08rem!important}
+details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h3{font-size:1.01rem!important}
+details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h4,
+details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h5,
+details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h6{font-size:.96rem!important}
+details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] p,
+details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] li{
+  color:#E5E7EB!important;
+  font-size:.95rem!important;
+  line-height:1.72!important;
+  margin:.2rem 0 .62rem!important;
+}
+details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] ul,
+details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] ol{
+  padding-left:1.15rem!important;
+  margin:.25rem 0 .8rem!important;
+}
+details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] strong,
+details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] b{
+  color:#F8FAFC!important;
+  font-size:inherit!important;
+  font-weight:800!important;
+}
+details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] em{
+  color:#CBD5E1!important;
+  font-size:inherit!important;
+}
+details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] hr{
+  border:none!important;
+  border-top:1px solid rgba(148,163,184,.18)!important;
+  margin:.95rem 0!important;
+}
+details[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] blockquote{
+  border-left:3px solid rgba(99,102,241,.45)!important;
+  background:rgba(15,23,42,.55)!important;
+  color:#CBD5E1!important;
+  margin:.8rem 0!important;
+  padding:.65rem .9rem!important;
+  border-radius:0 10px 10px 0!important;
+}
 @media (max-width:900px){
   .block-container{padding-left:1rem!important;padding-right:1rem!important}
   .price-header{padding:16px 18px}
@@ -642,11 +705,11 @@ if current_mode == '스캐너':
 
         st.markdown(
             f"<div style='display:flex;gap:12px;margin-bottom:12px'>"
-            f"<div style='flex:1;background:rgba(126,216,182,.08);border:1px solid rgba(126,216,182,.24);border-radius:10px;padding:10px;text-align:center'>"
-            f"<span style='color:#7ED8B6;font-weight:800;font-size:1.3rem'>{len(bt_)}</span>"
+            f"<div style='flex:1;background:rgba(99,217,162,.10);border:1px solid rgba(99,217,162,.28);border-radius:10px;padding:10px;text-align:center'>"
+            f"<span style='color:#63D9A2;font-weight:800;font-size:1.3rem'>{len(bt_)}</span>"
             f"<span style='color:#64748B;font-size:.8rem'> 매수</span></div>"
-            f"<div style='flex:1;background:rgba(243,165,165,.08);border:1px solid rgba(243,165,165,.24);border-radius:10px;padding:10px;text-align:center'>"
-            f"<span style='color:#F3A5A5;font-weight:800;font-size:1.3rem'>{len(st_)}</span>"
+            f"<div style='flex:1;background:rgba(255,143,150,.10);border:1px solid rgba(255,143,150,.28);border-radius:10px;padding:10px;text-align:center'>"
+            f"<span style='color:#FF8F96;font-weight:800;font-size:1.3rem'>{len(st_)}</span>"
             f"<span style='color:#64748B;font-size:.8rem'> 매도</span></div>"
             f"<div style='flex:1;background:rgba(99,102,241,.06);border:1px solid #6366F133;border-radius:10px;padding:10px;text-align:center'>"
             f"<span style='color:#A5B4FC;font-weight:800;font-size:1.3rem'>{len(results)}</span>"
@@ -655,9 +718,9 @@ if current_mode == '스캐너':
         )
 
         for rk, r in enumerate(results, start=1):
-            chc = '#7ED8B6' if r['chg'] >= 0 else '#F3A5A5'
+            chc = '#63D9A2' if r['chg'] >= 0 else '#FF8F96'
             chi = '▲' if r['chg'] >= 0 else '▼'
-            jc  = '#7ED8B6' if 'BUY' in r['jg'] else ('#F3A5A5' if 'SELL' in r['jg'] else '#F5D79A')
+            jc  = '#63D9A2' if 'BUY' in r['jg'] else ('#FF8F96' if 'SELL' in r['jg'] else '#F8DE9A')
 
             # 콤보 스캔 목록은 mx 배지 태그로만 표시 — 불릿 리스트(sh) 제거
 
@@ -665,7 +728,7 @@ if current_mode == '스캐너':
             th = "".join([
                 f"<span style='display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;"
                 f"background:rgba({'52,211,153' if t['dir']=='buy' else '248,113,113'},.12);"
-                f"color:{'#7ED8B6' if t['dir']=='buy' else '#F3A5A5'};"
+                f"color:{'#63D9A2' if t['dir']=='buy' else '#FF8F96'};"
                 f"font-size:.72rem;font-weight:700;margin-right:6px'>{t['icon']} {t['label']} {t['date']}</span>"
                 for t in r.get('transitions', [])
             ]) if r.get('transitions') else "<span style='color:#475569;font-size:.78rem'>UT/HULL 전환 없음</span>"
@@ -675,7 +738,7 @@ if current_mode == '스캐너':
                 f"<div style='margin:6px 0 2px'>"
                 f"<span style='display:inline-block;padding:2px 8px;border-radius:999px;"
                 f"background:rgba({'52,211,153' if r.get('multi_sig') else '148,163,184'},.16);"
-                f"color:{'#7ED8B6' if r.get('multi_sig') else '#94A3B8'};"
+                f"color:{'#63D9A2' if r.get('multi_sig') else '#94A3B8'};"
                 f"font-size:.72rem;font-weight:700'>"
                 f"MULTI-SIGNAL {'ON' if r.get('multi_sig') else 'OFF'} ({r.get('multi_cnt', 0)})</span>"
                 f"<span style='color:#64748B;font-size:.7rem;margin-left:6px'>"
@@ -694,10 +757,10 @@ if current_mode == '스캐너':
                 for m in r.get('multi_hits', [])
             ]) if r.get('multi_hits') else "<span style='color:#475569;font-size:.74rem'>최근 3일 다중시그널 후보 없음</span>"
 
-            esc = '#7ED8B6' if r['es'] > 10 else ('#F3A5A5' if r['es'] < -10 else '#F5D79A')
+            esc = '#63D9A2' if r['es'] > 10 else ('#FF8F96' if r['es'] < -10 else '#F8DE9A')
             bd  = '#1E293B' if r['scans'] else '#0F172A'
             op  = '1' if r['scans'] else '.6'
-            sc  = '#7ED8B6' if r['scan_score'] > 0 else ('#F3A5A5' if r['scan_score'] < 0 else '#F5D79A')
+            sc  = '#63D9A2' if r['scan_score'] > 0 else ('#FF8F96' if r['scan_score'] < 0 else '#F8DE9A')
 
             rh = ""
             if r.get('reason'):
