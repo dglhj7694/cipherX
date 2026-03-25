@@ -693,6 +693,20 @@ html, body, [class*="css"] { font-family:'Pretendard', sans-serif !important; }
 .cd-chip-label{color:#94A3B8;font-size:.7rem;font-weight:700;margin:0 0 4px}
 .cd-chip-value{color:#F8FAFC;font-size:1rem;font-weight:800;margin:0}
 .note-box{font-size:.85rem;color:#CBD5E1;line-height:1.6;font-weight:600; padding:12px;background:linear-gradient(160deg,rgba(15,23,42,.92),rgba(15,23,42,.74));border-radius:12px;margin-top:12px; border:1px solid rgba(99,102,241,.14); border-left:4px solid #6366F1}
+.spotlight-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:0 0 16px}
+.spotlight-card{background:linear-gradient(160deg,rgba(15,23,42,.9),rgba(15,23,42,.72));border:1px solid rgba(148,163,184,.12);border-radius:14px;padding:12px 14px}
+.spotlight-label{color:#94A3B8;font-size:.72rem;font-weight:700;margin:0 0 6px}
+.spotlight-value{color:#F8FAFC;font-size:1.28rem;font-weight:900;line-height:1.15;margin:0}
+.spotlight-sub{color:#CBD5E1;font-size:.78rem;font-weight:600;margin:6px 0 0}
+.section-pill{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font-size:.74rem;font-weight:800;border:1px solid transparent}
+.pill-green{background:rgba(99,217,162,.12);border-color:rgba(99,217,162,.28);color:#B8F1D5}
+.pill-red{background:rgba(255,143,150,.12);border-color:rgba(255,143,150,.28);color:#FFD2D7}
+.pill-amber{background:rgba(246,195,94,.12);border-color:rgba(246,195,94,.28);color:#F8DE9A}
+.ownership-stack{display:flex;flex-direction:column;gap:10px;margin:6px 0 0}
+.ownership-row{display:flex;justify-content:space-between;align-items:center;padding:11px 12px;border-radius:12px;background:linear-gradient(160deg,rgba(15,23,42,.9),rgba(15,23,42,.72));border:1px solid rgba(148,163,184,.12)}
+.ownership-left{display:flex;align-items:center;gap:10px;color:#E5E7EB;font-weight:700}
+.ownership-dot{width:10px;height:10px;border-radius:999px;display:inline-block}
+.ownership-right{color:#F8FAFC;font-weight:900}
 </style>
 """
 
@@ -1079,11 +1093,23 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     elif hs >= 2: v5_c, v5_t = "yellow", "⚠️ 보통 — 부채 관리 모니터링 필요"
     else:         v5_c, v5_t = "red",    "❌ 주의 — 부채 높거나 현금 부족"
     all_verdicts.append(("재무건전", v5_c))
+    v5_pill_cls = "pill-green" if v5_c == "green" else ("pill-amber" if v5_c == "yellow" else "pill-red")
+    dl_pill_cls = "pill-green" if dl_c == "green" else ("pill-amber" if dl_c == "yellow" else "pill-red")
 
     with st.container(border=True):
         col1, col2 = st.columns([1.1, 1])
+        debt_ratio_text = f"{dte:.1f}%" if isinstance(dte, (int, float)) else "N/A"
+        s5_spotlight = (
+            f"<div class='spotlight-grid'>"
+            f"<div class='spotlight-card'><p class='spotlight-label'>보유 현금</p><p class='spotlight-value' style='color:#63D9A2'>{_fmt_num(cash)}</p><p class='spotlight-sub'>현금 완충력</p></div>"
+            f"<div class='spotlight-card'><p class='spotlight-label'>총 부채</p><p class='spotlight-value'>{debt_display}</p><p class='spotlight-sub'>레버리지 규모</p></div>"
+            f"<div class='spotlight-card'><p class='spotlight-label'>부채/자본 비율</p><p class='spotlight-value' style='color:{'#B8F1D5' if dl_c == 'green' else '#F8DE9A' if dl_c == 'yellow' else '#FFD2D7'}'>{debt_ratio_text}</p><p class='spotlight-sub'>{dl}</p></div>"
+            f"</div>"
+        )
         html_s5_1 = (
             f'<div class="s-title"><span class="s-num">05</span> 회사에 돈이 얼마나 있나요? <span style="font-size:.8rem;color:#768390">SEC + Yahoo</span></div>'
+            f"<div style='display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px'><span class='section-pill {v5_pill_cls}'>{v5_t}</span><span class='section-pill {dl_pill_cls}'>D/E {dl}</span></div>"
+            f'{s5_spotlight}'
             f'{_metric_row("보유 현금", _fmt_num(cash), "m-value m-green m-big")}'
             f'{_metric_row("순 자산 (자본)", na_display, "m-green" if (na and na > 0) else "m-red")}'
             f'<div class="divider"></div>'
@@ -1268,19 +1294,30 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     else:            v10_c, v10_t = "red",    "⚠️ 기관 보유 낮음 — 개인 중심"
     all_verdicts.append(("지분구조", v10_c))
 
-    fig10 = _get_plotly_donut(['기관', '내부자', '개인/기타'], [inst, ins, pub], ['#2196F3', '#FF9800', '#4CAF50'])
+    fig10 = _get_plotly_donut(['기관', '내부자', '개인/기타'], [inst, ins, pub], ['#60A5FA', '#F6C35E', '#63D9A2'])
     pub_warning = "<br><span style='color:#FFC107;'>※ 기관/내부자 지분 합계가 100%를 초과하여 개인 지분이 0%로 표시됩니다.</span>" if inst + ins > 1 else ""
+    v10_pill_cls = "pill-green" if v10_c == "green" else ("pill-amber" if v10_c == "yellow" else "pill-red")
+    ownership_cards = (
+        f"<div class='spotlight-grid'>"
+        f"<div class='spotlight-card'><p class='spotlight-label'>총 발행 주식수</p><p class='spotlight-value'>{_fmt_num(info.get('sharesOutstanding', 0), False)} 주</p><p class='spotlight-sub'>Shares Outstanding</p></div>"
+        f"<div class='spotlight-card'><p class='spotlight-label'>유통 주식수</p><p class='spotlight-value'>{_fmt_num(info.get('floatShares', 0), False)} 주</p><p class='spotlight-sub'>Float</p></div>"
+        f"</div>"
+    )
+    ownership_stack = (
+        f"<div class='ownership-stack'>"
+        f"<div class='ownership-row'><div class='ownership-left'><span class='ownership-dot' style='background:#60A5FA'></span>기관 비율</div><div class='ownership-right'>{_fmt_pct(inst)}</div></div>"
+        f"<div class='ownership-row'><div class='ownership-left'><span class='ownership-dot' style='background:#F6C35E'></span>내부자 비율</div><div class='ownership-right'>{_fmt_pct(ins)}</div></div>"
+        f"<div class='ownership-row'><div class='ownership-left'><span class='ownership-dot' style='background:#63D9A2'></span>개인/기타(추정)</div><div class='ownership-right'>{_fmt_pct(pub)}</div></div>"
+        f"</div>"
+    )
 
     with st.container(border=True):
         st.markdown('<div class="s-title"><span class="s-num">10</span> 이 회사 누가 들고 있나요? <span style="font-size:.8rem;color:#768390">Yahoo</span></div>', unsafe_allow_html=True)
         col1, col2 = st.columns([1.1, 1])
         html_s10_1 = (
-            f'{_metric_row("총 발행 주식수", f"{_fmt_num(info.get("sharesOutstanding", 0), False)} 주")}'
-            f'{_metric_row("유통 주식수 (Float)", f"{_fmt_num(info.get("floatShares", 0), False)} 주")}'
-            f'<div class="divider"></div>'
-            f'{_metric_row("🏛️ 기관 비율", _fmt_pct(inst))}'
-            f'{_metric_row("👔 내부자 비율", _fmt_pct(ins))}'
-            f'{_metric_row("👤 개인/기타 (추정)", _fmt_pct(pub))}'
+            f"<div style='display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px'><span class='section-pill {v10_pill_cls}'>{v10_t}</span><span class='section-pill pill-amber'>혼합 지분 구조</span></div>"
+            f'{ownership_cards}'
+            f'{ownership_stack}'
             f'<div class="note-box">※ "기관"에는 연기금, 뮤추얼펀드, ETF, 헤지펀드가 포함됩니다.<br>'
             f'※ "개인/기타"는 (100% - 기관 - 내부자)로 추정한 값입니다.{pub_warning}</div>'
         )
