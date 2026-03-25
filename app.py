@@ -4,7 +4,7 @@
 # ══════════════════════════════════════════════════════════════
 
 import streamlit as st, google.generativeai as genai
-import time, re, math, json
+import time, math
 from datetime import datetime
 from st_copy_to_clipboard import st_copy_to_clipboard
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -91,6 +91,13 @@ div[data-testid="stToast"] p{color:#E8ECF1!important;font-weight:600!important}
 .prompt-caption{color:#94A3B8;font-size:.74rem;font-weight:700;margin-bottom:8px}
 </style>""", unsafe_allow_html=True)
 
+INITIAL_MESSAGE = {
+    "role": "assistant",
+    "type": "text",
+    "content": "🚦 **CipherX V14.2**\n**티커명**을 입력하세요.",
+}
+
+
 # ━━━ Constants ━━━
 @st.cache_resource
 def get_gemini_model():
@@ -103,20 +110,28 @@ def analyze(ticker, chart_days=252, refresh=False):
         ts = int(time.time()) if refresh else None
         df = compute_and_cache(ticker, ts)
         if df is None or df.empty or len(df) < 50:
-            return None, "데이터부족", None
+            return None, "데이터 부족", None
         dc = df.dropna(subset=['WT1', 'WT2']).tail(chart_days).copy()
         if dc.empty:
-            return None, "차트데이터부족", None
-        return build_chart(dc, ticker).to_json(), build_prompt_text(dc, build_metadata(dc, ticker)), build_metadata(dc, ticker)
+            return None, "차트 데이터 부족", None
+        meta = build_metadata(dc, ticker)
+        return build_chart(dc, ticker).to_json(), build_prompt_text(dc, meta), meta
     except Exception as e:
         import traceback
         print(f"[ERR]{ticker}:\n{traceback.format_exc()}")
-        return None, f"실패:{e}", None
+        return None, f"분석 실패: {e}", None
+
+
+def _initial_messages():
+    return [dict(INITIAL_MESSAGE)]
 
 # ━━━ Session + Main ━━━
 def init_session():
     defs = {
-        'messages': [{"role": "assistant", "type": "text", "content": "🚦 **CipherX V14.2**\n**티커명**을 입력하세요."}],
+        '_mode': '분석',
+        '_auto': None,
+        'quick': None,
+        'messages': _initial_messages(),
         'pending_ai_ticker': None,
         'pending_ai_prompt': None,
         'last_ticker': None,
@@ -125,10 +140,31 @@ def init_session():
         'scan_total': 0,
         'scan_focus_idx': None,
         'scan_focus_ticker': None,
+        'scan_nav_select_idx': None,
+        'selected_sector': None,
+        'scan_tickers_override': None,
     }
     for k, v in defs.items():
         if k not in st.session_state:
             st.session_state[k] = v
+
+
+def reset_session():
+    st.session_state['_mode'] = '분석'
+    st.session_state['_auto'] = None
+    st.session_state['quick'] = None
+    st.session_state['messages'] = _initial_messages()
+    st.session_state['pending_ai_ticker'] = None
+    st.session_state['pending_ai_prompt'] = None
+    st.session_state['last_ticker'] = None
+    st.session_state['scan_results'] = []
+    st.session_state['scan_source'] = ''
+    st.session_state['scan_total'] = 0
+    st.session_state['scan_focus_idx'] = None
+    st.session_state['scan_focus_ticker'] = None
+    st.session_state['scan_nav_select_idx'] = None
+    st.session_state['selected_sector'] = None
+    st.session_state['scan_tickers_override'] = None
 
 init_session()
 
@@ -181,70 +217,23 @@ def _queue_scan_navigation(idx):
     idx = max(0, min(int(idx), ctx['total'] - 1))
     ticker = ctx['results'][idx]['ticker']
     _set_scan_focus(ticker, idx)
+    st.session_state['scan_nav_select_idx'] = idx
     st.session_state['_mode'] = '분석'
     st.session_state['_auto'] = ticker
     st.rerun()
 
-'''
-def _render_analysis_nav():
-    ctx = _get_scan_focus_context()
-    if not ctx:
-        return
-    idx = ctx['idx']
-    row = ctx['row']
-    title = f"{ctx['source']} scan"
-    badge = f"{idx + 1}/{ctx['total']} · {row['ticker']}"
-    st.markdown(
-        f"""
-        <div class="analysis-nav">
-            <div class="analysis-nav-meta">
-                <div>
-                    <div class="analysis-nav-title">Scanner Context</div>
-                    <div class="analysis-nav-sub">Move through scan hits without losing your analysis history.</div>
-                </div>
-                <span class="analysis-nav-chip">{title}</span>
-            </div>
-            <div class="analysis-nav-meta" style="margin-bottom:0">
-                <div class="analysis-nav-sub">Current: <b style="color:#F8FAFC">{badge}</b> · Judgment <b style="color:#A5B4FC">{row.get('jg', 'N/A')}</b> · ES <b style="color:#CBD5E1">{row.get('es', 0):+.0f}</b></div>
-                <div class="analysis-nav-sub">Scan score <b style="color:#CBD5E1">{row.get('scan_score', 0):+.1f}</b></div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    c1, c2, c3, c4 = st.columns([1.1, 1, 1, 1.25])
-    with c1:
-        if st.button("Back To Scanner", key="scan_nav_back", use_container_width=True):
-        st.session_state['_mode'] = '스캐너'
-            st.rerun()
-    with c2:
-        if st.button("Prev", key="scan_nav_prev", use_container_width=True, disabled=idx <= 0):
-            _queue_scan_navigation(idx - 1)
-    with c3:
-        if st.button("Next", key="scan_nav_next", use_container_width=True, disabled=idx >= ctx['total'] - 1):
-            _queue_scan_navigation(idx + 1)
-    with c4:
-        labels = [f"{i + 1}. {r['ticker']} · {r.get('jg', 'N/A')} · ES {r.get('es', 0):+.0f}" for i, r in enumerate(ctx['results'])]
-        selected = st.selectbox("Browse scan results", labels, index=idx, label_visibility="collapsed")
-        selected_idx = labels.index(selected)
-        if selected_idx != idx:
-            _queue_scan_navigation(selected_idx)
-
-'''
 def _build_scan_nav_labels(results):
-    return [f"{i + 1}. {r['ticker']} 쨌 {r.get('jg', 'N/A')} 쨌 ES {r.get('es', 0):+.0f}" for i, r in enumerate(results)]
+    return [f"{i + 1}. {r['ticker']} · {r.get('jg', 'N/A')} · ES {r.get('es', 0):+.0f}" for i, r in enumerate(results)]
 
 def _handle_scan_jump():
     ctx = _get_scan_focus_context()
     if not ctx:
         return
-    labels = _build_scan_nav_labels(ctx['results'])
-    selected = st.session_state.get('scan_nav_select')
-    if selected not in labels:
+    selected_idx = st.session_state.get('scan_nav_select_idx')
+    if selected_idx is None:
         return
-    selected_idx = labels.index(selected)
-    if selected_idx != ctx['idx']:
-        _queue_scan_navigation(selected_idx)
+    if int(selected_idx) != ctx['idx']:
+        _queue_scan_navigation(int(selected_idx))
 
 def _render_analysis_sidebar_nav():
     ctx = _get_scan_focus_context()
@@ -264,11 +253,16 @@ def _render_analysis_sidebar_nav():
     with c2:
         if st.button("Next", key="scan_nav_next_sb", use_container_width=True, disabled=idx >= ctx['total'] - 1):
             _queue_scan_navigation(idx + 1)
-    st.session_state['scan_nav_select'] = labels[idx]
+
+    current_select = st.session_state.get('scan_nav_select_idx')
+    if current_select is None or current_select != idx or current_select >= len(labels):
+        st.session_state['scan_nav_select_idx'] = idx
+
     st.selectbox(
-        "종목선택",
-        labels,
-        key="scan_nav_select",
+        "종목 선택",
+        options=list(range(len(labels))),
+        format_func=lambda i: labels[i],
+        key="scan_nav_select_idx",
         on_change=_handle_scan_jump,
         label_visibility="collapsed",
     )
@@ -305,8 +299,7 @@ with st.sidebar:
     chart_period = st.radio("기간", ['3개월', '6개월', '1년'], index=0, horizontal=True, key="period")
     chart_days = {'3개월': 63, '6개월': 126, '1년': 252}[chart_period]
     if st.button("🗑️ 초기화", use_container_width=True, type="secondary"):
-        for k in ['messages', 'pending_ai_ticker', 'pending_ai_prompt', 'last_ticker', 'scan_focus_idx', 'scan_focus_ticker']:
-            st.session_state[k] = [{"role": "assistant", "type": "text", "content": "🚦 **CipherX V14.2**"}] if k == 'messages' else None
+        reset_session()
         st.rerun()
 
     if st.session_state.get('_mode', '분석') == '분석':
@@ -377,6 +370,11 @@ if current_mode == '스캐너':
             st.session_state.pop('selected_sector', None)
             st.session_state.pop('scan_tickers_override', None)
             st.session_state['scan_results'] = []
+            st.session_state['scan_source'] = ''
+            st.session_state['scan_total'] = 0
+            st.session_state['scan_focus_idx'] = None
+            st.session_state['scan_focus_ticker'] = None
+            st.session_state['scan_nav_select_idx'] = None
             st.rerun()
 
     if scan_btn and tickers:
@@ -550,6 +548,9 @@ if current_mode == '스캐너':
         st.session_state['scan_results'] = results
         st.session_state['scan_source']  = scan_source
         st.session_state['scan_total']   = len(tickers)
+        st.session_state['scan_focus_idx'] = 0 if results else None
+        st.session_state['scan_focus_ticker'] = results[0]['ticker'] if results else None
+        st.session_state['scan_nav_select_idx'] = 0 if results else None
 
     # ── 결과 렌더링 ──────────────────────────────────────────────────────────
     results = st.session_state.get('scan_results', [])
@@ -667,7 +668,7 @@ else:
             if msg.get("type") == "analysis":
                 render_analysis(msg)
             elif msg.get("type") == "report":
-                with st.expander(f"{msg.get('ticker', '')} AI리포트", expanded=True):
+                with st.expander(f"{msg.get('ticker', '')} AI 리포트", expanded=True):
                     st.markdown(msg["content"])
                 st.download_button(
                     "📥", key=f"dl_{i}",
@@ -680,12 +681,12 @@ else:
                 st.markdown(msg.get("content", ""))
             if msg.get("prompt") and msg.get("type") == "analysis":
                 with st.expander(f"{msg.get('ticker', '')} 프롬프트"):
-                    st.markdown("<div class='prompt-caption'>Exact AI prompt used for this ticker.</div>", unsafe_allow_html=True)
+                    st.markdown("<div class='prompt-caption'>이 종목 분석에 실제로 사용된 AI 프롬프트입니다.</div>", unsafe_allow_html=True)
                     st.code(msg["prompt"], language="markdown")
                     st_copy_to_clipboard(
                         msg["prompt"],
-                        before_copy_label="Copy prompt",
-                        after_copy_label="Copied",
+                        before_copy_label="프롬프트 복사",
+                        after_copy_label="복사됨",
                         key=f"copy_prompt_{msg.get('ticker', 'na')}_{i}",
                     )
 
@@ -700,14 +701,14 @@ else:
                 col_ = []
 
                 def gen():
-                    pb.progress(40, text="🚀 AI생성중...")
+                    pb.progress(40, text="🚀 AI 리포트 생성 중...")
                     for ch in model.generate_content(pp, stream=True):
                         if ch.text:
                             col_.append(ch.text)
                             yield ch.text
                     pb.progress(100)
 
-                with st.expander(f"{tp.upper()} AI리포트", expanded=True):
+                with st.expander(f"{tp.upper()} AI 리포트", expanded=True):
                     st.write_stream(gen())
                 time.sleep(.3)
                 pb.empty()
@@ -720,47 +721,47 @@ else:
                 st.rerun()
             except Exception as e:
                 pb.empty()
-                st.error(f"AI오류:{e}")
+                st.error(f"AI 오류: {e}")
 
     def process_ticker(tv, refresh=False):
         tv = tv.strip().upper()
         st.session_state.pending_ai_ticker = None
         st.session_state.pending_ai_prompt = None
         if not _valid_fmt(tv):
-            st.toast(f"⚠️ {tv} 형식오류", icon="🚨")
+            st.toast(f"⚠️ {tv} 형식 오류", icon="🚨")
             return
         if not validate_ticker(tv):
-            st.toast(f"⚠️ {tv} 없음", icon="🔍")
+            st.toast(f"⚠️ {tv} 티커를 찾을 수 없습니다", icon="🔍")
             return
         st.session_state.messages.append({"role": "user", "type": "text", "content": tv})
         st.session_state.last_ticker = tv
         _set_scan_focus(tv)
         with st.chat_message("assistant", avatar="✨"):
-            with st.status(f"🔍 {tv} 분석중...", expanded=True) as status:
-                st.write("📊 데이터+지표+시그널+위원회...")
+            with st.status(f"🔍 {tv} 분석 중...", expanded=True) as status:
+                st.write("📊 데이터, 지표, 시그널, 위원회 점수를 계산하고 있습니다...")
                 fund = fetch_fundamentals(tv)
                 fj, phist, meta = analyze(tv, chart_days, refresh)
                 if fj and meta:
                     jg  = meta['judgment']
                     act = meta.get('action_label', '')
                     es  = meta.get('ensemble_score', 0)
-                    st.write(f"📍 {act} | ES:{es:+.1f}")
+                    st.write(f"📍 {act} | ES {es:+.1f}")
                     _show_analysis_toasts(tv, meta)
                     prompt = build_ai_prompt(tv, phist, fund)
-                    status.update(label=f"✅ {tv} — {act}", state="complete", expanded=False)
+                    status.update(label=f"✅ {tv} - {act}", state="complete", expanded=False)
                 else:
                     prompt = None
-                    status.update(label=f"⚠️ {tv} 실패", state="error")
+                    status.update(label=f"⚠️ {tv} 분석 실패", state="error")
             if fj:
                 syn  = meta.get('reversal_synergy', 0)
                 pred = meta.get('prediction_boost', 0)
-                content = f"**{tv}** — **{meta.get('action_label', '')}**\n💬 {meta.get('judgment_reason', '')}"
+                content = f"**{tv}** - **{meta.get('action_label', '')}**\n💬 {meta.get('judgment_reason', '')}"
                 content += f"\n🏛️ ES:{es:+.1f} | B{meta.get('buy_agree',0)}:S{meta.get('sell_agree',0)} | 🌐{meta.get('context_label','')}"
                 if abs(syn) > 5:  content += f" | 🔄{syn:+.1f}"
                 if abs(pred) > 3: content += f" | 🔮{pred:+.1f}"
                 if meta.get('combined_scans'):
                     content += f"\n🎯 CS:매수{sum(1 for s in meta['combined_scans'] if s['dir']=='buy')} 매도{sum(1 for s in meta['combined_scans'] if s['dir']=='sell')}"
-                content += f"\n⏳{meta['leading_verdict']} | 📊{meta['lagging_verdict']}"
+                content += f"\n⏳ {meta['leading_verdict']} | 📊 {meta['lagging_verdict']}"
                 veto = meta.get('veto_flags', '')
                 if veto:
                     content += f"\n🚫 {veto}"
@@ -775,7 +776,7 @@ else:
             else:
                 st.session_state.messages.append({
                     "role": "assistant", "type": "text",
-                    "content": f"⚠️ **{tv}** 실패:{phist}"
+                    "content": f"⚠️ **{tv}** 분석 실패: {phist}"
                 })
                 st.rerun()
 
@@ -784,9 +785,7 @@ else:
     if st.session_state.get('quick'):
         process_ticker(st.session_state.pop('quick'))
     if st.session_state.pending_ai_ticker and st.session_state.pending_ai_prompt:
-        if st.button(f"🚀 {st.session_state.pending_ai_ticker.upper()} AI분석", type="primary", use_container_width=True):
+        if st.button(f"🚀 {st.session_state.pending_ai_ticker.upper()} AI 분석", type="primary", use_container_width=True):
             _run_ai()
     if ti := st.chat_input("티커 입력 (예: TSLA, AAPL, QQQ)"):
         process_ticker(ti)
-
-print("✅ CipherX V14.2 전체 완료!")
