@@ -125,7 +125,6 @@ def init_session():
         'scan_total': 0,
         'scan_focus_idx': None,
         'scan_focus_ticker': None,
-        'analysis_scan_jump': None,
     }
     for k, v in defs.items():
         if k not in st.session_state:
@@ -137,7 +136,6 @@ def _scan_tickers():
     return [str(r.get('ticker', '')).strip().upper() for r in st.session_state.get('scan_results', []) if str(r.get('ticker', '')).strip()]
 
 def _set_scan_focus(ticker=None, idx=None):
-    results = st.session_state.get('scan_results', [])
     tickers = _scan_tickers()
     if not tickers:
         st.session_state['scan_focus_idx'] = None
@@ -152,9 +150,6 @@ def _set_scan_focus(ticker=None, idx=None):
         return None
     st.session_state['scan_focus_idx'] = idx
     st.session_state['scan_focus_ticker'] = tickers[idx]
-    if idx < len(results):
-        row = results[idx]
-        st.session_state['analysis_scan_jump'] = f"{idx + 1}. {row['ticker']} · {row.get('jg', 'N/A')} · ES {row.get('es', 0):+.0f}"
     return idx
 
 def _get_scan_focus_context(current_ticker=None):
@@ -229,11 +224,7 @@ def _render_analysis_nav():
             _queue_scan_navigation(idx + 1)
     with c4:
         labels = [f"{i + 1}. {r['ticker']} · {r.get('jg', 'N/A')} · ES {r.get('es', 0):+.0f}" for i, r in enumerate(ctx['results'])]
-        current_label = labels[idx]
-        jump_key = 'analysis_scan_jump'
-        if st.session_state.get(jump_key) not in labels:
-            st.session_state[jump_key] = current_label
-        selected = st.selectbox("Browse scan results", labels, key=jump_key, label_visibility="collapsed")
+        selected = st.selectbox("Browse scan results", labels, index=idx, label_visibility="collapsed")
         selected_idx = labels.index(selected)
         if selected_idx != idx:
             _queue_scan_navigation(selected_idx)
@@ -267,7 +258,7 @@ with st.sidebar:
     chart_period = st.radio("기간", ['3개월', '6개월', '1년'], index=0, horizontal=True, key="period")
     chart_days = {'3개월': 63, '6개월': 126, '1년': 252}[chart_period]
     if st.button("🗑️ 초기화", use_container_width=True, type="secondary"):
-        for k in ['messages', 'pending_ai_ticker', 'pending_ai_prompt', 'last_ticker', 'scan_focus_idx', 'scan_focus_ticker', 'analysis_scan_jump']:
+        for k in ['messages', 'pending_ai_ticker', 'pending_ai_prompt', 'last_ticker', 'scan_focus_idx', 'scan_focus_ticker']:
             st.session_state[k] = [{"role": "assistant", "type": "text", "content": "🚦 **CipherX V14.2**"}] if k == 'messages' else None
         st.rerun()
 
