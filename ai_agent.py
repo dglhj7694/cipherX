@@ -2,6 +2,7 @@ import google.generativeai as genai
 import streamlit as st
 from config import *
 from utils import _cs_str
+from branding import BRAND_PAGE_TITLE
 
 
 def build_prompt_text(dc, meta):
@@ -96,11 +97,11 @@ def build_prompt_text(dc, meta):
 
 def build_ai_prompt(ticker, phist, fund):
     return f"""
-You are a veteran Wall Street analyst reviewing CipherX V14.2.
+You are a veteran Wall Street analyst reviewing {BRAND_PAGE_TITLE}.
 Write the entire report in Korean.
 
 System context:
-- CipherX V14.2 uses 5 committees: Trend, Momentum, Money, Structure, Leading
+- {BRAND_PAGE_TITLE} uses 5 committees: Trend, Momentum, Money, Structure, Leading
 - It also uses context-aware weighting, veto logic, reversal synergy, prediction boost, and auto-generated reasons
 - The input already contains smart-money divergence, RR (VAH/POC/VAL), and blow-off-top warnings
 

@@ -1,5 +1,5 @@
 ﻿# ══════════════════════════════════════════════════════════════
-#  CipherX V14.2 — PART 1/4
+#  Aroven V14.2 — PART 1/4
 #  설정, 레지스트리, 유틸리티, 기술지표
 # ══════════════════════════════════════════════════════════════
 
@@ -19,7 +19,15 @@ from localization import (
     localize_context_label,
     localize_judgment_label,
 )
-st.set_page_config(page_title="CipherX V14.2", page_icon="📈", layout="wide", initial_sidebar_state="collapsed")
+from branding import (
+    BRAND_PAGE_ICON,
+    BRAND_PAGE_TITLE,
+    BRAND_REPORT_SLUG,
+    INITIAL_MESSAGE_CONTENT,
+    build_brand_hero,
+    build_brand_lockup,
+)
+st.set_page_config(page_title=BRAND_PAGE_TITLE, page_icon=BRAND_PAGE_ICON, layout="wide", initial_sidebar_state="collapsed")
 
 # ━━━ CSS ━━━
 st.markdown("""<style>
@@ -105,6 +113,29 @@ border:1px solid rgba(99,102,241,.28);border-radius:16px;padding:14px 16px;margi
 .guide-step-title{color:#F8FAFC;font-size:.84rem;font-weight:800;margin:0 0 4px}
 .guide-step-copy{color:#94A3B8;font-size:.77rem;line-height:1.55;margin:0}
 .soft-note{color:#94A3B8;font-size:.76rem;line-height:1.55;margin-top:10px}
+.brand-hero{background:
+linear-gradient(160deg,rgba(9,16,27,.98),rgba(16,24,39,.9)),
+radial-gradient(circle at top right,rgba(125,211,252,.08),transparent 40%);
+border:1px solid rgba(125,211,252,.18);border-radius:20px;padding:18px 20px;margin:0 0 16px;
+box-shadow:0 16px 40px rgba(2,6,23,.28);position:relative;overflow:hidden}
+.brand-lockup{display:flex;align-items:center;gap:14px}
+.brand-lockup-compact{gap:10px}
+.brand-mark{width:58px;height:58px;display:grid;place-items:center;border-radius:18px;
+background:radial-gradient(circle at 30% 30%,rgba(246,195,94,.18),rgba(99,217,162,.06) 40%,rgba(15,23,42,.92) 72%);
+border:1px solid rgba(125,211,252,.18);box-shadow:inset 0 1px 0 rgba(248,250,252,.06),0 12px 24px rgba(2,6,23,.32)}
+.brand-lockup-compact .brand-mark{width:42px;height:42px;border-radius:14px}
+.brand-mark svg{width:100%;height:100%;display:block}
+.brand-copy{min-width:0}
+.brand-kicker{margin:0 0 4px;color:#7DD3FC;font-size:.7rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.brand-name-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.brand-wordmark{margin:0;color:#F8FAFC;font-size:1.95rem;font-weight:800;letter-spacing:-.04em;line-height:1}
+.brand-lockup-compact .brand-wordmark{font-size:1.08rem}
+.brand-accent{color:#F6C35E}
+.brand-version{display:inline-flex;align-items:center;padding:3px 9px;border-radius:999px;background:rgba(125,211,252,.12);border:1px solid rgba(125,211,252,.2);color:#D6E8FF;font-size:.68rem;font-weight:800}
+.brand-tagline{margin:6px 0 0;color:#94A3B8;font-size:.82rem;line-height:1.5}
+.brand-summary{margin:14px 0 0;color:#CBD5E1;font-size:.92rem;line-height:1.65;max-width:760px}
+.brand-chip-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.brand-chip{display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;background:rgba(226,232,240,.06);border:1px solid rgba(148,163,184,.18);color:#CBD5E1;font-size:.74rem;font-weight:700}
 div[data-testid="stExpander"]{
   background:linear-gradient(160deg,rgba(15,23,42,.94),rgba(17,24,39,.86))!important;
   border:1px solid rgba(148,163,184,.16)!important;
@@ -209,13 +240,15 @@ div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] blockquote{
   .price-big{font-size:1.78rem}
   .analysis-nav{padding:12px}
   .guide-grid{grid-template-columns:1fr}
+  .brand-hero{padding:16px}
+  .brand-wordmark{font-size:1.55rem}
 }
 </style>""", unsafe_allow_html=True)
 
 INITIAL_MESSAGE = {
     "role": "assistant",
     "type": "text",
-    "content": "🚦 **CipherX V14.2**\n티커를 입력하거나 사이드바의 **스캐너**에서 여러 종목을 먼저 살펴보세요.",
+    "content": INITIAL_MESSAGE_CONTENT,
 }
 
 
@@ -462,7 +495,7 @@ def _render_analysis_guide():
     )
 
 with st.sidebar:
-    st.markdown("## 🚦 CipherX V14.2")
+    st.markdown(build_brand_lockup("Market judgment studio", compact=True, kicker="Sidebar"), unsafe_allow_html=True)
     st.markdown("---")
     _mi = 0 if st.session_state.get('_mode', '분석') == '분석' else 1
     app_mode = st.radio("모드", ['분석', '스캐너'], index=_mi)
@@ -482,7 +515,14 @@ current_mode = st.session_state.get('_mode', '분석')
 #  스캐너 모드
 # ══════════════════════════════════════════════════════════════
 if current_mode == '스캐너':
-    st.markdown("<h2 style='text-align:center;color:#fff'>🔍 Scanner</h2>", unsafe_allow_html=True)
+    st.markdown(
+        build_brand_hero(
+            "Scanner Mode",
+            "섹터 유니버스를 훑고, 우선순위가 높은 종목부터 바로 심층 분석으로 연결합니다.",
+            chips=["Priority score", "ES direction", "One-click deep dive"],
+        ),
+        unsafe_allow_html=True,
+    )
     all_universe = sorted({str(t).strip().upper() for ts in SECTOR_GROUPS.values() for t in ts if str(t).strip()})
 
     st.markdown("#### 📂 섹터 선택")
@@ -843,8 +883,14 @@ if current_mode == '스캐너':
 #  분석 모드
 # ══════════════════════════════════════════════════════════════
 else:
-    st.markdown("<h2 style='text-align:center;color:#fff;margin-bottom:4px'>🚦 CipherX V14.2</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align:center;color:#64748B;margin-bottom:16px'>5위원회 종합 판단 + 예측 보정 + 자동 해설</p>", unsafe_allow_html=True)
+    st.markdown(
+        build_brand_hero(
+            "Analysis Mode",
+            "5위원회 종합 판단, 시장 맥락, 구조 점검, AI 리포트를 한 흐름으로 묶은 프리미엄 분석 워크스테이션입니다.",
+            chips=["5-Committee audit", "VP / RR structure", "AI devil's advocate"],
+        ),
+        unsafe_allow_html=True,
+    )
     _render_analysis_guide()
 
     if not st.session_state.last_ticker:
@@ -875,7 +921,7 @@ else:
                 st.download_button(
                     "📥", key=f"dl_{i}",
                     data=msg["content"].encode('utf-8'),
-                    file_name=f"{msg.get('ticker', '')}_V142_{datetime.now().strftime('%Y%m%d')}.md",
+                    file_name=f"{BRAND_REPORT_SLUG}_{msg.get('ticker', '').lower()}_{datetime.now().strftime('%Y%m%d')}.md",
                     mime="text/markdown",
                     use_container_width=True
                 )
