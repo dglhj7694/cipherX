@@ -163,49 +163,128 @@ def _score_dot_row(items):
                   f'<span style="font-size:.75rem;font-weight:700;color:#94a3b8;margin-top:2px; text-align:center;line-height:1.2">{name}</span></div>')
     return f'<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px;margin:12px 0">{cells}</div>'
 
+def _apply_cipherx_chart_theme(fig, title_text, height=320, show_legend=True):
+    fig.update_layout(
+        title=dict(text=f"<b>{title_text}</b>", font=dict(size=16, color='#F8FAFC', family="Pretendard")),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(15,23,42,.35)',
+        font=dict(color='#E5E7EB', size=12, family='Pretendard'),
+        margin=dict(l=14, r=14, t=48, b=14),
+        height=height,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1,
+            font=dict(color='#CBD5E1', size=11),
+            bgcolor='rgba(0,0,0,0)'
+        ),
+        showlegend=show_legend,
+        hoverlabel=dict(
+            bgcolor='rgba(11,14,20,.96)',
+            bordercolor='#334155',
+            font=dict(color='#F8FAFC', size=11, family='Pretendard')
+        ),
+    )
+    fig.update_xaxes(
+        showgrid=False,
+        tickfont=dict(color='#94A3B8', size=11),
+        zeroline=False,
+        linecolor='rgba(148,163,184,.16)'
+    )
+    fig.update_yaxes(
+        showgrid=True,
+        gridcolor='rgba(148,163,184,.12)',
+        zeroline=False,
+        tickfont=dict(color='#94A3B8', size=11),
+        linecolor='rgba(148,163,184,.16)'
+    )
+    return fig
+
 def _get_plotly_combo_chart(rv, nv, rd):
     if not rv or not rd or len(rv) < 2: return None
     rd_rev, rv_rev, nv_rev = rd[::-1], rv[::-1], nv[::-1]
     labels = [d.strftime('%Y') if hasattr(d, 'strftime') else str(d)[:4] for d in rd_rev]
 
     fig = go.Figure()
-    fig.add_trace(go.Bar(x=labels, y=rv_rev, name='매출', marker_color='#2196F3', opacity=0.9, text=[_fmt_num(v, False) for v in rv_rev], textposition='auto', textfont=dict(color='white', size=13, weight='bold')))
-    fig.add_trace(go.Scatter(x=labels, y=nv_rev, name='순이익', mode='lines+markers+text', line=dict(color='#63D9A2', width=4), marker=dict(size=10, color='white', line=dict(color='#63D9A2', width=2)), yaxis='y2', text=[_fmt_num(v, False) for v in nv_rev], textposition='top center', textfont=dict(color='#63D9A2', size=13, weight='bold')))
-    fig.update_layout(title=dict(text="<b>연도별 재무 추이</b>", font=dict(size=16, color='white', family="Arial")), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white', size=13, weight='bold'), margin=dict(l=10, r=10, t=40, b=10), height=320, xaxis=dict(showgrid=False, tickfont=dict(color='white')), yaxis=dict(showgrid=True, gridcolor='rgba(255, 255, 255, 0.15)', zeroline=False, tickfont=dict(color='white')), yaxis2=dict(overlaying='y', side='right', showgrid=False, tickfont=dict(color='#63D9A2')), legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1))
+    fig.add_trace(go.Bar(
+        x=labels, y=rv_rev, name='매출',
+        marker=dict(color='rgba(96,165,250,.78)', line=dict(color='rgba(165,180,252,.28)', width=1)),
+        opacity=0.92,
+        text=[_fmt_num(v, False) for v in rv_rev],
+        textposition='auto',
+        textfont=dict(color='#E5E7EB', size=12, family='Pretendard')
+    ))
+    fig.add_trace(go.Scatter(
+        x=labels, y=nv_rev, name='순이익', mode='lines+markers+text',
+        line=dict(color='#63D9A2', width=3),
+        marker=dict(size=9, color='#0F172A', line=dict(color='#63D9A2', width=2)),
+        yaxis='y2',
+        text=[_fmt_num(v, False) for v in nv_rev],
+        textposition='top center',
+        textfont=dict(color='#B8F1D5', size=12, family='Pretendard')
+    ))
+    _apply_cipherx_chart_theme(fig, "연도별 재무 추이", height=320, show_legend=True)
+    fig.update_layout(yaxis2=dict(overlaying='y', side='right', showgrid=False, tickfont=dict(color='#63D9A2', size=11)))
     return fig
 
 def _get_plotly_yearly_bar(dates, y1, y2, name1, name2, c1, c2):
     if not dates or not y1 or len(y1) < 2: return None
     labels = [d.strftime('%Y') if hasattr(d, 'strftime') else str(d)[:4] for d in dates[::-1]]
     fig = go.Figure()
-    fig.add_trace(go.Bar(x=labels, y=y1[::-1], name=name1, marker_color=c1, opacity=0.9, text=[_fmt_num(v, False) for v in y1[::-1]], textposition='auto', textfont=dict(color='white', size=13, weight='bold')))
-    fig.add_trace(go.Bar(x=labels, y=y2[::-1], name=name2, marker_color=c2, opacity=0.9, text=[_fmt_num(v, False) for v in y2[::-1]], textposition='auto', textfont=dict(color='white', size=13, weight='bold')))
-    fig.update_layout(title=dict(text="<b>연도별 자산/부채 추이</b>", font=dict(size=16, color='white', family="Arial")), barmode='group', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white', size=13, weight='bold'), margin=dict(l=10, r=10, t=40, b=10), height=320, xaxis=dict(showgrid=False, tickfont=dict(color='white')), yaxis=dict(showgrid=True, gridcolor='rgba(255, 255, 255, 0.15)', zeroline=False, tickfont=dict(color='white')), legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1))
+    fig.add_trace(go.Bar(
+        x=labels, y=y1[::-1], name=name1,
+        marker=dict(color=c1, line=dict(color='rgba(148,163,184,.24)', width=1)),
+        opacity=0.92,
+        text=[_fmt_num(v, False) for v in y1[::-1]],
+        textposition='auto',
+        textfont=dict(color='#E5E7EB', size=12, family='Pretendard')
+    ))
+    fig.add_trace(go.Bar(
+        x=labels, y=y2[::-1], name=name2,
+        marker=dict(color=c2, line=dict(color='rgba(148,163,184,.24)', width=1)),
+        opacity=0.92,
+        text=[_fmt_num(v, False) for v in y2[::-1]],
+        textposition='auto',
+        textfont=dict(color='#E5E7EB', size=12, family='Pretendard')
+    ))
+    _apply_cipherx_chart_theme(fig, "연도별 자산/부채 추이", height=320, show_legend=True)
+    fig.update_layout(barmode='group')
     return fig
 
 def _get_plotly_target_price(curr, low, mean, median, high):
     if not low or not high: return None
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=[low, high], y=[0, 0], mode='lines', line=dict(color='#768390', width=6), showlegend=False, hoverinfo='skip'))
+    fig.add_trace(go.Scatter(x=[low, high], y=[0, 0], mode='lines', line=dict(color='rgba(148,163,184,.52)', width=6), showlegend=False, hoverinfo='skip'))
     pts = [(low, '최저가', '#adbac7', 12, 'bottom center'), (high, '최고가', '#adbac7', 12, 'bottom center'), (mean, '평균', '#2196F3', 14, 'bottom center'), (median, '중앙값', '#63D9A2', 16, 'top center'), (curr, '현재가', '#F6C35E', 22, 'top center')]
     for val, name, color, size, pos in pts:
-        if val: fig.add_trace(go.Scatter(x=[val], y=[0], mode='markers+text', marker=dict(color=color, size=size, symbol='star' if name=='현재가' else 'circle', line=dict(width=2 if name=='현재가' else 1, color='white')), text=[f"<b>{name}</b><br>${val:,.2f}"], textposition=pos, textfont=dict(color=color if name in ['현재가', '중앙값'] else 'white', size=13, weight='bold'), name=name))
-    fig.update_layout(title=dict(text="<b>목표가 범위 및 현재가 위치</b>", font=dict(size=16, color='white', family="Arial")), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white', size=13, weight='bold'), height=260, margin=dict(l=20, r=20, t=50, b=20), xaxis=dict(showgrid=False, zeroline=False, showticklabels=False), yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[-1.2, 1.2]), legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5, font=dict(color='white')))
+        if val: fig.add_trace(go.Scatter(x=[val], y=[0], mode='markers+text', marker=dict(color=color, size=size, symbol='star' if name=='현재가' else 'circle', line=dict(width=2 if name=='현재가' else 1, color='#F8FAFC')), text=[f"<b>{name}</b><br>${val:,.2f}"], textposition=pos, textfont=dict(color=color if name in ['현재가', '중앙값'] else '#E5E7EB', size=12, family='Pretendard'), name=name))
+    _apply_cipherx_chart_theme(fig, "목표가 범위 및 현재가 위치", height=260, show_legend=True)
+    fig.update_xaxes(showgrid=False, zeroline=False, showticklabels=False)
+    fig.update_yaxes(showgrid=False, zeroline=False, showticklabels=False, range=[-1.2, 1.2])
+    fig.update_layout(legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5, font=dict(color='#CBD5E1', size=11), bgcolor='rgba(0,0,0,0)'))
     return fig
 
 def _get_plotly_donut(labels, values, colors):
     if sum(values) == 0: return None
-    fig = go.Figure(data=[go.Pie(labels=labels, values=values, hole=.55, marker_colors=colors, textinfo='label+percent', textfont=dict(color='white', size=14, weight='bold'), hoverinfo='label+percent')])
-    fig.update_layout(title=dict(text="<b>지분 구성 비율</b>", font=dict(size=16, color='white', family="Arial")), margin=dict(t=50, b=10, l=10, r=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='white', size=13, weight='bold'), showlegend=False, height=280)
+    fig = go.Figure(data=[go.Pie(
+        labels=labels, values=values, hole=.62,
+        marker=dict(colors=colors, line=dict(color='rgba(15,23,42,.92)', width=2)),
+        textinfo='label+percent',
+        textfont=dict(color='#F8FAFC', size=13, family='Pretendard'),
+        hoverinfo='label+percent'
+    )])
+    _apply_cipherx_chart_theme(fig, "지분 구성 비율", height=280, show_legend=False)
     return fig
 
 def _get_plotly_gauge(val, color):
     val_pct = val * 100
     fig = go.Figure(go.Indicator(
         mode = "gauge+number", value = val_pct, number = {'suffix': "%", 'font': {'size': 32, 'color': color, 'weight':'bold'}},
-        gauge = {'axis': {'range': [0, 100], 'tickwidth': 2, 'tickcolor': "white"}, 'bar': {'color': color, 'thickness': 0.8}, 'bgcolor': "rgba(255,255,255,0.1)", 'borderwidth': 0, 'steps': [{'range': [0, 10], 'color': 'rgba(126,216,182,0.2)'}, {'range': [10, 20], 'color': 'rgba(245,199,123,0.2)'}, {'range': [20, 100], 'color': 'rgba(243,165,165,0.2)'}]}
+        gauge = {'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "#94A3B8"}, 'bar': {'color': color, 'thickness': 0.76}, 'bgcolor': "rgba(255,255,255,0.06)", 'borderwidth': 0, 'steps': [{'range': [0, 10], 'color': 'rgba(99,217,162,0.20)'}, {'range': [10, 20], 'color': 'rgba(246,195,94,0.20)'}, {'range': [20, 100], 'color': 'rgba(255,143,150,0.20)'}]}
     ))
-    fig.update_layout(title=dict(text="<b>공매도 비율 (100% 기준)</b>", font=dict(size=16, color='white', family="Arial")), paper_bgcolor='rgba(0,0,0,0)', font=dict(color='white', weight='bold'), margin=dict(l=20, r=20, t=50, b=20), height=280)
+    _apply_cipherx_chart_theme(fig, "공매도 비율 (100% 기준)", height=280, show_legend=False)
     return fig
 
 # ── 분석 함수들 ─────────────────────────────────────────
