@@ -176,10 +176,13 @@ def render_judgment_card(m):
     reason=m.get('judgment_reason','');detail=m.get('judgment_detail','');action=m.get('action_label','')
     detail_text=(detail or '').strip() or (reason or '').strip()
     detail_norm=" ".join(detail_text.split())
-    detail_html=f"""<div style="margin:16px 0;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:14px 18px;border-left:3px solid {jc}">
-            <p style="color:#94A3B8;font-size:.72rem;font-weight:700;margin:0 0 6px">근거 요약</p>
-            <p style="color:#CBD5E1;font-size:.82rem;margin:0">{detail_text}</p>
-        </div>""" if detail_text else ""
+    detail_html = (
+        f"<div style=\"margin:16px 0;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);"
+        f"border-radius:12px;padding:14px 18px;border-left:3px solid {jc}\">"
+        f"<p style=\"color:#94A3B8;font-size:.72rem;font-weight:700;margin:0 0 6px\">근거 요약</p>"
+        f"<p style=\"color:#CBD5E1;font-size:.82rem;margin:0\">{detail_text}</p>"
+        f"</div>"
+    ) if detail_text else ""
     contrast=(m.get('contrast_notes','') or '').strip()
     contrast_norm=" ".join(contrast.split())
     long_rr=float(m.get('vp_long_rr',1) or 1);short_rr=float(m.get('vp_short_rr',1) or 1)
@@ -201,12 +204,15 @@ def render_judgment_card(m):
     if contrast or risk_tags:
         chips="".join([f"<span style='display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border-radius:999px;background:{col}22;border:1px solid {col}44;color:{col};font-size:.72rem;font-weight:700'>{label}</span>" for label,col in risk_tags])
         show_contrast=bool(contrast) and contrast_norm not in detail_norm and detail_norm not in contrast_norm
-        contrast_html=f"<p style='color:#CBD5E1;font-size:.8rem;margin:0 0 10px'>{contrast}</p>" if show_contrast else ""
-        risk_html=f"""<div style="margin:14px 0 0;background:rgba(15,23,42,.58);border:1px solid rgba(148,163,184,.14);border-radius:12px;padding:14px 16px">
-            <p style="color:#94A3B8;font-size:.72rem;font-weight:700;margin:0 0 8px">Risk Check</p>
-            {contrast_html}
-            <div style='display:flex;gap:8px;flex-wrap:wrap'>{chips}</div>
-        </div>"""
+        risk_parts = [
+            "<div style=\"margin:14px 0 0;background:rgba(15,23,42,.58);border:1px solid rgba(148,163,184,.14);border-radius:12px;padding:14px 16px\">",
+            "<p style=\"color:#94A3B8;font-size:.72rem;font-weight:700;margin:0 0 8px\">Risk Check</p>",
+        ]
+        if show_contrast:
+            risk_parts.append(f"<p style='color:#CBD5E1;font-size:.8rem;margin:0 0 10px'>{contrast}</p>")
+        risk_parts.append(f"<div style='display:flex;gap:8px;flex-wrap:wrap'>{chips}</div>")
+        risk_parts.append("</div>")
+        risk_html="".join(risk_parts)
     circ=2*3.14159*36;offset=circ*(1-cf/100)
     # Committee vote dots
     committee=m.get('committee',{})
@@ -238,9 +244,7 @@ def render_judgment_card(m):
                 <p style="font-size:1.8rem;font-weight:800;color:{jc};margin:0;letter-spacing:-.5px">{action}</p>
                 {dots_html}
             </div>
-        </div>
-        {detail_html}
-        {risk_html}
+        </div>{detail_html}{risk_html}
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:14px">
             <div style="background:rgba(255,255,255,.03);border-radius:10px;padding:12px;text-align:center">
                 <p style="color:#64748B;font-size:.68rem;font-weight:700;margin:0 0 4px">Ensemble</p>
