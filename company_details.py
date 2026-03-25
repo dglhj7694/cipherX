@@ -555,28 +555,32 @@ def _sector_pe_live(sector):
 # ═══════════════════════════════════════════════════════════════
 CSS = """
 <style>
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+html, body, [class*="css"] { font-family:'Pretendard', sans-serif !important; }
 @keyframes fadeUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
 [data-testid="stVerticalBlockBorderWrapper"] {
-    background: rgba(15,19,32,0.6) !important; 
+    background:
+        linear-gradient(180deg,rgba(99,102,241,.05),rgba(99,102,241,0) 26%),
+        linear-gradient(160deg,rgba(15,23,42,.94),rgba(17,24,39,.84)) !important;
     backdrop-filter: blur(16px) !important;
     -webkit-backdrop-filter: blur(16px) !important;
-    border: 1px solid rgba(255,255,255,0.05) !important; 
-    border-radius: 16px !important;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.3) !important; 
+    border: 1px solid rgba(99,102,241,.16) !important;
+    border-radius: 18px !important;
+    box-shadow: 0 16px 34px rgba(2,6,23,.28) !important;
     transition: all 0.4s cubic-bezier(0.16,1,0.3,1) !important; 
     max-width: 960px; margin-left: auto; margin-right: auto; margin-bottom: 35px !important; 
     animation: fadeUp 0.6s cubic-bezier(0.16,1,0.3,1) forwards;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:hover { 
-    transform: translateY(-4px) !important; 
-    border-color: rgba(99,102,241,0.3) !important; 
-    box-shadow: 0 12px 40px rgba(0,0,0,0.5) !important; 
+    transform: translateY(-3px) !important;
+    border-color: rgba(99,102,241,0.28) !important;
+    box-shadow: 0 18px 42px rgba(2,6,23,.34) !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"] > div { padding: 28px 32px !important; }
-.s-title{ font-size:1.25rem;font-weight:800;color:#A5B4FC; margin-bottom:24px;padding-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.05); display:flex;align-items:center;gap:12px}
-.s-title .s-num{ background:rgba(99,102,241,0.15);border-radius:8px;padding:4px 10px; font-size:.85rem;color:#A5B4FC;font-weight:900}
+.s-title{ font-size:1.18rem;font-weight:800;color:#C7D2FE; margin-bottom:22px;padding-bottom:12px; border-bottom:1px solid rgba(148,163,184,.12); display:flex;align-items:center;gap:12px}
+.s-title .s-num{ background:rgba(99,102,241,.14);border:1px solid rgba(99,102,241,.26);border-radius:999px;padding:4px 10px; font-size:.8rem;color:#C7D2FE;font-weight:900}
 .m-row{display:flex;justify-content:space-between; padding:12px 0;font-size:.95rem;align-items:center; border-bottom:1px solid rgba(255,255,255,.04); transition:all 0.3s ease;}
-.m-row:hover{background:rgba(255,255,255,0.02); padding-left:8px; padding-right:8px; border-radius:6px;}
+.m-row:hover{background:rgba(255,255,255,0.025); padding-left:8px; padding-right:8px; border-radius:8px;}
 .m-row:last-child{border-bottom:none}
 .m-label{color:#94A3B8;font-weight:600}
 .m-value{color:#F8FAFC;font-weight:800;text-align:right;max-width:55%}
@@ -585,7 +589,7 @@ CSS = """
 .m-yellow{color:#F8DE9A !important;font-weight:800}
 .m-blue{color:#38BDF8 !important;font-weight:800}
 .m-big{font-size:1.15rem;font-weight:900}
-.divider{border-top:1px dashed rgba(255,255,255,0.05);margin:20px 0}
+.divider{border-top:1px dashed rgba(148,163,184,.16);margin:20px 0}
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px}
 @media(max-width:900px){
   .two-col{grid-template-columns:1fr}
@@ -593,15 +597,23 @@ CSS = """
   .header-wrap{align-items:flex-start}
   .s-title{font-size:1.05rem;flex-wrap:wrap}
 }
-.opt-box{background:rgba(255,255,255,.02);backdrop-filter:blur(8px);padding:16px;border-radius:12px;border:1px solid rgba(255,255,255,.05); transition:all .3s;}
-.opt-box:hover{background:rgba(255,255,255,.04); transform:translateY(-2px);}
+.opt-box{background:linear-gradient(160deg,rgba(15,23,42,.9),rgba(15,23,42,.72));backdrop-filter:blur(8px);padding:16px;border-radius:14px;border:1px solid rgba(148,163,184,.12); transition:all .3s;}
+.opt-box:hover{background:linear-gradient(160deg,rgba(15,23,42,.94),rgba(15,23,42,.78)); transform:translateY(-2px);}
 .opt-list{margin:8px 0 0;padding-left:18px;font-size:.9rem;color:#F8FAFC;line-height:2.0;font-weight:600}
 .m-table{width:100%;border-collapse:collapse;font-size:.9rem;margin-top:8px}
-.m-table th{color:#94A3B8;text-align:left;padding:12px 10px;border-bottom:1px solid rgba(255,255,255,0.1);font-weight:700}
+.m-table th{color:#94A3B8;text-align:left;padding:12px 10px;border-bottom:1px solid rgba(148,163,184,.16);font-weight:700}
 .m-table td{color:#E8ECF1;padding:12px 10px;border-bottom:1px solid rgba(255,255,255,.02);font-weight:600; transition:all .3s;}
-.m-table tr:hover td{background:rgba(255,255,255,0.02);}
-.header-wrap{display:flex;justify-content:space-between;align-items:flex-end; flex-wrap:wrap;gap:12px;max-width:960px;margin:0 auto 24px; animation:fadeUp 0.6s forwards;}
-.note-box{font-size:.85rem;color:#94A3B8;line-height:1.6;font-weight:600; padding:12px;background:rgba(99,102,241,.05);border-radius:8px;margin-top:12px; border-left:4px solid #6366F1}
+.m-table tr:hover td{background:rgba(255,255,255,0.025);}
+.header-wrap{display:flex;justify-content:space-between;align-items:flex-end; flex-wrap:wrap;gap:12px;max-width:960px;margin:0 auto 18px; animation:fadeUp 0.6s forwards;}
+.cd-summary{max-width:960px;margin:0 auto 18px;background:
+    linear-gradient(180deg,rgba(99,102,241,.08),rgba(99,102,241,0) 30%),
+    linear-gradient(160deg,rgba(10,14,24,.96),rgba(16,24,39,.88));
+    border:1px solid rgba(99,102,241,.22);border-radius:16px;padding:14px 16px;box-shadow:0 14px 32px rgba(2,6,23,.18)}
+.cd-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.cd-chip{background:rgba(255,255,255,.03);border:1px solid rgba(148,163,184,.12);border-radius:12px;padding:10px 12px}
+.cd-chip-label{color:#94A3B8;font-size:.7rem;font-weight:700;margin:0 0 4px}
+.cd-chip-value{color:#F8FAFC;font-size:1rem;font-weight:800;margin:0}
+.note-box{font-size:.85rem;color:#CBD5E1;line-height:1.6;font-weight:600; padding:12px;background:linear-gradient(160deg,rgba(15,23,42,.92),rgba(15,23,42,.74));border-radius:12px;margin-top:12px; border:1px solid rgba(99,102,241,.14); border-left:4px solid #6366F1}
 </style>
 """
 
@@ -673,6 +685,24 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
         """
         <div class="note-box" style="max-width:960px;margin:0 auto 18px;">
             데이터는 Yahoo Finance 기반이며 일부 항목은 추정치 또는 지연 데이터일 수 있습니다.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    summary_items = [
+        ("Market Cap", _fmt_num(info.get('marketCap'))),
+        ("Trailing P/E", f"{info.get('trailingPE'):.2f}" if isinstance(info.get('trailingPE'), (int, float)) else "N/A"),
+        ("Beta", f"{info.get('beta'):.2f}" if isinstance(info.get('beta'), (int, float)) else "N/A"),
+        ("Dividend", _fmt_pct(info.get('dividendYield'))),
+    ]
+    summary_html = "".join([
+        f"<div class='cd-chip'><p class='cd-chip-label'>{label}</p><p class='cd-chip-value'>{value}</p></div>"
+        for label, value in summary_items
+    ])
+    st.markdown(
+        f"""
+        <div class="cd-summary">
+            <div class="cd-summary-grid">{summary_html}</div>
         </div>
         """,
         unsafe_allow_html=True,
