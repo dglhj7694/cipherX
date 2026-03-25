@@ -195,5 +195,22 @@ SECTOR_GROUPS = {
         'PG', 'KO', 'PEP', 'COST', 'WM', 'JNJ', 'ABV',
         # [대형 저변동성/배당]
         'MSFT', 'BRK.B', 'LIN', 'RTX', 'MMC'
+    ],
+    '⛓️엔비디아블록체인': [
+        # [AI 인프라 / 에너지 / 클라우드]
+        'SMR', 'CEG', 'VRT', 'EQIX',
+        # ※ 비상장/관련: TerraPower, CoreWeave, Nebius, Crusoe
+        
+        # [반도체 & 광통신 기술]
+        'INTC', 'TSM', 'COHR', 'LITE', 'ARM', 'ASML',
+        # ※ 비상장: Groq
+        
+        # [AI 모델 & 플랫폼 파트너]
+        'MSFT', 'GOOGL', 'AMZN', 'META',
+        # ※ 비상장: OpenAI, Anthropic, xAI, Mistral AI
+        
+        # [양자 / 로봇 / 차세대 App]
+        'IONQ', 'TSLA', 'PATH', 'RXRX', 'SDGR', 'PLTR',
+        # ※ 비상장: Figure AI, Wayve, Perplexity, Runway
     ],    
 }
