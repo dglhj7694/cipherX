@@ -469,3 +469,30 @@ def render_analysis(msg, key_prefix="analysis"):
             if m:render_combined_scans(m)
         with t4:
             if m:render_company_details(m['ticker'], key_prefix=f"{key_prefix}_company")
+
+# Re-declare with normalized labels/caption so the active definition matches the current chart features.
+def render_analysis(msg, key_prefix="analysis"):
+    m,fj=msg.get('meta'),msg.get('fig_json')
+    if m:
+        render_price_header(m, key_prefix=key_prefix)
+    if m or fj:
+        t0,t1,t2,t3,t4=st.tabs(["차트","판단/리스크","10-Layer","콤보스캔","기업정보"])
+        with t0:
+            if fj:
+                fig=go.Figure(json.loads(fj))
+                st.plotly_chart(fig,use_container_width=True,theme=None,config={'displaylogo':False,'modeBarButtonsToRemove':['lasso2d','select2d']}, key=f"{key_prefix}_price_chart")
+                st.caption("*캔들 툴팁, 우측 매물대(VP), 자동 추세선/평행채널, 패턴 오버레이를 제공합니다. 모바일에서는 판단 카드 확인 후 차트를 열면 더 읽기 쉽습니다.")
+        with t1:
+            if m:
+                render_judgment_card(m)
+                st.markdown("#### 5-Committee Ensemble")
+                render_committee_panel(m)
+                st.markdown("---")
+                render_leading_lagging(m)
+                render_indicator_help()
+        with t2:
+            if m:render_10layer_bars(m, html_key=f"{key_prefix}_10layer")
+        with t3:
+            if m:render_combined_scans(m)
+        with t4:
+            if m:render_company_details(m['ticker'], key_prefix=f"{key_prefix}_company")
