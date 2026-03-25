@@ -6,7 +6,6 @@
 import streamlit as st, google.generativeai as genai
 import time, math
 from datetime import datetime
-from st_copy_to_clipboard import st_copy_to_clipboard
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from sectors import SECTOR_GROUPS
 from config import GEMINI_API_KEY, COMBINED_SCAN_REGISTRY, CTX_KOR
@@ -666,7 +665,7 @@ else:
         av = "✨" if msg["role"] == "assistant" else "🧑‍💻"
         with st.chat_message(msg["role"], avatar=av):
             if msg.get("type") == "analysis":
-                render_analysis(msg)
+                render_analysis(msg, key_prefix=f"analysis_{i}_{msg.get('ticker', 'na')}")
             elif msg.get("type") == "report":
                 with st.expander(f"{msg.get('ticker', '')} AI 리포트", expanded=True):
                     st.markdown(msg["content"])
@@ -681,14 +680,11 @@ else:
                 st.markdown(msg.get("content", ""))
             if msg.get("prompt") and msg.get("type") == "analysis":
                 with st.expander(f"{msg.get('ticker', '')} 프롬프트"):
-                    st.markdown("<div class='prompt-caption'>이 종목 분석에 실제로 사용된 AI 프롬프트입니다.</div>", unsafe_allow_html=True)
-                    st.code(msg["prompt"], language="markdown")
-                    st_copy_to_clipboard(
-                        msg["prompt"],
-                        before_copy_label="프롬프트 복사",
-                        after_copy_label="복사됨",
-                        key=f"copy_prompt_{msg.get('ticker', 'na')}_{i}",
+                    st.markdown(
+                        "<div class='prompt-caption'>이 종목 분석에 실제로 사용된 AI 프롬프트입니다. 코드 블록 우측 상단 복사 아이콘을 사용하세요.</div>",
+                        unsafe_allow_html=True,
                     )
+                    st.code(msg["prompt"], language="markdown")
 
     def _run_ai():
         tp = st.session_state.pending_ai_ticker

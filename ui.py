@@ -35,7 +35,7 @@ def _narrative_text(m):
         return "가격이 밴드 상단에 위치한 상태에서 모멘텀이 둔화되어 단기 조정 리스크가 커졌습니다."
     return "추세·모멘텀·자금흐름이 뚜렷하게 한쪽으로 쏠리진 않아, 확인형 대응이 유리합니다."
 
-def _render_ensemble_gauge(es):
+def _render_ensemble_gauge(es, chart_key=None):
     gauge=go.Figure(go.Indicator(
         mode="gauge+number",
         value=es,
@@ -54,9 +54,9 @@ def _render_ensemble_gauge(es):
         }
     ))
     gauge.update_layout(height=180,margin=dict(l=6,r=6,t=8,b=8),paper_bgcolor='rgba(0,0,0,0)',font=dict(color='#E2E8F0'))
-    st.plotly_chart(gauge,use_container_width=True,theme=None,config={'displayModeBar':False})
+    st.plotly_chart(gauge,use_container_width=True,theme=None,config={'displayModeBar':False}, key=chart_key)
 
-def render_price_header(m):
+def render_price_header(m, key_prefix="analysis"):
     chg = m['price_change']
     cp = m['price_change_pct']
     cc = 'price-change-up' if chg >= 0 else 'price-change-down'
@@ -142,7 +142,7 @@ def render_price_header(m):
         unsafe_allow_html=True,
     )
 
-    _render_ensemble_gauge(es)
+    _render_ensemble_gauge(es, chart_key=f"{key_prefix}_ensemble_gauge")
 
 def _risk_size_hint(atr_pct):
     if atr_pct >= 6:
@@ -263,7 +263,7 @@ def render_committee_panel(m):
     syn=m.get('reversal_synergy',0)
     if abs(syn)>5:st.info(f"**[SYNERGY]** {syn:+.1f}")
 
-def render_10layer_bars(m):
+def render_10layer_bars(m, html_key="analysis"):
     layer_names = ['Trend', 'Momentum', 'Candle', 'BB', 'Volume', 'MF', 'Pattern', 'Combined', 'Leading', 'Lagging']
     buy_layers = m.get('buy_layers', {})
     sell_layers = m.get('sell_layers', {})
@@ -311,7 +311,7 @@ def render_10layer_bars(m):
         "</div>"
     )
     panel_h=max(430,120+len(layer_names)*44)
-    html_doc=f"""<!doctype html><html><head><meta charset='utf-8'></head><body style='margin:0;background:transparent;color:#E2E8F0;font-family:Pretendard,system-ui,sans-serif'>{panel_html}</body></html>"""
+    html_doc=f"""<!doctype html><html><head><meta charset='utf-8'></head><body style='margin:0;background:transparent;color:#E2E8F0;font-family:Pretendard,system-ui,sans-serif'><!-- {html_key} -->{panel_html}</body></html>"""
     components.html(html_doc,height=panel_h,scrolling=False)
 def render_leading_lagging(m):
     lv=m['leading_verdict'];lgv=m['lagging_verdict'];ac=m['composite_accel']
@@ -417,13 +417,13 @@ def render_indicator_help():
             "- `10-Layer`: 추세, 모멘텀, 구조, 자금 등 레이어별 점수"
         )
 
-def render_analysis(msg):
+def render_analysis(msg, key_prefix="analysis"):
     m,fj=msg.get('meta'),msg.get('fig_json')
-    if m:render_price_header(m)
+    if m:render_price_header(m, key_prefix=key_prefix)
     if m or fj:
         t0,t1,t2,t3,t4=st.tabs(["차트","종합판단","10-Layer","콤보스캔","기업정보"])
         with t0:
-            if fj:fig=go.Figure(json.loads(fj));st.plotly_chart(fig,use_container_width=True,theme=None,config={'displaylogo':False,'modeBarButtonsToRemove':['lasso2d','select2d']});st.caption("*캔들 오버 시 툴팁, 강/약 시그널 캔들 하이라이트, 우측 매물대(VP) 오버레이를 함께 제공합니다.")
+            if fj:fig=go.Figure(json.loads(fj));st.plotly_chart(fig,use_container_width=True,theme=None,config={'displaylogo':False,'modeBarButtonsToRemove':['lasso2d','select2d']}, key=f"{key_prefix}_price_chart");st.caption("*캔들 오버 시 툴팁, 강/약 시그널 캔들 하이라이트, 우측 매물대(VP) 오버레이를 함께 제공합니다.")
         with t1:
             if m:
                 render_judgment_card(m)
@@ -433,8 +433,8 @@ def render_analysis(msg):
                 render_leading_lagging(m)
                 render_indicator_help()
         with t2:
-            if m:render_10layer_bars(m)
+            if m:render_10layer_bars(m, html_key=f"{key_prefix}_10layer")
         with t3:
             if m:render_combined_scans(m)
         with t4:
-            if m:render_company_details(m['ticker'])
+            if m:render_company_details(m['ticker'], key_prefix=f"{key_prefix}_company")

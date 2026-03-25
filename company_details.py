@@ -604,7 +604,7 @@ CSS = """
 # 🏗️ 메인 렌더링
 # ═══════════════════════════════════════════════════════════════
 
-def render_company_details(ticker_str: str):
+def render_company_details(ticker_str: str, key_prefix: str = "company"):
     st.markdown(CSS, unsafe_allow_html=True)
 
     with st.spinner(f" {ticker_str}  분석 중 …"):
@@ -824,7 +824,7 @@ def render_company_details(ticker_str: str):
         with col1:
             st.markdown(html_s3_1, unsafe_allow_html=True)
         with col2:
-            if fig3: st.plotly_chart(fig3, use_container_width=True, config={'displayModeBar': False})
+            if fig3: st.plotly_chart(fig3, use_container_width=True, config={'displayModeBar': False}, key=f"{key_prefix}_fig3")
         st.markdown(_verdict_badge(v3_c, "", v3_t), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
@@ -975,7 +975,7 @@ def render_company_details(ticker_str: str):
         with col1:
             st.markdown(html_s5_1, unsafe_allow_html=True)
         with col2:
-            if fig5: st.plotly_chart(fig5, use_container_width=True, config={'displayModeBar': False})
+            if fig5: st.plotly_chart(fig5, use_container_width=True, config={'displayModeBar': False}, key=f"{key_prefix}_fig5")
             else: st.markdown("<div class='note-box'>※ 자산/부채 데이터를 모두 불러올 수 없어 차트가 생략되었습니다.</div>", unsafe_allow_html=True)
         st.markdown(_verdict_badge(v5_c, "", v5_t), unsafe_allow_html=True)
 
@@ -1132,7 +1132,7 @@ def render_company_details(ticker_str: str):
         with col1:
             st.markdown(html_s9_1, unsafe_allow_html=True)
         with col2:
-            if fig9: st.plotly_chart(fig9, use_container_width=True, config={'displayModeBar': False})
+            if fig9: st.plotly_chart(fig9, use_container_width=True, config={'displayModeBar': False}, key=f"{key_prefix}_fig9")
         st.markdown(_verdict_badge(cc, "", f"애널리스트 {n_ana}명 {rk} (목표가 {up_str})"), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
@@ -1165,7 +1165,7 @@ def render_company_details(ticker_str: str):
         with col1:
             st.markdown(html_s10_1, unsafe_allow_html=True)
         with col2:
-            if fig10: st.plotly_chart(fig10, use_container_width=True, config={'displayModeBar': False})
+            if fig10: st.plotly_chart(fig10, use_container_width=True, config={'displayModeBar': False}, key=f"{key_prefix}_fig10")
         st.markdown(_verdict_badge(v10_c, "", v10_t), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
@@ -1245,7 +1245,7 @@ def render_company_details(ticker_str: str):
         with col1:
             st.markdown(html_s12_1, unsafe_allow_html=True)
         with col2:
-            if fig12: st.plotly_chart(fig12, use_container_width=True, config={'displayModeBar': False})
+            if fig12: st.plotly_chart(fig12, use_container_width=True, config={'displayModeBar': False}, key=f"{key_prefix}_fig12")
         st.markdown(_verdict_badge(sc, "", f"공매도 {_fmt_pct(sp)} — {sl.replace('🔴', '').replace('🟡', '').replace('🟢', '').strip()}"), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
