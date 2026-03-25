@@ -637,6 +637,75 @@ def _sector_pe_live(sector):
 # ═══════════════════════════════════════════════════════════════
 # 🎨 CSS
 # ═══════════════════════════════════════════════════════════════
+def _is_rate_limited_error(err):
+    msg = str(err).lower()
+    return "too many requests" in msg or "rate limit" in msg or "429" in msg
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _fetch_company_bundle(ticker_str):
+    result = {
+        "info": {},
+        "fin": pd.DataFrame(),
+        "q_fin": pd.DataFrame(),
+        "bs": pd.DataFrame(),
+        "cf": pd.DataFrame(),
+        "error": None,
+        "rate_limited": False,
+    }
+    try:
+        tkr = yf.Ticker(ticker_str)
+        result["info"] = tkr.info or {}
+        try:
+            fin = tkr.financials if not tkr.financials.empty else tkr.income_stmt
+            result["fin"] = fin if fin is not None else pd.DataFrame()
+        except Exception:
+            pass
+        try:
+            q_fin = tkr.quarterly_financials if not tkr.quarterly_financials.empty else tkr.quarterly_income_stmt
+            result["q_fin"] = q_fin if q_fin is not None else pd.DataFrame()
+        except Exception:
+            pass
+        try:
+            bs = getattr(tkr, 'balance_sheet', None)
+            if bs is None or bs.empty: bs = getattr(tkr, 'balancesheet', None)
+            if bs is None or bs.empty: bs = tkr.get_balance_sheet(pretty=True)
+            if bs is None or bs.empty: bs = tkr.get_balance_sheet(pretty=False)
+            result["bs"] = bs if bs is not None else pd.DataFrame()
+        except Exception:
+            pass
+        try:
+            cf = tkr.cashflow
+            result["cf"] = cf if cf is not None else pd.DataFrame()
+        except Exception:
+            pass
+    except Exception as e:
+        result["error"] = str(e)
+        result["rate_limited"] = _is_rate_limited_error(e)
+    return result
+
+@st.cache_data(ttl=900, show_spinner=False)
+def _fetch_option_snapshot(ticker_str):
+    try:
+        return {"data": _max_pain(yf.Ticker(ticker_str)), "error": None, "rate_limited": False}
+    except Exception as e:
+        return {"data": (None, None, None, None, False), "error": str(e), "rate_limited": _is_rate_limited_error(e)}
+
+@st.cache_data(ttl=900, show_spinner=False)
+def _fetch_company_news_items(ticker_str):
+    try:
+        news_list = yf.Ticker(ticker_str).news
+        items = []
+        for n in (news_list or [])[:8]:
+            title = n.get('title') or n.get('content', {}).get('title', '제목 없음')
+            link = n.get('link') or n.get('content', {}).get('canonicalUrl', {}).get('url', '#')
+            pub_name = n.get('publisher') or n.get('content', {}).get('provider', {}).get('displayName', '')
+            ts = n.get('providerPublishTime', 0)
+            dt_str = (n.get('content', {}).get('pubDate', '') or '')[:16] if not ts else datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M')
+            items.append({"title": title, "link": link, "publisher": pub_name, "date": dt_str})
+        return {"items": items, "error": None, "rate_limited": False}
+    except Exception as e:
+        return {"items": [], "error": str(e), "rate_limited": _is_rate_limited_error(e)}
+
 CSS = """
 <style>
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -783,28 +852,21 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     st.markdown(CSS, unsafe_allow_html=True)
 
     with st.spinner(f"{ticker_str} 기업 정보를 정리하고 있습니다..."):
-        try:
-            tkr = yf.Ticker(ticker_str)
-            info = tkr.info or {}
-        except Exception as e:
+        bundle = _fetch_company_bundle(ticker_str)
+        info = bundle.get("info") or {}
+        if False and bundle.get("rate_limited"):
             st.error(f"❌ 데이터를 불러올 수 없습니다 — {e}"); return
+        if bundle.get("rate_limited"):
+            st.warning("Yahoo 요청이 잠시 제한되었습니다. 잠시 후 다시 시도하거나 뉴스 같은 부가 데이터를 나중에 불러와 주세요."); return
+        if bundle.get("error") and not info:
+            st.error(f"데이터를 불러오지 못했습니다: {bundle.get('error')}"); return
         if not info or 'shortName' not in info:
             st.error("❌ 유효하지 않은 종목이거나 데이터가 없습니다."); return
 
-        try: fin = tkr.financials if not tkr.financials.empty else tkr.income_stmt
-        except Exception: fin = None
-        try: q_fin = tkr.quarterly_financials if not tkr.quarterly_financials.empty else tkr.quarterly_income_stmt
-        except Exception: q_fin = None
-        
-        try:
-            bs = getattr(tkr, 'balance_sheet', None)
-            if bs is None or bs.empty: bs = getattr(tkr, 'balancesheet', None)
-            if bs is None or bs.empty: bs = tkr.get_balance_sheet(pretty=True)
-            if bs is None or bs.empty: bs = tkr.get_balance_sheet(pretty=False)
-        except Exception: bs = None
-            
-        try: cf = tkr.cashflow
-        except Exception: cf = None
+        fin = bundle.get("fin")
+        q_fin = bundle.get("q_fin")
+        bs = bundle.get("bs")
+        cf = bundle.get("cf")
 
         sector, industry = info.get('sector', 'N/A'), info.get('industry', 'N/A')
         price = info.get('currentPrice') or info.get('regularMarketPrice') or 0
@@ -1275,6 +1337,11 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     v5_pill_cls = "pill-green" if v5_c == "green" else ("pill-amber" if v5_c == "yellow" else "pill-red")
     dl_pill_cls = "pill-green" if dl_c == "green" else ("pill-amber" if dl_c == "yellow" else "pill-red")
 
+    if False and option_snapshot.get("rate_limited"):
+        vol_warning += "<div style='color:#F8DE9A; font-size:.85rem; margin-top:8px; font-weight:700;'>옵션 데이터 요청이 일시 제한되어 일부 값이 비어 있을 수 있습니다.</div>"
+
+    if False and option_snapshot.get("rate_limited"):
+        vol_warning += "<div style='color:#F8DE9A; font-size:.85rem; margin-top:8px; font-weight:700;'>옵션 데이터 요청이 일시 제한되어 일부 값이 비어 있을 수 있습니다.</div>"
     with st.container(border=True):
         col1, col2 = st.columns([1.1, 1])
         debt_ratio_text = f"{dte:.1f}%" if isinstance(dte, (int, float)) else "N/A"
@@ -1533,7 +1600,8 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     # ═══════════════════════════════════════════════════
     # 1️⃣01 옵션 / Max Pain 
     # ═══════════════════════════════════════════════════
-    exp, mp, tc, tp, is_vol_weight = _max_pain(tkr)
+    option_snapshot = _fetch_option_snapshot(ticker_str)
+    exp, mp, tc, tp, is_vol_weight = option_snapshot.get("data", (None, None, None, None, False))
 
     mp_note, mp_c = "", "gray"
     if mp and price and price > 0:
@@ -1614,15 +1682,15 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     # 📰 13. 최신 뉴스 
     # ═══════════════════════════════════════════════════
     try:
-        news_list = tkr.news
-        if news_list and len(news_list) > 0:
+        news_payload = _fetch_company_news_items(ticker_str)
+        if news_payload.get("items"):
             items = ""
-            for n in news_list[:8]:
+            for n in news_payload["items"]:
                 title    = n.get('title') or n.get('content', {}).get('title', '제목 없음')
                 link     = n.get('link') or n.get('content', {}).get('canonicalUrl', {}).get('url', '#')
                 pub_name = n.get('publisher') or n.get('content', {}).get('provider', {}).get('displayName', '')
-                ts       = n.get('providerPublishTime', 0)
-                if not ts: dt_str = (n.get('content', {}).get('pubDate', '') or '')[:16]
+                ts       = n.get('providerPublishTime', 0) if 'providerPublishTime' in n else 0
+                if not ts: dt_str = n.get('date', (n.get('content', {}).get('pubDate', '') or '')[:16])
                 else: dt_str = datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M')
                 items += f'<div class="n-item"><a href="{_esc(link)}" target="_blank" class="n-title">{_esc(title)}</a><div class="n-meta">{_esc(pub_name)} · {dt_str}</div></div>'
             with st.container(border=True):
