@@ -672,10 +672,7 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     st.markdown(
         """
         <div class="note-box" style="max-width:960px;margin:0 auto 18px;">
-            <b>이 화면 읽는 법</b><br>
-            1. 먼저 성장 사이클과 수익성 흐름으로 기업 체력을 확인합니다.<br>
-            2. 그다음 밸류에이션, 부채, 옵션/공매도로 리스크와 기대를 함께 봅니다.<br>
-            3. 숫자는 Yahoo Finance 기반이며 일부 항목은 추정치 또는 지연 데이터일 수 있습니다.
+            데이터는 Yahoo Finance 기반이며 일부 항목은 추정치 또는 지연 데이터일 수 있습니다.
         </div>
         """,
         unsafe_allow_html=True,
