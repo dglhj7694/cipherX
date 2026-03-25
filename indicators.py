@@ -11,6 +11,9 @@ def compute_stoch_rsi(c,rl=14,sl=14,ks=3,ds=3):r=compute_rsi(c,rl);mn,mx=r.rolli
 def compute_tr(h,l,c):pc=c.shift(1);return pd.concat([h-l,(h-pc).abs(),(l-pc).abs()],axis=1).max(axis=1)
 def compute_adx(h,l,c,p=14):tr=compute_tr(h,l,c);ph,pl=h.shift(1),l.shift(1);plus_dm=pd.Series(np.where((h-ph)>(pl-l),np.maximum(h-ph,0),0),index=h.index,dtype=float);minus_dm=pd.Series(np.where((pl-l)>(h-ph),np.maximum(pl-l,0),0),index=h.index,dtype=float);a=tr.ewm(alpha=1/p,min_periods=p).mean();pdi=100*plus_dm.ewm(alpha=1/p,min_periods=p).mean()/(a+1e-10);mdi=100*minus_dm.ewm(alpha=1/p,min_periods=p).mean()/(a+1e-10);dx=100*(pdi-mdi).abs()/(pdi+mdi+1e-10);return dx.ewm(alpha=1/p,min_periods=p).mean(),pdi,mdi
 def compute_obv(c,v):return (v*np.sign(c.diff()).fillna(0)).cumsum()
+def compute_obv_slope(obv,v,p=5):
+    scale=v.rolling(p*3,min_periods=p).mean()*max(p,1)
+    return (obv-obv.shift(p))/(scale+1e-10)
 def compute_macd(c,f=12,s=26,sig=9):ml=c.ewm(span=f,adjust=False).mean()-c.ewm(span=s,adjust=False).mean();sl=ml.ewm(span=sig,adjust=False).mean();return ml,sl,ml-sl
 def compute_ichimoku(h,l,c,tp=9,kp=26,sp=52,d=26):tk=(h.rolling(tp).max()+l.rolling(tp).min())/2;kj=(h.rolling(kp).max()+l.rolling(kp).min())/2;sa=((tk+kj)/2).shift(d);sb=((h.rolling(sp).max()+l.rolling(sp).min())/2).shift(d);return tk,kj,sa,sb
 def compute_cmf(h,l,c,v,p=20):m=((c-l)-(h-c))/(h-l+1e-10);return (m*v).rolling(p).sum()/(v.rolling(p).sum()+1e-10)
@@ -73,13 +76,15 @@ def compute_stochastic_slow(h,l,c,k_period=14,smooth_k=3,d_period=3):ll=l.rollin
 def compute_squeeze_mom_enh(c,h,l,bbu,bbl,kcu,kcl,kc_mid,period=20):sq=(bbu<kcu)&(bbl>kcl);mid_hl=(h.rolling(period).max()+l.rolling(period).min())/2;mom=c-(mid_hl+kc_mid)/2;ms_=mom.ewm(span=period,adjust=False).mean();return {'squeeze_on':sq,'momentum':ms_,'mom_rising':ms_>ms_.shift(1),'mom_positive':ms_>0,'mom_cross_up':(ms_>0)&(ms_.shift(1)<=0),'mom_cross_down':(ms_<0)&(ms_.shift(1)>=0)}
 
 def compute_indicators(df):
-    c,h,l,v=df['Close'],df['High'],df['Low'],df['Volume']
+    o,c,h,l,v=df['Open'],df['Close'],df['High'],df['Low'],df['Volume']
     for ma in [5,10,20,50,200]:df[f'MA{ma}']=c.rolling(ma).mean()
     df['EMA8']=c.ewm(span=8,adjust=False).mean();df['EMA21']=c.ewm(span=21,adjust=False).mean()
     df['BB_Mid']=df['MA20'];s20=c.rolling(20).std();df['BB_Up'],df['BB_Low']=df['BB_Mid']+s20*2,df['BB_Mid']-s20*2
     df['BB_Width']=(df['BB_Up']-df['BB_Low'])/(df['BB_Mid']+1e-10);df['Percent_B']=(c-df['BB_Low'])/(df['BB_Up']-df['BB_Low']+1e-10)
     tr=compute_tr(h,l,c);df['ATR']=tr.rolling(14).mean();df['SuperTrend'],df['ST_Direction']=compute_supertrend(h,l,c,tr)
     ak=tr.rolling(10).mean();mk=c.ewm(span=20,adjust=False).mean();df['KC_Upper']=mk+ak*1.5;df['KC_Mid']=mk;df['KC_Lower']=mk-ak*1.5
+    vol20=v.rolling(20,min_periods=5).mean();vol50=v.rolling(50,min_periods=10).mean()
+    df['Volume_Ratio_20']=v/(vol20+1e-10);df['Volume_Ratio_50']=v/(vol50+1e-10)
     w1,w2,wu,wd=compute_wavetrend(h,l,c);df['WT1'],df['WT2'],df['WT_Up'],df['WT_Down']=w1,w2,wu,wd
     df['RSI']=compute_rsi(c,14);df['StochK'],df['StochD']=compute_stoch_rsi(c);df['MFI']=compute_mfi(h,l,c,v,14).fillna(50)
     df['RSI_MFI']=compute_rsi_mfi(h,l,c,v,60);vw=(c*v).rolling(20).sum()/(v.rolling(20).sum()+1e-10);df['VWAP_Osc']=((c-vw)/(vw+1e-10))*100
@@ -87,10 +92,30 @@ def compute_indicators(df):
     df['MACD_Line'],df['MACD_Signal'],df['MACD_Hist']=compute_macd(c)
     tk,kj,sa,sb=compute_ichimoku(h,l,c);df['Ichimoku_Tenkan']=tk;df['Ichimoku_Kijun']=kj;df['Ichimoku_SenkouA']=sa;df['Ichimoku_SenkouB']=sb
     df['CMF']=compute_cmf(h,l,c,v,20)
+    df['OBV_Slope']=compute_obv_slope(df['OBV'],v,5);df['Price_Slope_5']=c.pct_change(5)
+    df['Low_Volume_Caution']=df['Volume_Ratio_20']<0.7
+    df['Smart_Money_Bearish_Div']=(df['Price_Slope_5']>0)&((df['OBV_Slope']<0)|(df['CMF']<0)|(df['Volume_Ratio_20']<0.7))
+    df['Smart_Money_Bullish_Div']=(df['Price_Slope_5']<0)&((df['OBV_Slope']>0)|(df['CMF']>0))
+    df['MA20_ATR_Gap']=(c-df['MA20'])/(df['ATR']+1e-10)
+    df['Blowoff_Top_Hard']=(df['MA20_ATR_Gap']>=3)&(df['Volume_Ratio_20']>=2)&(c<o)&((c>df['BB_Up'])|(df['WT1']>60))
+    df['Washout_Bottom_Hard']=(df['MA20_ATR_Gap']<=-3)&(df['Volume_Ratio_20']>=2)&(c>o)&((c<df['BB_Low'])|(df['WT1']<-60))
     rv=df['RSI']-df['RSI'].shift(3);df['RSI_Accel']=rv-rv.shift(3);wv=df['WT1']-df['WT1'].shift(3);df['WT_Accel']=wv-wv.shift(3);df['MACD_Accel']=df['MACD_Hist']-df['MACD_Hist'].shift(3)
     rn=df['RSI_Accel']/(df['RSI_Accel'].rolling(50,min_periods=10).std()+1e-10);wn=df['WT_Accel']/(df['WT_Accel'].rolling(50,min_periods=10).std()+1e-10);mn=df['MACD_Accel']/(df['MACD_Accel'].rolling(50,min_periods=10).std()+1e-10)
     df['Composite_Accel']=(rn+wn+mn)/3;wg=df['WT1']-df['WT2'];df['WT_Gap']=wg;df['WT_Gap_Abs']=wg.abs();df['WT_Conv_Speed']=df['WT_Gap_Abs'].shift(3)-df['WT_Gap_Abs']
     df['VP_POC'],df['VP_VAH'],df['VP_VAL']=compute_vp(h,l,c,v)
+    risk_floor=(df['ATR'].fillna(c*0.01)*0.75).clip(lower=c*0.003)
+    long_support=df['VP_POC'].where(df['VP_POC']<c,df['VP_VAL'])
+    long_support=long_support.where(long_support<c,c-risk_floor)
+    long_resist=df['VP_VAH'].where(df['VP_VAH']>c,df['VP_POC'])
+    long_resist=long_resist.where(long_resist>c,c+risk_floor)
+    short_support=df['VP_VAL'].where(df['VP_VAL']<c,df['VP_POC'])
+    short_support=short_support.where(short_support<c,c-risk_floor)
+    short_resist=df['VP_POC'].where(df['VP_POC']>c,df['VP_VAH'])
+    short_resist=short_resist.where(short_resist>c,c+risk_floor)
+    long_reward=(long_resist-c).clip(lower=0);long_risk=(c-long_support).where((c-long_support)>risk_floor,risk_floor)
+    short_reward=(c-short_support).clip(lower=0);short_risk=(short_resist-c).where((short_resist-c)>risk_floor,risk_floor)
+    df['VP_Long_RR']=long_reward/(long_risk+1e-10);df['VP_Short_RR']=short_reward/(short_risk+1e-10)
+    df['Upside_Space_Score']=np.clip((df['VP_Long_RR']-1.0)*20,-20,12)
     try:
         spy=fetch_spy()
         if not spy.empty:sc_=c.copy();spc=spy['Close'].reindex(sc_.index,method='ffill');sr=sc_.pct_change(20).fillna(0);spr=spc.pct_change(20).fillna(0);df['Stock_Return']=sr;df['SPY_Return']=spr;df['RS_Ratio']=((1+sr)/(1+spr+1e-10)).rolling(10,min_periods=5).mean()

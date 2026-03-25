@@ -561,13 +561,16 @@ def _committee_momentum(df,N):
     return ns,pd.Series(conv,index=idx)
 
 def _committee_money(df,N):
-    idx=df.index;C=df['Close'];score=pd.Series(0.,index=idx);cmf=N('CMF');obv=N('OBV');obv_ma=obv.rolling(20,min_periods=10).mean()
+    idx=df.index;C=df['Close'];score=pd.Series(0.,index=idx);cmf=N('CMF');obv=N('OBV');obv_ma=obv.rolling(20,min_periods=10).mean();F=lambda c:df.get(c,pd.Series(False,index=idx)).fillna(False)
     score+=np.clip(cmf*100,-30,30);obv_r=(obv-obv_ma)/(obv_ma.abs()+1e-10)*100;score+=np.clip(obv_r*.3,-20,20)
     ou=_vs(obv>obv.shift(1));od=_vs(obv<obv.shift(1));score+=np.where(ou>=5,10,np.where(od>=5,-10,0))
     score+=(N('MFI')-50)*.5+np.clip(N('RSI_MFI')*.8,-15,15)
     vol=df['Volume'];va=vol.rolling(50,min_periods=10).mean();vr=vol/(va+1e-10);pd_=np.where(C>C.shift(1),1,np.where(C<C.shift(1),-1,0))
     score += np.clip(vr * 7.5, 0, 20) * pd_
-    ns=(score/JT.MONEY_NORM*100).clip(-100,100);vc=np.clip(vr.values*30,10,60);cc=np.clip(np.abs(cmf.values)*100,0,30);conv=np.clip(vc+cc,10,95)
+    score+=np.clip(N('OBV_Slope')*12,-15,15)
+    score+=np.where(F('Smart_Money_Bullish_Div'),12,0)-np.where(F('Smart_Money_Bearish_Div'),16,0)
+    score-=np.where((N('Price_Slope_5')>0)&F('Low_Volume_Caution'),8,0)
+    ns=(score/JT.MONEY_NORM*100).clip(-100,100);vc=np.clip(vr.values*30,10,60);cc=np.clip(np.abs(cmf.values)*100,0,30);divc=np.where(F('Smart_Money_Bullish_Div')|F('Smart_Money_Bearish_Div'),10,0);conv=np.clip(vc+cc+divc,10,95)
     return ns,pd.Series(conv,index=idx)
 
 def _committee_structure(df,N):
@@ -584,8 +587,11 @@ def _committee_structure(df,N):
     cb=F('Morning_Star').astype(float)*20+F('Bullish_Engulfing').astype(float)*15+F('Hammer').astype(float)*12+F('Outside_Bullish').astype(float)*10+F('Doji_Bullish').astype(float)*5+F('Three_Bar_Reversal_Buy').astype(float)*15
     cs=F('Evening_Star').astype(float)*20+F('Bearish_Engulfing').astype(float)*15+F('Shooting_Star').astype(float)*12+F('Outside_Bearish').astype(float)*10+F('Doji_Bearish').astype(float)*5+F('Three_Bar_Reversal_Sell').astype(float)*15
     score+=cb-cs+np.where(F('BB_Squeeze_End_Bull'),15,np.where(F('BB_Squeeze_End_Bear'),-15,0))
+    score+=N('Upside_Space_Score')
+    score+=np.clip((N('VP_Long_RR')-JT.VP_RR_FLOOR)*12,-18,10)
+    score-=np.clip((N('VP_Short_RR')-JT.VP_RR_FLOOR)*12,0,12)
     ns=(score/JT.STRUCTURE_NORM*100).clip(-100,100)
-    ne=(pb<.2).astype(float)+(pb>.8).astype(float)+(cb>0).astype(float)+(cs>0).astype(float)+(((C-val_).abs()/(C+1e-10)<.03)|((vah-C).abs()/(C+1e-10)<.03)).astype(float)+F('BB_Squeeze_End_Bull').astype(float)+F('BB_Squeeze_End_Bear').astype(float)
+    ne=(pb<.2).astype(float)+(pb>.8).astype(float)+(cb>0).astype(float)+(cs>0).astype(float)+(((C-val_).abs()/(C+1e-10)<.03)|((vah-C).abs()/(C+1e-10)<.03)).astype(float)+F('BB_Squeeze_End_Bull').astype(float)+F('BB_Squeeze_End_Bear').astype(float)+(N('VP_Long_RR')>JT.VP_RR_STRONG).astype(float)+(N('VP_Short_RR')>JT.VP_RR_STRONG).astype(float)
     conv=np.clip(ne.values*20+15,10,90)
     return ns,pd.Series(conv,index=idx)
 
@@ -598,20 +604,43 @@ def _committee_leading(df,N):
     spb=N('Setup_Pressure_Buy');sps=N('Setup_Pressure_Sell')
     score += np.clip(spb * 2, 0, 20) - np.clip(sps * 2, 0, 20)
     F=lambda c:df.get(c,pd.Series(False,index=idx)).fillna(False)
+    ma_gap=N('MA20_ATR_Gap');score-=np.clip((ma_gap-1.5)*8,0,20);score+=np.clip((-ma_gap-1.5)*8,0,20)
     for cn,cfg in COMBINED_SCAN_REGISTRY.items():
         if cn not in df.columns:continue
         pts={1:15,2:8,3:3}.get(cfg['tier'],3)
         if cfg['dir']=='buy':score+=np.where(F(cn),pts,0)
         elif cfg['dir']=='sell':score-=np.where(F(cn),pts,0)
     score+=np.where(F('VuManChu_Bull'),20,0)-np.where(F('VuManChu_Bear'),20,0)
+    score+=np.where(F('Washout_Bottom_Hard'),35,0)-np.where(F('Blowoff_Top_Hard'),45,0)
     ns=(score/JT.LEADING_NORM*100).clip(-100,100)
     ag=(ut==1).astype(float)+hma.astype(float)+(sq>0).astype(float)+(ca>0).astype(float);dg=(ut==-1).astype(float)+(~hma).astype(float)+(sq<0).astype(float)+(ca<0).astype(float)
-    conv=np.clip(np.maximum(ag.values,dg.values)*20+10,10,90)
+    conv=np.clip(np.maximum(ag.values,dg.values)*20+10+np.where(F('Blowoff_Top_Hard')|F('Washout_Bottom_Hard'),12,0),10,90)
     return ns,pd.Series(conv,index=idx)
+
+def _normalize_weight_rows(wa):
+    wa=np.asarray(wa,dtype=float);rs=wa.sum(axis=1,keepdims=True);rs[rs<=0]=1.
+    return wa/rs
+
+def _apply_adx_weight_regime(wa,adx_values):
+    wa=_normalize_weight_rows(wa)
+    range_mult=np.array([0.70,0.95,1.15,1.25,0.95],dtype=float)
+    trend_mult=np.array([1.25,1.20,0.90,0.80,0.95],dtype=float)
+    low=np.isfinite(adx_values)&(adx_values<JT.ADX_RANGE_MAX);high=np.isfinite(adx_values)&(adx_values>JT.ADX_TREND_MIN)
+    if low.any():wa[low]*=range_mult
+    if high.any():wa[high]*=trend_mult
+    return _normalize_weight_rows(wa)
+
+def _downgrade_buy(label,severe=False):
+    if severe:return 'NEUTRAL'
+    return {'STRONG_BUY':'BUY','BUY':'WATCH_BUY','WATCH_BUY':'NEUTRAL'}.get(label,label)
+
+def _downgrade_sell(label,severe=False):
+    if severe:return 'NEUTRAL'
+    return {'STRONG_SELL':'SELL','SELL':'WATCH_SELL','WATCH_SELL':'NEUTRAL'}.get(label,label)
 
 
 def compute_committee_ensemble(df,vol_ratio,hma_r_v):
-    idx=df.index;n=len(df);N=lambda c,d=0:df.get(c,pd.Series(d,index=idx)).fillna(d)
+    idx=df.index;n=len(df);N=lambda c,d=0:df.get(c,pd.Series(d,index=idx)).fillna(d);F=lambda c:df.get(c,pd.Series(False,index=idx)).fillna(False)
     ctx=_detect_context_vectorized(df);df['Market_Context']=ctx
     scores={};convictions={}
     scores['Trend'],convictions['Trend']=_committee_trend(df,N);scores['Momentum'],convictions['Momentum']=_committee_momentum(df,N)
@@ -623,31 +652,56 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
         m=(ctx_v==cc)
         if m.any():wa[m]=CONTEXT_WEIGHTS.get(cn,CONTEXT_WEIGHTS['default'])
     
-    # Temporal Fuzzy Logic: Blend context weights over a 3-day EMA to prevent abrupt regime flickering
     wa = pd.DataFrame(wa).ewm(span=3, adjust=False).mean().values
-    # Veto
+    wa = _apply_adx_weight_regime(wa, N('ADX').values)
     wt1=N('WT1').values;rsi=N('RSI').values;cmf=N('CMF').values;obv=N('OBV').values;obv_ma=N('OBV').rolling(20,min_periods=10).mean().values;C=df['Close'].values;O=df['Open'].values
-    wt_hook_up = (wt1 > np.roll(wt1, 1))
-    wt_hook_dn = (wt1 < np.roll(wt1, 1))
-    vf=np.zeros((n,6),dtype=bool)
-    vf[:,0]=((wt1<-60)|(rsi<JT.VETO_EXTREME_RSI_LO)) & wt_hook_up  # Falling Knife Filter: requires upward hook
-    vf[:,1]=((wt1>60)|(rsi>JT.VETO_EXTREME_RSI_HI)) & wt_hook_dn   # Blowoff Filter: requires downward hook
+    vr_v=vol_ratio.values;obv_slope_v=N('OBV_Slope').values;price_slope_v=N('Price_Slope_5').values;long_rr_v=N('VP_Long_RR',1.).values;short_rr_v=N('VP_Short_RR',1.).values
+    pv_bear_v=F('Smart_Money_Bearish_Div').values;pv_bull_v=F('Smart_Money_Bullish_Div').values;low_vol_v=F('Low_Volume_Caution').values;hard_blowoff_v=F('Blowoff_Top_Hard').values
+    wt_hook_up=(wt1>np.roll(wt1,1));wt_hook_dn=(wt1<np.roll(wt1,1))
     flat=((pd.Series(C).rolling(20).max()-pd.Series(C).rolling(20).min())/(pd.Series(C).rolling(20).min()+1e-10)<.08).values
-    vf[:,2]=flat&(cmf>JT.VETO_MONEY_CMF)&(obv>obv_ma);vf[:,3]=flat&(cmf<-JT.VETO_MONEY_CMF)&(obv<obv_ma)
-    vr_v=vol_ratio.values;vf[:,4]=vf[:,0]&(vr_v>=3)&(C>O);vf[:,5]=vf[:,1]&(vr_v>=3)&(C<O)
-    df['Veto_Flags']=pd.Series([','.join([['ExOS','ExOB','Accum','Distrib','Capitul','Blowoff'][j] for j in range(6) if vf[i,j]]) for i in range(n)],index=idx)
-    # Active Flip
+    veto_masks={
+        'ExOS':((wt1<-60)|(rsi<JT.VETO_EXTREME_RSI_LO))&wt_hook_up,
+        'ExOB':((wt1>60)|(rsi>JT.VETO_EXTREME_RSI_HI))&wt_hook_dn,
+        'Accum':flat&(cmf>JT.VETO_MONEY_CMF)&(obv>obv_ma),
+        'Distrib':flat&(cmf<-JT.VETO_MONEY_CMF)&(obv<obv_ma),
+        'Capitul':(((wt1<-60)|(rsi<JT.VETO_EXTREME_RSI_LO))&wt_hook_up)&(vr_v>=3)&(C>O),
+        'Blowoff':(((wt1>60)|(rsi>JT.VETO_EXTREME_RSI_HI))&wt_hook_dn)&(vr_v>=3)&(C<O),
+        'PVBearDiv':pv_bear_v,
+        'PVBullDiv':pv_bull_v,
+        'RRLong':(long_rr_v<JT.VP_RR_FLOOR)&(C>=N('VP_POC').values),
+        'RRShort':(short_rr_v<JT.VP_RR_FLOOR)&(C<=N('VP_POC').values),
+        'HardBlowoff':hard_blowoff_v,
+    }
+    veto_names=list(veto_masks.keys());vf=np.column_stack([veto_masks[nm] for nm in veto_names])
+    df['Veto_Flags']=pd.Series([','.join([veto_names[j] for j in range(len(veto_names)) if vf[i,j]]) for i in range(n)],index=idx)
     sa=np.column_stack([scores[cm].values for cm in COMMITTEE_NAMES]);ca_=np.column_stack([convictions[cm].values for cm in COMMITTEE_NAMES])
-    es=sa.copy();ec=ca_.copy()
-    om=vf[:,0];tsm=np.abs(np.minimum(es[om,0],0));es[om,0]=np.clip(tsm*0.4,0,30);ec[om,0]=np.minimum(ec[om,0],25);ec[om,1]*=1.4;ec[om,2]*=1.3;ec[om,4]*=1.3
-    obm=vf[:,1];tbm=np.abs(np.maximum(es[obm,0],0));es[obm,0]=-np.clip(tbm*0.4,0,30);ec[obm,0]=np.minimum(ec[obm,0],25);ec[obm,1]*=1.4;ec[obm,2]*=1.3;ec[obm,4]*=1.3
-    for mi,bi in [(2,2),(3,2)]:mm=vf[:,mi];es[mm,0]*=0.3;ec[mm,bi]*=1.5
-    cm_=vf[:,4]
+    es=sa.copy();ec=ca_.copy();trend_i,mom_i,money_i,struct_i,lead_i=0,1,2,3,4
+    om=veto_masks['ExOS'];tsm=np.abs(np.minimum(es[om,trend_i],0));es[om,trend_i]=np.clip(tsm*0.4,0,30);ec[om,trend_i]=np.minimum(ec[om,trend_i],25);ec[om,mom_i]*=1.4;ec[om,money_i]*=1.3;ec[om,lead_i]*=1.3
+    obm=veto_masks['ExOB'];tbm=np.abs(np.maximum(es[obm,trend_i],0));es[obm,trend_i]=-np.clip(tbm*0.4,0,30);ec[obm,trend_i]=np.minimum(ec[obm,trend_i],25);ec[obm,mom_i]*=1.4;ec[obm,money_i]*=1.3;ec[obm,lead_i]*=1.3
+    for nm in ('Accum','Distrib'):
+        mm=veto_masks[nm];es[mm,trend_i]*=0.3;ec[mm,money_i]*=1.5
+    cm_=veto_masks['Capitul']
     for ci in range(NUM_COMMITTEES):sm_=np.abs(np.minimum(es[cm_,ci],0));es[cm_,ci]=np.maximum(es[cm_,ci],0)+sm_*0.3
-    ec[cm_,1]=np.clip(ec[cm_,1]*1.5,0,98)
-    bom=vf[:,5]
+    ec[cm_,mom_i]=np.clip(ec[cm_,mom_i]*1.5,0,98)
+    bom=veto_masks['Blowoff']
     for ci in range(NUM_COMMITTEES):bm_=np.abs(np.maximum(es[bom,ci],0));es[bom,ci]=np.minimum(es[bom,ci],0)-bm_*0.3
-    ec[bom,1]=np.clip(ec[bom,1]*1.5,0,98);ec=np.clip(ec,0,100)
+    ec[bom,mom_i]=np.clip(ec[bom,mom_i]*1.5,0,98)
+    pvb=veto_masks['PVBearDiv']
+    if pvb.any():
+        es[pvb]=np.where(es[pvb]>0,es[pvb]*(1-JT.DIVERGENCE_PENALTY),es[pvb]);es[pvb,money_i]-=12;es[pvb,struct_i]-=6;ec[pvb,money_i]=np.clip(ec[pvb,money_i]*1.2,0,98)
+    pvu=veto_masks['PVBullDiv']
+    if pvu.any():
+        es[pvu]=np.where(es[pvu]<0,es[pvu]*(1-JT.DIVERGENCE_PENALTY),es[pvu]);es[pvu,money_i]+=12;es[pvu,struct_i]+=6;ec[pvu,money_i]=np.clip(ec[pvu,money_i]*1.2,0,98)
+    rrl=veto_masks['RRLong']
+    if rrl.any():
+        es[rrl]=np.where(es[rrl]>0,es[rrl]*0.85,es[rrl]);es[rrl,struct_i]-=16;ec[rrl,struct_i]=np.clip(ec[rrl,struct_i]*1.15,0,98)
+    rrs=veto_masks['RRShort']
+    if rrs.any():
+        es[rrs]=np.where(es[rrs]<0,es[rrs]*0.85,es[rrs]);es[rrs,struct_i]+=16;ec[rrs,struct_i]=np.clip(ec[rrs,struct_i]*1.15,0,98)
+    hbo=veto_masks['HardBlowoff']
+    if hbo.any():
+        es[hbo]=np.where(es[hbo]>0,es[hbo]*0.60,es[hbo]);es[hbo,trend_i]-=15;es[hbo,mom_i]-=20;es[hbo,lead_i]=np.minimum(es[hbo,lead_i],-55);ec[hbo,lead_i]=np.maximum(ec[hbo,lead_i],85)
+    ec=np.clip(ec,0,100)
     # 시너지
     syn=np.zeros(n);ts_=es[:,0];ms_=es[:,1];mns_=es[:,2];ss_=es[:,3];ls_=es[:,4]
     bc=(ms_>20)&(ls_>10)&(ts_<10);bstr=np.clip((ms_+ls_)*0.15+np.abs(np.minimum(ts_,0))*0.1,0,25)
@@ -660,7 +714,6 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
     mb=np.where(mu.values>=3,8,np.where(md.values>=3,-8,0));stk=N('StochK');sb=np.where((stk.values<20)&(stk.values>N('StochD').values),5,np.where((stk.values>80)&(stk.values<N('StochD').values),-5,0))
     pred=ab+mb+sb;df['Prediction_Boost']=pred
     contribs=es*(ec/100.)*wa;ens=contribs.sum(axis=1)+syn+pred
-    # Blend in 10-layer totals to reduce committee-only bias.
     buy_total_arr=N('Buy_Total').values;sell_total_arr=N('Sell_Total').values
     ba_layers=N('Buy_Active_Layers').values;sa_layers=N('Sell_Active_Layers').values
     layer_edge=buy_total_arr-sell_total_arr
@@ -669,6 +722,11 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
     ens-=np.where((sa_layers>=7)&(ba_layers<=2),5,0)
     conflict_adj=np.clip(np.minimum(ba_layers,sa_layers)*1.3,0,8)
     ens-=np.where(np.abs(layer_edge)<6,conflict_adj,conflict_adj*0.4)
+    ens=np.where(veto_masks['PVBearDiv']&(ens>0),ens*(1-JT.DIVERGENCE_PENALTY),ens)
+    ens=np.where(veto_masks['PVBullDiv']&(ens<0),ens*(1-JT.DIVERGENCE_PENALTY),ens)
+    ens=np.where(veto_masks['RRLong']&(ens>0),ens*0.82,ens)
+    ens=np.where(veto_masks['RRShort']&(ens<0),ens*0.82,ens)
+    ens=np.where(veto_masks['HardBlowoff']&(ens>0),ens-22,ens)
     for ci,cm in enumerate(COMMITTEE_NAMES):
         s=es[:,ci];c=ec[:,ci];v=np.full(n,0,dtype=int);v=np.where((s>15)&(c>=25),1,v);v=np.where((s<-15)&(c>=25),-1,v);v=np.where(c<15,-99,v)
         df[f'CM_{cm}_Vote']=v;df[f'CM_{cm}_EffScore']=es[:,ci];df[f'CM_{cm}_EffConv']=ec[:,ci]
@@ -680,12 +738,13 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
     sag+=((sa_layers>=6)&(sell_total_arr>=20)).astype(int)
     cth=np.zeros(n);cth=np.where(ctx_v==CTX_EXTREME_OS,-10,cth);cth=np.where(ctx_v==CTX_EXTREME_OB,10,cth);cth=np.where(ctx_v==CTX_STRONG_UP,5,cth);cth=np.where(ctx_v==CTX_STRONG_DN,-5,cth);cth=np.where(ctx_v==CTX_BOTTOMING,-8,cth);cth=np.where(ctx_v==CTX_TOPPING,8,cth)
     j=np.full(n,'NEUTRAL',dtype=object);conf=np.zeros(n,dtype=float)
-    rs=[];rd=[];al=[]
+    rs=[];rd=[];al=[];contrast_notes=[]
     obv_v=N('OBV').values;obv_mav=N('OBV').rolling(20,min_periods=10).mean().values;mhv=N('MACD_Hist').values;mhpv=np.roll(mhv,1)
     ma50_v=N('MA50').values;ma200_v=N('MA200').values;wt1_v=N('WT1').values;rsi_v=N('RSI').values;mfi_v=N('MFI').values
     adx_v=N('ADX').values;stoch_v=N('StochK').values;ut_v=N('UTBot_Dir').values;sq_v=df.get('Squeeze_On',pd.Series(False,index=idx)).values
     atr_norm = (N('ATR').values / (C + 1e-10)) * 100
-    atr_scale = np.clip(atr_norm / 2.5, 0.75, 1.25) # Scale thresholds down for low beta, up for high beta
+    atr_scale = np.clip(atr_norm / 2.5, 0.75, 1.25)
+    buy_labels=('STRONG_BUY','BUY','WATCH_BUY');sell_labels=('STRONG_SELL','SELL','WATCH_SELL');money_eff=es[:,money_i]
     for i in range(n):
         e=ens[i];ba=bag[i];sl=sag[i];sy=syn[i];adj=cth[i];sr=1 if abs(sy)>=15 else 0
         asc = atr_scale[i]
@@ -699,16 +758,39 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
         elif (ctx_v[i] in (CTX_EXTREME_OS,CTX_BOTTOMING)) and ba>=2 and (sy>6 or pred[i]>5) and e>=(wbt-6):j[i]='BUY'
         elif (ctx_v[i] in (CTX_EXTREME_OB,CTX_TOPPING)) and sl>=2 and (sy<-6 or pred[i]<-5) and e<=(wst+6):j[i]='SELL'
         elif ba>=3 and sl>=3:j[i]='MIXED'
+        notes=[]
+        if pv_bear_v[i]:notes.append("price up but OBV/CMF/volume diverged")
+        elif pv_bull_v[i]:notes.append("price down but money flow improved")
+        if low_vol_v[i] and price_slope_v[i]>0:notes.append("volume below 0.7x average")
+        if long_rr_v[i]<JT.VP_RR_FLOOR and e>0:notes.append(f"long RR {long_rr_v[i]:.2f} vs VAH/POC")
+        if short_rr_v[i]<JT.VP_RR_FLOOR and e<0:notes.append(f"short RR {short_rr_v[i]:.2f} vs VAL/POC")
+        if hard_blowoff_v[i]:notes.append("blow-off top >3 ATR above MA20 with 2x red volume")
+        severe_buy=(money_eff[i]<=JT.MONEY_VETO_NEUTRAL) or (cmf[i]<0 and obv_slope_v[i]<0 and long_rr_v[i]<0.9)
+        severe_sell=(money_eff[i]>=abs(JT.MONEY_VETO_NEUTRAL)) or (cmf[i]>0 and obv_slope_v[i]>0 and short_rr_v[i]<0.9)
+        if hard_blowoff_v[i]:
+            if j[i] in buy_labels or j[i] in ('NEUTRAL','MIXED'):j[i]='STRONG_SELL' if (sl>=max(JT.WATCH_MIN_AGREE-sr,1) and e<=st) else 'SELL'
+        elif j[i] in buy_labels:
+            if pv_bear_v[i]:j[i]=_downgrade_buy(j[i],severe=(j[i]=='STRONG_BUY' and severe_buy))
+            if long_rr_v[i]<JT.VP_RR_FLOOR:j[i]=_downgrade_buy(j[i],severe=(long_rr_v[i]<0.75 and money_eff[i]<0))
+            if low_vol_v[i] and price_slope_v[i]>0:j[i]=_downgrade_buy(j[i],severe=False)
+        elif j[i] in sell_labels:
+            if pv_bull_v[i]:j[i]=_downgrade_sell(j[i],severe=(j[i]=='STRONG_SELL' and severe_sell))
+            if short_rr_v[i]<JT.VP_RR_FLOOR:j[i]=_downgrade_sell(j[i],severe=(short_rr_v[i]<0.75 and money_eff[i]>0))
+        contrast_notes.append('; '.join(notes[:3]))
         ae=abs(e);dm=max(ba,sl);ap=dm/NUM_COMMITTEES*35;sp=min(ae/60*30,30);avp=np.mean(ec[i])/100*20;syp=min(abs(sy)/20*10,10);pp=min(abs(pred[i])/15*5,5)
         raw=ap+sp+avp+syp+pp
         layer_conf=0.
-        if j[i] in ('STRONG_BUY','BUY','WATCH_BUY'):
+        if j[i] in buy_labels:
             layer_conf=min((ba_layers[i]*1.6)+(buy_total_arr[i]*0.22),14)
-        elif j[i] in ('STRONG_SELL','SELL','WATCH_SELL'):
+        elif j[i] in sell_labels:
             layer_conf=min((sa_layers[i]*1.6)+(sell_total_arr[i]*0.22),14)
         raw+=layer_conf
         if min(ba_layers[i],sa_layers[i])>=4:
             raw-=5
+        if notes and not hard_blowoff_v[i]:
+            raw-=min(6,2*len(notes))
+        if hard_blowoff_v[i]:
+            raw=min(99,raw+4)
         if j[i] in ('NEUTRAL','MIXED'):raw=max(15,min(55,raw))
         conf[i]=np.clip(raw,5,99)
         
@@ -724,9 +806,23 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
         ma200a=bool(C[i]>ma200_v[i]) if not np.isnan(ma200_v[i]) else False
         mhu=bool(mhv[i]>mhpv[i]) if i>0 else False
         r,d,a=_gen_reason(j[i],e,int(ctx_v[i]),vstr,sy,pred[i],ba,sl,wt1_v[i],rsi_v[i],mfi_v[i],cmf[i],obr,adx_v[i],vol_ratio.values[i],ma50a,ma200a,mhu,stoch_v[i],bool(hma_r_v[i]) if i<len(hma_r_v) else False,int(ut_v[i]),bool(sq_v[i]),cms)
+        note_txt=contrast_notes[-1]
+        if hard_blowoff_v[i]:
+            r="Blow-off top detected - take profit / sell bias"
+            a=f"TAKE_PROFIT / SELL | {a}" if a else "TAKE_PROFIT / SELL"
+        elif j[i]=='NEUTRAL' and pv_bear_v[i] and e>0:
+            r="Money veto: breakout quality deteriorated"
+        elif j[i]=='NEUTRAL' and pv_bull_v[i] and e<0:
+            r="Money veto: downside follow-through deteriorated"
+        if note_txt:
+            d=f"{d} | {note_txt}" if d else note_txt
+            if j[i] in buy_labels and not hard_blowoff_v[i]:
+                a=f"{a} | caution" if a else "BUY with caution"
+            elif j[i] in sell_labels and not hard_blowoff_v[i] and (pv_bull_v[i] or short_rr_v[i]<JT.VP_RR_FLOOR):
+                a=f"{a} | caution" if a else "SELL with caution"
         rs.append(r);rd.append(d);al.append(a)
     df['Trade_Judgment']=j;df['Judgment_Confidence']=conf;df['Buy_Agree']=bag;df['Sell_Agree']=sag
-    df['Judgment_Reason']=rs;df['Judgment_Detail']=rd;df['Action_Label']=al
+    df['Judgment_Reason']=rs;df['Judgment_Detail']=rd;df['Action_Label']=al;df['Contrast_Notes']=contrast_notes
     
     # 🎯 시스템 전면 전환(Macro Flip) 시그널 추가
     is_buy = pd.Series(j).isin(['STRONG_BUY', 'BUY', 'WATCH_BUY'])
