@@ -320,16 +320,87 @@ def _get_plotly_yearly_bar(dates, y1, y2, name1, name2, c1, c2):
     return fig
 
 def _get_plotly_target_price(curr, low, mean, median, high):
-    if not low or not high: return None
+    values = [v for v in [curr, low, mean, median, high] if isinstance(v, (int, float))]
+    if len(values) < 2:
+        return None
+
+    band_low = low if isinstance(low, (int, float)) else min(values)
+    band_high = high if isinstance(high, (int, float)) else max(values)
+    span = max(band_high - band_low, max(abs(v) for v in values) * 0.08, 1)
+    pad = span * 0.18
+
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=[low, high], y=[0, 0], mode='lines', line=dict(color='rgba(148,163,184,.52)', width=6), showlegend=False, hoverinfo='skip'))
-    pts = [(low, '최저가', '#adbac7', 12, 'bottom center'), (high, '최고가', '#adbac7', 12, 'bottom center'), (mean, '평균', '#2196F3', 14, 'bottom center'), (median, '중앙값', '#63D9A2', 16, 'top center'), (curr, '현재가', '#F6C35E', 22, 'top center')]
-    for val, name, color, size, pos in pts:
-        if val: fig.add_trace(go.Scatter(x=[val], y=[0], mode='markers+text', marker=dict(color=color, size=size, symbol='star' if name=='현재가' else 'circle', line=dict(width=2 if name=='현재가' else 1, color='#F8FAFC')), text=[f"<b>{name}</b><br>${val:,.2f}"], textposition=pos, textfont=dict(color=color if name in ['현재가', '중앙값'] else '#E5E7EB', size=12, family='Pretendard'), name=name))
-    _apply_cipherx_chart_theme(fig, "목표가 범위 및 현재가 위치", height=260, show_legend=True)
-    fig.update_xaxes(showgrid=False, zeroline=False, showticklabels=False)
-    fig.update_yaxes(showgrid=False, zeroline=False, showticklabels=False, range=[-1.2, 1.2])
-    fig.update_layout(legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5, font=dict(color='#CBD5E1', size=11), bgcolor='rgba(0,0,0,0)'))
+    fig.add_shape(
+        type='rect',
+        x0=-0.32, x1=0.32, y0=band_low, y1=band_high,
+        fillcolor='rgba(99,102,241,.12)',
+        line=dict(color='rgba(99,102,241,.26)', width=1.2),
+        layer='below'
+    )
+    fig.add_shape(
+        type='line',
+        x0=0, x1=0, y0=band_low - pad, y1=band_high + pad,
+        line=dict(color='rgba(148,163,184,.38)', width=8),
+        layer='below'
+    )
+    if isinstance(curr, (int, float)):
+        fig.add_shape(
+            type='line',
+            x0=-0.54, x1=0.54, y0=curr, y1=curr,
+            line=dict(color='rgba(246,195,94,.28)', width=1.4, dash='dot'),
+            layer='below'
+        )
+
+    marker_specs = [
+        ('최저가', band_low, -0.22, '#94A3B8', 'circle', 'right', -16),
+        ('평균', mean, 0.22, '#38BDF8', 'diamond', 'left', 0),
+        ('중앙값', median, -0.22, '#63D9A2', 'diamond', 'right', 8),
+        ('최고가', band_high, 0.22, '#E2E8F0', 'circle', 'left', 16),
+        ('현재가', curr, 0.0, '#F6C35E', 'star', 'center', 34),
+    ]
+    annotations = []
+    for name, val, xpos, color, symbol, anchor, yshift in marker_specs:
+        if not isinstance(val, (int, float)):
+            continue
+        fig.add_trace(go.Scatter(
+            x=[xpos], y=[val], mode='markers',
+            marker=dict(
+                color=color,
+                size=18 if name == '현재가' else 13,
+                symbol=symbol,
+                line=dict(color='#F8FAFC', width=2 if name == '현재가' else 1.2)
+            ),
+            hovertemplate=f"{name}<br>${val:,.2f}<extra></extra>",
+            showlegend=False
+        ))
+        annotations.append(dict(
+            x=xpos,
+            y=val,
+            text=f"<b>{name}</b><br>${val:,.2f}",
+            showarrow=False,
+            xanchor=anchor,
+            yanchor='middle' if name != '현재가' else 'bottom',
+            xshift=-16 if anchor == 'right' else (16 if anchor == 'left' else 0),
+            yshift=yshift,
+            font=dict(
+                color=color if name in ['현재가', '중앙값', '평균'] else '#E5E7EB',
+                size=12,
+                family='Pretendard'
+            )
+        ))
+
+    _apply_cipherx_chart_theme(fig, "목표가 코리도어", height=380, show_legend=False)
+    fig.update_xaxes(showgrid=False, zeroline=False, showticklabels=False, range=[-0.65, 0.65], fixedrange=True)
+    fig.update_yaxes(
+        showgrid=True,
+        gridcolor='rgba(148,163,184,.10)',
+        zeroline=False,
+        tickfont=dict(color='#94A3B8', size=11),
+        range=[band_low - pad, band_high + pad],
+        side='right',
+        fixedrange=True,
+    )
+    fig.update_layout(annotations=annotations)
     return fig
 
 def _get_plotly_donut(labels, values, colors):
@@ -907,6 +978,8 @@ html, body, [class*="css"] { font-family:'Pretendard', sans-serif !important; }
 .compact-chip b{color:#F8FAFC}
 .consensus-scale{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:16px 0 14px}
 .consensus-step{padding:12px 8px;border-radius:14px;background:linear-gradient(160deg,rgba(15,23,42,.92),rgba(15,23,42,.74));border:1px solid rgba(148,163,184,.12);text-align:center}
+.consensus-step strong{display:block;color:#E5E7EB;font-size:.78rem;font-weight:900;line-height:1.35}
+.consensus-step span{display:block;color:#94A3B8;font-size:.68rem;font-weight:700;margin-top:4px}
 .consensus-step-label{display:block;color:#CBD5E1;font-size:.72rem;font-weight:800;line-height:1.3}
 .consensus-step-score{display:block;color:#94A3B8;font-size:.68rem;font-weight:700;margin-top:4px}
 .consensus-step.active{box-shadow:0 0 0 1px rgba(248,250,252,.05) inset,0 12px 24px rgba(2,6,23,.18)}
@@ -926,12 +999,31 @@ html, body, [class*="css"] { font-family:'Pretendard', sans-serif !important; }
 .range-legend-label{color:#94A3B8;font-size:.7rem;font-weight:800}
 .range-legend-value{color:#F8FAFC;font-size:.92rem;font-weight:900;margin-top:4px}
 .range-legend-sub{color:#CBD5E1;font-size:.72rem;font-weight:700;margin-top:4px}
+.stack-col{display:flex;flex-direction:column;gap:12px}
+.target-mini-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:12px}
+.target-mini-card{padding:12px 13px;border-radius:14px;background:linear-gradient(160deg,rgba(15,23,42,.9),rgba(15,23,42,.72));border:1px solid rgba(148,163,184,.12)}
+.target-mini-label{color:#94A3B8;font-size:.72rem;font-weight:800;margin:0 0 6px}
+.target-mini-value{color:#F8FAFC;font-size:1rem;font-weight:900;margin:0}
+.target-mini-sub{color:#CBD5E1;font-size:.72rem;font-weight:700;margin:6px 0 0}
+.insight-shell{padding:14px 15px;border-radius:16px;background:linear-gradient(180deg,rgba(99,102,241,.08),rgba(99,102,241,0) 34%),linear-gradient(160deg,rgba(10,14,24,.96),rgba(16,24,39,.88));border:1px solid rgba(99,102,241,.16);box-shadow:0 16px 32px rgba(2,6,23,.16)}
+.insight-shell .cluster-title{margin-bottom:4px}
+.insight-shell .cluster-sub{margin-bottom:12px}
+.metric-rail-card{padding:14px 15px;border-radius:16px;background:linear-gradient(160deg,rgba(15,23,42,.92),rgba(15,23,42,.76));border:1px solid rgba(148,163,184,.12)}
+.metric-rail-row{margin-top:12px}
+.metric-rail-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:7px}
+.metric-rail-head span{color:#CBD5E1;font-size:.78rem;font-weight:800}
+.metric-rail-head strong{color:#F8FAFC;font-size:.82rem;font-weight:900}
+.metric-rail-track{height:8px;border-radius:999px;background:rgba(148,163,184,.12);overflow:hidden}
+.metric-rail-fill{height:100%;border-radius:999px}
+.metric-rail-note{color:#94A3B8;font-size:.72rem;font-weight:700;margin:6px 0 0}
+.spotlight-grid.tight{grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}
 @media(max-width:900px){
   .hero-bento{grid-template-columns:1fr}
   .meta-grid{grid-template-columns:1fr}
   .invest-hero{grid-template-columns:1fr}
   .cluster-grid{grid-template-columns:1fr}
   .consensus-scale{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .target-mini-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 </style>
 """
@@ -1437,12 +1529,16 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     net_cash_cls = "m-green" if isinstance(net_cash, (int, float)) and net_cash >= 0 else "m-red"
     ocf_cls = "m-green" if isinstance(ocf, (int, float)) and ocf > 0 else "m-red"
     fcf_cls = "m-green" if isinstance(fcf, (int, float)) and fcf > 0 else "m-red"
+    cash_fill = min(max(cash_to_debt, 0), 2) / 2 * 100 if isinstance(cash_to_debt, (int, float)) else 0
+    dte_fill = 100 - (min(max(dte, 0), 220) / 220 * 100) if isinstance(dte, (int, float)) else 0
+    cash_tone = "#63D9A2" if isinstance(cash_to_debt, (int, float)) and cash_to_debt >= 1 else "#F6C35E" if isinstance(cash_to_debt, (int, float)) and cash_to_debt >= 0.5 else "#FF8F96"
+    dte_tone = "#63D9A2" if dl_c == "green" else "#F6C35E" if dl_c == "yellow" else "#FF8F96"
 
     with st.container(border=True):
-        col1, col2 = st.columns([1.1, 1])
         debt_ratio_text = f"{dte:.1f}%" if isinstance(dte, (int, float)) else "N/A"
+        s5_title_html = '<div class="s-title"><span class="s-num">05</span> 회사에 돈이 얼마나 있나요? <span style="font-size:.8rem;color:#768390">SEC + Yahoo</span></div>'
         s5_spotlight = (
-            f"<div class='spotlight-grid'>"
+            f"<div class='spotlight-grid tight'>"
             f"<div class='spotlight-card'><p class='spotlight-label'>보유 현금</p><p class='spotlight-value' style='color:#63D9A2'>{_fmt_num(cash)}</p><p class='spotlight-sub'>현금 및 현금성 자산</p></div>"
             f"<div class='spotlight-card'><p class='spotlight-label'>영업현금흐름</p><p class='spotlight-value' style='color:{'#B8F1D5' if ocf_cls == 'm-green' else '#FFD2D7'}'>{_fmt_num(ocf)}</p><p class='spotlight-sub'>본업에서 버는 현금</p></div>"
             f"<div class='spotlight-card'><p class='spotlight-label'>잉여현금흐름</p><p class='spotlight-value' style='color:{'#B8F1D5' if fcf_cls == 'm-green' else '#FFD2D7'}'>{_fmt_num(fcf)}</p><p class='spotlight-sub'>투자 후 남는 현금</p></div>"
@@ -1456,15 +1552,29 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
             f"<span class='compact-chip'>이자 부담 {_esc(ib_txt)}</span>"
             f"</div>"
         )
-        html_s5_1 = (
-            f'<div class="s-title"><span class="s-num">05</span> 회사에 돈이 얼마나 있나요? <span style="font-size:.8rem;color:#768390">SEC + Yahoo</span></div>'
+        s5_header_html = (
             f"<div style='display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px'><span class='section-pill {v5_pill_cls}'>{v5_t}</span><span class='section-pill {dl_pill_cls}'>D/E {dl}</span></div>"
-            f'{s5_spotlight}'
+            f"{s5_spotlight}"
             f"{s5_chip_row}"
-            f"<div class='cluster-grid'>"
+        )
+        s5_health_board = (
+            f"<div class='metric-rail-card'>"
+            f"<div class='cluster-title'>재무 체력 보드</div>"
+            f"<div class='cluster-sub'>현금 여력과 레버리지 강도를 한 번에 읽을 수 있게 요약했습니다.</div>"
+            f"<div class='metric-rail-row'><div class='metric-rail-head'><span>차입 상환 완충력</span><strong>{cash_to_debt_text}</strong></div><div class='metric-rail-track'><div class='metric-rail-fill' style='width:{cash_fill:.1f}%;background:{cash_tone}'></div></div><div class='metric-rail-note'>1.0x 이상이면 보유 현금만으로 총부채를 대부분 커버할 수 있습니다.</div></div>"
+            f"<div class='metric-rail-row'><div class='metric-rail-head'><span>레버리지 강도</span><strong>{debt_ratio_text}</strong></div><div class='metric-rail-track'><div class='metric-rail-fill' style='width:{dte_fill:.1f}%;background:{dte_tone}'></div></div><div class='metric-rail-note'>부채/자본 비율은 낮을수록 방어력이 좋습니다.</div></div>"
+            f"<div class='target-mini-grid'>"
+            f"<div class='target-mini-card'><p class='target-mini-label'>순현금</p><p class='target-mini-value {net_cash_cls}'>{net_cash_text}</p><p class='target-mini-sub'>현금 - 총부채</p></div>"
+            f"<div class='target-mini-card'><p class='target-mini-label'>부채 추세</p><p class='target-mini-value'>{dt_trend}</p><p class='target-mini-sub'>최근 재무제표 흐름</p></div>"
+            f"<div class='target-mini-card'><p class='target-mini-label'>이자 부담</p><p class='target-mini-value'>{ib_txt}</p><p class='target-mini-sub'>상환 여력 체크</p></div>"
+            f"</div>"
+            f"</div>"
+        )
+        s5_stack_html = (
+            f"<div class='stack-col'>"
             f"<div class='cluster-card'>"
             f"<div class='cluster-title'>유동성 / 현금창출</div>"
-            f"<div class='cluster-sub'>당장 버틸 수 있는지와, 본업이 실제 현금을 만들어내는지를 같이 봅니다.</div>"
+            f"<div class='cluster-sub'>현금이 있는가보다, 현금이 계속 들어오는 구조인가가 더 중요합니다.</div>"
             f'{_metric_row("보유 현금", _fmt_num(cash), "m-value m-green m-big")}'
             f'{_metric_row("영업활동 현금흐름", _fmt_num(ocf), ocf_cls)}'
             f'{_metric_row("잉여현금흐름", _fmt_num(fcf), fcf_cls)}'
@@ -1480,24 +1590,25 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
             f'{_metric_row("부채 추세", dt_trend)}'
             f'{_metric_row("이자 부담(ICR)", ib_txt)}'
             f"</div>"
-            f"</div>"
-            f'<div class="note-box">※ <b>부채/자본 비율</b>은 총부채를 순자산으로 나눈 값으로 직접 교차 계산합니다.<br>※ 현금 잔고와 함께 영업활동 현금흐름, 잉여현금흐름까지 같이 봐야 재무 체력을 제대로 읽을 수 있습니다.</div>'
-        )
-        s5_read_html = (
-            f"<div class='cluster-card' style='margin-top:14px'>"
+            f"<div class='insight-shell'>"
             f"<div class='cluster-title'>해석 포인트</div>"
             f"<div class='cluster-sub'>현금이 많아도 현금흐름이 마이너스면 빠르게 소진될 수 있고, 부채가 있어도 영업활동 현금흐름이 안정적이면 부담이 낮아집니다.</div>"
-            f"{_metric_row('차입 상환 완충력', cash_to_debt_text, 'm-green' if isinstance(cash_to_debt, (int, float)) and cash_to_debt >= 1 else 'm-value')}"
             f"{_metric_row('실질 재무 포지션', '순현금 우위' if isinstance(net_cash, (int, float)) and net_cash >= 0 else '순부채 구조', net_cash_cls)}"
             f"{_metric_row('핵심 체크', '현금흐름 지속성 > 현금 절대규모', 'm-value')}"
             f"</div>"
+            f'<div class="note-box">※ <b>부채/자본 비율</b>은 총부채를 순자산으로 나눈 값으로 직접 교차 계산합니다.<br>※ 현금 잔고와 함께 영업활동 현금흐름, 잉여현금흐름까지 같이 봐야 재무 체력을 제대로 읽을 수 있습니다.</div>'
+            f"</div>"
         )
+        st.markdown(s5_title_html, unsafe_allow_html=True)
+        st.markdown("<div class='section-lead'>현금 자체보다 영업활동 현금흐름과 상환 여력을 함께 보면 재무 체력이 더 정확하게 보입니다.</div>", unsafe_allow_html=True)
+        st.markdown(s5_header_html, unsafe_allow_html=True)
+        col1, col2 = st.columns([1.02, 0.98])
         with col1:
-            st.markdown(html_s5_1, unsafe_allow_html=True)
-        with col2:
             if fig5: st.plotly_chart(fig5, use_container_width=True, config={'displayModeBar': False}, key=f"{key_prefix}_fig5")
             else: st.markdown("<div class='note-box'>※ 자산/부채 데이터를 모두 불러올 수 없어 차트가 생략되었습니다.</div>", unsafe_allow_html=True)
-            st.markdown(s5_read_html, unsafe_allow_html=True)
+            st.markdown(s5_health_board, unsafe_allow_html=True)
+        with col2:
+            st.markdown(s5_stack_html, unsafe_allow_html=True)
         st.markdown(_verdict_badge(v5_c, "", v5_t), unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
@@ -1643,6 +1754,7 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
         else: scale_idx = 4
     else:
         scale_idx = None
+    scale_tone = "buy" if scale_idx in (0, 1) else "hold" if scale_idx == 2 else "sell" if scale_idx in (3, 4) else ""
     scale_items = [
         ("강력 매수", "1.0-1.5"),
         ("매수", "1.6-2.0"),
@@ -1651,78 +1763,76 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
         ("강력 매도", "4.1-5.0"),
     ]
     scale_html = "".join(
-        f"<div class='consensus-step {'active' if scale_idx == idx else ''}'><strong>{label}</strong><span>{band}</span></div>"
+        f"<div class='consensus-step {'active ' + scale_tone if scale_idx == idx and scale_tone else 'active' if scale_idx == idx else ''}'><strong>{label}</strong><span>{band}</span></div>"
         for idx, (label, band) in enumerate(scale_items)
     )
-    range_values = [v for v in [price, t_low, t_median, t_mean, t_high] if isinstance(v, (int, float))]
-    range_floor = min(range_values) if range_values else None
-    range_ceiling = max(range_values) if range_values else None
-
-    def _marker_pos(val):
-        if not isinstance(val, (int, float)) or range_floor is None or range_ceiling is None or range_ceiling == range_floor:
-            return None
-        return max(2.0, min(98.0, ((val - range_floor) / (range_ceiling - range_floor)) * 100))
-
-    marker_specs = [
-        ("low", "저가", t_low),
-        ("median", "중앙값", t_median),
-        ("current", "현재가", price),
-        ("high", "고가", t_high),
-    ]
-    range_markers_html = "".join(
-        f"<div class='range-marker {cls}' style='left:{pos:.1f}%'><span>{label}</span></div>"
-        for cls, label, value in marker_specs
-        for pos in [_marker_pos(value)]
-        if pos is not None
-    )
-    range_legend_html = "".join(
-        f"<div class='range-legend-item'><span>{label}</span><strong>{f'${value:,.2f}' if isinstance(value, (int, float)) else 'N/A'}</strong></div>"
-        for label, value in [("현재가", price), ("저가", t_low), ("평균", t_mean), ("중앙값", t_median), ("고가", t_high)]
-    )
+    raw_range_position = ((price - t_low) / (t_high - t_low) * 100) if isinstance(price, (int, float)) and isinstance(t_low, (int, float)) and isinstance(t_high, (int, float)) and t_high != t_low else None
+    range_position_pct = max(0.0, min(100.0, raw_range_position)) if isinstance(raw_range_position, (int, float)) else None
+    if isinstance(raw_range_position, (int, float)):
+        if raw_range_position > 100:
+            range_state = "범위 상단 돌파"
+        elif raw_range_position < 0:
+            range_state = "범위 하단 이탈"
+        elif raw_range_position >= 85:
+            range_state = "범위 상단 근접"
+        elif raw_range_position >= 65:
+            range_state = "범위 상단권"
+        elif raw_range_position >= 35:
+            range_state = "범위 중앙권"
+        else:
+            range_state = "범위 하단권"
+    else:
+        range_state = "범위 정보 부족"
+    target_gap_abs = (up_ref - price) if isinstance(up_ref, (int, float)) and isinstance(price, (int, float)) else None
+    target_gap_text = f"{'+' if target_gap_abs >= 0 else '-'}${abs(target_gap_abs):,.2f}" if isinstance(target_gap_abs, (int, float)) else "N/A"
 
     with st.container(border=True):
         st.markdown('<div class="s-title"><span class="s-num">09</span> 전문가들의 의견 <span style="font-size:.8rem;color:#768390">Yahoo</span></div>', unsafe_allow_html=True)
-        col1, col2 = st.columns([1, 1.3])
+        st.markdown("<div class='section-lead'>컨센서스 숫자만 보기보다 현재가가 목표가 코리도어의 어디쯤 있는지 함께 보면 훨씬 직관적입니다.</div>", unsafe_allow_html=True)
         s9_spotlight = (
-            f"<div class='spotlight-grid'>"
+            f"<div style='display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px'><span class='section-pill {cc_pill_cls}'>{con}</span><span class='section-pill pill-amber'>{rk}</span></div>"
+            f"<div class='spotlight-grid tight'>"
             f"<div class='spotlight-card'><p class='spotlight-label'>컨센서스</p><p class='spotlight-value'>{con}</p><p class='spotlight-sub'>평균 의견 {f'{rm:.2f}/5.0' if isinstance(rm, (int, float)) else 'N/A'}</p></div>"
             f"<div class='spotlight-card'><p class='spotlight-label'>목표가 기대여력</p><p class='spotlight-value' style='color:{'#63D9A2' if isinstance(up_pct, (int, float)) and up_pct >= 0 else '#FF8F96'}'>{up_str}</p><p class='spotlight-sub'>중앙값 또는 평균 목표가 기준</p></div>"
+            f"<div class='spotlight-card'><p class='spotlight-label'>현재가 위치</p><p class='spotlight-value'>{f'{range_position_pct:.0f}%' if isinstance(range_position_pct, (int, float)) else 'N/A'}</p><p class='spotlight-sub'>{range_state}</p></div>"
             f"<div class='spotlight-card'><p class='spotlight-label'>커버리지 수</p><p class='spotlight-value'>{n_ana}명</p><p class='spotlight-sub'>의견을 낸 애널리스트 수</p></div>"
             f"</div>"
         )
-        html_s9_1 = (
-            f"<div style='display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px'><span class='section-pill {cc_pill_cls}'>{con}</span><span class='section-pill pill-amber'>{rk}</span></div>"
-            f"{s9_spotlight}"
-            f"<div class='cluster-card' style='margin-top:14px'>"
+        s9_target_tiles = (
+            f"<div class='target-mini-grid'>"
+            f"<div class='target-mini-card'><p class='target-mini-label'>현재가</p><p class='target-mini-value'>{f'${price:,.2f}' if isinstance(price, (int, float)) else 'N/A'}</p><p class='target-mini-sub'>{range_state}</p></div>"
+            f"<div class='target-mini-card'><p class='target-mini-label'>중앙값 목표가</p><p class='target-mini-value'>{f'${t_median:,.2f}' if isinstance(t_median, (int, float)) else 'N/A'}</p><p class='target-mini-sub'>기대여력 {up_str}</p></div>"
+            f"<div class='target-mini-card'><p class='target-mini-label'>평균 목표가</p><p class='target-mini-value'>{f'${t_mean:,.2f}' if isinstance(t_mean, (int, float)) else 'N/A'}</p><p class='target-mini-sub'>가격 간극 {target_gap_text}</p></div>"
+            f"<div class='target-mini-card'><p class='target-mini-label'>최저 / 최고</p><p class='target-mini-value'>{f'${t_low:,.2f}' if isinstance(t_low, (int, float)) else 'N/A'} · {f'${t_high:,.2f}' if isinstance(t_high, (int, float)) else 'N/A'}</p><p class='target-mini-sub'>스트리트 밴드</p></div>"
+            f"</div>"
+        )
+        s9_scale_html = (
+            f"<div class='cluster-card'>"
             f"<div class='cluster-title'>컨센서스 스케일</div>"
             f"<div class='cluster-sub'>1.0에 가까울수록 강한 매수, 5.0에 가까울수록 강한 매도 의견입니다.</div>"
             f"<div class='consensus-scale'>{scale_html}</div>"
-            f"</div>"
-            f"<div class='cluster-card' style='margin-top:14px'>"
-            f"<div class='cluster-title'>목표가 범위</div>"
-            f"<div class='cluster-sub'>현재가가 애널리스트 목표가 범위의 어느 위치에 있는지 빠르게 읽을 수 있습니다.</div>"
-            f"<div class='range-strip'>{range_markers_html}</div>"
-            f"<div class='range-legend'>{range_legend_html}</div>"
-            f"{_metric_row('최저 목표가', f'${t_low:,.2f}' if isinstance(t_low, (int, float)) else 'N/A')}"
-            f"{_metric_row('평균 목표가', f'${t_mean:,.2f}' if isinstance(t_mean, (int, float)) else 'N/A')}"
-            f"{_metric_row('중앙값 목표가', f'${t_median:,.2f}' if isinstance(t_median, (int, float)) else 'N/A')}"
-            f"{_metric_row('최고 목표가', f'${t_high:,.2f}' if isinstance(t_high, (int, float)) else 'N/A')}"
+            f"{_metric_row('평균 의견', f'{rm:.2f} / 5.0' if isinstance(rm, (int, float)) else 'N/A', 'm-value m-blue')}"
+            f"{_metric_row('현재가 위치', f'{range_position_pct:.0f}%' if isinstance(range_position_pct, (int, float)) else 'N/A', 'm-value')}"
             f"</div>"
         )
         s9_read_html = (
-            f"<div class='cluster-card' style='margin-top:14px'>"
+            f"<div class='insight-shell'>"
             f"<div class='cluster-title'>읽는 법</div>"
-            f"<div class='cluster-sub'>컨센서스는 가격 방향의 힌트일 뿐 확정 신호는 아닙니다. 현재가가 목표가 하단에 가까우면 기대여력이 남아 있을 수 있고, 상단에 가까우면 이미 기대가 상당 부분 반영됐을 수 있습니다.</div>"
+            f"<div class='cluster-sub'>현재가가 코리도어 상단에 가까우면 기대가 이미 많이 반영된 상태일 수 있고, 하단에 가까우면 리레이팅 여지가 남아 있을 수 있습니다. 컨센서스는 방향 힌트이지 확정 시그널은 아닙니다.</div>"
             f"{_metric_row('현재가 vs 목표가', up_str, 'm-green' if isinstance(up_pct, (int, float)) and up_pct >= 0 else 'm-red')}"
             f"{_metric_row('참여 애널리스트', f'{n_ana}명', 'm-value')}"
             f"{_metric_row('추천 키', rk, 'm-value m-blue')}"
+            f"{_metric_row('가격대 해석', range_state, 'm-value')}"
             f"</div>"
         )
+        st.markdown(s9_spotlight, unsafe_allow_html=True)
+        col1, col2 = st.columns([1.12, 0.88])
         with col1:
-            st.markdown(html_s9_1, unsafe_allow_html=True)
-        with col2:
             if fig9: st.plotly_chart(fig9, use_container_width=True, config={'displayModeBar': False}, key=f"{key_prefix}_fig9")
             else: st.markdown("<div class='note-box'>※ 목표가 데이터가 충분하지 않아 차트가 생략되었습니다.</div>", unsafe_allow_html=True)
+            st.markdown(s9_target_tiles, unsafe_allow_html=True)
+        with col2:
+            st.markdown(s9_scale_html, unsafe_allow_html=True)
             st.markdown(s9_read_html, unsafe_allow_html=True)
         st.markdown(_verdict_badge(cc, "", f"애널리스트 {n_ana}명 {rk} (목표가 {up_str})"), unsafe_allow_html=True)
 
