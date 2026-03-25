@@ -590,8 +590,8 @@ def build_chart(dc,ticker):
         yoff=dc['Low']-dc['ATR']*(0.8 if 'Hull' in sn else 1.2 if 'UTBot' in sn else 1.8) if 'Bull' in sn or 'Buy' in sn else dc['High']+dc['ATR']*(0.8 if 'Hull' in sn else 1.2 if 'UTBot' in sn else 1.8)
         _sig_marker(fig,dc,sn,1,yoff,clr,sym,sz,lbl,legendgroup=legendgroup,showlegend=showlegend,visible=visible)
     sb,ss=_collect_strong_markers(dc)
-    _add_trendline_overlays(fig,dc,max_per_side=2,default_visible='legendonly')
-    _add_pattern_overlay(fig,dc,_detect_active_pattern(dc),default_visible='legendonly')
+    _add_trendline_overlays(fig,dc,max_per_side=2,default_visible=True)
+    _add_pattern_overlay(fig,dc,_detect_active_pattern(dc),default_visible=True)
     _add_volume_profile_overlay(fig,dc,default_visible='legendonly')
     if sb.any():
         sr=dc[sb];yv=sr['Low']-sr['ATR']*2;ht=[]
