@@ -1,5 +1,5 @@
 ﻿# ══════════════════════════════════════════════════════════════
-#  Aroven V14.2 — PART 1/4
+#  SIGL — PART 1/4
 #  설정, 레지스트리, 유틸리티, 기술지표
 # ══════════════════════════════════════════════════════════════
 
@@ -20,12 +20,12 @@ from localization import (
     localize_judgment_label,
 )
 from branding import (
+    BRAND_NAME,
     BRAND_PAGE_ICON,
     BRAND_PAGE_TITLE,
     BRAND_REPORT_SLUG,
     INITIAL_MESSAGE_CONTENT,
-    build_brand_hero,
-    build_brand_lockup,
+    build_brand_board,
 )
 st.set_page_config(page_title=BRAND_PAGE_TITLE, page_icon=BRAND_PAGE_ICON, layout="wide", initial_sidebar_state="collapsed")
 
@@ -113,29 +113,55 @@ border:1px solid rgba(99,102,241,.28);border-radius:16px;padding:14px 16px;margi
 .guide-step-title{color:#F8FAFC;font-size:.84rem;font-weight:800;margin:0 0 4px}
 .guide-step-copy{color:#94A3B8;font-size:.77rem;line-height:1.55;margin:0}
 .soft-note{color:#94A3B8;font-size:.76rem;line-height:1.55;margin-top:10px}
-.brand-hero{background:
-linear-gradient(160deg,rgba(9,16,27,.98),rgba(16,24,39,.9)),
-radial-gradient(circle at top right,rgba(125,211,252,.08),transparent 40%);
-border:1px solid rgba(125,211,252,.18);border-radius:20px;padding:18px 20px;margin:0 0 16px;
-box-shadow:0 16px 40px rgba(2,6,23,.28);position:relative;overflow:hidden}
-.brand-lockup{display:flex;align-items:center;gap:14px}
-.brand-lockup-compact{gap:10px}
-.brand-mark{width:58px;height:58px;display:grid;place-items:center;border-radius:18px;
-background:radial-gradient(circle at 30% 30%,rgba(246,195,94,.18),rgba(99,217,162,.06) 40%,rgba(15,23,42,.92) 72%);
-border:1px solid rgba(125,211,252,.18);box-shadow:inset 0 1px 0 rgba(248,250,252,.06),0 12px 24px rgba(2,6,23,.32)}
-.brand-lockup-compact .brand-mark{width:42px;height:42px;border-radius:14px}
-.brand-mark svg{width:100%;height:100%;display:block}
-.brand-copy{min-width:0}
-.brand-kicker{margin:0 0 4px;color:#7DD3FC;font-size:.7rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
-.brand-name-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.brand-wordmark{margin:0;color:#F8FAFC;font-size:1.95rem;font-weight:800;letter-spacing:-.04em;line-height:1}
-.brand-lockup-compact .brand-wordmark{font-size:1.08rem}
-.brand-accent{color:#F6C35E}
-.brand-version{display:inline-flex;align-items:center;padding:3px 9px;border-radius:999px;background:rgba(125,211,252,.12);border:1px solid rgba(125,211,252,.2);color:#D6E8FF;font-size:.68rem;font-weight:800}
-.brand-tagline{margin:6px 0 0;color:#94A3B8;font-size:.82rem;line-height:1.5}
-.brand-summary{margin:14px 0 0;color:#CBD5E1;font-size:.92rem;line-height:1.65;max-width:760px}
-.brand-chip-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
-.brand-chip{display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;background:rgba(226,232,240,.06);border:1px solid rgba(148,163,184,.18);color:#CBD5E1;font-size:.74rem;font-weight:700}
+.sigl-board{--sigl-accent:#A5B4FC;--sigl-accent-soft:rgba(165,180,252,.18);--sigl-accent-strong:rgba(165,180,252,.34);
+background:
+linear-gradient(180deg,rgba(4,7,12,.98),rgba(11,14,20,.98)),
+radial-gradient(circle at top right,rgba(165,180,252,.08),transparent 34%);
+border:1px solid rgba(148,163,184,.16);border-radius:18px;overflow:hidden;position:relative;margin:0 0 16px;
+box-shadow:0 18px 42px rgba(2,6,23,.34)}
+.sigl-board:before{content:"";position:absolute;inset:0;background:
+linear-gradient(90deg,transparent 0,transparent calc(100% - 1px),rgba(148,163,184,.04) calc(100% - 1px)),
+linear-gradient(0deg,transparent 0,transparent calc(100% - 1px),rgba(148,163,184,.04) calc(100% - 1px));
+background-size:28px 28px;pointer-events:none;opacity:.55}
+.sigl-board--bull{--sigl-accent:#63D9A2;--sigl-accent-soft:rgba(99,217,162,.18);--sigl-accent-strong:rgba(99,217,162,.34)}
+.sigl-board--bear{--sigl-accent:#FF8F96;--sigl-accent-soft:rgba(255,143,150,.16);--sigl-accent-strong:rgba(255,143,150,.34)}
+.sigl-board--neutral{--sigl-accent:#F6C35E;--sigl-accent-soft:rgba(246,195,94,.16);--sigl-accent-strong:rgba(246,195,94,.32)}
+.sigl-board--scanner{--sigl-accent:#7DD3FC;--sigl-accent-soft:rgba(125,211,252,.16);--sigl-accent-strong:rgba(125,211,252,.32)}
+.sigl-board-shell{position:relative;display:grid;grid-template-columns:minmax(240px,300px) 1fr;gap:14px;padding:16px}
+.sigl-code-panel,.sigl-data-panel{position:relative;z-index:1}
+.sigl-code-panel{display:flex;flex-direction:column;justify-content:space-between;gap:12px;
+background:linear-gradient(180deg,rgba(9,12,18,.96),rgba(7,10,15,.9));border:1px solid rgba(148,163,184,.14);
+border-radius:14px;padding:14px;box-shadow:inset 0 1px 0 rgba(248,250,252,.04)}
+.sigl-kicker{margin:0;color:var(--sigl-accent);font-size:.72rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
+.sigl-code-row{display:grid;grid-template-columns:repeat(4,minmax(42px,1fr));gap:8px}
+.sigl-code-cell{display:grid;place-items:center;min-height:62px;border-radius:12px;
+background:linear-gradient(180deg,#151A24,#0B0E14);border:1px solid rgba(226,232,240,.10);border-bottom-color:var(--sigl-accent-strong);
+color:#F8FAFC;font-family:"JetBrains Mono","SFMono-Regular",Consolas,monospace;font-size:2rem;font-weight:800;letter-spacing:.08em;
+box-shadow:inset 0 1px 0 rgba(248,250,252,.03)}
+.sigl-code-cell--accent{color:var(--sigl-accent);text-shadow:0 0 16px rgba(255,255,255,.04)}
+.sigl-board-summary{margin:0;color:#94A3B8;font-size:.82rem;line-height:1.55;max-width:30ch}
+.sigl-data-panel{background:linear-gradient(180deg,rgba(9,12,18,.94),rgba(7,10,15,.86));border:1px solid rgba(148,163,184,.14);
+border-radius:14px;padding:12px}
+.sigl-tile-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.sigl-tile{background:linear-gradient(180deg,rgba(15,19,28,.96),rgba(10,13,20,.88));border:1px solid rgba(148,163,184,.12);
+border-radius:12px;padding:10px 12px;min-height:74px;display:flex;flex-direction:column;justify-content:center}
+.sigl-tile-label{margin:0 0 6px;color:#64748B;font-size:.66rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
+.sigl-tile-value{margin:0;color:#F8FAFC;font-size:1.08rem;font-weight:800;line-height:1.2;
+font-family:"JetBrains Mono","SFMono-Regular",Consolas,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sigl-tape{position:relative;z-index:1;border-top:1px solid rgba(148,163,184,.12);background:rgba(7,10,15,.92);overflow:hidden}
+.sigl-tape-track{display:flex;gap:26px;width:max-content;padding:10px 0;animation:siglMarquee 30s linear infinite}
+.sigl-tape-item{display:inline-flex;align-items:center;gap:10px;color:#CBD5E1;font-size:.78rem;font-weight:700;letter-spacing:.04em;white-space:nowrap}
+.sigl-tape-dot{width:7px;height:7px;border-radius:999px;background:var(--sigl-accent);box-shadow:0 0 10px var(--sigl-accent)}
+.sigl-board--compact{margin:12px 0 10px}
+.sigl-board--compact .sigl-board-shell{grid-template-columns:1fr;padding:12px;gap:10px}
+.sigl-board--compact .sigl-code-panel,.sigl-board--compact .sigl-data-panel{padding:10px}
+.sigl-board--compact .sigl-code-cell{min-height:48px;font-size:1.35rem}
+.sigl-board--compact .sigl-board-summary{display:none}
+.sigl-board--compact .sigl-tile-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.sigl-board--compact .sigl-tile{min-height:62px;padding:9px 10px}
+.sigl-board--compact .sigl-tile-value{font-size:.92rem}
+.sigl-board--compact .sigl-tape-track{gap:18px;padding:8px 0;animation-duration:24s}
+@keyframes siglMarquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 div[data-testid="stExpander"]{
   background:linear-gradient(160deg,rgba(15,23,42,.94),rgba(17,24,39,.86))!important;
   border:1px solid rgba(148,163,184,.16)!important;
@@ -240,8 +266,9 @@ div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] blockquote{
   .price-big{font-size:1.78rem}
   .analysis-nav{padding:12px}
   .guide-grid{grid-template-columns:1fr}
-  .brand-hero{padding:16px}
-  .brand-wordmark{font-size:1.55rem}
+  .sigl-board-shell{grid-template-columns:1fr}
+  .sigl-tile-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .sigl-code-cell{min-height:54px;font-size:1.55rem}
 }
 </style>""", unsafe_allow_html=True)
 
@@ -444,6 +471,130 @@ def _show_analysis_toasts(ticker, meta):
     if warning_parts:
         st.toast(" · ".join(warning_parts[:2]), icon='⚠️')
 
+def _format_board_text(value, fallback="--"):
+    text = str(value).strip() if value is not None else ""
+    return text or fallback
+
+def _format_board_es(value):
+    try:
+        return f"{float(value):+.1f}"
+    except (TypeError, ValueError):
+        return "--"
+
+def _short_period_label(period_label):
+    return {
+        '3개월': '3M',
+        '6개월': '6M',
+        '1년': '1Y',
+        '2년': '2Y',
+    }.get(str(period_label).strip(), _format_board_text(period_label))
+
+def _latest_analysis_message():
+    for msg in reversed(st.session_state.get('messages', [])):
+        if msg.get("type") == "analysis":
+            return msg
+    return None
+
+def _resolve_board_tone(mode_label, judgment, es_value):
+    judgment_text = str(judgment or "")
+    judgment_key = judgment_text.upper()
+    if 'BUY' in judgment_key or '매수' in judgment_text:
+        return 'bull'
+    if 'SELL' in judgment_key or '매도' in judgment_text:
+        return 'bear'
+    try:
+        numeric_es = float(es_value)
+    except (TypeError, ValueError):
+        numeric_es = 0.0
+    if mode_label == 'SCANNER':
+        if numeric_es > 10:
+            return 'bull'
+        if numeric_es < -10:
+            return 'bear'
+        return 'scanner'
+    return 'neutral'
+
+def _build_brand_payload(current_mode, chart_period):
+    mode_label = 'SCANNER' if current_mode == '스캐너' else 'ANALYSIS'
+    period_label = _short_period_label(chart_period)
+
+    if current_mode == '스캐너':
+        results = st.session_state.get('scan_results', [])
+        focus_idx = st.session_state.get('scan_focus_idx')
+        focus_row = None
+        if results:
+            if isinstance(focus_idx, int) and 0 <= focus_idx < len(results):
+                focus_row = results[focus_idx]
+            else:
+                focus_row = results[0]
+
+        selected_sector = _format_board_text(st.session_state.get('selected_sector'), fallback='READY')
+        focus = _format_board_text(focus_row.get('ticker') if focus_row else selected_sector, fallback='READY')
+        es_value = focus_row.get('es') if focus_row else None
+        judgment = _format_board_text(focus_row.get('jg_key') if focus_row else 'READY', fallback='READY')
+        context = _format_board_text(
+            focus_row.get('ctx') if focus_row else (selected_sector if selected_sector != 'READY' else 'STANDBY'),
+            fallback='STANDBY'
+        )
+        scan_source = _format_board_text(st.session_state.get('scan_source'), fallback='WATCHLIST').upper()
+        summary = "Let the quieter market signal rise to the top before you drill down."
+        marquee_items = [
+            f"{BRAND_NAME} {mode_label} ACTIVE",
+            f"FOCUS {focus}",
+            f"ES {_format_board_es(es_value)}",
+            f"JUDG {judgment}",
+            f"CTX {context}",
+            f"SOURCE {scan_source}",
+            f"COUNT {len(results)}",
+            f"PERIOD {period_label}",
+        ]
+        return {
+            'brand_code': BRAND_NAME,
+            'mode': mode_label,
+            'focus': focus,
+            'es': _format_board_es(es_value),
+            'judgment': judgment,
+            'context': context,
+            'period': period_label,
+            'marquee_items': marquee_items,
+            'summary': summary,
+            'status_tone': _resolve_board_tone(mode_label, judgment, es_value),
+        }
+
+    analysis_msg = _latest_analysis_message()
+    meta = analysis_msg.get('meta') if analysis_msg else None
+    focus = _format_board_text((analysis_msg or {}).get('ticker') or st.session_state.get('last_ticker'), fallback='WAIT').upper()
+    es_value = meta.get('ensemble_score') if meta else None
+    judgment = _format_board_text(meta.get('judgment') if meta else 'IDLE', fallback='IDLE')
+    context = _format_board_text(meta.get('context_label') if meta else 'STANDBY', fallback='STANDBY')
+    summary = (
+        f"Quiet signal first. Then structure. Then conviction. {meta.get('action_label')} is live on {focus}."
+        if meta and meta.get('action_label')
+        else "Built to read the quieter market signal before price gets loud."
+    )
+    marquee_items = [
+        f"{BRAND_NAME} {mode_label} ACTIVE",
+        f"FOCUS {focus}",
+        f"ES {_format_board_es(es_value)}",
+        f"JUDG {judgment}",
+        f"CTX {context}",
+        f"PERIOD {period_label}",
+    ]
+    if meta:
+        marquee_items.append(f"B{int(meta.get('buy_agree', 0))}:S{int(meta.get('sell_agree', 0))}")
+    return {
+        'brand_code': BRAND_NAME,
+        'mode': mode_label,
+        'focus': focus,
+        'es': _format_board_es(es_value),
+        'judgment': judgment,
+        'context': context,
+        'period': period_label,
+        'marquee_items': marquee_items,
+        'summary': summary,
+        'status_tone': _resolve_board_tone(mode_label, judgment, es_value),
+    }
+
 def _render_scanner_guide(tickers, scan_source):
     target_count = len(tickers)
     source_label = scan_source or "직접"
@@ -495,13 +646,13 @@ def _render_analysis_guide():
     )
 
 with st.sidebar:
-    st.markdown(build_brand_lockup("Market judgment studio", compact=True, kicker="Sidebar"), unsafe_allow_html=True)
-    st.markdown("---")
     _mi = 0 if st.session_state.get('_mode', '분석') == '분석' else 1
     app_mode = st.radio("모드", ['분석', '스캐너'], index=_mi)
     st.session_state['_mode'] = app_mode
     chart_period = st.radio("기간", ['3개월', '6개월', '1년', '2년'], index=1, horizontal=True, key="period")
     chart_days = {'3개월': 63, '6개월': 126, '1년': 252, '2년': 504}[chart_period]
+    st.markdown(build_brand_board(_build_brand_payload(app_mode, chart_period), compact=True), unsafe_allow_html=True)
+    st.markdown("---")
     if st.button("🗑️ 초기화", use_container_width=True, type="secondary"):
         reset_session()
         st.rerun()
@@ -510,19 +661,13 @@ with st.sidebar:
         _render_analysis_sidebar_nav()
 
 current_mode = st.session_state.get('_mode', '분석')
+main_board_payload = _build_brand_payload(current_mode, chart_period)
 
 # ══════════════════════════════════════════════════════════════
 #  스캐너 모드
 # ══════════════════════════════════════════════════════════════
 if current_mode == '스캐너':
-    st.markdown(
-        build_brand_hero(
-            "Scanner Mode",
-            "섹터 유니버스를 훑고, 우선순위가 높은 종목부터 바로 심층 분석으로 연결합니다.",
-            chips=["Priority score", "ES direction", "One-click deep dive"],
-        ),
-        unsafe_allow_html=True,
-    )
+    st.markdown(build_brand_board(main_board_payload), unsafe_allow_html=True)
     all_universe = sorted({str(t).strip().upper() for ts in SECTOR_GROUPS.values() for t in ts if str(t).strip()})
 
     st.markdown("#### 📂 섹터 선택")
@@ -883,14 +1028,7 @@ if current_mode == '스캐너':
 #  분석 모드
 # ══════════════════════════════════════════════════════════════
 else:
-    st.markdown(
-        build_brand_hero(
-            "Analysis Mode",
-            "5위원회 종합 판단, 시장 맥락, 구조 점검, AI 리포트를 한 흐름으로 묶은 프리미엄 분석 워크스테이션입니다.",
-            chips=["5-Committee audit", "VP / RR structure", "AI devil's advocate"],
-        ),
-        unsafe_allow_html=True,
-    )
+    st.markdown(build_brand_board(main_board_payload), unsafe_allow_html=True)
     _render_analysis_guide()
 
     if not st.session_state.last_ticker:

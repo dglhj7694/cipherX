@@ -1,71 +1,88 @@
 import html
 
-BRAND_NAME = "Aroven"
-BRAND_VERSION = "V14.2"
-BRAND_PAGE_TITLE = f"{BRAND_NAME} {BRAND_VERSION}"
-BRAND_PAGE_ICON = "🧭"
-BRAND_TAGLINE = "Clarity before conviction"
-BRAND_REPORT_SLUG = "aroven"
+BRAND_NAME = "SIGL"
+BRAND_PAGE_TITLE = BRAND_NAME
+BRAND_PAGE_ICON = "📶"
+BRAND_REPORT_SLUG = "sigl"
 
 INITIAL_MESSAGE_CONTENT = (
-    f"{BRAND_PAGE_ICON} **{BRAND_PAGE_TITLE}**\n"
+    f"{BRAND_PAGE_ICON} **{BRAND_NAME}**\n"
     "티커를 입력하거나 사이드바의 **스캐너**에서 여러 종목을 먼저 살펴보세요."
 )
 
-
-def _brand_mark_svg():
-    return """
-    <svg viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <defs>
-            <linearGradient id="aroven-ring" x1="18" y1="18" x2="78" y2="78" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stop-color="#E2E8F0" />
-                <stop offset="100%" stop-color="#7DD3FC" />
-            </linearGradient>
-            <linearGradient id="aroven-needle" x1="48" y1="18" x2="48" y2="78" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stop-color="#F6C35E" />
-                <stop offset="100%" stop-color="#63D9A2" />
-            </linearGradient>
-        </defs>
-        <circle cx="48" cy="48" r="26" stroke="url(#aroven-ring)" stroke-width="4" opacity="0.92" />
-        <circle cx="48" cy="48" r="18" stroke="#22314A" stroke-width="1.5" opacity="0.9" />
-        <path d="M48 18L58 47L48 78L38 47L48 18Z" fill="url(#aroven-needle)" />
-        <path d="M48 18L62 33" stroke="#F8FAFC" stroke-width="2" stroke-linecap="round" opacity="0.78" />
-        <path d="M48 78L34 63" stroke="#0F172A" stroke-width="2" stroke-linecap="round" opacity="0.48" />
-        <circle cx="48" cy="48" r="5" fill="#F8FAFC" />
-        <circle cx="67" cy="29" r="3" fill="#F6C35E" />
-    </svg>
-    """
+_BOARD_FIELDS = (
+    ("MODE", "mode"),
+    ("FOCUS", "focus"),
+    ("ES", "es"),
+    ("JUDG", "judgment"),
+    ("CTX", "context"),
+    ("PERIOD", "period"),
+)
 
 
-def build_brand_lockup(subtitle=BRAND_TAGLINE, compact=False, kicker=None):
-    wrapper_class = "brand-lockup brand-lockup-compact" if compact else "brand-lockup"
-    kicker_html = f"<p class='brand-kicker'>{html.escape(kicker)}</p>" if kicker else ""
-    subtitle_html = f"<p class='brand-tagline'>{html.escape(subtitle)}</p>" if subtitle else ""
-    return f"""
-    <div class="{wrapper_class}">
-        <div class="brand-mark">{_brand_mark_svg()}</div>
-        <div class="brand-copy">
-            {kicker_html}
-            <div class="brand-name-row">
-                <p class="brand-wordmark">Aro<span class="brand-accent">v</span>en</p>
-                <span class="brand-version">{BRAND_VERSION}</span>
+def _esc(value, fallback="--"):
+    text = str(value).strip() if value is not None else ""
+    return html.escape(text or fallback)
+
+
+def _build_code_cells(brand_code):
+    letters = list((brand_code or BRAND_NAME).upper())[:4]
+    if len(letters) < 4:
+        letters.extend([""] * (4 - len(letters)))
+    cells = []
+    for idx, letter in enumerate(letters):
+        accent = " sigl-code-cell--accent" if idx in (0, len(letters) - 1) else ""
+        cells.append(f"<span class='sigl-code-cell{accent}'>{_esc(letter, '&nbsp;')}</span>")
+    return "".join(cells)
+
+
+def _build_metric_tiles(payload):
+    tiles = []
+    for label, key in _BOARD_FIELDS:
+        tiles.append(
+            f"""
+            <div class="sigl-tile">
+                <p class="sigl-tile-label">{label}</p>
+                <p class="sigl-tile-value">{_esc(payload.get(key))}</p>
             </div>
-            {subtitle_html}
-        </div>
-    </div>
-    """
+            """
+        )
+    return "".join(tiles)
 
 
-def build_brand_hero(mode_label, summary, chips=None):
-    chips = chips or []
-    chips_html = "".join(
-        f"<span class='brand-chip'>{html.escape(chip)}</span>"
-        for chip in chips
+def _build_marquee(items):
+    clean_items = [str(item).strip() for item in (items or []) if str(item).strip()]
+    if not clean_items:
+        clean_items = [BRAND_NAME, "SIGNAL DESK", "READY"]
+    repeated = clean_items + clean_items
+    return "".join(
+        f"<span class='sigl-tape-item'><span class='sigl-tape-dot'></span>{html.escape(item)}</span>"
+        for item in repeated
     )
+
+
+def build_brand_board(payload, compact=False):
+    board_class = "sigl-board sigl-board--compact" if compact else "sigl-board"
+    tone = str(payload.get("status_tone", "neutral")).strip().lower()
+    if tone in {"bull", "bear", "neutral", "scanner"}:
+        board_class += f" sigl-board--{tone}"
+    mode = _esc(payload.get("mode"), "STANDBY")
+    summary = _esc(payload.get("summary"), "")
+    summary_html = f"<p class='sigl-board-summary'>{summary}</p>" if summary else ""
     return f"""
-    <div class="brand-hero fade-up">
-        {build_brand_lockup(BRAND_TAGLINE, compact=False, kicker=mode_label)}
-        <p class="brand-summary">{html.escape(summary)}</p>
-        <div class="brand-chip-row">{chips_html}</div>
+    <div class="{board_class}">
+        <div class="sigl-board-shell">
+            <div class="sigl-code-panel">
+                <p class="sigl-kicker">{mode} DESK</p>
+                <div class="sigl-code-row">{_build_code_cells(payload.get("brand_code"))}</div>
+                {summary_html}
+            </div>
+            <div class="sigl-data-panel">
+                <div class="sigl-tile-grid">{_build_metric_tiles(payload)}</div>
+            </div>
+        </div>
+        <div class="sigl-tape">
+            <div class="sigl-tape-track">{_build_marquee(payload.get("marquee_items"))}</div>
+        </div>
     </div>
     """
