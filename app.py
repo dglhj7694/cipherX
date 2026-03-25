@@ -28,19 +28,19 @@ div.stButton>button[kind="primary"]{background:linear-gradient(135deg,#6366F1,#8
 div.stButton>button[kind="secondary"]{background-color:#12161F!important;color:#C4CDD8!important;border:1px solid #2A3040!important;border-radius:12px!important;width:100%}
 .price-header{background:linear-gradient(160deg,#0F1320,#141926);border:1px solid #1C2233;border-radius:16px;padding:20px 24px;margin-bottom:18px}
 .price-big{font-size:2.2rem;font-weight:800;margin:0}
-.price-change-up{color:#34D399!important} .price-change-down{color:#F87171!important}
+.price-change-up{color:#7ED8B6!important} .price-change-down{color:#F3A5A5!important}
 .ind-mini{display:inline-block;padding:4px 10px;margin:2px;border-radius:8px;font-size:.76rem;font-weight:600}
-.ind-b{background:rgba(16,185,129,.12);color:#6EE7B7}
-.ind-s{background:rgba(239,68,68,.12);color:#FCA5A5}
-.ind-n{background:rgba(245,158,11,.10);color:#FCD34D}
+.ind-b{background:rgba(126,216,182,.14);color:#A7E7CF}
+.ind-s{background:rgba(243,165,165,.14);color:#F6C2C2}
+.ind-n{background:rgba(245,199,123,.12);color:#F5D79A}
 .layer-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)}
 .layer-bar{background:#151921;border-radius:4px;height:8px;flex:1;margin:0 8px;overflow:hidden}
-.layer-fill-b{height:8px;border-radius:4px;background:linear-gradient(90deg,#059669,#34D399)}
-.layer-fill-s{height:8px;border-radius:4px;background:linear-gradient(90deg,#DC2626,#F87171)}
+.layer-fill-b{height:8px;border-radius:4px;background:linear-gradient(90deg,#356D5E,#7ED8B6)}
+.layer-fill-s{height:8px;border-radius:4px;background:linear-gradient(90deg,#8F5A5A,#F3A5A5)}
 .score-card{border-radius:14px;padding:20px;text-align:center;position:relative;overflow:hidden}
-.score-card-buy{background:linear-gradient(160deg,#052E16,#0D1B2A);border:1px solid rgba(16,185,129,.25)}
-.score-card-sell{background:linear-gradient(160deg,#2A0E0E,#1B0D1B);border:1px solid rgba(239,68,68,.25)}
-.score-card-neutral{background:linear-gradient(160deg,#1A1608,#1B1A0D);border:1px solid rgba(245,158,11,.2)}
+.score-card-buy{background:linear-gradient(160deg,#10211C,#101C24);border:1px solid rgba(126,216,182,.22)}
+.score-card-sell{background:linear-gradient(160deg,#241515,#16131B);border:1px solid rgba(243,165,165,.22)}
+.score-card-neutral{background:linear-gradient(160deg,#1D180F,#19160F);border:1px solid rgba(245,199,123,.18)}
 .fade-up{animation:fadeUp .35s ease both}
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 .conf-ring{position:relative;width:80px;height:80px;display:inline-block}
@@ -49,9 +49,9 @@ div.stButton>button[kind="secondary"]{background-color:#12161F!important;color:#
 .ring-fg{fill:none;stroke-width:8;stroke-linecap:round}
 .ring-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:.92rem;font-weight:800}
 .vote-dot{width:8px;height:8px;border-radius:999px;display:inline-block}
-.vote-dot.buy{background:#34D399;box-shadow:0 0 7px rgba(52,211,153,.65)}
-.vote-dot.sell{background:#F87171;box-shadow:0 0 7px rgba(248,113,113,.65)}
-.vote-dot.neutral{background:#FF9800;box-shadow:0 0 7px rgba(255,152,0,.55)}
+.vote-dot.buy{background:#7ED8B6;box-shadow:0 0 7px rgba(126,216,182,.5)}
+.vote-dot.sell{background:#F3A5A5;box-shadow:0 0 7px rgba(243,165,165,.5)}
+.vote-dot.neutral{background:#F5C77B;box-shadow:0 0 7px rgba(245,199,123,.45)}
 .vote-dot.abstain{background:#64748B}
 .cm-card{background:rgba(255,255,255,.03);border:1px solid rgba(148,163,184,.12);border-radius:10px;padding:10px}
 .cm-name{color:#94A3B8;font-size:.7rem;font-weight:700;margin:0 0 4px}
@@ -60,10 +60,10 @@ div.stButton>button[kind="secondary"]{background-color:#12161F!important;color:#
 .cm-mini-bar{height:4px;background:rgba(148,163,184,.18);border-radius:999px;overflow:hidden;margin-top:6px}
 .cm-mini-fill{height:100%;border-radius:999px}
 .tow-bar{position:relative;height:14px;border-radius:999px;background:rgba(148,163,184,.15);overflow:hidden}
-.tow-buy{position:absolute;right:50%;top:0;bottom:0;background:linear-gradient(90deg,#065F46,#34D399)}
-.tow-sell{position:absolute;left:50%;top:0;bottom:0;background:linear-gradient(90deg,#F87171,#7F1D1D)}
+.tow-buy{position:absolute;right:50%;top:0;bottom:0;background:linear-gradient(90deg,#3E6D60,#7ED8B6)}
+.tow-sell{position:absolute;left:50%;top:0;bottom:0;background:linear-gradient(90deg,#F3A5A5,#7A4D4D)}
 .tow-center{position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(226,232,240,.55)}
-.stat-mini{background:rgba(255,255,255,.03);border:1px solid #1E293B;border-radius:10px;padding:10px 8px;text-align:center}
+.stat-mini{background:rgba(255,255,255,.025);border:1px solid rgba(148,163,184,.16);border-radius:10px;padding:10px 8px;text-align:center;min-height:78px;display:flex;flex-direction:column;justify-content:center}
 .sm-label{color:#64748B;font-size:.66rem;font-weight:700;margin:0 0 4px}
 .sm-value{color:#E2E8F0;font-size:1rem;font-weight:800;margin:0}
 .cs-card{border-radius:10px;padding:10px 14px;margin:5px 0;border-left:4px solid}
@@ -88,12 +88,26 @@ div[data-testid="stToast"] p{color:#E8ECF1!important;font-weight:600!important}
 .analysis-nav-sub{color:#94A3B8;font-size:.78rem}
 .analysis-nav-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.24);color:#C7D2FE;font-size:.74rem;font-weight:700}
 .prompt-caption{color:#94A3B8;font-size:.74rem;font-weight:700;margin-bottom:8px}
+.guide-card{background:linear-gradient(160deg,rgba(15,23,42,.92),rgba(15,23,42,.78));border:1px solid rgba(148,163,184,.18);border-radius:16px;padding:14px 16px;margin:0 0 14px;box-shadow:0 14px 32px rgba(2,6,23,.18)}
+.guide-kicker{color:#A5B4FC;font-size:.75rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;margin:0 0 8px}
+.guide-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.guide-step{background:rgba(255,255,255,.03);border:1px solid rgba(148,163,184,.12);border-radius:12px;padding:12px 13px}
+.guide-step-title{color:#F8FAFC;font-size:.84rem;font-weight:800;margin:0 0 4px}
+.guide-step-copy{color:#94A3B8;font-size:.77rem;line-height:1.55;margin:0}
+.soft-note{color:#94A3B8;font-size:.76rem;line-height:1.55;margin-top:10px}
+@media (max-width:900px){
+  .block-container{padding-left:1rem!important;padding-right:1rem!important}
+  .price-header{padding:16px 18px}
+  .price-big{font-size:1.78rem}
+  .analysis-nav{padding:12px}
+  .guide-grid{grid-template-columns:1fr}
+}
 </style>""", unsafe_allow_html=True)
 
 INITIAL_MESSAGE = {
     "role": "assistant",
     "type": "text",
-    "content": "🚦 **CipherX V14.2**\n**티커명**을 입력하세요.",
+    "content": "🚦 **CipherX V14.2**\n티커를 입력하거나 사이드바에서 **스캐너 모드**로 여러 종목을 먼저 훑어보세요.",
 }
 
 
@@ -289,6 +303,58 @@ def _show_analysis_toasts(ticker, meta):
     if warning_parts:
         st.toast(" | ".join(warning_parts[:2]), icon='⚠️')
 
+def _render_scanner_guide(tickers, scan_source):
+    target_count = len(tickers)
+    source_label = scan_source or "직접"
+    st.markdown(
+        f"""
+        <div class="guide-card fade-up">
+            <p class="guide-kicker">Scanner Guide</p>
+            <div class="guide-grid">
+                <div class="guide-step">
+                    <p class="guide-step-title">1. 유니버스 선택</p>
+                    <p class="guide-step-copy">섹터 버튼이나 직접 입력으로 스캔 대상을 정합니다. 지금 준비된 종목은 <b style="color:#F8FAFC">{target_count}개</b>, 출처는 <b style="color:#F8FAFC">{source_label}</b>입니다.</p>
+                </div>
+                <div class="guide-step">
+                    <p class="guide-step-title">2. 점수와 강도 확인</p>
+                    <p class="guide-step-copy"><b>SCAN</b>은 우선순위, <b>ES</b>는 방향성입니다. 멀티시그널과 최근 콤보가 겹칠수록 상단에 배치됩니다.</p>
+                </div>
+                <div class="guide-step">
+                    <p class="guide-step-title">3. 바로 분석으로 이동</p>
+                    <p class="guide-step-copy">카드의 <b>분석</b> 버튼을 누르면 분석 모드로 넘어가고, 사이드바의 Scan Navigator로 이전/다음 종목을 빠르게 넘길 수 있습니다.</p>
+                </div>
+            </div>
+            <p class="soft-note">스캐너는 병렬로 동작하므로 완료 순서는 섞일 수 있습니다. 최종 결과는 스캔 점수 기준으로 다시 정렬됩니다.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+def _render_analysis_guide():
+    st.markdown(
+        """
+        <div class="guide-card fade-up">
+            <p class="guide-kicker">How To Read</p>
+            <div class="guide-grid">
+                <div class="guide-step">
+                    <p class="guide-step-title">1. Action / Confidence</p>
+                    <p class="guide-step-copy">먼저 최종 액션과 신뢰도를 보고, 그 아래 근거 요약으로 방향성의 중심 논리를 빠르게 확인합니다.</p>
+                </div>
+                <div class="guide-step">
+                    <p class="guide-step-title">2. Risk Check</p>
+                    <p class="guide-step-copy">스마트 머니 다이버전스, R:R, 저거래량, 과열 위험이 있으면 여기서 먼저 경고를 확인하세요.</p>
+                </div>
+                <div class="guide-step">
+                    <p class="guide-step-title">3. 차트와 AI 리포트</p>
+                    <p class="guide-step-copy">차트 탭에서 VP/강신호/캔들 툴팁으로 타이밍을 보고, AI 리포트는 마지막 정리용 보조 의견으로 활용하면 좋습니다.</p>
+                </div>
+            </div>
+            <p class="soft-note">최근 분석은 펼쳐서 보여주고, 이전 분석과 AI 리포트는 접힌 상태로 정리해 스크롤 부담을 줄였습니다.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
 with st.sidebar:
     st.markdown("## 🚦 CipherX V14.2")
     st.markdown("---")
@@ -361,6 +427,8 @@ if current_mode == '스캐너':
         scan_source = "직접"
     tickers = list(dict.fromkeys([t for t in tickers if t]))
 
+    _render_scanner_guide(tickers, scan_source)
+
     cb1, cb2 = st.columns([3, 1])
     with cb1:
         scan_btn = st.button(f"🚀 스캔({len(tickers)})", type="primary", use_container_width=True)
@@ -376,8 +444,12 @@ if current_mode == '스캐너':
             st.session_state['scan_nav_select_idx'] = None
             st.rerun()
 
+    if scan_btn and not tickers:
+        st.warning("스캔할 티커가 없습니다. 섹터를 고르거나 직접 티커를 입력해 주세요.")
+
     if scan_btn and tickers:
         pb = st.progress(0)
+        scan_note = st.empty()
         results = []
         sts = math.floor(time.time() / 300)
 
@@ -533,15 +605,24 @@ if current_mode == '스캐너':
             except Exception:
                 return None
 
-        # 병렬 스캔 실행
-        with ThreadPoolExecutor(max_workers=min(16, max(4, len(tickers) // 8), len(tickers))) as ex:
-            futs = {ex.submit(_so, t): t for t in tickers}
-            for idx_f, f in enumerate(as_completed(futs)):
-                pb.progress((idx_f + 1) / len(tickers))
-                r = f.result()
-                if r:
-                    results.append(r)
+        with st.status(f"🔍 {len(tickers)}개 종목 스캔 준비 중...", expanded=True) as scan_status:
+            scan_note.caption("1/3 시그널 레지스트리와 캐시 상태를 확인했습니다.")
+
+            # 병렬 스캔 실행
+            scan_note.caption("2/3 병렬 스캔을 시작합니다. 최근 완료 종목이 아래에 표시됩니다.")
+            with ThreadPoolExecutor(max_workers=min(16, max(4, len(tickers) // 8), len(tickers))) as ex:
+                futs = {ex.submit(_so, t): t for t in tickers}
+                for idx_f, f in enumerate(as_completed(futs)):
+                    done_ticker = futs[f]
+                    pb.progress((idx_f + 1) / len(tickers))
+                    scan_note.caption(f"병렬 스캔 중 · 최근 완료 {done_ticker} · {idx_f + 1}/{len(tickers)}")
+                    r = f.result()
+                    if r:
+                        results.append(r)
+            scan_note.caption("3/3 결과를 정렬하고 스캐너 카드를 준비합니다.")
+            scan_status.update(label=f"✅ 스캔 완료 · 결과 {len(results)}개", state="complete", expanded=False)
         pb.empty()
+        scan_note.empty()
 
         results.sort(key=lambda x: (-x['scan_score'], -x['strength'], -x['latest_sig_ts'], x['ticker']))
         st.session_state['scan_results'] = results
@@ -557,14 +638,15 @@ if current_mode == '스캐너':
         bt_  = [r for r in results if 'BUY'  in r['jg']]
         st_  = [r for r in results if 'SELL' in r['jg']]
         scan_total = st.session_state.get('scan_total', 0)
+        st.caption("정렬 기준: Scan Score → Strength → 최근 시그널 순서입니다.")
 
         st.markdown(
             f"<div style='display:flex;gap:12px;margin-bottom:12px'>"
-            f"<div style='flex:1;background:rgba(0,230,118,.06);border:1px solid #10B98133;border-radius:10px;padding:10px;text-align:center'>"
-            f"<span style='color:#34D399;font-weight:800;font-size:1.3rem'>{len(bt_)}</span>"
+            f"<div style='flex:1;background:rgba(126,216,182,.08);border:1px solid rgba(126,216,182,.24);border-radius:10px;padding:10px;text-align:center'>"
+            f"<span style='color:#7ED8B6;font-weight:800;font-size:1.3rem'>{len(bt_)}</span>"
             f"<span style='color:#64748B;font-size:.8rem'> 매수</span></div>"
-            f"<div style='flex:1;background:rgba(255,23,68,.06);border:1px solid #EF444433;border-radius:10px;padding:10px;text-align:center'>"
-            f"<span style='color:#F87171;font-weight:800;font-size:1.3rem'>{len(st_)}</span>"
+            f"<div style='flex:1;background:rgba(243,165,165,.08);border:1px solid rgba(243,165,165,.24);border-radius:10px;padding:10px;text-align:center'>"
+            f"<span style='color:#F3A5A5;font-weight:800;font-size:1.3rem'>{len(st_)}</span>"
             f"<span style='color:#64748B;font-size:.8rem'> 매도</span></div>"
             f"<div style='flex:1;background:rgba(99,102,241,.06);border:1px solid #6366F133;border-radius:10px;padding:10px;text-align:center'>"
             f"<span style='color:#A5B4FC;font-weight:800;font-size:1.3rem'>{len(results)}</span>"
@@ -573,9 +655,9 @@ if current_mode == '스캐너':
         )
 
         for rk, r in enumerate(results, start=1):
-            chc = '#34D399' if r['chg'] >= 0 else '#F87171'
+            chc = '#7ED8B6' if r['chg'] >= 0 else '#F3A5A5'
             chi = '▲' if r['chg'] >= 0 else '▼'
-            jc  = '#34D399' if 'BUY' in r['jg'] else ('#F87171' if 'SELL' in r['jg'] else '#FCD34D')
+            jc  = '#7ED8B6' if 'BUY' in r['jg'] else ('#F3A5A5' if 'SELL' in r['jg'] else '#F5D79A')
 
             # 콤보 스캔 목록은 mx 배지 태그로만 표시 — 불릿 리스트(sh) 제거
 
@@ -583,7 +665,7 @@ if current_mode == '스캐너':
             th = "".join([
                 f"<span style='display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;"
                 f"background:rgba({'52,211,153' if t['dir']=='buy' else '248,113,113'},.12);"
-                f"color:{'#34D399' if t['dir']=='buy' else '#F87171'};"
+                f"color:{'#7ED8B6' if t['dir']=='buy' else '#F3A5A5'};"
                 f"font-size:.72rem;font-weight:700;margin-right:6px'>{t['icon']} {t['label']} {t['date']}</span>"
                 for t in r.get('transitions', [])
             ]) if r.get('transitions') else "<span style='color:#475569;font-size:.78rem'>UT/HULL 전환 없음</span>"
@@ -593,7 +675,7 @@ if current_mode == '스캐너':
                 f"<div style='margin:6px 0 2px'>"
                 f"<span style='display:inline-block;padding:2px 8px;border-radius:999px;"
                 f"background:rgba({'52,211,153' if r.get('multi_sig') else '148,163,184'},.16);"
-                f"color:{'#34D399' if r.get('multi_sig') else '#94A3B8'};"
+                f"color:{'#7ED8B6' if r.get('multi_sig') else '#94A3B8'};"
                 f"font-size:.72rem;font-weight:700'>"
                 f"MULTI-SIGNAL {'ON' if r.get('multi_sig') else 'OFF'} ({r.get('multi_cnt', 0)})</span>"
                 f"<span style='color:#64748B;font-size:.7rem;margin-left:6px'>"
@@ -606,20 +688,20 @@ if current_mode == '스캐너':
                 f"<span style='display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:999px;"
                 f"background:rgba({'52,211,153' if m['dir']=='buy' else '248,113,113' if m['dir']=='sell' else '148,163,184'},.10);"
                 f"border:1px solid rgba(148,163,184,.25);"
-                f"color:{'#86EFAC' if m['dir']=='buy' else '#FCA5A5' if m['dir']=='sell' else '#CBD5E1'};"
+                f"color:{'#A7E7CF' if m['dir']=='buy' else '#F6C2C2' if m['dir']=='sell' else '#CBD5E1'};"
                 f"font-size:.7rem;font-weight:600;margin:2px 4px 2px 0'>"
                 f"{m['icon']} {m['label']} {m['date']}</span>"
                 for m in r.get('multi_hits', [])
             ]) if r.get('multi_hits') else "<span style='color:#475569;font-size:.74rem'>최근 3일 다중시그널 후보 없음</span>"
 
-            esc = '#34D399' if r['es'] > 10 else ('#F87171' if r['es'] < -10 else '#FCD34D')
+            esc = '#7ED8B6' if r['es'] > 10 else ('#F3A5A5' if r['es'] < -10 else '#F5D79A')
             bd  = '#1E293B' if r['scans'] else '#0F172A'
             op  = '1' if r['scans'] else '.6'
-            sc  = '#34D399' if r['scan_score'] > 0 else ('#F87171' if r['scan_score'] < 0 else '#FCD34D')
+            sc  = '#7ED8B6' if r['scan_score'] > 0 else ('#F3A5A5' if r['scan_score'] < 0 else '#F5D79A')
 
             rh = ""
             if r.get('reason'):
-                rc = '#6EE7B7' if 'BUY' in r['jg'] else ('#FCA5A5' if 'SELL' in r['jg'] else '#FCD34D')
+                rc = '#A7E7CF' if 'BUY' in r['jg'] else ('#F6C2C2' if 'SELL' in r['jg'] else '#F5D79A')
                 rh = (f"<div style='padding:4px 0;border-top:1px solid rgba(255,255,255,.04);margin-top:4px'>"
                       f"<span style='color:{rc};font-size:.78rem'>💬 {r['reason'][:80]}</span></div>")
 
@@ -653,6 +735,7 @@ if current_mode == '스캐너':
 else:
     st.markdown("<h2 style='text-align:center;color:#fff;margin-bottom:4px'>🚦 CipherX V14.2</h2>", unsafe_allow_html=True)
     st.markdown("<p style='text-align:center;color:#64748B;margin-bottom:16px'>5-Committee Ensemble + Prediction + Auto Reason</p>", unsafe_allow_html=True)
+    _render_analysis_guide()
 
     if not st.session_state.last_ticker:
         cols = st.columns(4)
@@ -661,13 +744,23 @@ else:
                 if st.button(t, use_container_width=True):
                     st.session_state['quick'] = t
 
+    analysis_indices = [i for i, msg in enumerate(st.session_state.messages) if msg.get("type") == "analysis"]
+    report_indices = [i for i, msg in enumerate(st.session_state.messages) if msg.get("type") == "report"]
+    latest_analysis_idx = analysis_indices[-1] if analysis_indices else None
+    latest_report_idx = report_indices[-1] if report_indices else None
+
     for i, msg in enumerate(st.session_state.messages):
         av = "✨" if msg["role"] == "assistant" else "🧑‍💻"
         with st.chat_message(msg["role"], avatar=av):
             if msg.get("type") == "analysis":
-                render_analysis(msg, key_prefix=f"analysis_{i}_{msg.get('ticker', 'na')}")
+                is_latest_analysis = i == latest_analysis_idx
+                if is_latest_analysis:
+                    render_analysis(msg, key_prefix=f"analysis_{i}_{msg.get('ticker', 'na')}")
+                else:
+                    with st.expander(f"{msg.get('ticker', '')} 이전 분석", expanded=False):
+                        render_analysis(msg, key_prefix=f"analysis_{i}_{msg.get('ticker', 'na')}")
             elif msg.get("type") == "report":
-                with st.expander(f"{msg.get('ticker', '')} AI 리포트", expanded=True):
+                with st.expander(f"{msg.get('ticker', '')} AI 리포트", expanded=i == latest_report_idx):
                     st.markdown(msg["content"])
                 st.download_button(
                     "📥", key=f"dl_{i}",
@@ -691,23 +784,29 @@ else:
         pp = st.session_state.pending_ai_prompt
         with st.chat_message("assistant", avatar="✨"):
             pb = st.progress(0)
+            ai_note = st.empty()
             try:
                 model = get_gemini_model()
-                pb.progress(20)
+                pb.progress(12)
+                ai_note.caption("1/3 AI 모델을 준비하고 있습니다.")
                 col_ = []
 
                 def gen():
-                    pb.progress(40, text="🚀 AI 리포트 생성 중...")
+                    pb.progress(32)
+                    ai_note.caption("2/3 리포트 초안을 생성하고 있습니다. 종목과 시장 컨텍스트를 함께 요약합니다.")
                     for ch in model.generate_content(pp, stream=True):
                         if ch.text:
                             col_.append(ch.text)
                             yield ch.text
+                    pb.progress(88)
+                    ai_note.caption("3/3 문장을 정리하고 화면에 반영합니다.")
                     pb.progress(100)
 
                 with st.expander(f"{tp.upper()} AI 리포트", expanded=True):
                     st.write_stream(gen())
                 time.sleep(.3)
                 pb.empty()
+                ai_note.empty()
                 st.session_state.messages.append({
                     "role": "assistant", "type": "report",
                     "ticker": tp.upper(), "content": "".join(col_)
@@ -717,6 +816,7 @@ else:
                 st.rerun()
             except Exception as e:
                 pb.empty()
+                ai_note.empty()
                 st.error(f"AI 오류: {e}")
 
     def process_ticker(tv, refresh=False):
@@ -734,16 +834,23 @@ else:
         _set_scan_focus(tv)
         with st.chat_message("assistant", avatar="✨"):
             with st.status(f"🔍 {tv} 분석 중...", expanded=True) as status:
-                st.write("📊 데이터, 지표, 시그널, 위원회 점수를 계산하고 있습니다...")
+                st.write("1. 입력 형식과 티커 유효성을 확인했습니다.")
+                status.update(label=f"📦 {tv} 기본 정보 수집 중...", state="running", expanded=True)
+                st.write("2. 기업 기본 정보와 부가 메타데이터를 불러오고 있습니다.")
                 fund = fetch_fundamentals(tv)
+                status.update(label=f"📊 {tv} 가격·지표 계산 중...", state="running", expanded=True)
+                st.write("3. 가격 데이터, 기술 지표, 위원회 점수, 차트 메타데이터를 계산합니다.")
                 fj, phist, meta = analyze(tv, chart_days, refresh)
                 if fj and meta:
                     jg  = meta['judgment']
                     act = meta.get('action_label', '')
                     es  = meta.get('ensemble_score', 0)
+                    status.update(label=f"🧠 {tv} 프롬프트 정리 중...", state="running", expanded=True)
+                    st.write("4. AI 리포트용 프롬프트와 화면 카드 요약을 구성합니다.")
                     st.write(f"📍 {act} | ES {es:+.1f}")
                     _show_analysis_toasts(tv, meta)
                     prompt = build_ai_prompt(tv, phist, fund)
+                    st.write("5. 분석 카드와 리포트 버튼을 표시할 준비가 끝났습니다.")
                     status.update(label=f"✅ {tv} - {act}", state="complete", expanded=False)
                 else:
                     prompt = None
@@ -781,6 +888,7 @@ else:
     if st.session_state.get('quick'):
         process_ticker(st.session_state.pop('quick'))
     if st.session_state.pending_ai_ticker and st.session_state.pending_ai_prompt:
+        st.caption("AI 리포트는 보통 10~20초 정도 걸립니다. 시스템 판단을 요약하고 반론 포인트도 함께 정리합니다.")
         if st.button(f"🚀 {st.session_state.pending_ai_ticker.upper()} AI 분석", type="primary", use_container_width=True):
             _run_ai()
     if ti := st.chat_input("티커 입력 (예: TSLA, AAPL, QQQ)"):

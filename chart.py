@@ -5,6 +5,12 @@ from plotly.subplots import make_subplots
 from config import *
 from utils import _sf
 
+SOFT_GREEN = '#7ED8B6'
+SOFT_GREEN_FILL = 'rgba(126,216,182,.78)'
+SOFT_RED = '#F3A5A5'
+SOFT_RED_FILL = 'rgba(243,165,165,.78)'
+SOFT_AMBER = '#F5C77B'
+
 def _build_candle_hover(dc):
     n=len(dc)
     bar_buy=[[] for _ in range(n)];bar_sell=[[] for _ in range(n)];bar_neutral=[[] for _ in range(n)]
@@ -126,7 +132,7 @@ def _add_volume_profile_overlay(fig,dc):
         f=float(pv/vmax);alpha=min(.30,max(.08,.08+.22*f))
         fig.add_shape(type='rect',x0=x_right-max_width*f,x1=x_right,y0=float(edges[bi]),y1=float(edges[bi+1]),
             fillcolor=f'rgba(99,102,241,{alpha})',line=dict(width=0),row=1,col=1,layer='below')
-    vp_colors=[('VP_POC','#A5B4FC','dot'),('VP_VAH','#60A5FA','dash'),('VP_VAL','#34D399','dash')]
+    vp_colors=[('VP_POC','#A5B4FC','dot'),('VP_VAH','#60A5FA','dash'),('VP_VAL',SOFT_GREEN,'dash')]
     for col,clr,sty in vp_colors:
         if col in dc.columns:
             val=float(dc[col].iloc[-1])
@@ -150,20 +156,20 @@ def build_chart(dc,ticker):
     mac={20:'#f1c40f',50:'#e74c3c',200:'#2ecc71'}
     fig=make_subplots(rows=8,cols=1,shared_xaxes=True,vertical_spacing=0.02,row_heights=[.32,.04,.09,.09,.09,.09,.09,.19],subplot_titles=(ticker,"Vol","WaveTrend","MACD","Money Flow","Stoch Slow","Squeeze Mom","5-Committee Ensemble"))
     hover=_build_candle_hover(dc)
-    fig.add_trace(go.Candlestick(x=dc.index,open=dc['Open'],high=dc['High'],low=dc['Low'],close=dc['Close'],name="Price",increasing_line_color='#00E676',decreasing_line_color='#FF1744',increasing_fillcolor='rgba(0,230,118,.8)',decreasing_fillcolor='rgba(255,23,68,.8)',text=hover,hoverinfo='text',hoverlabel=dict(bgcolor='rgba(11,14,20,.97)',bordercolor='#334155',font=dict(size=11,family='Pretendard',color='#F1F5F9'),align='left')),row=1,col=1)
+    fig.add_trace(go.Candlestick(x=dc.index,open=dc['Open'],high=dc['High'],low=dc['Low'],close=dc['Close'],name="Price",increasing_line_color=SOFT_GREEN,decreasing_line_color=SOFT_RED,increasing_fillcolor=SOFT_GREEN_FILL,decreasing_fillcolor=SOFT_RED_FILL,text=hover,hoverinfo='text',hoverlabel=dict(bgcolor='rgba(11,14,20,.97)',bordercolor='#334155',font=dict(size=11,family='Pretendard',color='#F1F5F9'),align='left')),row=1,col=1)
     for mp in [20,50,200]:fig.add_trace(go.Scatter(x=dc.index,y=dc[f'MA{mp}'],line=dict(color=mac[mp],width=1.2),name=f'{mp}MA',hoverinfo='skip',showlegend=(mp==200)),row=1,col=1)
-    for mc,clr,nm in [(dc['ST_Direction']==1,'#00E676','ST▲'),(dc['ST_Direction']==-1,'#FF1744','ST▼')]:fig.add_trace(go.Scatter(x=dc.index,y=dc['SuperTrend'].where(mc),line=dict(color=clr,width=2),name=nm,connectgaps=False,hoverinfo='skip',showlegend=False),row=1,col=1)
+    for mc,clr,nm in [(dc['ST_Direction']==1,SOFT_GREEN,'ST▲'),(dc['ST_Direction']==-1,SOFT_RED,'ST▼')]:fig.add_trace(go.Scatter(x=dc.index,y=dc['SuperTrend'].where(mc),line=dict(color=clr,width=2),name=nm,connectgaps=False,hoverinfo='skip',showlegend=False),row=1,col=1)
     fig.add_trace(go.Scatter(x=dc.index,y=dc['BB_Up'],line=dict(color='#475569',width=1,dash='dot'),name='BB',hoverinfo='skip',showlegend=False),row=1,col=1)
     fig.add_trace(go.Scatter(x=dc.index,y=dc['BB_Low'],line=dict(color='#475569',width=1,dash='dot'),fill='tonexty',fillcolor='rgba(71,85,105,.06)',hoverinfo='skip',showlegend=False),row=1,col=1)
     if 'HMA' in dc.columns:
         hup=dc.get('HMA_Rising',pd.Series(False,index=dc.index)).fillna(False)
-        fig.add_trace(go.Scatter(x=dc.index,y=dc['HMA'].where(hup),line=dict(color='#00E676',width=2.5),name='HMA▲',connectgaps=False,hoverinfo='skip'),row=1,col=1)
-        fig.add_trace(go.Scatter(x=dc.index,y=dc['HMA'].where(~hup),line=dict(color='#FF1744',width=2.5),name='HMA▼',connectgaps=False,hoverinfo='skip',showlegend=False),row=1,col=1)
+        fig.add_trace(go.Scatter(x=dc.index,y=dc['HMA'].where(hup),line=dict(color=SOFT_GREEN,width=2.5),name='HMA▲',connectgaps=False,hoverinfo='skip'),row=1,col=1)
+        fig.add_trace(go.Scatter(x=dc.index,y=dc['HMA'].where(~hup),line=dict(color=SOFT_RED,width=2.5),name='HMA▼',connectgaps=False,hoverinfo='skip',showlegend=False),row=1,col=1)
     if 'UTBot_Stop' in dc.columns:
         ub=dc['UTBot_Dir']==1;us=dc['UTBot_Dir']==-1
-        fig.add_trace(go.Scatter(x=dc.index,y=dc['UTBot_Stop'].where(ub),line=dict(color='rgba(0,230,118,.5)',width=2,dash='dot'),name='UTBot▲',connectgaps=False,hoverinfo='skip'),row=1,col=1)
-        fig.add_trace(go.Scatter(x=dc.index,y=dc['UTBot_Stop'].where(us),line=dict(color='rgba(255,23,68,.5)',width=2,dash='dot'),name='UTBot▼',connectgaps=False,hoverinfo='skip',showlegend=False),row=1,col=1)
-    for sn,clr,sym,sz,lbl in [('Hull_Turn_Bull','#00E676','circle',8,'🟢Hull▲'),('Hull_Turn_Bear','#FF1744','circle',8,'🔴Hull▼'),('UTBot_Buy','#00E676','triangle-up',12,'🤖UTBot▲'),('UTBot_Sell','#FF1744','triangle-down',12,'🤖UTBot▼'),('VuManChu_Bull','#00E676','diamond',12,'💎VuMC▲'),('VuManChu_Bear','#FF1744','diamond',12,'💎VuMC▼')]:
+        fig.add_trace(go.Scatter(x=dc.index,y=dc['UTBot_Stop'].where(ub),line=dict(color='rgba(126,216,182,.5)',width=2,dash='dot'),name='UTBot▲',connectgaps=False,hoverinfo='skip'),row=1,col=1)
+        fig.add_trace(go.Scatter(x=dc.index,y=dc['UTBot_Stop'].where(us),line=dict(color='rgba(243,165,165,.5)',width=2,dash='dot'),name='UTBot▼',connectgaps=False,hoverinfo='skip',showlegend=False),row=1,col=1)
+    for sn,clr,sym,sz,lbl in [('Hull_Turn_Bull',SOFT_GREEN,'circle',8,'🟢Hull▲'),('Hull_Turn_Bear',SOFT_RED,'circle',8,'🔴Hull▼'),('UTBot_Buy',SOFT_GREEN,'triangle-up',12,'🤖UTBot▲'),('UTBot_Sell',SOFT_RED,'triangle-down',12,'🤖UTBot▼'),('VuManChu_Bull',SOFT_GREEN,'diamond',12,'💎VuMC▲'),('VuManChu_Bear',SOFT_RED,'diamond',12,'💎VuMC▼')]:
         yoff=dc['Low']-dc['ATR']*(0.8 if 'Hull' in sn else 1.2 if 'UTBot' in sn else 1.8) if 'Bull' in sn or 'Buy' in sn else dc['High']+dc['ATR']*(0.8 if 'Hull' in sn else 1.2 if 'UTBot' in sn else 1.8)
         _sig_marker(fig,dc,sn,1,yoff,clr,sym,sz,lbl)
     sb,ss=_collect_strong_markers(dc)
@@ -174,19 +180,19 @@ def build_chart(dc,ticker):
         for bi in sr.index:
             br=[SIGNAL_REGISTRY.get(s,COMBINED_SCAN_REGISTRY.get(s,{})).get('kor',s) for s in STRONG_BUY_SIGS if s in dc.columns and dc.loc[bi,s]]
             ht.append(f"<b>⭐강력매수</b><br><span style='color:#94A3B8'>{', '.join(br[:5]) or '다중강세'}</span><br>{bi.strftime('%Y-%m-%d')}")
-        fig.add_trace(go.Scatter(x=sr.index,y=yv,mode='markers',marker=dict(symbol='star',size=8,color='#FFD700',line=dict(width=2,color='#00E676'),opacity=.95),name='⭐강력매수',hovertemplate="%{text}<extra></extra>",text=ht),row=1,col=1)
+        fig.add_trace(go.Scatter(x=sr.index,y=yv,mode='markers',marker=dict(symbol='star',size=8,color='#E8C56C',line=dict(width=2,color=SOFT_GREEN),opacity=.95),name='⭐강력매수',hovertemplate="%{text}<extra></extra>",text=ht),row=1,col=1)
     if ss.any():
         sr=dc[ss];yv=sr['High']+sr['ATR']*2;ht=[]
         for bi in sr.index:
             br=[SIGNAL_REGISTRY.get(s,COMBINED_SCAN_REGISTRY.get(s,{})).get('kor',s) for s in STRONG_SELL_SIGS if s in dc.columns and dc.loc[bi,s]]
             ht.append(f"<b>⭐강력매도</b><br><span style='color:#94A3B8'>{', '.join(br[:5]) or '다중약세'}</span><br>{bi.strftime('%Y-%m-%d')}")
-        fig.add_trace(go.Scatter(x=sr.index,y=yv,mode='markers',marker=dict(symbol='star',size=8,color='#FFD700',line=dict(width=2,color='#FF1744'),opacity=.95),name='⭐강력매도',hovertemplate="%{text}<extra></extra>",text=ht),row=1,col=1)
+        fig.add_trace(go.Scatter(x=sr.index,y=yv,mode='markers',marker=dict(symbol='star',size=8,color='#E8C56C',line=dict(width=2,color=SOFT_RED),opacity=.95),name='⭐강력매도',hovertemplate="%{text}<extra></extra>",text=ht),row=1,col=1)
     # R2 Vol
-    bb=dc['Close']<dc['Open'];fig.add_trace(go.Bar(x=dc.index,y=dc['Volume'],marker_color=np.where(bb,'rgba(255,23,68,.5)','rgba(0,230,118,.5)').tolist(),name="Vol",opacity=.8,hoverinfo='skip',showlegend=False),row=2,col=1)
+    bb=dc['Close']<dc['Open'];fig.add_trace(go.Bar(x=dc.index,y=dc['Volume'],marker_color=np.where(bb,'rgba(243,165,165,.5)','rgba(126,216,182,.5)').tolist(),name="Vol",opacity=.8,hoverinfo='skip',showlegend=False),row=2,col=1)
     # R3 WT
-    fig.add_trace(go.Scatter(x=dc.index,y=dc['WT1'],line=dict(color='#00E676',width=2),name="WT1",hovertemplate="WT1:%{y:.1f}<br><span style='color:#94A3B8'>과매수/과매도 압력 지표</span><extra></extra>"),row=3,col=1)
-    fig.add_trace(go.Scatter(x=dc.index,y=dc['WT2'],line=dict(color='#FF1744',width=1.5,dash='dot'),hoverinfo='skip',showlegend=False),row=3,col=1)
-    wd=dc['WT1']-dc['WT2'];fig.add_trace(go.Bar(x=dc.index,y=wd,marker_color=np.where(wd>=0,'rgba(0,230,118,.25)','rgba(255,23,68,.25)').tolist(),hoverinfo='skip',showlegend=False),row=3,col=1)
+    fig.add_trace(go.Scatter(x=dc.index,y=dc['WT1'],line=dict(color=SOFT_GREEN,width=2),name="WT1",hovertemplate="WT1:%{y:.1f}<br><span style='color:#94A3B8'>과매수/과매도 압력 지표</span><extra></extra>"),row=3,col=1)
+    fig.add_trace(go.Scatter(x=dc.index,y=dc['WT2'],line=dict(color=SOFT_RED,width=1.5,dash='dot'),hoverinfo='skip',showlegend=False),row=3,col=1)
+    wd=dc['WT1']-dc['WT2'];fig.add_trace(go.Bar(x=dc.index,y=wd,marker_color=np.where(wd>=0,'rgba(126,216,182,.25)','rgba(243,165,165,.25)').tolist(),hoverinfo='skip',showlegend=False),row=3,col=1)
     for y_,c_,d_ in [(OB1,'#FF5252','solid'),(0,'#475569','dot'),(OS1,'#4FC3F7','solid')]:fig.add_hline(y=y_,line_dash=d_,line_color=c_,line_width=1,row=3,col=1)
     for sn,clr,sym,sz,lbl in [('Gold_Dot','#FFD700','star',14,'🏆Gold'),('Green_Dot_T1','#00E676','circle',10,'🟢T1'),('Green_Dot_T2','#69F0AE','circle',8,'🟩T2'),('Blood_Diamond','#DC143C','star',14,'🩸Blood'),('Red_Dot_T1','#FF1744','circle',10,'🔴T1'),('Red_Dot_T2','#FF5252','circle',8,'🟥T2'),('Bull_Divergence','#AA00FF','triangle-up',10,'📈BullDiv'),('Bear_Divergence','#AA00FF','triangle-down',10,'📉BearDiv'),('RSI_Bull_Divergence','#CE93D8','triangle-up',8,'📊RSIDiv▲'),('RSI_Bear_Divergence','#CE93D8','triangle-down',8,'📊RSIDiv▼')]:_sig_marker(fig,dc,sn,3,dc['WT1'],clr,sym,sz,lbl)
     # R4 MACD
@@ -220,7 +226,7 @@ def build_chart(dc,ticker):
     for sn,clr,sym,sz,lbl in [('Squeeze_Fire_Buy','#00FFFF','star-diamond',14,'💥SqFire▲'),('Squeeze_Fire_Sell','#FF6600','star-diamond',14,'🧨SqFire▼'),('Squeeze_Mom_Cross_Up','#00E676','diamond',10,'💥SqMom▲'),('Squeeze_Mom_Cross_Down','#FF1744','diamond',10,'💥SqMom▼')]:_sig_marker(fig,dc,sn,7,sqm,clr,sym,sz,lbl)
     # R8 Ensemble
     if 'Ensemble_Score' in dc.columns:
-        es=dc['Ensemble_Score'];colors=np.where(es>=30,'#00E676',np.where(es>=10,'#69F0AE',np.where(es<=-30,'#FF1744',np.where(es<=-10,'#FF5252','#FFC107'))))
+        es=dc['Ensemble_Score'];colors=np.where(es>=30,SOFT_GREEN,np.where(es>=10,'#A7E7CF',np.where(es<=-30,SOFT_RED,np.where(es<=-10,'#F6C2C2',SOFT_AMBER))))
         cmd=[dc.get(f'CM_{cm}_EffScore',pd.Series(0,index=dc.index)).values for cm in COMMITTEE_NAMES];cma=np.column_stack(cmd) if cmd else np.zeros((len(dc),5))
         jgv=dc.get('Trade_Judgment',pd.Series('N/A',index=dc.index)).values;cfv=dc.get('Judgment_Confidence',pd.Series(0,index=dc.index)).values
         ctxv=dc.get('Market_Context',pd.Series(0,index=dc.index)).values;bav=dc.get('Buy_Agree',pd.Series(0,index=dc.index)).values;sav=dc.get('Sell_Agree',pd.Series(0,index=dc.index)).values
@@ -236,7 +242,8 @@ def build_chart(dc,ticker):
                 if pc in ctx_colors and ci>ss_:fig.add_vrect(x0=dc.index[ss_],x1=dc.index[ci-1],fillcolor=ctx_colors[pc],line_width=0,row=8,col=1)
                 ss_=ci;pc=cur
         if pc in ctx_colors:fig.add_vrect(x0=dc.index[ss_],x1=dc.index[-1],fillcolor=ctx_colors[pc],line_width=0,row=8,col=1)
-    fig.update_layout(template="plotly_dark",paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",margin=dict(l=2,r=2,t=40,b=2),height=1600,showlegend=True,hovermode="closest",legend=dict(orientation="h",yanchor="bottom",y=1.02,xanchor="center",x=.5,font=dict(size=8,color='#94A3B8'),bgcolor='rgba(0,0,0,0)'))
+    chart_height = 1360 if len(dc) <= 126 else 1460
+    fig.update_layout(template="plotly_dark",paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",margin=dict(l=2,r=2,t=40,b=2),height=chart_height,showlegend=True,hovermode="closest",legend=dict(orientation="h",yanchor="bottom",y=1.02,xanchor="center",x=.5,font=dict(size=8,color='#94A3B8'),bgcolor='rgba(0,0,0,0)'))
     for i in range(1,9):fig.update_layout(**{(f'yaxis{i}' if i>1 else 'yaxis'):dict(gridcolor='rgba(51,65,85,.3)',tickfont=dict(size=9,color='#64748B'))})
     fig.update_yaxes(range=[-50,50],row=5,col=1);fig.update_yaxes(range=[0,100],row=6,col=1)
     ad=pd.date_range(start=dc.index[0],end=dc.index[-1],freq='D');nt=ad.difference(dc.index.normalize())
