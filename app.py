@@ -462,7 +462,7 @@ with st.sidebar:
     app_mode = st.radio("모드", ['분석', '스캐너'], index=_mi)
     st.session_state['_mode'] = app_mode
     chart_period = st.radio("기간", ['3개월', '6개월', '1년'], index=0, horizontal=True, key="period")
-    show_trendlines = st.checkbox("자동 빗각 표시", value=True, key="show_trendlines")
+    show_trendlines = st.checkbox("자동 빗각/채널 표시", value=True, key="show_trendlines")
     chart_days = {'3개월': 63, '6개월': 126, '1년': 252}[chart_period]
     if st.button("🗑️ 초기화", use_container_width=True, type="secondary"):
         reset_session()

@@ -242,18 +242,35 @@ def _compute_trendlines(dc,max_per_side=2):
     spacing=max(float(np.nanmedian(atr.values))*0.5,1e-6)
     supports=_select_trendlines(_collect_trendline_candidates(dc,'Low','support'),max_per_side,spacing)
     resistances=_select_trendlines(_collect_trendline_candidates(dc,'High','resistance'),max_per_side,spacing)
+    for line in supports:
+        window=slice(line['start_idx'],line['end_idx']+1)
+        base_window=line['line_values'][window]
+        channel_offset=float(np.max(dc['High'].astype(float).values[window]-base_window))
+        if np.isfinite(channel_offset) and channel_offset>spacing:
+            line['channel_offset']=channel_offset
+            line['channel_values']=line['line_values']+channel_offset
+            line['channel_projected_price']=line['projected_price']+channel_offset
+    for line in resistances:
+        window=slice(line['start_idx'],line['end_idx']+1)
+        base_window=line['line_values'][window]
+        channel_offset=float(np.min(dc['Low'].astype(float).values[window]-base_window))
+        if np.isfinite(channel_offset) and abs(channel_offset)>spacing:
+            line['channel_offset']=channel_offset
+            line['channel_values']=line['line_values']+channel_offset
+            line['channel_projected_price']=line['projected_price']+channel_offset
     return supports,resistances
 
 def _trendline_hover(line,label):
     kind='Support' if line['kind']=='support' else 'Resistance'
     start_date=line['start_date'].strftime('%Y-%m-%d')
     end_date=line['end_date'].strftime('%Y-%m-%d')
+    channel_text=f"<br>Channel projected price: {line['channel_projected_price']:.2f}" if 'channel_projected_price' in line else ''
     return (
         f"<b>{label}</b><br>"
         f"Type: {kind}<br>"
         f"Anchors: {start_date} ({line['start_price']:.2f}) -> {end_date} ({line['end_price']:.2f})<br>"
         f"Projected: %{{y:.2f}}<br>"
-        f"Current projected price: {line['projected_price']:.2f}<extra></extra>"
+        f"Current projected price: {line['projected_price']:.2f}{channel_text}<extra></extra>"
     )
 
 def _add_trendline_overlays(fig,dc,max_per_side=2):
@@ -267,27 +284,53 @@ def _add_trendline_overlays(fig,dc,max_per_side=2):
         line['end_date']=dc.index[line['end_idx']]
         xs=dc.index[line['start_idx']:]
         ys=line['line_values'][line['start_idx']:]
+        channel_color=palette['support'][min(idx-1,len(palette['support'])-1)]
+        channel_dash='solid' if line['active'] else 'dot'
+        if 'channel_values' in line:
+            fig.add_trace(go.Scatter(
+                x=xs,
+                y=line['channel_values'][line['start_idx']:],
+                mode='lines',
+                line=dict(color=channel_color,width=1.3,dash='dash'),
+                name=f'Channel S{idx}',
+                hovertemplate=_trendline_hover(line,f'Channel S{idx}')
+            ),row=1,col=1)
         fig.add_trace(go.Scatter(
             x=xs,
             y=ys,
             mode='lines',
-            line=dict(color=palette['support'][min(idx-1,len(palette['support'])-1)],width=2,dash='solid' if line['active'] else 'dot'),
+            line=dict(color=channel_color,width=2,dash=channel_dash),
             name=f'Trendline S{idx}',
-            hovertemplate=_trendline_hover(line,f'Trendline S{idx}')
+            hovertemplate=_trendline_hover(line,f'Trendline S{idx}'),
+            fill='tonexty' if 'channel_values' in line else None,
+            fillcolor='rgba(45,212,191,0.06)' if 'channel_values' in line else None
         ),row=1,col=1)
     for idx,line in enumerate(resistances,1):
         line['start_date']=dc.index[line['start_idx']]
         line['end_date']=dc.index[line['end_idx']]
         xs=dc.index[line['start_idx']:]
         ys=line['line_values'][line['start_idx']:]
+        channel_color=palette['resistance'][min(idx-1,len(palette['resistance'])-1)]
+        channel_dash='solid' if line['active'] else 'dot'
         fig.add_trace(go.Scatter(
             x=xs,
             y=ys,
             mode='lines',
-            line=dict(color=palette['resistance'][min(idx-1,len(palette['resistance'])-1)],width=2,dash='solid' if line['active'] else 'dot'),
+            line=dict(color=channel_color,width=2,dash=channel_dash),
             name=f'Trendline R{idx}',
             hovertemplate=_trendline_hover(line,f'Trendline R{idx}')
         ),row=1,col=1)
+        if 'channel_values' in line:
+            fig.add_trace(go.Scatter(
+                x=xs,
+                y=line['channel_values'][line['start_idx']:],
+                mode='lines',
+                line=dict(color=channel_color,width=1.3,dash='dash'),
+                name=f'Channel R{idx}',
+                hovertemplate=_trendline_hover(line,f'Channel R{idx}'),
+                fill='tonexty',
+                fillcolor='rgba(251,113,133,0.05)'
+            ),row=1,col=1)
     return supports,resistances
 
 def build_chart(dc,ticker,show_trendlines=True):
