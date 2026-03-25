@@ -4,6 +4,7 @@
 # ══════════════════════════════════════════════════════════════
 
 import streamlit as st, google.generativeai as genai
+import streamlit.components.v1 as components
 import time, math
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -595,6 +596,10 @@ def _build_brand_payload(current_mode, chart_period):
         'status_tone': _resolve_board_tone(mode_label, judgment, es_value),
     }
 
+def _render_brand_board(payload, compact=False):
+    height = 300 if compact else 240
+    components.html(build_brand_board(payload, compact=compact), height=height, scrolling=False)
+
 def _render_scanner_guide(tickers, scan_source):
     target_count = len(tickers)
     source_label = scan_source or "직접"
@@ -651,7 +656,7 @@ with st.sidebar:
     st.session_state['_mode'] = app_mode
     chart_period = st.radio("기간", ['3개월', '6개월', '1년', '2년'], index=1, horizontal=True, key="period")
     chart_days = {'3개월': 63, '6개월': 126, '1년': 252, '2년': 504}[chart_period]
-    st.markdown(build_brand_board(_build_brand_payload(app_mode, chart_period), compact=True), unsafe_allow_html=True)
+    _render_brand_board(_build_brand_payload(app_mode, chart_period), compact=True)
     st.markdown("---")
     if st.button("🗑️ 초기화", use_container_width=True, type="secondary"):
         reset_session()
@@ -667,7 +672,7 @@ main_board_payload = _build_brand_payload(current_mode, chart_period)
 #  스캐너 모드
 # ══════════════════════════════════════════════════════════════
 if current_mode == '스캐너':
-    st.markdown(build_brand_board(main_board_payload), unsafe_allow_html=True)
+    _render_brand_board(main_board_payload)
     all_universe = sorted({str(t).strip().upper() for ts in SECTOR_GROUPS.values() for t in ts if str(t).strip()})
 
     st.markdown("#### 📂 섹터 선택")
@@ -1028,7 +1033,7 @@ if current_mode == '스캐너':
 #  분석 모드
 # ══════════════════════════════════════════════════════════════
 else:
-    st.markdown(build_brand_board(main_board_payload), unsafe_allow_html=True)
+    _render_brand_board(main_board_payload)
     _render_analysis_guide()
 
     if not st.session_state.last_ticker:
