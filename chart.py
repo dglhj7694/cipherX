@@ -333,7 +333,198 @@ def _add_trendline_overlays(fig,dc,max_per_side=2):
             ),row=1,col=1)
     return supports,resistances
 
-def build_chart(dc,ticker,show_trendlines=True):
+def _line_slope(line):
+    return (float(line['end_price'])-float(line['start_price']))/max(float(line['end_idx']-line['start_idx']),1.0)
+
+def _pattern_state(dc,upper_vals,lower_vals,start_idx,atr_values):
+    close=dc['Close'].astype(float).values
+    recent_start=max(int(start_idx)+1,len(dc)-3)
+    for idx in range(recent_start,len(dc)):
+        tol_now=float(atr_values[idx]*0.35)
+        tol_prev=float(atr_values[idx-1]*0.35)
+        if close[idx]>upper_vals[idx]+tol_now and close[idx-1]<=upper_vals[idx-1]+tol_prev:
+            return 'BREAKOUT_UP',idx
+        if close[idx]<lower_vals[idx]-tol_now and close[idx-1]>=lower_vals[idx-1]-tol_prev:
+            return 'BREAKOUT_DOWN',idx
+    last_idx=len(dc)-1
+    tol_last=float(atr_values[last_idx]*0.35)
+    if close[last_idx]<=upper_vals[last_idx]+tol_last and close[last_idx]>=lower_vals[last_idx]-tol_last:
+        return 'FORMING',last_idx
+    return None,None
+
+def _detect_flag_pole(dc,start_idx,avg_slope,flat_threshold,atr_med):
+    close=dc['Close'].astype(float).values
+    best_name=None;best_bonus=0.0
+    max_pole=min(20,int(start_idx))
+    for pole_len in range(6,max_pole+1):
+        pole_start=int(start_idx-pole_len)
+        move=float(close[start_idx-1]-close[pole_start])
+        strength=abs(move)/(atr_med+1e-10)
+        if strength<3.0:continue
+        pole_slope=move/max(float(pole_len),1.0)
+        if move>0 and avg_slope<=flat_threshold*2 and abs(avg_slope)<=abs(pole_slope)*0.35:
+            bonus=0.25+min(strength/12.0,0.45)
+            if bonus>best_bonus:
+                best_name='Bull Flag';best_bonus=bonus
+        if move<0 and avg_slope>=-flat_threshold*2 and abs(avg_slope)<=abs(pole_slope)*0.35:
+            bonus=0.25+min(strength/12.0,0.45)
+            if bonus>best_bonus:
+                best_name='Bear Flag';best_bonus=bonus
+    return best_name,best_bonus
+
+def _pattern_base_score(pattern_end_idx,dc_len,upper_intrusion,lower_intrusion,shape_score,freshness,pole_bonus=0.0):
+    recency=1.0-min(max((dc_len-1-pattern_end_idx),0)/12.0,1.0)
+    fit=max(0.0,1.0-min((upper_intrusion+lower_intrusion)/0.45,1.0))
+    return recency*0.22+fit*0.26+shape_score*0.22+freshness*0.16+pole_bonus*0.14
+
+def _build_pattern_candidate(dc,support,resistance,atr_values,atr_med):
+    start_idx=max(int(support['start_idx']),int(resistance['start_idx']))
+    if start_idx>=len(dc)-5:return None
+    upper_vals=resistance['line_values']
+    lower_vals=support['line_values']
+    widths=upper_vals-lower_vals
+    if np.any(widths[start_idx:]<=max(atr_med*0.2,1e-6)):return None
+    upper_slope=_line_slope(resistance);lower_slope=_line_slope(support)
+    span=max(len(dc)-1-start_idx,1)
+    flat_threshold=max((atr_med/max(span,1))*0.15,atr_med*0.0025)
+    parallel_threshold=max(max(abs(upper_slope),abs(lower_slope))*0.25,flat_threshold*1.5)
+    width_start=float(widths[start_idx]);width_end=float(widths[-1])
+    width_change=(width_end-width_start)/(abs(width_start)+1e-10)
+    converging=width_change<=-0.18
+    stable_width=abs(width_change)<=0.22
+    window=slice(start_idx,len(dc))
+    upper_intrusion=float(np.mean(dc['High'].astype(float).values[window]>(upper_vals[window]+atr_values[window]*0.35)))
+    lower_intrusion=float(np.mean(dc['Low'].astype(float).values[window]<(lower_vals[window]-atr_values[window]*0.35)))
+    if upper_intrusion>0.22 or lower_intrusion>0.22:return None
+    state,trigger_idx=_pattern_state(dc,upper_vals,lower_vals,start_idx,atr_values)
+    if state is None:return None
+    freshness=1.0 if state=='FORMING' else max(0.55,1.0-((len(dc)-1-trigger_idx)/3.0)*0.25)
+    upper_flat=abs(upper_slope)<=flat_threshold
+    lower_flat=abs(lower_slope)<=flat_threshold
+    same_direction=np.sign(upper_slope)==np.sign(lower_slope) and not upper_flat and not lower_flat
+    name=None;shape_score=0.0;pole_bonus=0.0
+    avg_slope=(upper_slope+lower_slope)/2.0
+    if same_direction and stable_width and abs(upper_slope-lower_slope)<=parallel_threshold:
+        if 5<=span<=20:
+            flag_name,pole_bonus=_detect_flag_pole(dc,start_idx,avg_slope,flat_threshold,atr_med)
+            if flag_name is not None:
+                name=flag_name;shape_score=0.92
+        if name is None:
+            name='Channel';shape_score=0.82
+    elif converging:
+        if upper_slope<-flat_threshold and lower_slope>flat_threshold:
+            name='Symmetrical Triangle';shape_score=0.90
+        elif upper_flat and lower_slope>flat_threshold:
+            name='Ascending Triangle';shape_score=0.94
+        elif lower_flat and upper_slope<-flat_threshold:
+            name='Descending Triangle';shape_score=0.94
+        elif upper_slope>flat_threshold and lower_slope>flat_threshold and lower_slope>upper_slope+flat_threshold:
+            name='Rising Wedge';shape_score=0.90
+        elif upper_slope<-flat_threshold and lower_slope<-flat_threshold and abs(upper_slope)>abs(lower_slope)+flat_threshold:
+            name='Falling Wedge';shape_score=0.90
+    if name is None:return None
+    score=_pattern_base_score(max(int(support['end_idx']),int(resistance['end_idx'])),len(dc),upper_intrusion,lower_intrusion,shape_score,freshness,pole_bonus)
+    return {
+        'name':name,
+        'state':state,
+        'start_idx':start_idx,
+        'end_idx':len(dc)-1,
+        'anchor_end_idx':max(int(support['end_idx']),int(resistance['end_idx'])),
+        'upper_line':upper_vals,
+        'lower_line':lower_vals,
+        'upper_intrusion':upper_intrusion,
+        'lower_intrusion':lower_intrusion,
+        'score':score,
+        'trigger_idx':trigger_idx,
+        'upper_projected_price':float(upper_vals[-1]),
+        'lower_projected_price':float(lower_vals[-1]),
+    }
+
+def _detect_active_pattern(dc):
+    if dc.empty or len(dc)<24:return None
+    atr=_trendline_atr(dc)
+    atr_values=atr.values.astype(float)
+    atr_med=max(float(np.nanmedian(atr_values)),1e-6)
+    spacing=max(atr_med*0.35,1e-6)
+    supports=_select_trendlines(_collect_trendline_candidates(dc,'Low','support'),6,spacing)
+    resistances=_select_trendlines(_collect_trendline_candidates(dc,'High','resistance'),6,spacing)
+    candidates=[]
+    for support in supports:
+        for resistance in resistances:
+            candidate=_build_pattern_candidate(dc,support,resistance,atr_values,atr_med)
+            if candidate is not None:candidates.append(candidate)
+    if not candidates:return None
+    best=sorted(candidates,key=lambda x:(x['score'],x['anchor_end_idx'],-(x['upper_intrusion']+x['lower_intrusion'])),reverse=True)[0]
+    best['start_date']=dc.index[best['start_idx']]
+    best['end_date']=dc.index[best['end_idx']]
+    return best
+
+def _pattern_style(pattern):
+    bullish={'Ascending Triangle','Falling Wedge','Bull Flag'}
+    bearish={'Descending Triangle','Rising Wedge','Bear Flag'}
+    if pattern['state']=='BREAKOUT_UP':
+        return '#34D399','rgba(52,211,153,0.08)'
+    if pattern['state']=='BREAKOUT_DOWN':
+        return '#FB7185','rgba(251,113,133,0.08)'
+    if pattern['name'] in bullish:
+        return '#6EE7B7','rgba(110,231,183,0.05)'
+    if pattern['name'] in bearish:
+        return '#FDA4AF','rgba(253,164,175,0.05)'
+    return '#A5B4FC','rgba(165,180,252,0.05)'
+
+def _pattern_hover(pattern,boundary_name):
+    return (
+        f"<b>{pattern['name']}</b><br>"
+        f"Boundary: {boundary_name}<br>"
+        f"State: {pattern['state']}<br>"
+        f"Window: {pattern['start_date'].strftime('%Y-%m-%d')} -> {pattern['end_date'].strftime('%Y-%m-%d')}<br>"
+        f"Upper projected: {pattern['upper_projected_price']:.2f}<br>"
+        f"Lower projected: {pattern['lower_projected_price']:.2f}<extra></extra>"
+    )
+
+def _add_pattern_overlay(fig,dc,pattern):
+    if pattern is None:return
+    xs=dc.index[pattern['start_idx']:]
+    lower_vals=pattern['lower_line'][pattern['start_idx']:]
+    upper_vals=pattern['upper_line'][pattern['start_idx']:]
+    edge_color,fill_color=_pattern_style(pattern)
+    fig.add_trace(go.Scatter(
+        x=xs,
+        y=lower_vals,
+        mode='lines',
+        line=dict(color=edge_color,width=2,dash='dash'),
+        name='Pattern Lower',
+        hovertemplate=_pattern_hover(pattern,'Lower'),
+        showlegend=False
+    ),row=1,col=1)
+    fig.add_trace(go.Scatter(
+        x=xs,
+        y=upper_vals,
+        mode='lines',
+        line=dict(color=edge_color,width=2,dash='dash'),
+        name='Pattern Upper',
+        hovertemplate=_pattern_hover(pattern,'Upper'),
+        fill='tonexty',
+        fillcolor=fill_color,
+        showlegend=False
+    ),row=1,col=1)
+    fig.add_annotation(
+        x=dc.index[-1],
+        y=float(max(pattern['upper_projected_price'],pattern['lower_projected_price'])),
+        text=f"{pattern['name']} · {pattern['state']}",
+        showarrow=False,
+        font=dict(size=10,color=edge_color,family='Pretendard'),
+        bgcolor='rgba(15,23,42,0.78)',
+        bordercolor=edge_color,
+        borderwidth=1,
+        borderpad=4,
+        xanchor='right',
+        yanchor='bottom',
+        row=1,
+        col=1
+    )
+
+def build_chart(dc,ticker,show_trendlines=True,show_patterns=True):
     mac={20:'#f1c40f',50:'#e74c3c',200:'#2ecc71'}
     fig=make_subplots(rows=8,cols=1,shared_xaxes=True,vertical_spacing=0.02,row_heights=[.32,.04,.09,.09,.09,.09,.09,.19],subplot_titles=(ticker,"Vol","WaveTrend","MACD","Money Flow","Stoch Slow","Squeeze Mom","5-Committee Ensemble"))
     hover=_build_candle_hover(dc)
@@ -358,6 +549,8 @@ def build_chart(dc,ticker,show_trendlines=True):
     _add_volume_profile_overlay(fig,dc)
     if show_trendlines:
         _add_trendline_overlays(fig,dc,max_per_side=2)
+    if show_patterns:
+        _add_pattern_overlay(fig,dc,_detect_active_pattern(dc))
     if sb.any():
         sr=dc[sb];yv=sr['Low']-sr['ATR']*2;ht=[]
         for bi in sr.index:
