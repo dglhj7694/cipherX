@@ -87,7 +87,7 @@ div[data-testid="stMetricValue"]{color:#F8FAFC!important}
 def get_gemini_model():
     if GEMINI_API_KEY:
         genai.configure(api_key=GEMINI_API_KEY)
-    return genai.GenerativeModel('gemini-2.5-flash')
+    return genai.GenerativeModel('gemini-flash-latest')
 
 def analyze(ticker, chart_days=252, refresh=False):
     try:
