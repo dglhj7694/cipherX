@@ -467,7 +467,7 @@ with st.sidebar:
     _mi = 0 if st.session_state.get('_mode', '분석') == '분석' else 1
     app_mode = st.radio("모드", ['분석', '스캐너'], index=_mi)
     st.session_state['_mode'] = app_mode
-    chart_period = st.radio("기간", ['3개월', '6개월', '1년', '2년'], index=2, horizontal=True, key="period")
+    chart_period = st.radio("기간", ['3개월', '6개월', '1년', '2년'], index=1, horizontal=True, key="period")
     chart_days = {'3개월': 63, '6개월': 126, '1년': 252, '2년': 504}[chart_period]
     if st.button("🗑️ 초기화", use_container_width=True, type="secondary"):
         reset_session()
@@ -678,6 +678,7 @@ if current_mode == '스캐너':
                     fallback = sorted(acs, key=lambda x: (x.get('tier', 9), x.get('days_ago', 99)))[:6]
                     mhits = [{'icon': h['icon'], 'label': h['kor'], 'dir': h['dir'], 'date': h['date']} for h in fallback]
 
+                raw_jg = str(lt.get('Trade_Judgment', 'N/A'))
                 return {
                     'ticker':       t,
                     'price':        _sf(lt['Close']),
@@ -694,7 +695,8 @@ if current_mode == '스캐너':
                     # 표시용 최근 콤보
                     'multi_hits':   mhits,
                     # 판단
-                    'jg':           localize_judgment_label(str(lt.get('Trade_Judgment', 'N/A'))),
+                    'jg_key':       raw_jg,
+                    'jg':           localize_judgment_label(raw_jg),
                     'cf':           cf,
                     'es':           es,
                     'ctx':          localize_context_label(int(_sf(lt.get('Market_Context', 0)))),
@@ -742,8 +744,8 @@ if current_mode == '스캐너':
     # ── 결과 렌더링 ──────────────────────────────────────────────────────────
     results = st.session_state.get('scan_results', [])
     if results:
-        bt_  = [r for r in results if 'BUY'  in r['jg']]
-        st_  = [r for r in results if 'SELL' in r['jg']]
+        bt_  = [r for r in results if 'BUY'  in str(r.get('jg_key', ''))]
+        st_  = [r for r in results if 'SELL' in str(r.get('jg_key', ''))]
         scan_total = st.session_state.get('scan_total', 0)
         st.caption("정렬 기준: 스캔 점수 → 강도 → 최근 시그널 순서입니다.")
 
@@ -764,7 +766,8 @@ if current_mode == '스캐너':
         for rk, r in enumerate(results, start=1):
             chc = '#63D9A2' if r['chg'] >= 0 else '#FF8F96'
             chi = '▲' if r['chg'] >= 0 else '▼'
-            jc  = '#63D9A2' if 'BUY' in r['jg'] else ('#FF8F96' if 'SELL' in r['jg'] else '#F8DE9A')
+            jg_key = str(r.get('jg_key', ''))
+            jc  = '#63D9A2' if 'BUY' in jg_key else ('#FF8F96' if 'SELL' in jg_key else '#F8DE9A')
 
             # 콤보 스캔 목록은 mx 배지 태그로만 표시 — 불릿 리스트(sh) 제거
 
@@ -808,7 +811,7 @@ if current_mode == '스캐너':
 
             rh = ""
             if r.get('reason'):
-                rc = '#A7E7CF' if 'BUY' in r['jg'] else ('#F6C2C2' if 'SELL' in r['jg'] else '#F5D79A')
+                rc = '#A7E7CF' if 'BUY' in jg_key else ('#F6C2C2' if 'SELL' in jg_key else '#F5D79A')
                 rh = (f"<div style='padding:4px 0;border-top:1px solid rgba(255,255,255,.04);margin-top:4px'>"
                       f"<span style='color:{rc};font-size:.78rem'>💬 {r['reason'][:80]}</span></div>")
 
