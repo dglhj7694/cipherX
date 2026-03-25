@@ -80,6 +80,15 @@ section[data-testid="stSidebar"]{background-color:#080A10;border-right:1px solid
 header{background-color:transparent!important}
 div[data-testid="stMetricValue"]{color:#F8FAFC!important}
 ::-webkit-scrollbar{width:6px} ::-webkit-scrollbar-track{background:#0B0E14} ::-webkit-scrollbar-thumb{background:#2A3040;border-radius:3px}
+div[data-testid="stToastContainer"]{top:4.75rem!important}
+div[data-testid="stToast"]{background:linear-gradient(160deg,rgba(15,23,42,.96),rgba(17,24,39,.94))!important;border:1px solid rgba(99,102,241,.30)!important;border-radius:14px!important;box-shadow:0 18px 40px rgba(2,6,23,.42)!important;backdrop-filter:blur(12px)}
+div[data-testid="stToast"] p{color:#E8ECF1!important;font-weight:600!important}
+.analysis-nav{background:linear-gradient(160deg,rgba(15,23,42,.94),rgba(17,24,39,.86));border:1px solid rgba(99,102,241,.22);border-radius:16px;padding:14px 16px;margin:0 0 14px;box-shadow:0 14px 34px rgba(2,6,23,.26)}
+.analysis-nav-meta{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.analysis-nav-title{color:#F8FAFC;font-weight:800;font-size:1rem}
+.analysis-nav-sub{color:#94A3B8;font-size:.78rem}
+.analysis-nav-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.24);color:#C7D2FE;font-size:.74rem;font-weight:700}
+.prompt-caption{color:#94A3B8;font-size:.74rem;font-weight:700;margin-bottom:8px}
 </style>""", unsafe_allow_html=True)
 
 # ━━━ Constants ━━━
@@ -114,12 +123,140 @@ def init_session():
         'scan_results': [],
         'scan_source': '',
         'scan_total': 0,
+        'scan_focus_idx': None,
+        'scan_focus_ticker': None,
+        'analysis_scan_jump': None,
     }
     for k, v in defs.items():
         if k not in st.session_state:
             st.session_state[k] = v
 
 init_session()
+
+def _scan_tickers():
+    return [str(r.get('ticker', '')).strip().upper() for r in st.session_state.get('scan_results', []) if str(r.get('ticker', '')).strip()]
+
+def _set_scan_focus(ticker=None, idx=None):
+    results = st.session_state.get('scan_results', [])
+    tickers = _scan_tickers()
+    if not tickers:
+        st.session_state['scan_focus_idx'] = None
+        st.session_state['scan_focus_ticker'] = None
+        return None
+    if idx is None and ticker:
+        try:
+            idx = tickers.index(str(ticker).strip().upper())
+        except ValueError:
+            idx = None
+    if idx is None or idx < 0 or idx >= len(tickers):
+        return None
+    st.session_state['scan_focus_idx'] = idx
+    st.session_state['scan_focus_ticker'] = tickers[idx]
+    if idx < len(results):
+        row = results[idx]
+        st.session_state['analysis_scan_jump'] = f"{idx + 1}. {row['ticker']} · {row.get('jg', 'N/A')} · ES {row.get('es', 0):+.0f}"
+    return idx
+
+def _get_scan_focus_context(current_ticker=None):
+    results = st.session_state.get('scan_results', [])
+    tickers = _scan_tickers()
+    if not results or not tickers:
+        return None
+    current = str(current_ticker or st.session_state.get('last_ticker') or '').strip().upper()
+    idx = st.session_state.get('scan_focus_idx')
+    if current:
+        if idx is None or idx >= len(tickers) or tickers[idx] != current:
+            idx = _set_scan_focus(current)
+    elif idx is None:
+        return None
+    if idx is None:
+        return None
+    return {
+        'idx': idx,
+        'total': len(results),
+        'source': st.session_state.get('scan_source') or 'scan',
+        'row': results[idx],
+        'results': results,
+    }
+
+def _queue_scan_navigation(idx):
+    ctx = _get_scan_focus_context()
+    if not ctx:
+        return
+    idx = max(0, min(int(idx), ctx['total'] - 1))
+    ticker = ctx['results'][idx]['ticker']
+    _set_scan_focus(ticker, idx)
+    st.session_state['_mode'] = '분석'
+    st.session_state['_auto'] = ticker
+    st.rerun()
+
+def _render_analysis_nav():
+    ctx = _get_scan_focus_context()
+    if not ctx:
+        return
+    idx = ctx['idx']
+    row = ctx['row']
+    title = f"{ctx['source']} scan"
+    badge = f"{idx + 1}/{ctx['total']} · {row['ticker']}"
+    st.markdown(
+        f"""
+        <div class="analysis-nav">
+            <div class="analysis-nav-meta">
+                <div>
+                    <div class="analysis-nav-title">Scanner Context</div>
+                    <div class="analysis-nav-sub">Move through scan hits without losing your analysis history.</div>
+                </div>
+                <span class="analysis-nav-chip">{title}</span>
+            </div>
+            <div class="analysis-nav-meta" style="margin-bottom:0">
+                <div class="analysis-nav-sub">Current: <b style="color:#F8FAFC">{badge}</b> · Judgment <b style="color:#A5B4FC">{row.get('jg', 'N/A')}</b> · ES <b style="color:#CBD5E1">{row.get('es', 0):+.0f}</b></div>
+                <div class="analysis-nav-sub">Scan score <b style="color:#CBD5E1">{row.get('scan_score', 0):+.1f}</b></div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    c1, c2, c3, c4 = st.columns([1.1, 1, 1, 1.25])
+    with c1:
+        if st.button("Back To Scanner", key="scan_nav_back", use_container_width=True):
+            st.session_state['_mode'] = '스캐너'
+            st.rerun()
+    with c2:
+        if st.button("Prev", key="scan_nav_prev", use_container_width=True, disabled=idx <= 0):
+            _queue_scan_navigation(idx - 1)
+    with c3:
+        if st.button("Next", key="scan_nav_next", use_container_width=True, disabled=idx >= ctx['total'] - 1):
+            _queue_scan_navigation(idx + 1)
+    with c4:
+        labels = [f"{i + 1}. {r['ticker']} · {r.get('jg', 'N/A')} · ES {r.get('es', 0):+.0f}" for i, r in enumerate(ctx['results'])]
+        current_label = labels[idx]
+        jump_key = 'analysis_scan_jump'
+        if st.session_state.get(jump_key) not in labels:
+            st.session_state[jump_key] = current_label
+        selected = st.selectbox("Browse scan results", labels, key=jump_key, label_visibility="collapsed")
+        selected_idx = labels.index(selected)
+        if selected_idx != idx:
+            _queue_scan_navigation(selected_idx)
+
+def _show_analysis_toasts(ticker, meta):
+    judgment = str(meta.get('judgment', 'NEUTRAL'))
+    action = str(meta.get('action_label', '')).strip() or judgment
+    ensemble = float(meta.get('ensemble_score', 0))
+    primary_icon = '🟢' if 'BUY' in judgment else ('🔴' if 'SELL' in judgment else '🟡')
+    st.toast(f"{ticker} {action} | ES {ensemble:+.1f}", icon=primary_icon)
+
+    warning_parts = []
+    veto = str(meta.get('veto_flags', '')).strip()
+    if veto:
+        warning_parts.append(f"Veto {veto}")
+    contrast = str(meta.get('contrast_notes', '')).strip()
+    if contrast:
+        warning_parts.append(contrast.split(';')[0][:90])
+    tier1 = [str(s.get('kor', '')).strip() for s in meta.get('combined_scans', []) if s.get('tier') == 1 and s.get('is_today')]
+    if tier1:
+        warning_parts.append(f"T1 {', '.join(tier1[:2])}")
+    if warning_parts:
+        st.toast(" | ".join(warning_parts[:2]), icon='⚠️')
 
 with st.sidebar:
     st.markdown("## 🚦 CipherX V14.2")
@@ -130,7 +267,7 @@ with st.sidebar:
     chart_period = st.radio("기간", ['3개월', '6개월', '1년'], index=0, horizontal=True, key="period")
     chart_days = {'3개월': 63, '6개월': 126, '1년': 252}[chart_period]
     if st.button("🗑️ 초기화", use_container_width=True, type="secondary"):
-        for k in ['messages', 'pending_ai_ticker', 'pending_ai_prompt', 'last_ticker']:
+        for k in ['messages', 'pending_ai_ticker', 'pending_ai_prompt', 'last_ticker', 'scan_focus_idx', 'scan_focus_ticker', 'analysis_scan_jump']:
             st.session_state[k] = [{"role": "assistant", "type": "text", "content": "🚦 **CipherX V14.2**"}] if k == 'messages' else None
         st.rerun()
 
@@ -464,6 +601,7 @@ if current_mode == '스캐너':
             )
 
             if st.button(f"{r['ticker']} 분석", key=f"sc_{r['ticker']}", use_container_width=True):
+                _set_scan_focus(r['ticker'], rk - 1)
                 st.session_state['_mode'] = '분석'
                 st.session_state['_auto'] = r['ticker']
                 st.rerun()
@@ -481,6 +619,8 @@ else:
             with cols[i]:
                 if st.button(t, use_container_width=True):
                     st.session_state['quick'] = t
+
+    _render_analysis_nav()
 
     for i, msg in enumerate(st.session_state.messages):
         av = "✨" if msg["role"] == "assistant" else "🧑‍💻"
@@ -500,9 +640,15 @@ else:
             else:
                 st.markdown(msg.get("content", ""))
             if msg.get("prompt") and msg.get("type") == "analysis":
-                with st.expander("프롬프트"):
+                with st.expander(f"{msg.get('ticker', '')} 프롬프트"):
+                    st.markdown("<div class='prompt-caption'>Exact AI prompt used for this ticker.</div>", unsafe_allow_html=True)
                     st.code(msg["prompt"], language="markdown")
-                    st_copy_to_clipboard(msg["prompt"], before_copy_label="📋", after_copy_label="✅")
+                    st_copy_to_clipboard(
+                        msg["prompt"],
+                        before_copy_label="Copy prompt",
+                        after_copy_label="Copied",
+                        key=f"copy_prompt_{msg.get('ticker', 'na')}_{i}",
+                    )
 
     def _run_ai():
         tp = st.session_state.pending_ai_ticker
@@ -549,6 +695,7 @@ else:
             return
         st.session_state.messages.append({"role": "user", "type": "text", "content": tv})
         st.session_state.last_ticker = tv
+        _set_scan_focus(tv)
         with st.chat_message("assistant", avatar="✨"):
             with st.status(f"🔍 {tv} 분석중...", expanded=True) as status:
                 st.write("📊 데이터+지표+시그널+위원회...")
@@ -559,18 +706,7 @@ else:
                     act = meta.get('action_label', '')
                     es  = meta.get('ensemble_score', 0)
                     st.write(f"📍 {act} | ES:{es:+.1f}")
-                    if 'STRONG' in jg:
-                        st.toast(f"{'🟢🟢🟢' if 'BUY' in jg else '🔴🔴🔴'} {tv} {jg}!",
-                                 icon="🚀" if 'BUY' in jg else "⚠️")
-                    veto = meta.get('veto_flags', '')
-                    if veto:
-                        st.toast(f"🚫 Veto:{veto}", icon="🚫")
-                    # cs['icon']은 'REV'/'BRK'/'UP'/'DN'/'WARN' 등 텍스트일 수 있어
-                    # st.toast(icon=)은 실제 이모지만 허용하므로 별도 매핑 사용
-                    _ICON_EMOJI = {'UP':'🚀','DN':'🔻','REV':'🔄','BRK':'💥','WARN':'⚠️'}
-                    for cs in [s for s in meta.get('combined_scans', []) if s['tier'] == 1 and s['is_today']]:
-                        _ei = _ICON_EMOJI.get(str(cs.get('icon', '')), '🎯')
-                        st.toast(f"🎯 T1 {cs['kor']}!", icon=_ei)
+                    _show_analysis_toasts(tv, meta)
                     prompt = build_ai_prompt(tv, phist, fund)
                     status.update(label=f"✅ {tv} — {act}", state="complete", expanded=False)
                 else:

@@ -143,6 +143,14 @@ def render_price_header(m):
     )
 
     _render_ensemble_gauge(es)
+
+def _risk_size_hint(atr_pct):
+    if atr_pct >= 6:
+        return 'Small', '#F87171'
+    if atr_pct >= 3.5:
+        return 'Reduced', '#FCD34D'
+    return 'Standard', '#34D399'
+
 def render_judgment_card(m):
     jg=m['judgment'];es=m.get('ensemble_score',0);cf=m['confidence']
     cc='score-card-buy' if 'BUY' in jg else('score-card-sell' if 'SELL' in jg else 'score-card-neutral')
@@ -154,6 +162,31 @@ def render_judgment_card(m):
             <p style="color:#94A3B8;font-size:.72rem;font-weight:700;margin:0 0 6px">근거 요약</p>
             <p style="color:#CBD5E1;font-size:.82rem;margin:0">{detail_text}</p>
         </div>""" if detail_text else ""
+    contrast=(m.get('contrast_notes','') or '').strip()
+    long_rr=float(m.get('vp_long_rr',1) or 1);short_rr=float(m.get('vp_short_rr',1) or 1)
+    volume_ratio=float(m.get('volume_ratio_20',1) or 1)
+    risk_tags=[]
+    if m.get('smart_money_bearish_div'):
+        risk_tags.append(("Smart money divergence", '#F87171'))
+    elif m.get('smart_money_bullish_div'):
+        risk_tags.append(("Money flow support", '#34D399'))
+    if 'BUY' in jg and long_rr < 1:
+        risk_tags.append((f"Long RR {long_rr:.2f}", '#FCD34D'))
+    if 'SELL' in jg and short_rr < 1:
+        risk_tags.append((f"Short RR {short_rr:.2f}", '#FCD34D'))
+    if volume_ratio < 0.7:
+        risk_tags.append((f"Low vol {volume_ratio:.1f}x", '#FCD34D'))
+    if m.get('blowoff_top_hard'):
+        risk_tags.append(("Blow-off risk", '#F87171'))
+    risk_html=""
+    if contrast or risk_tags:
+        chips="".join([f"<span style='display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border-radius:999px;background:{col}22;border:1px solid {col}44;color:{col};font-size:.72rem;font-weight:700'>{label}</span>" for label,col in risk_tags])
+        contrast_html=f"<p style='color:#CBD5E1;font-size:.8rem;margin:0 0 10px'>{contrast}</p>" if contrast else ""
+        risk_html=f"""<div style="margin:14px 0 0;background:rgba(15,23,42,.58);border:1px solid rgba(148,163,184,.14);border-radius:12px;padding:14px 16px">
+            <p style="color:#94A3B8;font-size:.72rem;font-weight:700;margin:0 0 8px">Risk Check</p>
+            {contrast_html}
+            <div style='display:flex;gap:8px;flex-wrap:wrap'>{chips}</div>
+        </div>"""
     circ=2*3.14159*36;offset=circ*(1-cf/100)
     # Committee vote dots
     committee=m.get('committee',{})
@@ -186,6 +219,7 @@ def render_judgment_card(m):
             </div>
         </div>
         {detail_html}
+        {risk_html}
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:14px">
             <div style="background:rgba(255,255,255,.03);border-radius:10px;padding:12px;text-align:center">
                 <p style="color:#64748B;font-size:.68rem;font-weight:700;margin:0 0 4px">Ensemble</p>
@@ -292,10 +326,18 @@ def render_leading_lagging(m):
     pb_=m.get('percent_b',0.5);pb_pct=pb_*100
     cmf_=m.get('cmf',0);cmf_c='#34D399' if cmf_>0.05 else('#F87171' if cmf_<-0.05 else '#94A3B8')
     obv_c='#34D399' if m.get('obv_trend')=='rising' else '#F87171'
+    obv_slope=m.get('obv_slope',0);obv_slope_c='#34D399' if obv_slope>0 else('#F87171' if obv_slope<0 else '#94A3B8')
     atr_pct=m.get('atr_pct',0)
+    volume_ratio=m.get('volume_ratio_20',1);vol_c='#34D399' if volume_ratio>=1 else('#FCD34D' if volume_ratio>=0.7 else '#F87171')
+    long_rr=m.get('vp_long_rr',1);short_rr=m.get('vp_short_rr',1)
+    long_rr_c='#34D399' if long_rr>=1.35 else('#FCD34D' if long_rr>=1 else '#F87171')
+    short_rr_c='#34D399' if short_rr>=1.35 else('#FCD34D' if short_rr>=1 else '#F87171')
     ma50d=m.get('ma50_dist',0);ma200d=m.get('ma200_dist',0)
     ma50c='#34D399' if ma50d>0 else '#F87171'
     ma200c='#34D399' if ma200d>0 else '#F87171'
+    size_label,size_color=_risk_size_hint(atr_pct)
+    flow_text='Bear Div' if m.get('smart_money_bearish_div') else('Bull Div' if m.get('smart_money_bullish_div') else 'Aligned')
+    flow_color='#F87171' if m.get('smart_money_bearish_div') else('#34D399' if m.get('smart_money_bullish_div') else '#94A3B8')
     st.markdown(f"""<div style='display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px'>
         <div style='background:rgba(255,255,255,.03);border:1px solid #1E293B;border-radius:12px;padding:16px'>
             <p style='font-weight:700;color:#A5B4FC;margin:0 0 8px;font-size:.85rem'>선행 지표 (Leading)</p>
@@ -325,11 +367,16 @@ def render_leading_lagging(m):
         <div class='tow-bar'><div class='tow-buy' style='width:{bw}%'></div><div class='tow-sell' style='width:{sw}%'></div><div class='tow-center'></div></div>
     </div>""",unsafe_allow_html=True)
     # Tech snapshot
-    st.markdown(f"""<div style='display:grid;grid-template-columns:repeat(6,1fr);gap:8px'>
+    st.markdown(f"""<div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px'>
         <div class='stat-mini'><p class='sm-label'>BB %B</p><p class='sm-value' style='color:{"#34D399" if pb_<0.3 else("#F87171" if pb_>0.7 else "#FF9800")}'>{pb_pct:.0f}%</p></div>
         <div class='stat-mini'><p class='sm-label'>CMF</p><p class='sm-value' style='color:{cmf_c}'>{cmf_:+.3f}</p></div>
-        <div class='stat-mini'><p class='sm-label'>OBV 추세</p><p class='sm-value' style='color:{obv_c}'>{"상승" if m.get("obv_trend")=="rising" else "하락"}</p></div>
+        <div class='stat-mini'><p class='sm-label'>Money Flow</p><p class='sm-value' style='color:{flow_color}'>{flow_text}</p></div>
+        <div class='stat-mini'><p class='sm-label'>OBV Slope</p><p class='sm-value' style='color:{obv_slope_c}'>{obv_slope:+.2f}</p></div>
+        <div class='stat-mini'><p class='sm-label'>Vol 20d</p><p class='sm-value' style='color:{vol_c}'>{volume_ratio:.1f}x</p></div>
+        <div class='stat-mini'><p class='sm-label'>Long RR</p><p class='sm-value' style='color:{long_rr_c}'>{long_rr:.2f}</p></div>
+        <div class='stat-mini'><p class='sm-label'>Short RR</p><p class='sm-value' style='color:{short_rr_c}'>{short_rr:.2f}</p></div>
         <div class='stat-mini'><p class='sm-label'>ATR%</p><p class='sm-value' style='color:#A5B4FC'>{atr_pct:.1f}%</p></div>
+        <div class='stat-mini'><p class='sm-label'>Risk Size</p><p class='sm-value' style='color:{size_color}'>{size_label}</p></div>
         <div class='stat-mini'><p class='sm-label'>MA50 이격</p><p class='sm-value' style='color:{ma50c}'>{ma50d:+.1f}%</p></div>
         <div class='stat-mini'><p class='sm-label'>MA200 이격</p><p class='sm-value' style='color:{ma200c}'>{ma200d:+.1f}%</p></div>
     </div>""",unsafe_allow_html=True)
