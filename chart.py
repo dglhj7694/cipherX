@@ -303,6 +303,22 @@ def _trendline_hover(line,label):
         f"최종 예상가: {line['projected_price']:.2f}{channel_text}<extra></extra>"
     )
 
+def _overlay_hover_x(dc,slot=0):
+    return dc.index[-1]+pd.Timedelta(days=5+slot)
+
+def _add_overlay_hover_anchor(fig,x,y,hovertemplate,legendgroup,visible,color,row=1,col=1):
+    fig.add_trace(go.Scatter(
+        x=[x],
+        y=[y],
+        mode='markers',
+        marker=dict(symbol='circle-open',size=9,color='rgba(0,0,0,0)',line=dict(width=1,color=color)),
+        name='',
+        legendgroup=legendgroup,
+        showlegend=False,
+        visible=visible,
+        hovertemplate=hovertemplate,
+    ),row=row,col=col)
+
 def _add_trendline_overlays(fig,dc,max_per_side=2,default_visible='legendonly'):
     supports,resistances=_compute_trendlines(dc,max_per_side=max_per_side)
     palette={
@@ -327,8 +343,9 @@ def _add_trendline_overlays(fig,dc,max_per_side=2,default_visible='legendonly'):
                 legendgroup='trend_overlay',
                 showlegend=not trend_legend_shown,
                 visible=default_visible,
-                hovertemplate=_trendline_hover(line,f'Channel S{idx}')
+                hoverinfo='skip'
             ),row=1,col=1)
+            _add_overlay_hover_anchor(fig,_overlay_hover_x(dc,0),float(line['channel_projected_price']),_trendline_hover(line,f'Channel S{idx}'),'trend_overlay',default_visible,channel_color)
             trend_legend_shown=True
         fig.add_trace(go.Scatter(
             x=xs,
@@ -339,10 +356,11 @@ def _add_trendline_overlays(fig,dc,max_per_side=2,default_visible='legendonly'):
             legendgroup='trend_overlay',
             showlegend=not trend_legend_shown,
             visible=default_visible,
-            hovertemplate=_trendline_hover(line,f'Trendline S{idx}'),
+            hoverinfo='skip',
             fill='tonexty' if 'channel_values' in line else None,
             fillcolor='rgba(45,212,191,0.06)' if 'channel_values' in line else None
         ),row=1,col=1)
+        _add_overlay_hover_anchor(fig,_overlay_hover_x(dc,1),float(line['projected_price']),_trendline_hover(line,f'Trendline S{idx}'),'trend_overlay',default_visible,channel_color)
         trend_legend_shown=True
     for idx,line in enumerate(resistances,1):
         line['start_date']=dc.index[line['start_idx']]
@@ -360,8 +378,9 @@ def _add_trendline_overlays(fig,dc,max_per_side=2,default_visible='legendonly'):
             legendgroup='trend_overlay',
             showlegend=not trend_legend_shown,
             visible=default_visible,
-            hovertemplate=_trendline_hover(line,f'Trendline R{idx}')
+            hoverinfo='skip'
         ),row=1,col=1)
+        _add_overlay_hover_anchor(fig,_overlay_hover_x(dc,1),float(line['projected_price']),_trendline_hover(line,f'Trendline R{idx}'),'trend_overlay',default_visible,channel_color)
         trend_legend_shown=True
         if 'channel_values' in line:
             fig.add_trace(go.Scatter(
@@ -373,10 +392,11 @@ def _add_trendline_overlays(fig,dc,max_per_side=2,default_visible='legendonly'):
                 legendgroup='trend_overlay',
                 showlegend=False,
                 visible=default_visible,
-                hovertemplate=_trendline_hover(line,f'Channel R{idx}'),
+                hoverinfo='skip',
                 fill='tonexty',
                 fillcolor='rgba(251,113,133,0.05)'
             ),row=1,col=1)
+            _add_overlay_hover_anchor(fig,_overlay_hover_x(dc,0),float(line['channel_projected_price']),_trendline_hover(line,f'Channel R{idx}'),'trend_overlay',default_visible,channel_color)
     return supports,resistances
 
 def _line_slope(line):
@@ -543,7 +563,7 @@ def _add_pattern_overlay(fig,dc,pattern,default_visible='legendonly'):
         legendgroup='pattern_overlay',
         showlegend=False,
         visible=default_visible,
-        hovertemplate=_pattern_hover(pattern,'Lower'),
+        hoverinfo='skip',
     ),row=1,col=1)
     fig.add_trace(go.Scatter(
         x=xs,
@@ -554,10 +574,19 @@ def _add_pattern_overlay(fig,dc,pattern,default_visible='legendonly'):
         legendgroup='pattern_overlay',
         showlegend=True,
         visible=default_visible,
-        hovertemplate=_pattern_hover(pattern,'Upper'),
+        hoverinfo='skip',
         fill='tonexty',
         fillcolor=fill_color,
     ),row=1,col=1)
+    _add_overlay_hover_anchor(
+        fig,
+        _overlay_hover_x(dc,2),
+        float((pattern['upper_projected_price']+pattern['lower_projected_price'])/2.0),
+        _pattern_hover(pattern,'Upper'),
+        'pattern_overlay',
+        default_visible,
+        edge_color,
+    )
     fig.add_trace(go.Scatter(
         x=[dc.index[-1]],
         y=[float(max(pattern['upper_projected_price'],pattern['lower_projected_price']))],
