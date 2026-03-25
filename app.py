@@ -214,7 +214,7 @@ def _render_analysis_nav():
     c1, c2, c3, c4 = st.columns([1.1, 1, 1, 1.25])
     with c1:
         if st.button("Back To Scanner", key="scan_nav_back", use_container_width=True):
-            st.session_state['_mode'] = '스캐너'
+        st.session_state['_mode'] = '스캐너'
             st.rerun()
     with c2:
         if st.button("Prev", key="scan_nav_prev", use_container_width=True, disabled=idx <= 0):
@@ -228,6 +228,51 @@ def _render_analysis_nav():
         selected_idx = labels.index(selected)
         if selected_idx != idx:
             _queue_scan_navigation(selected_idx)
+
+def _build_scan_nav_labels(results):
+    return [f"{i + 1}. {r['ticker']} 쨌 {r.get('jg', 'N/A')} 쨌 ES {r.get('es', 0):+.0f}" for i, r in enumerate(results)]
+
+def _handle_scan_jump():
+    ctx = _get_scan_focus_context()
+    if not ctx:
+        return
+    labels = _build_scan_nav_labels(ctx['results'])
+    selected = st.session_state.get('scan_nav_select')
+    if selected not in labels:
+        return
+    selected_idx = labels.index(selected)
+    if selected_idx != ctx['idx']:
+        _queue_scan_navigation(selected_idx)
+
+def _render_analysis_sidebar_nav():
+    ctx = _get_scan_focus_context()
+    if not ctx:
+        return
+    idx = ctx['idx']
+    row = ctx['row']
+    labels = _build_scan_nav_labels(ctx['results'])
+    st.markdown("---")
+    st.markdown("#### Scan Navigator")
+    st.caption(f"{ctx['source']} scan · {idx + 1}/{ctx['total']} · {row['ticker']}")
+    st.caption(f"Judgment {row.get('jg', 'N/A')} · ES {row.get('es', 0):+.0f} · Scan {row.get('scan_score', 0):+.1f}")
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("Prev", key="scan_nav_prev_sb", use_container_width=True, disabled=idx <= 0):
+            _queue_scan_navigation(idx - 1)
+    with c2:
+        if st.button("Next", key="scan_nav_next_sb", use_container_width=True, disabled=idx >= ctx['total'] - 1):
+            _queue_scan_navigation(idx + 1)
+    st.session_state['scan_nav_select'] = labels[idx]
+    st.selectbox(
+        "종목선택",
+        labels,
+        key="scan_nav_select",
+        on_change=_handle_scan_jump,
+        label_visibility="collapsed",
+    )
+    if st.button("Back To Scanner", key="scan_nav_back_sb", use_container_width=True):
+        st.session_state['_mode'] = '스캐너'
+        st.rerun()
 
 def _show_analysis_toasts(ticker, meta):
     judgment = str(meta.get('judgment', 'NEUTRAL'))
@@ -261,6 +306,9 @@ with st.sidebar:
         for k in ['messages', 'pending_ai_ticker', 'pending_ai_prompt', 'last_ticker', 'scan_focus_idx', 'scan_focus_ticker']:
             st.session_state[k] = [{"role": "assistant", "type": "text", "content": "🚦 **CipherX V14.2**"}] if k == 'messages' else None
         st.rerun()
+
+    if st.session_state.get('_mode', '분석') == '분석':
+        _render_analysis_sidebar_nav()
 
 current_mode = st.session_state.get('_mode', '분석')
 
@@ -610,8 +658,6 @@ else:
             with cols[i]:
                 if st.button(t, use_container_width=True):
                     st.session_state['quick'] = t
-
-    _render_analysis_nav()
 
     for i, msg in enumerate(st.session_state.messages):
         av = "✨" if msg["role"] == "assistant" else "🧑‍💻"
