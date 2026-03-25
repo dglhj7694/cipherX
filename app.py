@@ -185,6 +185,7 @@ def _queue_scan_navigation(idx):
     st.session_state['_auto'] = ticker
     st.rerun()
 
+'''
 def _render_analysis_nav():
     ctx = _get_scan_focus_context()
     if not ctx:
@@ -229,6 +230,7 @@ def _render_analysis_nav():
         if selected_idx != idx:
             _queue_scan_navigation(selected_idx)
 
+'''
 def _build_scan_nav_labels(results):
     return [f"{i + 1}. {r['ticker']} 쨌 {r.get('jg', 'N/A')} 쨌 ES {r.get('es', 0):+.0f}" for i, r in enumerate(results)]
 
