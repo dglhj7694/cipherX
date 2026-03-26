@@ -1386,43 +1386,7 @@ else:
         st.caption("QUANT AUDIT는 보통 10~20초 정도 걸립니다. 시스템 판단 요약과 반론 포인트를 함께 정리합니다.")
         if st.button(f"🚀 {st.session_state.pending_ai_ticker.upper()} QUANT AUDIT", type="primary", use_container_width=True):
             _run_ai()
-    analysis_meta = "".join([
-        _sigl_badge("단일 티커 분석", 'accent'),
-        _sigl_badge("차트·위원회·리포트 연동", 'muted'),
-        _sigl_badge("예: NVDA TSLA QQQ", 'warning'),
-    ])
-    with st.form("analysis_ticker_input", clear_on_submit=True):
-        st.markdown(
-            f"""
-            <div class="sigl-composer-head">
-                <div>
-                    <p class="sigl-composer-title">분석 티커 입력</p>
-                    <p class="sigl-composer-copy">현재 시스템 카드와 같은 톤으로 티커를 입력하고 바로 SIGL 분석을 시작합니다.</p>
-                </div>
-                <div class="sigl-composer-tools">
-                    <span class="sigl-composer-tool">Analysis</span>
-                    <span class="sigl-composer-tool">Signal Read</span>
-                </div>
-            </div>
-            <div class="sigl-composer-meta">{analysis_meta}</div>
-            """,
-            unsafe_allow_html=True,
-        )
-        input_col, submit_col = st.columns([7.8, 1.8])
-        with input_col:
-            ti = st.text_input(
-                "분석 티커 입력",
-                placeholder="분석할 티커를 입력하세요. 예: TSLA, AAPL, QQQ",
-                key="analysis_input",
-                label_visibility="collapsed",
-            )
-        with submit_col:
-            analyze_submit = st.form_submit_button("분석 시작", type="primary", use_container_width=True)
-        st.markdown(
-            "<p class='sigl-composer-note'>여러 티커를 넣으면 첫 번째 티커를 기준으로 분석합니다.</p>",
-            unsafe_allow_html=True,
-        )
-    if analyze_submit:
+    if ti := st.chat_input("분석할 티커를 입력하세요. 예: TSLA, AAPL, QQQ"):
         parsed = _parse_ticker_input(ti)
         if not parsed:
             st.toast("분석할 티커를 입력해 주세요.", icon="⌨️")

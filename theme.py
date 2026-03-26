@@ -210,9 +210,21 @@ div[data-testid="stChatInput"] > div{{
   background:transparent!important;
   border:none!important;
 }}
+div[data-testid="stChatInput"] > div > div,
+div[data-testid="stChatInput"] > div > div > div{{
+  background:transparent!important;
+  border:none!important;
+  box-shadow:none!important;
+}}
 div[data-testid="stChatInput"] form,
 div[data-testid="stChatInput"] [data-baseweb="textarea"],
 div[data-testid="stChatInput"] [data-baseweb="base-input"]{{
+  background:transparent!important;
+  border:none!important;
+  box-shadow:none!important;
+}}
+div[data-testid="stChatInput"] [data-baseweb="textarea"] > div,
+div[data-testid="stChatInput"] [data-baseweb="base-input"] > div{{
   background:transparent!important;
   border:none!important;
   box-shadow:none!important;
