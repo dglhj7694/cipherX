@@ -260,7 +260,31 @@ def _app_component_doc(inner_html):
         f"{build_app_theme_css()}"
         "</head><body style='margin:0;background:transparent'>"
         f"{inner_html}"
-        "</body></html>"
+        """
+        <script>
+        (function () {
+          const resizeFrame = () => {
+            const height = Math.max(
+              document.body ? document.body.scrollHeight : 0,
+              document.documentElement ? document.documentElement.scrollHeight : 0
+            );
+            if (window.frameElement && height) {
+              window.frameElement.style.height = `${height}px`;
+            }
+          };
+          window.addEventListener('load', resizeFrame);
+          window.addEventListener('resize', resizeFrame);
+          if (window.ResizeObserver && document.body) {
+            const observer = new ResizeObserver(() => resizeFrame());
+            observer.observe(document.body);
+          }
+          setTimeout(resizeFrame, 0);
+          setTimeout(resizeFrame, 120);
+          setTimeout(resizeFrame, 320);
+        })();
+        </script>
+        </body></html>
+        """
     )
 
 
@@ -975,15 +999,14 @@ if current_mode == '스캐너':
             """,
             unsafe_allow_html=True,
         )
-        input_col, scan_col, clear_col = st.columns([7.2, 1.8, 1.4])
-        with input_col:
-            ci = st.text_input(
-                "스캔 대상 티커 입력",
-                placeholder="NVDA, TSLA, AAPL, QQQ",
-                key="scan_in",
-                label_visibility="collapsed",
-            )
-        with scan_col:
+        ci = st.text_input(
+            "스캔 대상 티커 입력",
+            placeholder="NVDA, TSLA, AAPL, QQQ",
+            key="scan_in",
+            label_visibility="collapsed",
+        )
+        action_col, clear_col = st.columns(2)
+        with action_col:
             scan_btn = st.form_submit_button("스캔 실행", type="primary", use_container_width=True)
         with clear_col:
             clear_scan = st.form_submit_button("초기화", type="secondary", use_container_width=True)

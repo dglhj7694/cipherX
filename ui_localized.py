@@ -77,7 +77,31 @@ def _component_doc(inner_html):
         f"{build_app_theme_css()}"
         "</head><body style='margin:0;background:transparent'>"
         f"{inner_html}"
-        "</body></html>"
+        """
+        <script>
+        (function () {
+          const resizeFrame = () => {
+            const height = Math.max(
+              document.body ? document.body.scrollHeight : 0,
+              document.documentElement ? document.documentElement.scrollHeight : 0
+            );
+            if (window.frameElement && height) {
+              window.frameElement.style.height = `${height}px`;
+            }
+          };
+          window.addEventListener('load', resizeFrame);
+          window.addEventListener('resize', resizeFrame);
+          if (window.ResizeObserver && document.body) {
+            const observer = new ResizeObserver(() => resizeFrame());
+            observer.observe(document.body);
+          }
+          setTimeout(resizeFrame, 0);
+          setTimeout(resizeFrame, 120);
+          setTimeout(resizeFrame, 320);
+        })();
+        </script>
+        </body></html>
+        """
     )
 
 
