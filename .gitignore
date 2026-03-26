@@ -1,3 +1,14 @@
 _tmp_test.txt
 tests/test_trendlines.py
 BRAND_GUIDE.md
+__pycache__/ai_agent.cpython-314.pyc
+__pycache__/branding.cpython-314.pyc
+__pycache__/chart.cpython-314.pyc
+__pycache__/company_details.cpython-314.pyc
+__pycache__/config.cpython-314.pyc
+__pycache__/indicators.cpython-314.pyc
+__pycache__/localization.cpython-314.pyc
+__pycache__/theme.cpython-314.pyc
+__pycache__/ui_localized.cpython-314.pyc
+__pycache__/utils.cpython-314.pyc
+__pycache__/sectors.cpython-314.pyc

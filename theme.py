@@ -400,6 +400,7 @@ div[data-testid="stMetricValue"]{{
   border-radius:var(--sigl-radius-md);
   padding:16px 18px;
   box-shadow:var(--sigl-shadow-sm);
+  min-width:0;
 }}
 .sigl-card--accent{{
   background:
@@ -451,11 +452,15 @@ div[data-testid="stMetricValue"]{{
 .sigl-grid{{
   display:grid;
   gap:12px;
+  align-items:start;
 }}
 .sigl-grid--2{{grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))}}
 .sigl-grid--3{{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}}
-.sigl-grid--4{{grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr))}}
-.sigl-grid--5{{grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr))}}
+.sigl-grid--4{{grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr))}}
+.sigl-grid--5{{grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr))}}
+.sigl-grid > *{{
+  min-width:0;
+}}
 .sigl-inline{{
   display:flex;
   gap:8px;

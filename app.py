@@ -260,24 +260,26 @@ def _app_component_doc(inner_html):
     return (
         "<!doctype html><html><head><meta charset='utf-8'>"
         f"{build_app_theme_css()}"
-        "</head><body style='margin:0;background:transparent'>"
-        f"{inner_html}"
+        "</head><body style='margin:0;background:transparent;overflow:hidden'>"
+        f"<div id='sigl-root' style='display:block'>{inner_html}</div>"
         """
         <script>
         (function () {
           const resizeFrame = () => {
-            const body = document.body;
-            const root = document.documentElement;
+            const rootEl = document.getElementById('sigl-root');
+            if (!window.frameElement || !rootEl) {
+              return;
+            }
             const height = Math.max(
-              body ? body.scrollHeight : 0,
-              body ? Math.ceil(body.getBoundingClientRect().height) : 0,
-              root ? root.scrollHeight : 0,
-              root ? Math.ceil(root.getBoundingClientRect().height) : 0
+              rootEl.scrollHeight || 0,
+              Math.ceil(rootEl.getBoundingClientRect().height || 0)
             );
-            if (window.frameElement && height) {
+            if (height) {
               const nextHeight = Math.ceil(height);
-              const currentHeight = parseFloat(window.frameElement.style.height || "0");
-              if (!currentHeight || Math.abs(currentHeight - nextHeight) > 2) {
+              const currentHeight = parseFloat(
+                window.frameElement.style.height || window.frameElement.getAttribute('height') || "0"
+              );
+              if (!currentHeight || Math.abs(currentHeight - nextHeight) > 1) {
                 window.frameElement.style.height = `${nextHeight}px`;
               }
             }
@@ -286,13 +288,14 @@ def _app_component_doc(inner_html):
           window.addEventListener('load', resizeFrame);
           window.addEventListener('resize', scheduleResize);
           document.addEventListener('DOMContentLoaded', scheduleResize);
-          if (window.ResizeObserver && document.body) {
+          const rootEl = document.getElementById('sigl-root');
+          if (window.ResizeObserver && rootEl) {
             const observer = new ResizeObserver(() => scheduleResize());
-            observer.observe(document.body);
+            observer.observe(rootEl);
           }
-          if (window.MutationObserver && document.body) {
+          if (window.MutationObserver && rootEl) {
             const mutationObserver = new MutationObserver(() => scheduleResize());
-            mutationObserver.observe(document.body, {
+            mutationObserver.observe(rootEl, {
               childList: true,
               subtree: true,
               attributes: true,
@@ -311,7 +314,8 @@ def _app_component_doc(inner_html):
 
 
 def _render_surface_html(inner_html, height):
-    components.html(_app_component_doc(inner_html), height=height, scrolling=False)
+    del height
+    st.markdown(inner_html, unsafe_allow_html=True)
 
 
 def _normalized_selected_sectors(value):

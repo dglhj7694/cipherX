@@ -3,7 +3,6 @@ import json
 
 import plotly.graph_objects as go
 import streamlit as st
-import streamlit.components.v1 as components
 
 from company_details import render_company_details
 from config import COMMITTEE_NAMES, CONTEXT_WEIGHTS, CTX_LABELS
@@ -71,66 +70,9 @@ def _badge(label, tone="muted"):
     return f"<span class='sigl-badge sigl-badge--{tone}'>{safe}</span>"
 
 
-def _component_doc(inner_html):
-    return (
-        "<!doctype html><html><head><meta charset='utf-8'>"
-        f"{build_app_theme_css()}"
-        "</head><body style='margin:0;background:transparent'>"
-        f"{inner_html}"
-        """
-        <script>
-        (function () {
-          const resizeFrame = () => {
-            const body = document.body;
-            const root = document.documentElement;
-            const height = Math.max(
-              body ? body.scrollHeight : 0,
-              body ? Math.ceil(body.getBoundingClientRect().height) : 0,
-              root ? root.scrollHeight : 0,
-              root ? Math.ceil(root.getBoundingClientRect().height) : 0
-            );
-            if (window.frameElement && height) {
-              const nextHeight = Math.ceil(height);
-              const currentHeight = parseFloat(window.frameElement.style.height || "0");
-              if (!currentHeight || Math.abs(currentHeight - nextHeight) > 2) {
-                window.frameElement.style.height = `${nextHeight}px`;
-              }
-            }
-          };
-          const scheduleResize = () => window.requestAnimationFrame(resizeFrame);
-          window.addEventListener('load', resizeFrame);
-          window.addEventListener('resize', scheduleResize);
-          document.addEventListener('DOMContentLoaded', scheduleResize);
-          if (window.ResizeObserver && document.body) {
-            const observer = new ResizeObserver(() => scheduleResize());
-            observer.observe(document.body);
-          }
-          if (window.MutationObserver && document.body) {
-            const mutationObserver = new MutationObserver(() => scheduleResize());
-            mutationObserver.observe(document.body, {
-              childList: true,
-              subtree: true,
-              attributes: true,
-              characterData: true
-            });
-          }
-          setTimeout(resizeFrame, 0);
-          setTimeout(resizeFrame, 120);
-          setTimeout(resizeFrame, 320);
-          setTimeout(resizeFrame, 720);
-        })();
-        </script>
-        </body></html>
-        """
-    )
-
-
 def _render_panel_html(inner_html, min_height=240):
-    components.html(
-        _component_doc(inner_html),
-        height=min_height,
-        scrolling=False,
-    )
+    del min_height
+    st.markdown(inner_html, unsafe_allow_html=True)
 
 
 def _progress_metric_card(label, value, sub, tone, fill):
@@ -544,6 +486,97 @@ def render_leading_lagging(meta):
         <div class="sigl-grid sigl-grid--4" style="margin-top:12px">{cards}</div>
         """
     _render_panel_html(panel_html, min_height=_leading_lagging_panel_height(len(stat_cards)))
+
+
+def render_leading_lagging(meta):
+    leading = translate_chart_text(meta.get("leading_verdict", ""))
+    lagging = translate_chart_text(meta.get("lagging_verdict", ""))
+    accel = _safe_float(meta.get("composite_accel", 0))
+    setup_buy = _safe_float(meta.get("setup_pressure_buy", 0))
+    setup_sell = _safe_float(meta.get("setup_pressure_sell", 0))
+    max_setup = max(setup_buy, setup_sell, 1)
+    buy_width = min(setup_buy / max_setup * 50, 50)
+    sell_width = min(setup_sell / max_setup * 50, 50)
+
+    flow_text = "약세 다이버전스" if meta.get("smart_money_bearish_div") else ("자금 유입 지지" if meta.get("smart_money_bullish_div") else "중립")
+    flow_tone = "negative" if meta.get("smart_money_bearish_div") else ("positive" if meta.get("smart_money_bullish_div") else "muted")
+    size_label, size_tone = _risk_size_hint(_safe_float(meta.get("atr_pct", 0)))
+
+    utbot_dir = _safe_int(meta.get("utbot_dir", 0))
+    utbot_label = "UT 매수" if utbot_dir == 1 else ("UT 매도" if utbot_dir == -1 else "UT 중립")
+    utbot_tone = "positive" if utbot_dir == 1 else ("negative" if utbot_dir == -1 else "accent")
+    hma_rising = bool(meta.get("hma_rising"))
+
+    stat_cards = [
+        _mini_stat_card("BB %B", f"{_safe_float(meta.get('percent_b', 0.5)) * 100:.0f}%", "positive" if _safe_float(meta.get("percent_b", 0.5)) < 0.3 else ("negative" if _safe_float(meta.get("percent_b", 0.5)) > 0.7 else "warning")),
+        _mini_stat_card("CMF", f"{_safe_float(meta.get('cmf', 0)):+.3f}", "positive" if _safe_float(meta.get("cmf", 0)) > 0.05 else ("negative" if _safe_float(meta.get("cmf", 0)) < -0.05 else "muted")),
+        _mini_stat_card("자금 흐름", flow_text, flow_tone),
+        _mini_stat_card("OBV 기울기", f"{_safe_float(meta.get('obv_slope', 0)):+.2f}", "positive" if _safe_float(meta.get("obv_slope", 0)) > 0 else ("negative" if _safe_float(meta.get("obv_slope", 0)) < 0 else "muted")),
+        _mini_stat_card("최근 거래량", f"{_safe_float(meta.get('volume_ratio_20', 1)):.1f}x", "positive" if _safe_float(meta.get("volume_ratio_20", 1)) >= 1 else ("warning" if _safe_float(meta.get("volume_ratio_20", 1)) >= 0.7 else "negative")),
+        _mini_stat_card("ATR%", f"{_safe_float(meta.get('atr_pct', 0)):.1f}%", "accent"),
+        _mini_stat_card("권장 비중", size_label, size_tone),
+        _mini_stat_card("50일선 거리", f"{_safe_float(meta.get('ma50_dist', 0)):+.1f}%", "positive" if _safe_float(meta.get("ma50_dist", 0)) > 0 else "negative"),
+        _mini_stat_card("200일선 거리", f"{_safe_float(meta.get('ma200_dist', 0)):+.1f}%", "positive" if _safe_float(meta.get("ma200_dist", 0)) > 0 else "negative"),
+    ]
+
+    panel_html = f"""
+        <div class="sigl-grid sigl-grid--2">
+          <div class="sigl-card">
+            <div class="sigl-section-head">
+              <div>
+                <p class="sigl-section-title">선행 지표</p>
+                <p class="sigl-section-copy">속도와 전환 신호 중심의 해석입니다.</p>
+              </div>
+            </div>
+            <p class="sigl-metric-value" style="font-size:1.18rem;color:{_tone_color('positive' if accel >= 0 else 'negative')}">{_esc(leading)}</p>
+            <div class="sigl-chip-row">
+              {_badge(f'가속도 {accel:+.2f}', 'positive' if accel > 0 else ('negative' if accel < 0 else 'muted'))}
+              {_badge(utbot_label, utbot_tone)}
+              {_badge('HMA 상승' if hma_rising else 'HMA 하락', 'positive' if hma_rising else 'negative')}
+            </div>
+          </div>
+          <div class="sigl-card">
+            <div class="sigl-section-head">
+              <div>
+                <p class="sigl-section-title">후행 지표</p>
+                <p class="sigl-section-copy">구조와 누적 추세를 중심으로 봅니다.</p>
+              </div>
+            </div>
+            <p class="sigl-metric-value" style="font-size:1.18rem;color:{_tone_color(_tone_from_text(lagging))}">{_esc(lagging)}</p>
+            <div class="sigl-chip-row">
+              {_badge(localize_regime_label(meta.get('regime'), meta.get('regime_label')), 'accent')}
+              {_badge(f"RS {_safe_float(meta.get('rs_ratio', 1)):.3f}", 'muted')}
+            </div>
+          </div>
+        </div>
+        <div class="sigl-card" style="margin-top:12px">
+          <div class="sigl-section-head">
+            <div>
+              <p class="sigl-section-title">매수/매도 압력</p>
+              <p class="sigl-section-copy">현재 셋업 압력이 어느 쪽으로 더 기울었는지 보여줍니다.</p>
+            </div>
+          </div>
+          <div class="sigl-inline" style="justify-content:space-between">
+            <span class="sigl-summary">매수 압력 {setup_buy:.1f}</span>
+            <span class="sigl-summary">매도 압력 {setup_sell:.1f}</span>
+          </div>
+          <div class="sigl-bar-split" style="--buy:{buy_width:.2f}%;--sell:{sell_width:.2f}%">
+            <div class="sigl-bar-split__buy"></div>
+            <div class="sigl-bar-split__sell"></div>
+            <div class="sigl-bar-split__center"></div>
+          </div>
+        </div>
+        <div class="sigl-card" style="margin-top:12px">
+          <div class="sigl-section-head">
+            <div>
+              <p class="sigl-section-title">보조 지표 스냅샷</p>
+              <p class="sigl-section-copy">과열, 자금 흐름, 변동성, 위치 정보를 같은 규격으로 봅니다.</p>
+            </div>
+          </div>
+          <div class="sigl-grid sigl-grid--4">{''.join(stat_cards)}</div>
+        </div>
+        """
+    _render_panel_html(panel_html)
 
 
 def render_combined_scans(meta):
