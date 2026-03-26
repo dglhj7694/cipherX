@@ -192,10 +192,20 @@ div[data-testid="stForm"] div[data-testid="stTextInput"] input{{
   padding-left:14px!important;
   border-radius:16px!important;
   background:rgba(11,16,32,.74)!important;
+  color:var(--sigl-text-strong)!important;
+}}
+div[data-testid="stForm"] div[data-testid="stTextInput"] input::placeholder{{
+  color:#7F91AF!important;
+  opacity:1!important;
 }}
 div[data-testid="stForm"] div[data-testid="stFormSubmitButton"] button{{
   min-height:54px!important;
   border-radius:16px!important;
+}}
+div[data-testid="stForm"] div[data-testid="stFormSubmitButton"] button[kind="secondary"]{{
+  background:linear-gradient(180deg, rgba(29,40,64,.96), rgba(22,32,51,.92))!important;
+  color:#E2E8F0!important;
+  border:1px solid rgba(148,163,184,.24)!important;
 }}
 div[data-testid="stForm"] div[data-testid="stHorizontalBlock"]{{
   align-items:end!important;

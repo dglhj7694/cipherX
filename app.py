@@ -370,7 +370,7 @@ def _render_scanner_selection_panel(selected_sectors, selected_list):
             <div class="sigl-code-list">{chips}</div>
         </div>
         """
-    _render_surface_html(panel_html, 222)
+    _render_surface_html(panel_html, 286)
 
 
 def _render_scanner_summary(results, total_count):
