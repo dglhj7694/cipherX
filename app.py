@@ -103,16 +103,6 @@ div[data-testid="stToast"] p{color:#E8ECF1!important;font-weight:600!important}
 .analysis-nav-sub{color:#94A3B8;font-size:.78rem}
 .analysis-nav-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.24);color:#C7D2FE;font-size:.74rem;font-weight:700}
 .prompt-caption{color:#94A3B8;font-size:.74rem;font-weight:700;margin-bottom:8px}
-.guide-card{background:
-linear-gradient(180deg,rgba(99,102,241,.08),rgba(99,102,241,0) 34%),
-linear-gradient(160deg,rgba(10,14,24,.96),rgba(16,24,39,.88));
-border:1px solid rgba(99,102,241,.28);border-radius:16px;padding:14px 16px;margin:0 0 14px;box-shadow:0 16px 36px rgba(2,6,23,.22);position:relative;overflow:hidden}
-.guide-card:before{content:"";position:absolute;inset:0 0 auto 0;height:1px;background:linear-gradient(90deg,rgba(99,102,241,0),rgba(165,180,252,.8),rgba(99,102,241,0))}
-.guide-kicker{color:#C7D2FE;font-size:.75rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;margin:0 0 8px}
-.guide-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
-.guide-step{background:linear-gradient(160deg,rgba(15,23,42,.9),rgba(15,23,42,.72));border:1px solid rgba(148,163,184,.14);border-radius:12px;padding:12px 13px}
-.guide-step-title{color:#F8FAFC;font-size:.84rem;font-weight:800;margin:0 0 4px}
-.guide-step-copy{color:#94A3B8;font-size:.77rem;line-height:1.55;margin:0}
 .soft-note{color:#94A3B8;font-size:.76rem;line-height:1.55;margin-top:10px}
 div[data-testid="stExpander"]{
   background:linear-gradient(160deg,rgba(15,23,42,.94),rgba(17,24,39,.86))!important;
@@ -217,7 +207,6 @@ div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] blockquote{
   .price-header{padding:16px 18px}
   .price-big{font-size:1.78rem}
   .analysis-nav{padding:12px}
-  .guide-grid{grid-template-columns:1fr}
 }
 </style>""", unsafe_allow_html=True)
 
@@ -824,56 +813,6 @@ def _render_brand_board(payload, compact=False):
     if not compact:
         st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
-def _render_scanner_guide(tickers, scan_source):
-    target_count = len(tickers)
-    source_label = scan_source or "직접"
-    st.markdown(
-        f"""
-        <div class="guide-card fade-up">
-            <p class="guide-kicker">Scanner Guide · 스캐너 안내</p>
-            <div class="guide-grid">
-                <div class="guide-step">
-                    <p class="guide-step-title">1. 유니버스 선택</p>
-                    <p class="guide-step-copy">섹터 버튼이나 직접 입력으로 스캔 대상을 정합니다. 지금 준비된 종목은 <b style="color:#F8FAFC">{target_count}개</b>, 출처는 <b style="color:#F8FAFC">{source_label}</b>입니다.</p>
-                </div>
-                <div class="guide-step">
-                    <p class="guide-step-title">2. 점수와 강도 확인</p>
-                    <p class="guide-step-copy"><b>스캔 점수</b>는 우선순위, <b>ES</b>는 방향성입니다. 멀티 시그널과 최근 콤보가 겹칠수록 상단에 배치됩니다.</p>
-                </div>
-                <div class="guide-step">
-                    <p class="guide-step-title">3. 바로 분석으로 이동</p>
-                    <p class="guide-step-copy">카드의 <b>분석</b> 버튼을 누르면 분석 모드로 넘어가고, 사이드바의 스캔 내비게이터에서 이전/다음 종목을 빠르게 넘길 수 있습니다.</p>
-                </div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-def _render_analysis_guide():
-    st.markdown(
-        """
-        <div class="guide-card fade-up">
-            <p class="guide-kicker">How To Use · 사용 방법</p>
-            <div class="guide-grid">
-                <div class="guide-step">
-                    <p class="guide-step-title">1. 최종 판단 / 신뢰도</p>
-                    <p class="guide-step-copy">먼저 최종 판단과 신뢰도를 보고, 그 아래 근거 요약으로 방향성의 중심 논리를 빠르게 확인합니다.</p>
-                </div>
-                <div class="guide-step">
-                    <p class="guide-step-title">2. 위험 점검</p>
-                    <p class="guide-step-copy">스마트 머니 다이버전스, 손익비, 저거래량, 과열 위험이 있으면 여기서 먼저 경고를 확인하세요.</p>
-                </div>
-                <div class="guide-step">
-                    <p class="guide-step-title">3. 차트와 AI 리포트</p>
-                    <p class="guide-step-copy">차트 탭에서 거래량 프로파일(VP), 패턴, 캔들 툴팁으로 타이밍을 보고, AI 리포트는 마지막 정리용 보조 의견으로 활용하면 좋습니다.</p>
-                </div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
 with st.sidebar:
     _mi = 0 if st.session_state.get('_mode', '분석') == '분석' else 1
     app_mode = st.radio("모드", ['분석', '스캐너'], index=_mi)
@@ -945,8 +884,6 @@ if current_mode == '스캐너':
         tickers = []
         scan_source = "직접"
     tickers = list(dict.fromkeys([t for t in tickers if t]))
-
-    _render_scanner_guide(tickers, scan_source)
 
     cb1, cb2 = st.columns([3, 1])
     with cb1:
@@ -1257,7 +1194,6 @@ if current_mode == '스캐너':
 # ══════════════════════════════════════════════════════════════
 else:
     _render_brand_board(main_board_payload)
-    _render_analysis_guide()
 
     if not st.session_state.last_ticker:
         cols = st.columns(4)
