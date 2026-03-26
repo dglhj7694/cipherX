@@ -614,7 +614,7 @@ def _build_brand_payload(current_mode, chart_period):
     }
 
 def _render_brand_board(payload, compact=False):
-    height = 320 if compact else 290
+    height = 320 if compact else 336
     components.html(build_brand_board(payload, compact=compact), height=height, scrolling=False)
 
 def _render_scanner_guide(tickers, scan_source):
@@ -673,7 +673,6 @@ with st.sidebar:
     st.session_state['_mode'] = app_mode
     chart_period = st.radio("기간", ['3개월', '6개월', '1년', '2년'], index=1, horizontal=True, key="period")
     chart_days = {'3개월': 63, '6개월': 126, '1년': 252, '2년': 504}[chart_period]
-    _render_brand_board(_build_brand_payload(app_mode, chart_period), compact=True)
     st.markdown("---")
     if st.button("🗑️ 초기화", use_container_width=True, type="secondary"):
         reset_session()
