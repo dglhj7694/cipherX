@@ -87,7 +87,7 @@ html,body{
   background:linear-gradient(90deg,transparent,rgba(255,255,255,.05),rgba(255,255,255,.16),rgba(255,255,255,.05),transparent);
   transform:skewX(-18deg);
   mix-blend-mode:screen;
-  animation:siglSweep 6.8s linear infinite;
+  animation:siglSweep 5.8s linear infinite;
 }
 .sigl-topbar{
   position:relative;
@@ -523,7 +523,7 @@ html,body{
 .sigl-lane-track{
   display:flex;
   width:max-content;
-  animation:siglLaneMarquee 18s linear infinite;
+  animation:siglLaneMarquee 15s linear infinite;
   will-change:transform;
 }
 .sigl-lane-group{
