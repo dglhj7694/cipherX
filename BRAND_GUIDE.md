@@ -1,16 +1,16 @@
-# SIGL Brand Guide
+# SIGN Brand Guide
 
 ## Core Identity
-- Official name: `SIGL`
-- Official expression: `$SIGL (Signal)`
+- Official name: `SIGN`
+- Official expression: `$SIGN (Signal)`
 - Core cues: `Bull`, `Bear`, `Signal`
 - Tone: premium terminal, market-aware, disciplined, modern
 - Rule: no visible version text on user-facing surfaces
 
 ## Dual-Logo System
-- `SIGL` uses two coordinated logos.
+- `SIGN` uses two coordinated logos.
 - `Symbol logo`: circular bull/bear badge for icon-first surfaces.
-- `Wordmark logo`: `$SIGL` with `(Signal)` for typography-first surfaces.
+- `Wordmark logo`: `$SIGN` with `(Signal)` for typography-first surfaces.
 - Header rule: left symbol, absolute-centered wordmark, right spacer for balance.
 
 ## Symbol Logo
@@ -31,15 +31,15 @@
 
 ## Wordmark Logo
 - Structure:
-  - line 1: `$SIGL`
+  - line 1: `$SIGN`
   - line 2: `(Signal)`
 - Color priority:
   - `$`: green accent
-  - `SIGL`: warm off-white
+  - `SIGN`: warm off-white
   - `(Signal)`: muted steel-gray
   - red: tiny terminal accent only
 - Behavior:
-  - `(Signal)` must always be visibly smaller than `$SIGL`
+  - `(Signal)` must always be visibly smaller than `$SIGN`
   - the wordmark should feel premium and controlled, not retro-terminal or gaming-like
   - the center wordmark is the primary text expression of the brand
 
@@ -49,7 +49,7 @@
   - wordmark centered against the full header canvas
   - spacer on the right to keep the center stable
 - Docs / reports / onboarding copy:
-  - prefer `$SIGL (Signal)` text expression
+  - prefer `$SIGN (Signal)` text expression
 - Favicon / icon surfaces:
   - symbol-only
 
@@ -64,7 +64,7 @@
 
 ## Do Not
 - Do not show version labels next to the logo.
-- Do not paint the full `SIGL` wordmark in red/green.
+- Do not paint the full `SIGN` wordmark in red/green.
 - Do not replace the circular badge with chart candles or bars.
 - Do not let the left symbol shift the centered wordmark off-axis.
-- Do not make `(Signal)` equal in size or weight to `$SIGL`.
+- Do not make `(Signal)` equal in size or weight to `$SIGN`.

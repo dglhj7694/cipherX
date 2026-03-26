@@ -132,6 +132,124 @@ div[data-testid="stMarkdownContainer"] p,
 div[data-testid="stMarkdownContainer"] li{{
   color:var(--sigl-text)!important;
 }}
+section[data-testid="stSidebar"] div[data-testid="stRadio"]{{
+  margin:0 0 14px!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] > label{{
+  display:block!important;
+  margin:0 0 8px!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] > label p{{
+  color:var(--sigl-text-muted)!important;
+  font-size:.72rem!important;
+  font-weight:800!important;
+  letter-spacing:.08em!important;
+  text-transform:uppercase!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"]{{
+  display:grid!important;
+  grid-template-columns:repeat(2, minmax(0, 1fr))!important;
+  gap:8px!important;
+  padding:6px!important;
+  border:1px solid rgba(148,163,184,.12)!important;
+  border-radius:16px!important;
+  background:linear-gradient(180deg, rgba(19,28,45,.72), rgba(15,23,42,.56))!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"] > label[data-baseweb="radio"]{{
+  position:relative!important;
+  display:flex!important;
+  align-items:stretch!important;
+  justify-content:center!important;
+  min-height:46px!important;
+  margin:0!important;
+  border-radius:14px!important;
+  border:1px solid rgba(148,163,184,.12)!important;
+  background:linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.015))!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.03)!important;
+  overflow:hidden!important;
+  cursor:pointer!important;
+  transition:transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"] > label[data-baseweb="radio"]:hover{{
+  transform:translateY(-1px)!important;
+  border-color:rgba(142,164,255,.22)!important;
+  background:linear-gradient(180deg, rgba(142,164,255,.10), rgba(142,164,255,.04))!important;
+  box-shadow:0 10px 20px rgba(2,6,23,.16)!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"] > label[data-baseweb="radio"]::before{{
+  content:"";
+  position:absolute;
+  inset:auto auto 9px 10px;
+  width:8px;
+  height:8px;
+  border-radius:999px;
+  background:rgba(148,163,184,.42);
+  box-shadow:none;
+  transition:transform .2s ease, background .2s ease, box-shadow .2s ease, opacity .2s ease!important;
+  opacity:.9;
+}}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"] > label[data-baseweb="radio"]::after{{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+  background:radial-gradient(circle at center, rgba(142,164,255,.18), rgba(142,164,255,0) 62%);
+  opacity:0;
+  transform:scale(.74);
+  pointer-events:none;
+}}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"] > label[data-baseweb="radio"] > div:first-child{{
+  position:absolute!important;
+  inset:0!important;
+  opacity:0!important;
+  width:100%!important;
+  height:100%!important;
+  margin:0!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"] > label[data-baseweb="radio"] > div:last-child{{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:100%!important;
+  min-height:46px!important;
+  padding:10px 14px 10px 24px!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"] > label[data-baseweb="radio"] > div:last-child p{{
+  width:100%!important;
+  margin:0!important;
+  color:var(--sigl-text)!important;
+  font-size:.82rem!important;
+  font-weight:800!important;
+  text-align:center!important;
+  letter-spacing:-.01em!important;
+  transition:color .18s ease!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"] > label[data-baseweb="radio"]:has(input:checked){{
+  transform:translateY(-1px)!important;
+  border-color:rgba(142,164,255,.34)!important;
+  background:linear-gradient(180deg, rgba(142,164,255,.18), rgba(93,123,255,.08))!important;
+  box-shadow:
+    0 10px 22px rgba(93,123,255,.18)!important,
+    inset 0 0 0 1px rgba(142,164,255,.14)!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"] > label[data-baseweb="radio"]:has(input:checked)::before{{
+  background:var(--sigl-success)!important;
+  box-shadow:
+    0 0 0 4px rgba(99,217,162,.12),
+    0 0 14px rgba(99,217,162,.26)!important;
+  transform:scale(1.12)!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"] > label[data-baseweb="radio"]:has(input:checked)::after{{
+  opacity:1!important;
+  transform:scale(1)!important;
+  animation:sigl-radio-pulse .42s ease-out 1!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"] > label[data-baseweb="radio"]:has(input:checked) > div:last-child p{{
+  color:var(--sigl-text-strong)!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"] > label[data-baseweb="radio"]:active{{
+  transform:scale(.985)!important;
+}}
 div[data-testid="stTabs"] button{{
   color:var(--sigl-text-muted)!important;
   font-weight:800!important;
@@ -341,6 +459,11 @@ div[data-testid="stChatInput"] button svg{{
 }}
 div[data-testid="stMetricValue"]{{
   color:var(--sigl-text-strong)!important;
+}}
+@keyframes sigl-radio-pulse{{
+  0%{{opacity:.18;transform:scale(.74)}}
+  55%{{opacity:.9;transform:scale(1.02)}}
+  100%{{opacity:1;transform:scale(1)}}
 }}
 ::-webkit-scrollbar{{width:8px;height:8px}}
 ::-webkit-scrollbar-track{{background:#0B1020}}
@@ -948,6 +1071,9 @@ p[data-testid="stCaption"]{{
   .sigl-layer-label{{font-size:.68rem;padding:3px 7px}}
 }}
 @media (max-width: 640px){{
+  section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"]{{
+    grid-template-columns:1fr!important;
+  }}
   .sigl-grid--2,
   .sigl-grid--3,
   .sigl-grid--4,
@@ -974,6 +1100,14 @@ p[data-testid="stCaption"]{{
   }}
   div[data-testid="stChatInput"]{{max-width:none}}
 }}
+@media (prefers-reduced-motion: reduce){{
+  section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"] > label[data-baseweb="radio"],
+  section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"] > label[data-baseweb="radio"]::before,
+  section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"] > label[data-baseweb="radio"]::after{{
+    animation:none!important;
+    transition:none!important;
+  }}
+}}
 </style>"""
 
 
@@ -994,10 +1128,10 @@ html,body{{
   max-width:100%;
 }}
 .sigl-brand-shell{{
-  display:block;
-  padding:14px 16px;
-  background:
-    linear-gradient(180deg, rgba(19,28,45,.98), rgba(15,23,42,.94));
+  position:relative;
+  min-height:124px;
+  padding:18px 22px;
+  background:linear-gradient(180deg, rgba(11,16,32,.98) 0%, rgba(14,20,37,.95) 100%);
   border:1px solid rgba(148,163,184,.18);
   border-radius:22px;
   box-shadow:0 16px 36px rgba(8,15,30,.26);
@@ -1006,29 +1140,488 @@ html,body{{
   min-width:0;
   overflow:hidden;
 }}
-.sigl-brand-banner{{
+.sigl-brand-shell::before{{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,0) 22%, rgba(255,255,255,.018) 78%, rgba(255,255,255,.03) 100%),
+    repeating-linear-gradient(90deg, rgba(148,163,184,.045) 0 1px, transparent 1px 42px),
+    repeating-linear-gradient(180deg, rgba(148,163,184,.028) 0 1px, transparent 1px 20px);
+  opacity:.36;
+  animation:sigl-scanline-drift 16s linear infinite;
+  pointer-events:none;
+}}
+.sigl-brand-shell::after{{
+  content:"";
+  position:absolute;
+  inset:-10% -4%;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255,216,120,.16) 0%, rgba(255,216,120,.08) 18%, rgba(255,216,120,0) 44%),
+    radial-gradient(circle at 50% 50%, rgba(255,244,208,.10) 0%, rgba(255,244,208,0) 28%);
+  opacity:0;
+  transform:scale(.96);
+  filter:blur(18px);
+  animation:sigl-header-jackpot-haze 10.8s linear infinite;
+  pointer-events:none;
+}}
+.sigl-brand-shell > .sigl-brand-bar::before{{
+  content:"";
+  position:absolute;
+  inset:-12px;
+  border-radius:18px;
+  border:1px solid rgba(255,255,255,.04);
+  pointer-events:none;
+}}
+.sigl-brand-shell--compact{{
+  min-height:108px;
+}}
+.sigl-brand-bar{{
+  position:relative;
+  z-index:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
   width:100%;
-  height:auto;
-  display:block;
-  border-radius:16px;
-  box-shadow:0 14px 28px rgba(8,15,30,.18);
+  min-height:84px;
 }}
-.sigl-brand-logo-image{{
-  display:block;
-  width:84px;
-  height:84px;
-  object-fit:contain;
-}}
-.sigl-brand-wordmark{{
+.sigl-brand-lockup{{
+  position:relative;
+  z-index:1;
+  display:flex;
+  justify-content:center;
+  width:min(100%, 520px);
   min-width:0;
 }}
+.sigl-brand-lockup::before{{
+  content:none;
+}}
+.sigl-brand-wordmark{{
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  gap:6px;
+  min-width:0;
+  text-align:center;
+  position:relative;
+  z-index:1;
+}}
+.sigl-brand-title{{
+  display:inline-flex;
+  align-items:baseline;
+  gap:.05em;
+  font-size:clamp(2.18rem, 5vw, 3.35rem);
+  line-height:.94;
+  font-weight:900;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+  text-shadow:none;
+  position:relative;
+}}
+.sigl-brand-title__jackpot{{
+  position:absolute;
+  left:0;
+  top:0;
+  display:inline-flex;
+  align-items:baseline;
+  gap:.05em;
+  opacity:0;
+  pointer-events:none;
+  z-index:3;
+  animation:sigl-jackpot-burst 10.8s linear infinite;
+}}
+.sigl-brand-title__jackpot-mark{{
+  color:#FFE08B;
+  text-shadow:
+    0 0 12px rgba(255,214,102,.34),
+    0 0 28px rgba(255,214,102,.24),
+    0 0 56px rgba(255,214,102,.12);
+}}
+.sigl-brand-title__jackpot-letters{{
+  display:inline-flex;
+  align-items:baseline;
+  gap:.05em;
+}}
+.sigl-brand-title__jackpot-letters span{{
+  display:inline-block;
+  color:#FFF4C9;
+  text-shadow:
+    0 0 12px rgba(255,214,102,.40),
+    0 0 28px rgba(255,214,102,.28),
+    0 0 62px rgba(255,214,102,.16);
+}}
+.sigl-brand-title__mark{{
+  display:inline-block;
+  color:#9CF7C5;
+  text-shadow:
+    0 0 10px rgba(72,245,162,.26),
+    0 0 24px rgba(72,245,162,.18);
+  transform-origin:50% 72%;
+  will-change:transform, text-shadow, color;
+  animation:sigl-dollar-pop 3.2s cubic-bezier(.23,.88,.33,1) infinite;
+}}
+.sigl-brand-title__letters{{
+  position:relative;
+  display:inline-flex;
+  align-items:baseline;
+  gap:.05em;
+  padding:.02em .04em;
+}}
+.sigl-brand-title__letters::before,
+.sigl-brand-title__letters::after{{
+  content:"";
+  position:absolute;
+  inset:-.36em -.28em -.24em;
+  pointer-events:none;
+  filter:blur(20px);
+  opacity:.46;
+}}
+.sigl-brand-title__letters::before{{
+  background:
+    radial-gradient(circle at 11% 56%, rgba(255,88,102,.38), transparent 18%),
+    radial-gradient(circle at 60% 50%, rgba(255,88,102,.30), transparent 20%);
+  animation:sigl-bloom-red 7.3s steps(1,end) infinite;
+}}
+.sigl-brand-title__letters::after{{
+  background:
+    radial-gradient(circle at 34% 48%, rgba(72,245,162,.34), transparent 16%),
+    radial-gradient(circle at 92% 44%, rgba(72,245,162,.36), transparent 20%);
+  animation:sigl-bloom-green 8.1s steps(1,end) infinite;
+}}
+.sigl-brand-letter{{
+  position:relative;
+  display:inline-block;
+  color:#FCFDFF;
+  text-shadow:
+    0 0 8px rgba(248,250,252,.12),
+    0 0 20px rgba(255,255,255,.07);
+  will-change:text-shadow, color, opacity;
+}}
+.sigl-brand-letter::after{{
+  content:attr(data-char);
+  position:absolute;
+  inset:0;
+  color:var(--glow-color);
+  opacity:.0;
+  pointer-events:none;
+  mix-blend-mode:screen;
+  filter:blur(.6px);
+}}
+.sigl-brand-letter--red{{
+  --glow-color:#FF5866;
+  animation:sigl-neon-red 7.2s steps(1,end) infinite;
+}}
+.sigl-brand-letter--red::after{{
+  animation:sigl-neon-red-ghost 7.2s steps(1,end) infinite;
+}}
+.sigl-brand-letter--green{{
+  --glow-color:#48F5A2;
+  animation:sigl-neon-green 8.4s steps(1,end) infinite;
+}}
+.sigl-brand-letter--green::after{{
+  animation:sigl-neon-green-ghost 8.4s steps(1,end) infinite;
+}}
+.sigl-brand-letter--s{{
+  animation-delay:-.9s;
+}}
+.sigl-brand-letter--s::after{{
+  animation-delay:-.9s;
+}}
+.sigl-brand-letter--i{{
+  animation-delay:-2.6s;
+}}
+.sigl-brand-letter--i::after{{
+  animation-delay:-2.6s;
+}}
+.sigl-brand-letter--g{{
+  animation-delay:-1.4s;
+}}
+.sigl-brand-letter--g::after{{
+  animation-delay:-1.4s;
+}}
+.sigl-brand-letter--n{{
+  animation-delay:-3.2s;
+}}
+.sigl-brand-letter--n::after{{
+  animation-delay:-3.2s;
+}}
+.sigl-brand-subtitle{{
+  position:relative;
+  padding-right:14px;
+  color:#8E9AAF;
+  font-size:.74rem;
+  font-weight:800;
+  letter-spacing:.2em;
+  line-height:1;
+}}
+.sigl-brand-subtitle::after{{
+  content:"";
+  position:absolute;
+  right:0;
+  top:50%;
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  background:rgba(255,143,150,.92);
+  box-shadow:0 0 12px rgba(255,143,150,.28);
+  transform:translateY(-50%);
+  animation:sigl-subtitle-dot-jackpot 10.8s linear infinite;
+}}
+.sigl-brand-shell--compact .sigl-brand-bar{{
+  min-height:70px;
+}}
+.sigl-brand-shell--compact .sigl-brand-lockup{{
+  width:min(100%, 460px);
+}}
+.sigl-brand-shell--compact .sigl-brand-title{{
+  font-size:clamp(1.9rem, 4.4vw, 2.9rem);
+}}
+.sigl-brand-shell--compact .sigl-brand-subtitle{{
+  font-size:.68rem;
+  letter-spacing:.18em;
+}}
+@keyframes sigl-neon-red{{
+  0%, 5%, 11%, 18%, 31%, 38%, 55%, 63%, 79%, 100%{{
+    color:#FFF4F6;
+    text-shadow:
+      0 0 8px rgba(248,250,252,.12),
+      0 0 18px rgba(255,88,102,.14);
+  }}
+  6%, 10.8%, 20.2%, 30.8%, 40.2%, 55%, 65.2%, 78.4%{{
+    color:#FFEDEF;
+    text-shadow:
+      0 0 8px rgba(255,255,255,.50),
+      0 0 16px rgba(255,88,102,.62),
+      0 0 34px rgba(255,88,102,.38),
+      0 0 64px rgba(255,88,102,.20);
+  }}
+  8%, 22.2%, 42.2%, 58.4%{{
+    color:#FFFFFF;
+    text-shadow:
+      0 0 10px rgba(255,255,255,.68),
+      0 0 20px rgba(255,88,102,.86),
+      0 0 44px rgba(255,88,102,.52),
+      0 0 82px rgba(255,88,102,.26);
+  }}
+}}
+@keyframes sigl-neon-red-ghost{{
+  0%, 5%, 11%, 18%, 31%, 38%, 55%, 63%, 79%, 100%{{opacity:.04}}
+  6%, 10.8%, 20.2%, 30.8%, 40.2%, 55%, 65.2%, 78.4%{{opacity:.22}}
+  8%, 22.2%, 42.2%, 58.4%{{opacity:.36}}
+}}
+@keyframes sigl-neon-green{{
+  0%, 7%, 12%, 24%, 36%, 43%, 60%, 69%, 82%, 100%{{
+    color:#F4FFF9;
+    text-shadow:
+      0 0 8px rgba(248,250,252,.12),
+      0 0 18px rgba(72,245,162,.14);
+  }}
+  8%, 13.8%, 26.2%, 38.2%, 45.2%, 62.2%, 71.2%, 83.6%{{
+    color:#EAFFF4;
+    text-shadow:
+      0 0 8px rgba(255,255,255,.48),
+      0 0 16px rgba(72,245,162,.60),
+      0 0 34px rgba(72,245,162,.38),
+      0 0 64px rgba(72,245,162,.20);
+  }}
+  10%, 28.2%, 48.2%, 73.2%{{
+    color:#FFFFFF;
+    text-shadow:
+      0 0 10px rgba(255,255,255,.66),
+      0 0 20px rgba(72,245,162,.84),
+      0 0 44px rgba(72,245,162,.50),
+      0 0 82px rgba(72,245,162,.24);
+  }}
+}}
+@keyframes sigl-neon-green-ghost{{
+  0%, 7%, 12%, 24%, 36%, 43%, 60%, 69%, 82%, 100%{{opacity:.04}}
+  8%, 13.8%, 26.2%, 38.2%, 45.2%, 62.2%, 71.2%, 83.6%{{opacity:.22}}
+  10%, 28.2%, 48.2%, 73.2%{{opacity:.34}}
+}}
+@keyframes sigl-bloom-red{{
+  0%, 14%, 27%, 42%, 58%, 71%, 100%{{opacity:.16;transform:translateY(0) scale(1)}}
+  7%, 20%, 35%, 50%, 66%, 84%{{opacity:.30;transform:translateY(-1px) scale(1.04)}}
+  11%, 24%, 39%, 63%{{opacity:.44;transform:translateY(0) scale(1.08)}}
+}}
+@keyframes sigl-bloom-green{{
+  0%, 16%, 29%, 46%, 59%, 76%, 100%{{opacity:.14;transform:translateY(0) scale(1)}}
+  9%, 21%, 37%, 52%, 68%, 88%{{opacity:.28;transform:translateY(1px) scale(1.05)}}
+  13%, 25%, 41%, 73%{{opacity:.40;transform:translateY(0) scale(1.09)}}
+}}
+@keyframes sigl-dollar-pop{{
+  0%, 16%, 24%, 42%, 52%, 100%{{
+    color:#9CF7C5;
+    transform:translateY(0) scale(1);
+    text-shadow:
+      0 0 10px rgba(72,245,162,.24),
+      0 0 22px rgba(72,245,162,.16);
+  }}
+  18%{{
+    color:#DFFFF0;
+    transform:translateY(-3px) scale(1.06);
+    text-shadow:
+      0 0 10px rgba(255,255,255,.32),
+      0 0 18px rgba(72,245,162,.78),
+      0 0 36px rgba(72,245,162,.48),
+      0 0 64px rgba(72,245,162,.26);
+  }}
+  21%{{
+    color:#BBF1D2;
+    transform:translateY(1px) scale(.98);
+    text-shadow:
+      0 0 10px rgba(72,245,162,.34),
+      0 0 20px rgba(72,245,162,.20);
+  }}
+  46%{{
+    color:#D7FFEA;
+    transform:translateY(-2px) scale(1.04);
+    text-shadow:
+      0 0 10px rgba(255,255,255,.24),
+      0 0 18px rgba(72,245,162,.72),
+      0 0 34px rgba(72,245,162,.44),
+      0 0 60px rgba(72,245,162,.24);
+  }}
+  49%{{
+    color:#A6EEC4;
+    transform:translateY(0) scale(1);
+    text-shadow:
+      0 0 10px rgba(72,245,162,.26),
+      0 0 22px rgba(72,245,162,.16);
+  }}
+}}
+@keyframes sigl-jackpot-burst{{
+  0%, 73%, 100%{{
+    opacity:0;
+    transform:scale(1);
+  }}
+  74.2%{{
+    opacity:.28;
+    transform:scale(1.012);
+  }}
+  75.4%{{
+    opacity:1;
+    transform:scale(1.035);
+  }}
+  76.2%{{
+    opacity:.52;
+    transform:scale(1.014);
+  }}
+  77.1%{{
+    opacity:1;
+    transform:scale(1.028);
+  }}
+  78.2%{{
+    opacity:.72;
+    transform:scale(1.016);
+  }}
+  79.2%{{
+    opacity:0;
+    transform:scale(1);
+  }}
+}}
+@keyframes sigl-scanline-drift{{
+  0%{{transform:translate3d(0,0,0)}}
+  100%{{transform:translate3d(0,14px,0)}}
+}}
+@keyframes sigl-header-jackpot-haze{{
+  0%, 73%, 100%{{
+    opacity:0;
+    transform:scale(.96);
+  }}
+  74.2%{{
+    opacity:.18;
+    transform:scale(1);
+  }}
+  75.4%{{
+    opacity:.42;
+    transform:scale(1.04);
+  }}
+  76.2%{{
+    opacity:.28;
+    transform:scale(1.015);
+  }}
+  77.1%{{
+    opacity:.36;
+    transform:scale(1.03);
+  }}
+  78.2%{{
+    opacity:.14;
+    transform:scale(1.01);
+  }}
+  79.2%{{
+    opacity:0;
+    transform:scale(.98);
+  }}
+}}
+@keyframes sigl-subtitle-dot-jackpot{{
+  0%, 73%, 100%{{
+    background:rgba(255,143,150,.92);
+    box-shadow:0 0 12px rgba(255,143,150,.28);
+  }}
+  74.2%{{
+    background:rgba(137,255,188,.96);
+    box-shadow:
+      0 0 10px rgba(72,245,162,.46),
+      0 0 18px rgba(72,245,162,.22);
+  }}
+  75.4%{{
+    background:#DFFFF0;
+    box-shadow:
+      0 0 10px rgba(255,255,255,.34),
+      0 0 18px rgba(72,245,162,.78),
+      0 0 34px rgba(72,245,162,.34);
+  }}
+  76.2%{{
+    background:rgba(168,255,206,.98);
+    box-shadow:
+      0 0 10px rgba(72,245,162,.54),
+      0 0 22px rgba(72,245,162,.26);
+  }}
+  77.1%{{
+    background:#F1FFF7;
+    box-shadow:
+      0 0 10px rgba(255,255,255,.30),
+      0 0 18px rgba(72,245,162,.72),
+      0 0 30px rgba(72,245,162,.30);
+  }}
+  78.2%{{
+    background:rgba(183,255,217,.96);
+    box-shadow:
+      0 0 10px rgba(72,245,162,.42),
+      0 0 18px rgba(72,245,162,.20);
+  }}
+  79.2%{{
+    background:rgba(255,143,150,.92);
+    box-shadow:0 0 12px rgba(255,143,150,.28);
+  }}
+}}
 @media (max-width: 920px){{
-  .sigl-brand-shell{{padding:12px 14px}}
-  .sigl-brand-banner{{border-radius:14px}}
+  .sigl-brand-shell{{min-height:116px;padding:16px 18px}}
+  .sigl-brand-bar{{min-height:78px}}
+  .sigl-brand-lockup{{width:min(100%, 470px)}}
+  .sigl-brand-title{{font-size:clamp(1.95rem, 5.6vw, 3rem)}}
 }}
 @media (max-width: 640px){{
-  .sigl-brand-shell{{padding:10px 10px;border-radius:18px}}
-  .sigl-brand-banner{{border-radius:12px}}
+  .sigl-brand-shell{{min-height:100px;padding:14px 16px;border-radius:18px}}
+  .sigl-brand-bar{{min-height:64px;justify-content:center}}
+  .sigl-brand-lockup{{width:100%}}
+  .sigl-brand-wordmark{{gap:4px}}
+  .sigl-brand-title{{font-size:clamp(1.72rem, 10vw, 2.22rem);letter-spacing:.09em}}
+  .sigl-brand-subtitle{{font-size:.64rem;letter-spacing:.14em;padding-right:10px}}
+  .sigl-brand-subtitle::after{{width:5px;height:5px}}
+}}
+@media (prefers-reduced-motion: reduce){{
+  .sigl-brand-shell::before,
+  .sigl-brand-shell::after,
+  .sigl-brand-title__jackpot,
+  .sigl-brand-title__mark,
+  .sigl-brand-title__letters::before,
+  .sigl-brand-title__letters::after,
+  .sigl-brand-letter,
+  .sigl-brand-letter::after{{
+    animation:none!important;
+  }}
 }}
 """
 

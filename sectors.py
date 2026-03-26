@@ -168,34 +168,6 @@ SECTOR_GROUPS = {
         'MP','UAMY','TROX',
         'NB','IPX','PPTA','IDR','CRML','MTRN','COHR','PLPC','HXL',
     ],
-
-    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    # 🔥 오늘자 공격 (AI 전력/인프라 병목 & 중소형 성장주)
-    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    '0325 공격': [
-        # [전력/냉각/인프라]
-        'MOD', 'POWL', 'NVT', 'MYRG', 'STRL', 'GTLS', 'BE', 'GNRC', 'FLNC', 'ITRI',
-        # [네트워크/부품/반도체]
-        'TTMI', 'FN', 'UCTT',
-        # [방산/원자력/우주]
-        'BWXT', 'AVAV', 'KTOS', 'RKLB',
-        # [바이오/디지털헬스]
-        'PTGX', 'EXAS', 'CRSP', 'BEAM',
-        # [소비재/기타]
-        'ELF',
-    ],
-
-    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    # 🛡️ 오늘자 방어 (현금흐름·가격결정권·대형 배당/방어주)
-    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    '0325 오늘자 방어': [
-        # [유틸리티/에너지 - 현금흐름 강점]
-        'NEE', 'CEG', 'VST', 'DUK', 'XOM', 'CVX',
-        # [필수소비재/헬스케어 - 가격결정력]
-        'PG', 'KO', 'PEP', 'COST', 'WM', 'JNJ', 'ABV',
-        # [대형 저변동성/배당]
-        'MSFT', 'BRK.B', 'LIN', 'RTX', 'MMC'
-    ],
     '⛓️엔비디아블록체인': [
         # [AI 인프라 / 에너지 / 클라우드]
         'SMR', 'CEG', 'VRT', 'EQIX',
@@ -213,4 +185,21 @@ SECTOR_GROUPS = {
         'IONQ', 'TSLA', 'PATH', 'RXRX', 'SDGR', 'PLTR',
         # ※ 비상장: Figure AI, Wayve, Perplexity, Runway
     ],    
+
+
+    '주도섹터 공격': [
+        'AAOI', 'ALAB', 'AMKR', 'ARM', 'ASTS', 'AVAV', 'BAH', 'BE', 'BEAM', 'BWXT', 
+        'CAMT', 'CPRX', 'CRSP', 'CRX', 'DOCN', 'ELF', 'EXAS', 'FIX', 'FLNC', 'FN', 
+        'GNRC', 'GTLS', 'HALO', 'HUBS', 'ITRI', 'KPTI', 'KTOS', 'LMT', 'LRCX', 'LUNR', 
+        'MNMD', 'MOD', 'MRVL', 'MSTR', 'MU', 'MYRG', 'NVDA', 'NVT', 'ONDS', 'ORCL', 
+        'PL', 'PLTR', 'POWL', 'PTGX', 'RKLB', 'SATS', 'SIDU', 'SPCE', 'STRL', 'TER', 
+        'TTMI', 'UCTT', 'VRT', 'XENE'
+    ],
+
+    '주도섹터 방어': [
+        'ABBV', 'ACN', 'ADP', 'APD', 'AROC', 'BRK.B', 'CEG', 'CLX', 'COST', 'CPB', 
+        'CVX', 'DHR', 'DUK', 'EQT', 'EXP', 'FTI', 'JNJ', 'JPM', 'KO', 'LIN', 
+        'MMC', 'MSFT', 'NEE', 'NUE', 'PAYX', 'PEP', 'PG', 'RTX', 'SCCO', 'STZ', 
+        'TMO', 'VST', 'WM', 'WMT', 'XOM', 'ZBH'
+    ], 
 }
