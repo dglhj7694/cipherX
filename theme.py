@@ -159,17 +159,37 @@ div[data-testid="stChatMessage"]{{
   padding:16px 18px;
   box-shadow:var(--sigl-shadow-sm);
 }}
+div[data-testid="stBottomBlockContainer"]{{
+  background:
+    linear-gradient(180deg, rgba(11,16,32,0) 0%, rgba(11,16,32,.82) 32%, rgba(11,16,32,.98) 100%)!important;
+  padding-top:18px!important;
+}}
+div[data-testid="stBottomBlockContainer"] > div{{
+  background:transparent!important;
+}}
 div[data-testid="stChatInput"]{{
-  margin-top:14px;
+  margin:0 auto 10px!important;
+  max-width:980px;
+  padding:10px 12px!important;
+  border-radius:22px!important;
+  border:1px solid var(--sigl-border-soft)!important;
+  background:
+    linear-gradient(180deg, rgba(142,164,255,.08), rgba(142,164,255,0) 36%),
+    linear-gradient(180deg, rgba(19,28,45,.98), rgba(15,23,42,.94))!important;
+  box-shadow:var(--sigl-shadow-md)!important;
+}}
+div[data-testid="stChatInput"] > div{{
+  background:transparent!important;
+  border:none!important;
 }}
 div[data-testid="stChatInput"] textarea{{
-  background:linear-gradient(180deg, rgba(19,28,45,.98), rgba(15,23,42,.92))!important;
-  border:1px solid var(--sigl-border-soft)!important;
-  border-radius:18px!important;
+  background:rgba(255,255,255,.03)!important;
+  border:1px solid rgba(148,163,184,.14)!important;
+  border-radius:16px!important;
   color:var(--sigl-text-strong)!important;
-  box-shadow:var(--sigl-shadow-sm)!important;
-  padding:.95rem 3.1rem .95rem 1rem!important;
-  min-height:56px!important;
+  box-shadow:none!important;
+  padding:1rem 3.2rem 1rem 1rem!important;
+  min-height:58px!important;
 }}
 div[data-testid="stChatInput"] textarea::placeholder{{
   color:var(--sigl-text-muted)!important;
@@ -178,7 +198,7 @@ div[data-testid="stChatInput"] textarea::placeholder{{
 div[data-testid="stChatInput"] button{{
   background:linear-gradient(135deg, #7C93FF, #5D7BFF)!important;
   border:none!important;
-  border-radius:12px!important;
+  border-radius:14px!important;
   color:white!important;
   box-shadow:0 10px 20px rgba(93,123,255,.22)!important;
 }}
@@ -594,6 +614,7 @@ p[data-testid="stCaption"]{{
   .sigl-result-summary{{grid-template-columns:1fr}}
   .block-container{{padding-left:1rem!important;padding-right:1rem!important}}
   .sigl-price-value{{font-size:1.8rem}}
+  div[data-testid="stChatInput"]{{max-width:none}}
 }}
 </style>"""
 
@@ -684,6 +705,7 @@ html,body{{
   grid-template-columns:minmax(0, 1.3fr) minmax(260px, .9fr);
   gap:14px;
   padding:18px 22px 22px;
+  align-items:stretch;
 }}
 .sigl-brand-card{{
   background:rgba(255,255,255,.03);

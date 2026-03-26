@@ -889,7 +889,7 @@ def _build_brand_payload(current_mode, chart_period):
     }
 
 def _render_brand_board(payload, compact=False):
-    height = 240 if compact else 320
+    height = 250 if compact else 380
     components.html(build_brand_board(payload, compact=compact), height=height, scrolling=False)
     if not compact:
         st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
