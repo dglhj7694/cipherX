@@ -1260,6 +1260,107 @@ div[data-testid="stMetricValue"]{{
   border-color:rgba(142,164,255,.28);
   background:linear-gradient(180deg, rgba(142,164,255,.10), rgba(255,255,255,.03));
 }}
+.sigl-sector-picker-anchor{{
+  width:0;
+  height:0;
+  overflow:hidden;
+}}
+div[data-testid="stVerticalBlock"]:has(.sigl-sector-picker-anchor){{
+  gap:10px!important;
+  padding:10px!important;
+  border:1px solid rgba(148,163,184,.12);
+  border-radius:18px;
+  background:linear-gradient(180deg, rgba(19,28,45,.76), rgba(15,23,42,.58));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
+}}
+div[data-testid="stVerticalBlock"]:has(.sigl-sector-picker-anchor) > div[data-testid="stHorizontalBlock"]{{
+  gap:8px!important;
+}}
+div[data-testid="stVerticalBlock"]:has(.sigl-sector-picker-anchor) div.stButton{{
+  height:100%;
+}}
+div[data-testid="stVerticalBlock"]:has(.sigl-sector-picker-anchor) div.stButton>button{{
+  position:relative;
+  min-height:52px!important;
+  border-radius:15px!important;
+  border:1px solid rgba(148,163,184,.14)!important;
+  background:linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.015))!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.03)!important;
+  overflow:hidden!important;
+  transition:
+    transform .18s ease,
+    border-color .18s ease,
+    background .18s ease,
+    box-shadow .18s ease!important;
+}}
+div[data-testid="stVerticalBlock"]:has(.sigl-sector-picker-anchor) div.stButton>button::before{{
+  content:"";
+  position:absolute;
+  inset:auto auto 11px 12px;
+  width:8px;
+  height:8px;
+  border-radius:999px;
+  background:rgba(148,163,184,.42);
+  opacity:.92;
+  transition:
+    transform .18s ease,
+    background .18s ease,
+    box-shadow .18s ease,
+    opacity .18s ease!important;
+}}
+div[data-testid="stVerticalBlock"]:has(.sigl-sector-picker-anchor) div.stButton>button::after{{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+  background:radial-gradient(circle at center, rgba(142,164,255,.18), rgba(142,164,255,0) 62%);
+  opacity:0;
+  transform:scale(.76);
+  pointer-events:none;
+  transition:opacity .2s ease, transform .2s ease!important;
+}}
+div[data-testid="stVerticalBlock"]:has(.sigl-sector-picker-anchor) div.stButton>button span,
+div[data-testid="stVerticalBlock"]:has(.sigl-sector-picker-anchor) div.stButton>button p,
+div[data-testid="stVerticalBlock"]:has(.sigl-sector-picker-anchor) div.stButton>button div{{
+  color:var(--sigl-text)!important;
+  font-weight:800!important;
+}}
+div[data-testid="stVerticalBlock"]:has(.sigl-sector-picker-anchor) div.stButton>button:hover{{
+  transform:translateY(-1px)!important;
+  border-color:rgba(142,164,255,.22)!important;
+  background:linear-gradient(180deg, rgba(142,164,255,.10), rgba(142,164,255,.04))!important;
+  box-shadow:0 10px 20px rgba(2,6,23,.16)!important;
+}}
+div[data-testid="stVerticalBlock"]:has(.sigl-sector-picker-anchor) div.stButton>button[kind="primary"]{{
+  transform:translateY(1px)!important;
+  border-color:rgba(99,217,162,.32)!important;
+  background:
+    linear-gradient(180deg, rgba(99,217,162,.18), rgba(18,163,98,.08))!important;
+  box-shadow:
+    0 10px 22px rgba(10,36,24,.18)!important,
+    inset 0 0 0 1px rgba(99,217,162,.14)!important,
+    inset 0 10px 18px rgba(99,217,162,.05)!important;
+}}
+div[data-testid="stVerticalBlock"]:has(.sigl-sector-picker-anchor) div.stButton>button[kind="primary"]::before{{
+  background:var(--sigl-success)!important;
+  box-shadow:
+    0 0 0 4px rgba(99,217,162,.12),
+    0 0 14px rgba(99,217,162,.26)!important;
+  transform:scale(1.12)!important;
+}}
+div[data-testid="stVerticalBlock"]:has(.sigl-sector-picker-anchor) div.stButton>button[kind="primary"]::after{{
+  opacity:1!important;
+  transform:scale(1)!important;
+  background:radial-gradient(circle at center, rgba(99,217,162,.18), rgba(99,217,162,0) 62%)!important;
+}}
+div[data-testid="stVerticalBlock"]:has(.sigl-sector-picker-anchor) div.stButton>button[kind="primary"] span,
+div[data-testid="stVerticalBlock"]:has(.sigl-sector-picker-anchor) div.stButton>button[kind="primary"] p,
+div[data-testid="stVerticalBlock"]:has(.sigl-sector-picker-anchor) div.stButton>button[kind="primary"] div{{
+  color:var(--sigl-text-strong)!important;
+}}
+div[data-testid="stVerticalBlock"]:has(.sigl-sector-picker-anchor) div.stButton>button:active{{
+  transform:scale(.985)!important;
+}}
 .sigl-note,
 .sigl-summary,
 .sigl-section-copy,
@@ -1538,6 +1639,12 @@ p[data-testid="stCaption"]{{
   section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"] > label[data-baseweb="radio"],
   section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"] > label[data-baseweb="radio"]::before,
   section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"] > label[data-baseweb="radio"]::after{{
+    animation:none!important;
+    transition:none!important;
+  }}
+  div[data-testid="stVerticalBlock"]:has(.sigl-sector-picker-anchor) div.stButton>button,
+  div[data-testid="stVerticalBlock"]:has(.sigl-sector-picker-anchor) div.stButton>button::before,
+  div[data-testid="stVerticalBlock"]:has(.sigl-sector-picker-anchor) div.stButton>button::after{{
     animation:none!important;
     transition:none!important;
   }}

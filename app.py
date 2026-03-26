@@ -1057,7 +1057,9 @@ if current_mode == '스캐너':
         ],
         eyebrow="스캔 대상 구성",
     )
-    _render_sector_button_picker(sector_names, current_sector_selection)
+    with st.container():
+        st.markdown("<div class='sigl-sector-picker-anchor'></div>", unsafe_allow_html=True)
+        _render_sector_button_picker(sector_names, current_sector_selection)
 
     selected_sectors = _normalized_selected_sectors(
         st.session_state.get('selected_sectors') or current_sector_selection
