@@ -87,7 +87,7 @@ html,body{
   background:linear-gradient(90deg,transparent,rgba(255,255,255,.05),rgba(255,255,255,.16),rgba(255,255,255,.05),transparent);
   transform:skewX(-18deg);
   mix-blend-mode:screen;
-  animation:siglSweep 8.8s linear infinite;
+  animation:siglSweep 6.8s linear infinite;
 }
 .sigl-topbar{
   position:relative;
@@ -523,7 +523,7 @@ html,body{
 .sigl-lane-track{
   display:flex;
   width:max-content;
-  animation:siglLaneMarquee 28s linear infinite;
+  animation:siglLaneMarquee 18s linear infinite;
   will-change:transform;
 }
 .sigl-lane-group{
@@ -832,7 +832,7 @@ def _build_lane_group(row):
 
 def _build_log_lanes(rows):
     active_rows = list(rows or [])[:5] or _placeholder_history_rows()
-    durations = [22, 26, 30, 24, 28]
+    durations = [14, 16, 18, 15, 17]
     delays = [0, -3, -6, -2, -5]
     lanes = []
 
