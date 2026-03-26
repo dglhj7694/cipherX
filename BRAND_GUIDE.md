@@ -1,45 +1,50 @@
 # SIGL Brand Guide
 
 ## Core Identity
-- Canonical syntax: `[ SIGL ]`
-- Hidden meaning: `Signal`
-- Tone: premium signal terminal, LED logboard, disciplined and alive
+- Official name: `SIGL`
+- Official lockup: `$SIGL`
+- Brand subline: `(Signal)`
+- Tone: premium terminal, market-aware, disciplined, modern
 - Rule: no visible version text on user-facing surfaces
 
-## Header System
-- The main header is a LED logboard, not a marketing hero.
-- Structure:
-  - top rail with `MODE`, `STATUS`, `FEED`, and analysis log count
-  - left log wall filled by recent analyzed tickers
-  - right terminal fields for the current focus ticker
-  - bottom ticker strip that keeps moving through recent board items
-- The sidebar acts only as a control panel and does not render the brand board.
+## Logo System
+- Primary mark: `signal wave + ticker uptick` inside a rounded square frame
+- Logo structure:
+  - left: dual-tone symbol
+  - right: `$SIGL`
+  - below wordmark: `(Signal)`
+- Symbol color roles:
+  - bullish stroke: green
+  - bearish stroke: red
+  - guide/frame accent: electric blue
+- Wordmark rule:
+  - `$` uses electric blue accent
+  - `SIGL` stays off-white for readability
+  - `(Signal)` stays muted steel/blue-gray
+  - do not color the whole wordmark green/red
 
-## Data Rules
-- `history_rows` comes from real `analysis` messages in session history.
-- Each log row uses `TIME / TICKER / SIGNAL / ES / CTX`.
-- `focus_recent_signals` comes from `meta.recent_signals` when available.
-- `focus_stack_summary` prioritizes:
-  - `B:S` agreement
-  - top combined scans
-  - veto flags
-  - lead/lag verdict fallback
-- The ticker strip prefers:
-  - recent analysis log summaries
-  - current focus recent signals
-  - scanner results as fallback
+## Color Rules
+- Base shell: deep navy
+- Wordmark: warm off-white
+- Neutral brand accent: electric blue
+- Bull accent: vivid green
+- Bear accent: vivid red
+- Semantic use:
+  - green/red may appear in the logo symbol
+  - green/red remain valid UI state colors for buy/sell surfaces
+  - blue remains the stabilizing brand accent
 
-## Visual Rules
-- Base typography stays mono for labels and data.
-- Ticker codes and key numbers use a segmented LED-style treatment.
-- The board uses:
-  - dot-matrix texture
-  - CRT scanline overlay
-  - subtle bloom on key text
-  - afterimage on ticker strip text
-- Motion includes:
-  - strong pulse on the status dot
-  - slow sweep light across the board
-  - one-time flash on the newest log row
-  - continuous ticker movement
-- `prefers-reduced-motion` keeps the board readable and reduces the stronger effects.
+## Usage Rules
+- Preferred header lockup: `symbol + $SIGL + (Signal)`
+- Small-size usage:
+  - icon only for very small spaces
+  - `$SIGL` without `(Signal)` only when width is constrained
+- Keep generous breathing room around the mark
+- Avoid heavy neon glow or gaming-style saturation
+- Avoid old LED logboard branding language and textures in the main logo system
+
+## Do Not
+- Do not show version labels next to the logo
+- Do not split `SIGL` letters into bull/bear colors
+- Do not use red/green as the page background
+- Do not replace `$SIGL` with bracket syntax like `[ SIGL ]` in the main brand lockup

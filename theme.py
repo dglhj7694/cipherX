@@ -996,13 +996,16 @@ html,body{{
 .sigl-brand-shell{{
   display:flex;
   align-items:center;
-  justify-content:flex-start;
-  min-height:96px;
-  padding:16px 22px;
-  background:linear-gradient(180deg, rgba(19,28,45,.98), rgba(15,23,42,.92));
-  border:1px solid var(--sigl-border-soft);
-  border-radius:20px;
-  box-shadow:var(--sigl-shadow-sm);
+  justify-content:center;
+  min-height:126px;
+  padding:22px 28px;
+  background:
+    radial-gradient(circle at 12% 22%, rgba(34,197,94,.14), rgba(34,197,94,0) 28%),
+    radial-gradient(circle at 88% 26%, rgba(251,113,133,.12), rgba(251,113,133,0) 30%),
+    linear-gradient(180deg, rgba(19,28,45,.98), rgba(15,23,42,.92));
+  border:1px solid rgba(142,164,255,.22);
+  border-radius:22px;
+  box-shadow:0 18px 36px rgba(8,15,30,.24);
   width:100%;
   max-width:100%;
   min-width:0;
@@ -1010,36 +1013,70 @@ html,body{{
 .sigl-brand-lockup{{
   display:flex;
   align-items:center;
-  gap:14px;
+  gap:20px;
   min-width:0;
+  margin:0 auto;
+  width:100%;
+  justify-content:center;
 }}
 .sigl-brand-logo{{
-  width:48px;
-  height:48px;
+  width:72px;
+  height:72px;
   display:flex;
   align-items:center;
   justify-content:center;
   flex:0 0 auto;
+  filter:drop-shadow(0 12px 20px rgba(8,15,30,.22));
 }}
 .sigl-brand-logo svg{{
-  width:48px;
-  height:48px;
+  width:72px;
+  height:72px;
   display:block;
 }}
-.sigl-brand-mark{{display:flex;align-items:center;min-width:0}}
+.sigl-brand-mark{{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:2px;
+  min-width:220px;
+  text-align:center;
+}}
 .sigl-brand-name{{
   margin:0;
-  color:var(--sigl-text-strong);
-  font-size:2.15rem;
+  color:#F8FAFC;
+  font-size:62px;
   font-weight:900;
-  letter-spacing:-.03em;
+  line-height:.92;
+  letter-spacing:-.065em;
   overflow-wrap:anywhere;
+  text-shadow:0 0 18px rgba(93,123,255,.16);
+  white-space:nowrap;
+}}
+.sigl-brand-prefix{{
+  color:#8EA4FF;
+  margin-right:.06em;
+}}
+.sigl-brand-word{{
+  color:#F8FAFC;
+}}
+.sigl-brand-sub{{
+  margin:0;
+  color:#94A3B8;
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.2em;
+  text-transform:uppercase;
+  white-space:nowrap;
 }}
 @media (max-width: 640px){{
-  .sigl-brand-shell{{padding:14px 18px;min-height:88px}}
+  .sigl-brand-shell{{padding:18px 18px;min-height:104px}}
   .sigl-brand-logo,
-  .sigl-brand-logo svg{{width:42px;height:42px}}
-  .sigl-brand-name{{font-size:1.82rem}}
+  .sigl-brand-logo svg{{width:56px;height:56px}}
+  .sigl-brand-lockup{{gap:14px}}
+  .sigl-brand-mark{{min-width:170px}}
+  .sigl-brand-name{{font-size:42px}}
+  .sigl-brand-sub{{font-size:9px;letter-spacing:.16em}}
 }}
 """
 
