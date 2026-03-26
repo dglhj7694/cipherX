@@ -528,6 +528,40 @@ def _primary_recent_signal_tone(signal_items, fallback="neutral"):
         return _format_board_text(signal_items[0].get('dir'), fallback).lower()
     return fallback
 
+def _history_signal_stack(meta=None, limit=3):
+    meta = meta or {}
+    items = []
+    seen = set()
+
+    for icon, label, _date, direction, _is_combined in reversed(list(meta.get('recent_signals') or [])[-limit:]):
+        clean_label = _format_board_text(label, '')
+        if not clean_label or clean_label in seen:
+            continue
+        seen.add(clean_label)
+        items.append({
+            'icon': _format_board_text(icon, '•'),
+            'label': clean_label,
+            'tone': _format_board_text(direction, 'neutral').lower(),
+        })
+        if len(items) >= limit:
+            break
+
+    if not items:
+        for raw in list(meta.get('combined_scans') or [])[:limit]:
+            clean_label = _format_board_text(raw.get('kor') or raw.get('name'), '')
+            if not clean_label or clean_label in seen:
+                continue
+            seen.add(clean_label)
+            items.append({
+                'icon': _format_board_text(raw.get('icon'), '•'),
+                'label': clean_label,
+                'tone': _format_board_text(raw.get('dir'), 'neutral').lower(),
+            })
+            if len(items) >= limit:
+                break
+
+    return items
+
 def _change_tone_from_value(value):
     if isinstance(value, (int, float)):
         if value > 0:
@@ -553,6 +587,7 @@ def _history_rows_from_messages(messages, limit=8):
             'signal': _terminal_signal_label(meta),
             'recent': _latest_recent_signal_label(meta),
             'recent_tone': _latest_recent_signal_tone(meta),
+            'signal_stack': _history_signal_stack(meta, limit=3),
             'tone': _resolve_board_tone('ANALYSIS', meta.get('judgment') or meta.get('action_label'), es_value),
             'fresh': idx == 0,
         })

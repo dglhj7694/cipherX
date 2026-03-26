@@ -1,6 +1,6 @@
 import html
 
-BRAND_NAME = "SIGL"
+BRAND_NAME = "$SIGL (Signal)"
 BRAND_PAGE_TITLE = BRAND_NAME
 BRAND_PAGE_ICON = "📟"
 BRAND_REPORT_SLUG = "sigl"
@@ -618,6 +618,45 @@ html,body{
 .sigl-lane-badge--ghost{
   box-shadow:inset 0 1px 0 rgba(255,255,255,.03),0 0 16px rgba(255,255,255,.06);
 }
+.sigl-lane-sigs{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+}
+.sigl-lane-mini{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  min-height:28px;
+  padding:5px 9px;
+  border-radius:999px;
+  border:1px solid rgba(148,163,184,.14);
+  background:linear-gradient(180deg,rgba(13,17,25,.96),rgba(8,11,18,.92));
+  font-size:.7rem;
+  font-weight:800;
+  letter-spacing:.04em;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
+}
+.sigl-lane-mini--bull{
+  color:#B8F1D5;
+  border-color:rgba(99,217,162,.22);
+  background:linear-gradient(180deg,rgba(7,30,21,.98),rgba(6,20,16,.92));
+}
+.sigl-lane-mini--bear{
+  color:#FFD2D7;
+  border-color:rgba(255,143,150,.22);
+  background:linear-gradient(180deg,rgba(33,14,18,.98),rgba(21,10,14,.92));
+}
+.sigl-lane-mini--neutral{
+  color:#F8DE9A;
+  border-color:rgba(246,195,94,.2);
+  background:linear-gradient(180deg,rgba(33,25,10,.96),rgba(18,14,8,.92));
+}
+.sigl-lane-mini--scanner{
+  color:#D6F2FF;
+  border-color:rgba(125,211,252,.22);
+  background:linear-gradient(180deg,rgba(8,25,35,.96),rgba(8,18,26,.92));
+}
 .sigl-board--compact .sigl-brand-copy,
 .sigl-board--compact .sigl-summary,
 .sigl-board--compact .sigl-flow-row,
@@ -732,6 +771,10 @@ def _placeholder_recent_signals():
     return [{"icon": "*", "label": "AWAITING SIGNAL", "date": "--/--", "dir": "neutral", "is_combined": False}]
 
 
+def _placeholder_lane_signals():
+    return [{"icon": "*", "label": "STANDBY", "tone": "neutral"}]
+
+
 def _build_flow_chips(items):
     active_items = list(items or [])[:4] or _placeholder_recent_signals()
     chips = []
@@ -809,6 +852,11 @@ def _build_lane_group(row):
     signal_tone = _signal_tone(row.get("signal"), _tone_class(row.get("tone"), "neutral"))
     change_tone = _change_tone(row.get("change_tone"))
     recent_tone = _signal_tone(row.get("recent_tone"))
+    signal_items = list(row.get("signal_stack") or [])[:3] or _placeholder_lane_signals()
+    signal_stack_html = "".join(
+        f"<span class='sigl-lane-mini sigl-lane-mini--{_signal_tone(item.get('tone'), 'neutral')}'>{_esc(item.get('icon'), '*')} {_esc(item.get('label'), 'STANDBY')}</span>"
+        for item in signal_items
+    )
     return f"""
     <div class="sigl-lane-group">
         <span class="sigl-lane-time sigl-led sigl-led--soft">{_esc(row.get("time"), "--:--")}</span>
@@ -823,7 +871,9 @@ def _build_lane_group(row):
             <span class="sigl-lane-value sigl-lane-value--{change_tone}">{_esc(row.get("change_pct"), "--")}</span>
         </span>
         <span class="sigl-lane-badge sigl-lane-badge--{signal_tone}">{_esc(row.get("signal"), "IDLE")}</span>
-        <span class="sigl-lane-key">RECENT</span>
+        <span class="sigl-lane-key">SIGS</span>
+        <span class="sigl-lane-sigs">{signal_stack_html}</span>
+        <span class="sigl-lane-key">LAST</span>
         <span class="sigl-lane-badge sigl-lane-badge--{recent_tone} sigl-lane-badge--ghost">{_esc(row.get("recent"), "STANDBY")}</span>
     </div>
     """
