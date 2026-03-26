@@ -357,11 +357,7 @@ def render_committee_panel(meta):
           <div class="sigl-grid sigl-grid--5">{''.join(cards)}</div>
         </div>
         """
-    components.html(
-        _component_doc(panel_html),
-        height=280,
-        scrolling=False,
-    )
+    st.markdown(panel_html, unsafe_allow_html=True)
     if meta.get("veto_flags"):
         st.warning(f"제한 조건: {meta.get('veto_flags')}")
     if abs(_safe_float(meta.get("reversal_synergy", 0))) > 5:
@@ -418,11 +414,7 @@ def render_10layer_bars(meta, html_key="analysis"):
           <div class="sigl-layer-board">{''.join(rows)}</div>
         </div>
         """
-    components.html(
-        _component_doc(panel_html),
-        height=max(500, 160 + len(layer_names) * 42),
-        scrolling=False,
-    )
+    st.markdown(panel_html, unsafe_allow_html=True)
 
 
 def render_leading_lagging(meta):

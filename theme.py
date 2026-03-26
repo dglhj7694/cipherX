@@ -377,10 +377,10 @@ div[data-testid="stMetricValue"]{{
   display:grid;
   gap:12px;
 }}
-.sigl-grid--2{{grid-template-columns:repeat(2,minmax(0,1fr))}}
-.sigl-grid--3{{grid-template-columns:repeat(3,minmax(0,1fr))}}
-.sigl-grid--4{{grid-template-columns:repeat(4,minmax(0,1fr))}}
-.sigl-grid--5{{grid-template-columns:repeat(5,minmax(0,1fr))}}
+.sigl-grid--2{{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}}
+.sigl-grid--3{{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}}
+.sigl-grid--4{{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}}
+.sigl-grid--5{{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}}
 .sigl-inline{{
   display:flex;
   gap:8px;
@@ -760,6 +760,12 @@ p[data-testid="stCaption"]{{
 .prompt-caption{{color:var(--sigl-text-muted);font-size:.76rem;font-weight:700;margin-bottom:8px}}
 .soft-note{{color:var(--sigl-text-muted);font-size:.8rem;line-height:1.6;margin-top:10px}}
 @media (max-width: 980px){{
+  .sigl-grid--5{{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}}
+  .sigl-layer-row{{grid-template-columns:54px 1fr 54px;gap:8px}}
+  .sigl-layer-track{{height:28px}}
+  .sigl-layer-label{{font-size:.68rem;padding:3px 7px}}
+}}
+@media (max-width: 640px){{
   .sigl-grid--2,
   .sigl-grid--3,
   .sigl-grid--4,
@@ -767,6 +773,9 @@ p[data-testid="stCaption"]{{
   .sigl-result-summary{{grid-template-columns:1fr}}
   .block-container{{padding-left:1rem!important;padding-right:1rem!important}}
   .sigl-price-value{{font-size:1.8rem}}
+  .sigl-layer-row{{grid-template-columns:46px 1fr 46px;gap:6px}}
+  .sigl-layer-track{{height:26px}}
+  .sigl-layer-label{{font-size:.64rem;padding:2px 6px}}
   div[data-testid="stChatInput"]{{max-width:none}}
 }}
 </style>"""
