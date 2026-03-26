@@ -111,6 +111,32 @@ textarea{{
   border:1px solid var(--sigl-border-soft)!important;
   color:var(--sigl-text-strong)!important;
   border-radius:14px!important;
+  transition:
+    border-color .18s ease,
+    box-shadow .18s ease,
+    background .18s ease,
+    transform .18s ease!important;
+}}
+div[data-baseweb="select"]>div:hover,
+div[data-testid="stTextInput"] input:hover,
+div[data-testid="stNumberInput"] input:hover,
+textarea:hover{{
+  background:rgba(15,23,42,.84)!important;
+  border-color:rgba(148,163,184,.22)!important;
+}}
+div[data-baseweb="select"]>div:focus-within,
+div[data-testid="stTextInput"] input:focus,
+div[data-testid="stTextInput"] input:focus-visible,
+div[data-testid="stNumberInput"] input:focus,
+div[data-testid="stNumberInput"] input:focus-visible,
+textarea:focus,
+textarea:focus-visible{{
+  background:rgba(15,23,42,.88)!important;
+  border-color:rgba(142,164,255,.34)!important;
+  box-shadow:
+    0 0 0 3px rgba(142,164,255,.10),
+    0 10px 20px rgba(2,6,23,.12)!important;
+  outline:none!important;
 }}
 div[data-baseweb="select"] span,
 div[data-baseweb="select"] input,
@@ -121,6 +147,20 @@ div[data-testid="stMultiSelect"] [data-baseweb="tag"]{{
   background:rgba(142,164,255,.12)!important;
   border:1px solid rgba(142,164,255,.22)!important;
   border-radius:999px!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04)!important;
+  transition:
+    transform .18s ease,
+    border-color .18s ease,
+    background .18s ease,
+    box-shadow .18s ease!important;
+}}
+div[data-testid="stMultiSelect"] [data-baseweb="tag"]:hover{{
+  transform:translateY(-1px);
+  background:rgba(142,164,255,.18)!important;
+  border-color:rgba(166,183,255,.34)!important;
+  box-shadow:
+    0 10px 18px rgba(2,6,23,.12),
+    inset 0 1px 0 rgba(255,255,255,.05)!important;
 }}
 div[data-testid="stMultiSelect"] [data-baseweb="tag"] span,
 div[data-testid="stMultiSelect"] [data-baseweb="tag"] div{{
@@ -251,57 +291,182 @@ section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"] 
   transform:scale(.985)!important;
 }}
 div[data-testid="stTabs"] button{{
+  position:relative!important;
+  overflow:hidden!important;
+  flex:0 0 auto!important;
+  scroll-snap-align:start!important;
   color:var(--sigl-text-muted)!important;
   font-weight:800!important;
-  border:1px solid transparent!important;
-  border-radius:12px!important;
-  background:transparent!important;
-  min-height:42px!important;
-  padding:.55rem .95rem!important;
-  transition:background .18s ease, border-color .18s ease, color .18s ease, box-shadow .18s ease!important;
+  letter-spacing:-.01em!important;
+  border:1px solid rgba(148,163,184,.08)!important;
+  border-radius:14px!important;
+  background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0))!important;
+  min-height:46px!important;
+  padding:.7rem 1.05rem!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.03)!important;
+  transition:
+    transform .18s ease,
+    background .18s ease,
+    border-color .18s ease,
+    color .18s ease,
+    box-shadow .18s ease!important;
+}}
+div[data-testid="stTabs"] button::before{{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+  pointer-events:none;
+  background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,0) 42%);
+  opacity:.55;
+}}
+div[data-testid="stTabs"] button::after{{
+  content:"";
+  position:absolute;
+  left:14px;
+  right:14px;
+  bottom:7px;
+  height:2px;
+  border-radius:999px;
+  background:linear-gradient(90deg, rgba(124,147,255,0), rgba(124,147,255,.92), rgba(124,147,255,0));
+  opacity:0;
+  transform:scaleX(.62);
+  transition:opacity .18s ease, transform .18s ease;
 }}
 div[data-testid="stTabs"] button:hover{{
   color:var(--sigl-text)!important;
-  background:rgba(255,255,255,.04)!important;
+  transform:translateY(-1px);
+  border-color:rgba(148,163,184,.18)!important;
+  background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.01))!important;
+  box-shadow:
+    0 10px 18px rgba(2,6,23,.12),
+    inset 0 1px 0 rgba(255,255,255,.04)!important;
+}}
+div[data-testid="stTabs"] button:focus-visible{{
+  outline:none!important;
+  border-color:rgba(142,164,255,.30)!important;
+  box-shadow:
+    0 0 0 3px rgba(142,164,255,.10),
+    inset 0 1px 0 rgba(255,255,255,.04)!important;
 }}
 div[data-testid="stTabs"] button[aria-selected="true"]{{
   color:var(--sigl-text-strong)!important;
-  background:linear-gradient(180deg, rgba(142,164,255,.16), rgba(93,123,255,.10))!important;
-  border-color:rgba(142,164,255,.28)!important;
-  box-shadow:0 10px 20px rgba(93,123,255,.14)!important;
+  transform:translateY(-1px);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,0) 36%),
+    linear-gradient(180deg, rgba(142,164,255,.18), rgba(93,123,255,.10))!important;
+  border-color:rgba(142,164,255,.30)!important;
+  box-shadow:
+    0 12px 24px rgba(93,123,255,.16),
+    inset 0 1px 0 rgba(255,255,255,.06)!important;
+}}
+div[data-testid="stTabs"] button[aria-selected="true"]::after{{
+  opacity:1;
+  transform:scaleX(1);
 }}
 div[data-testid="stTabs"] [role="tablist"]{{
-  flex-wrap:wrap!important;
-  gap:6px!important;
-  padding:6px!important;
-  border:1px solid var(--sigl-border-soft)!important;
-  border-radius:16px!important;
-  background:linear-gradient(180deg, rgba(19,28,45,.96), rgba(15,23,42,.88))!important;
+  position:relative!important;
+  isolation:isolate;
+  flex-wrap:nowrap!important;
+  gap:8px!important;
+  padding:8px!important;
+  border:1px solid rgba(148,163,184,.14)!important;
+  border-radius:18px!important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,0) 26%),
+    linear-gradient(180deg, rgba(19,28,45,.96), rgba(15,23,42,.88))!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.03),
+    0 10px 22px rgba(2,6,23,.12)!important;
   margin-bottom:14px!important;
+  overflow-x:auto!important;
+  overflow-y:hidden!important;
+  scrollbar-width:none;
+  scroll-snap-type:x proximity;
+}}
+div[data-testid="stTabs"] [role="tablist"]::-webkit-scrollbar{{
+  display:none;
 }}
 div[data-testid="stTabs"] [role="tabpanel"]{{
+  position:relative;
   min-width:0!important;
-  padding-top:4px!important;
+  padding-top:10px!important;
+  animation:sigl-tab-panel-in .24s ease;
 }}
-div.stButton>button{{
-  border-radius:14px!important;
+div.stButton>button,
+div[data-testid="stFormSubmitButton"] button{{
+  position:relative!important;
+  overflow:hidden!important;
+  border-radius:16px!important;
   font-weight:800!important;
-  min-height:44px!important;
-  transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease!important;
+  letter-spacing:-.01em!important;
+  min-height:46px!important;
+  border:1px solid rgba(148,163,184,.22)!important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,0) 28%),
+    linear-gradient(180deg, rgba(29,40,64,.96), rgba(22,32,51,.92))!important;
+  color:var(--sigl-text-strong)!important;
+  box-shadow:
+    0 10px 22px rgba(2,6,23,.16),
+    inset 0 1px 0 rgba(255,255,255,.04)!important;
+  transition:
+    transform .18s ease,
+    box-shadow .18s ease,
+    border-color .18s ease,
+    background .18s ease!important;
 }}
-div.stButton>button:hover{{
+div.stButton>button::before,
+div[data-testid="stFormSubmitButton"] button::before{{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+  pointer-events:none;
+  background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,0) 42%);
+  opacity:.65;
+}}
+div.stButton>button:hover,
+div[data-testid="stFormSubmitButton"] button:hover{{
   transform:translateY(-1px);
+  border-color:rgba(142,164,255,.26)!important;
+  box-shadow:
+    0 14px 28px rgba(2,6,23,.22),
+    inset 0 1px 0 rgba(255,255,255,.06)!important;
 }}
-div.stButton>button[kind="primary"]{{
-  background:linear-gradient(135deg, #7C93FF, #5D7BFF)!important;
+div.stButton>button:active,
+div[data-testid="stFormSubmitButton"] button:active{{
+  transform:translateY(0) scale(.988)!important;
+  box-shadow:
+    0 8px 16px rgba(2,6,23,.16),
+    inset 0 1px 0 rgba(255,255,255,.04)!important;
+}}
+div.stButton>button[kind="primary"],
+div[data-testid="stFormSubmitButton"] button[kind="primary"]{{
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,0) 34%),
+    linear-gradient(135deg, #7C93FF, #5D7BFF)!important;
   color:white!important;
-  border:none!important;
-  box-shadow:0 12px 24px rgba(93,123,255,.22)!important;
+  border:1px solid rgba(142,164,255,.26)!important;
+  box-shadow:
+    0 14px 28px rgba(93,123,255,.20),
+    inset 0 1px 0 rgba(255,255,255,.08)!important;
 }}
-div.stButton>button[kind="secondary"]{{
-  background:linear-gradient(180deg, rgba(19,28,45,.96), rgba(15,23,42,.88))!important;
-  color:var(--sigl-text)!important;
-  border:1px solid var(--sigl-border-soft)!important;
+div.stButton>button[kind="primary"]:hover,
+div[data-testid="stFormSubmitButton"] button[kind="primary"]:hover{{
+  border-color:rgba(166,183,255,.40)!important;
+  box-shadow:
+    0 18px 34px rgba(93,123,255,.24),
+    inset 0 1px 0 rgba(255,255,255,.10)!important;
+}}
+div.stButton>button[kind="secondary"],
+div[data-testid="stFormSubmitButton"] button[kind="secondary"],
+div.stButton>button:not([kind="primary"]),
+div[data-testid="stFormSubmitButton"] button:not([kind="primary"]){{
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,0) 24%),
+    linear-gradient(180deg, rgba(19,28,45,.96), rgba(15,23,42,.90))!important;
+  color:var(--sigl-text-strong)!important;
+  border:1px solid rgba(148,163,184,.20)!important;
 }}
 div[data-testid="stExpander"]{{
   background:linear-gradient(180deg, rgba(19,28,45,.96), rgba(15,23,42,.90))!important;
@@ -359,26 +524,29 @@ div[data-testid="stForm"] div[data-testid="stTextInput"] input{{
   border-radius:16px!important;
   background:rgba(11,16,32,.74)!important;
   color:var(--sigl-text-strong)!important;
+  transition:
+    border-color .18s ease,
+    box-shadow .18s ease,
+    background .18s ease!important;
 }}
 div[data-testid="stForm"] div[data-testid="stTextInput"] input::placeholder{{
   color:#7F91AF!important;
   opacity:1!important;
 }}
+div[data-testid="stForm"] div[data-testid="stTextInput"] input:hover{{
+  background:rgba(11,16,32,.82)!important;
+  border-color:rgba(148,163,184,.22)!important;
+}}
+div[data-testid="stForm"] div[data-testid="stTextInput"] input:focus,
+div[data-testid="stForm"] div[data-testid="stTextInput"] input:focus-visible{{
+  background:rgba(11,16,32,.88)!important;
+  border-color:rgba(142,164,255,.36)!important;
+  box-shadow:
+    0 0 0 3px rgba(142,164,255,.10),
+    0 12px 22px rgba(2,6,23,.14)!important;
+}}
 div[data-testid="stForm"] div[data-testid="stFormSubmitButton"] button{{
   min-height:54px!important;
-  border-radius:16px!important;
-}}
-div[data-testid="stForm"] div[data-testid="stFormSubmitButton"] button:not([kind="primary"]){{
-  background:linear-gradient(180deg, rgba(29,40,64,.96), rgba(22,32,51,.92))!important;
-  color:#F8FAFC!important;
-  border:1px solid rgba(148,163,184,.24)!important;
-  box-shadow:none!important;
-}}
-div[data-testid="stForm"] div[data-testid="stFormSubmitButton"] button:not([kind="primary"]) span,
-div[data-testid="stForm"] div[data-testid="stFormSubmitButton"] button:not([kind="primary"]) p,
-div[data-testid="stForm"] div[data-testid="stFormSubmitButton"] button:not([kind="primary"]) div{{
-  color:#F8FAFC!important;
-  opacity:1!important;
 }}
 div[data-testid="stForm"] div[data-testid="stHorizontalBlock"]{{
   align-items:end!important;
@@ -439,10 +607,26 @@ div[data-testid="stChatInput"] textarea{{
   box-shadow:none!important;
   padding:1rem 3.2rem 1rem 1rem!important;
   min-height:58px!important;
+  transition:
+    border-color .18s ease,
+    box-shadow .18s ease,
+    background .18s ease!important;
 }}
 div[data-testid="stChatInput"] textarea::placeholder{{
   color:var(--sigl-text-muted)!important;
   opacity:1!important;
+}}
+div[data-testid="stChatInput"] textarea:hover{{
+  background:rgba(15,23,42,.96)!important;
+  border-color:rgba(148,163,184,.22)!important;
+}}
+div[data-testid="stChatInput"] textarea:focus,
+div[data-testid="stChatInput"] textarea:focus-visible{{
+  background:rgba(15,23,42,.98)!important;
+  border-color:rgba(142,164,255,.36)!important;
+  box-shadow:
+    0 0 0 3px rgba(142,164,255,.10),
+    0 14px 26px rgba(2,6,23,.14)!important;
 }}
 div[data-testid="stChatInput"] button{{
   background:linear-gradient(135deg, #7C93FF, #5D7BFF)!important;
@@ -464,6 +648,10 @@ div[data-testid="stMetricValue"]{{
   0%{{opacity:.18;transform:scale(.74)}}
   55%{{opacity:.9;transform:scale(1.02)}}
   100%{{opacity:1;transform:scale(1)}}
+}}
+@keyframes sigl-tab-panel-in{{
+  0%{{opacity:.65;transform:translateY(3px)}}
+  100%{{opacity:1;transform:translateY(0)}}
 }}
 ::-webkit-scrollbar{{width:8px;height:8px}}
 ::-webkit-scrollbar-track{{background:#0B1020}}
@@ -690,6 +878,15 @@ div[data-testid="stMetricValue"]{{
   flex-wrap:wrap;
   align-items:center;
   margin-top:12px;
+}}
+.sigl-composer-meta--scanner{{
+  gap:6px;
+  margin:2px 0 10px;
+}}
+.sigl-composer-meta--scanner .sigl-badge{{
+  padding:5px 10px;
+  font-size:.72rem;
+  font-weight:750;
 }}
 .sigl-composer-note{{
   margin-top:12px;
@@ -1009,6 +1206,60 @@ div[data-testid="stMetricValue"]{{
   color:var(--sigl-text-muted);
   font-size:.82rem;
 }}
+.sigl-scanner-scope{{
+  position:relative;
+  overflow:hidden;
+  isolation:isolate;
+  background:
+    radial-gradient(110% 88% at 50% 0%, rgba(142,164,255,.12), rgba(142,164,255,0) 52%),
+    linear-gradient(180deg, rgba(142,164,255,.08), rgba(142,164,255,0) 34%),
+    linear-gradient(180deg, rgba(19,28,45,.98), rgba(15,23,42,.92));
+  border-color:rgba(142,164,255,.24);
+  box-shadow:
+    0 20px 44px rgba(4,8,18,.22),
+    inset 0 1px 0 rgba(255,255,255,.04);
+}}
+.sigl-scanner-scope::before{{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:
+    linear-gradient(110deg, rgba(255,255,255,.08), rgba(255,255,255,0) 26%),
+    radial-gradient(62% 34% at 50% -6%, rgba(188,200,255,.12), rgba(188,200,255,0) 72%);
+  opacity:.78;
+}}
+.sigl-scanner-scope > *{{
+  position:relative;
+  z-index:1;
+}}
+.sigl-scanner-scope__meta{{
+  margin-left:auto;
+  justify-content:flex-end;
+}}
+.sigl-scanner-scope__sectors{{
+  margin-top:2px;
+}}
+.sigl-scanner-scope__sectors .sigl-badge{{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05);
+}}
+.sigl-scanner-scope__codes{{
+  margin-top:14px;
+  padding-top:14px;
+  max-height:138px;
+  border-top:1px solid rgba(148,163,184,.14);
+}}
+.sigl-scanner-scope__codes .sigl-code-chip{{
+  background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+  border-color:rgba(148,163,184,.18);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05);
+  transition:transform .18s ease, border-color .18s ease, background .18s ease;
+}}
+.sigl-scanner-scope__codes .sigl-code-chip:hover{{
+  transform:translateY(-1px);
+  border-color:rgba(142,164,255,.28);
+  background:linear-gradient(180deg, rgba(142,164,255,.10), rgba(255,255,255,.03));
+}}
 .sigl-note,
 .sigl-summary,
 .sigl-section-copy,
@@ -1049,6 +1300,125 @@ div[data-testid="stMetricValue"]{{
   font-size:.74rem;
   font-weight:800;
 }}
+.sigl-page-banner,
+.sigl-card,
+.sigl-metric-card,
+.sigl-committee-card,
+.sigl-result-card,
+.analysis-nav,
+div[data-testid="stChatMessage"],
+div[data-testid="stExpander"]{{
+  position:relative;
+  isolation:isolate;
+  overflow:hidden;
+  transition:
+    transform .22s ease,
+    box-shadow .22s ease,
+    background .22s ease!important;
+}}
+.sigl-page-banner::after,
+.sigl-card::after,
+.sigl-metric-card::after,
+.sigl-committee-card::after,
+.sigl-result-card::after,
+.analysis-nav::after,
+div[data-testid="stChatMessage"]::after,
+div[data-testid="stExpander"]::after{{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:linear-gradient(112deg, rgba(255,255,255,0) 18%, rgba(255,255,255,.08) 48%, rgba(255,255,255,0) 78%);
+  opacity:0;
+  transform:translate3d(-14%, 0, 0);
+  transition:opacity .22s ease, transform .32s ease;
+}}
+.sigl-page-banner:hover,
+.sigl-card:hover,
+.sigl-metric-card:hover,
+.sigl-committee-card:hover,
+.sigl-result-card:hover,
+.analysis-nav:hover,
+div[data-testid="stChatMessage"]:hover,
+div[data-testid="stExpander"]:hover{{
+  transform:translateY(-2px);
+  box-shadow:
+    0 18px 34px rgba(2,6,23,.20),
+    inset 0 1px 0 rgba(255,255,255,.04)!important;
+}}
+.sigl-page-banner:hover::after,
+.sigl-card:hover::after,
+.sigl-metric-card:hover::after,
+.sigl-committee-card:hover::after,
+.sigl-result-card:hover::after,
+.analysis-nav:hover::after,
+div[data-testid="stChatMessage"]:hover::after,
+div[data-testid="stExpander"]:hover::after{{
+  opacity:1;
+  transform:translate3d(0, 0, 0);
+}}
+.sigl-page-banner:focus-within,
+.sigl-card:focus-within,
+.sigl-metric-card:focus-within,
+.sigl-committee-card:focus-within,
+.sigl-result-card:focus-within,
+.analysis-nav:focus-within,
+div[data-testid="stChatMessage"]:focus-within,
+div[data-testid="stExpander"]:focus-within{{
+  box-shadow:
+    0 16px 30px rgba(2,6,23,.18),
+    0 0 0 1px rgba(142,164,255,.18),
+    inset 0 1px 0 rgba(255,255,255,.04)!important;
+}}
+.sigl-badge,
+.sigl-chip,
+.sigl-composer-tool,
+.analysis-nav-chip,
+.sigl-code-chip{{
+  transition:
+    transform .18s ease,
+    border-color .18s ease,
+    box-shadow .18s ease,
+    background .18s ease;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+}}
+.sigl-badge:hover,
+.sigl-chip:hover,
+.sigl-composer-tool:hover,
+.analysis-nav-chip:hover,
+.sigl-code-chip:hover{{
+  transform:translateY(-1px);
+  box-shadow:
+    0 10px 18px rgba(2,6,23,.12),
+    inset 0 1px 0 rgba(255,255,255,.06);
+}}
+.sigl-progress,
+.sigl-bar-split,
+.sigl-layer-track{{
+  transition:border-color .18s ease, box-shadow .18s ease;
+}}
+.sigl-progress__fill,
+.sigl-bar-split__buy,
+.sigl-bar-split__sell,
+.sigl-layer-fill--buy,
+.sigl-layer-fill--sell{{
+  transition:
+    width .45s cubic-bezier(.22,.61,.36,1),
+    left .45s cubic-bezier(.22,.61,.36,1),
+    box-shadow .18s ease;
+}}
+.sigl-progress:hover,
+.sigl-bar-split:hover,
+.sigl-layer-track:hover{{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+}}
+.sigl-progress:hover .sigl-progress__fill,
+.sigl-bar-split:hover .sigl-bar-split__buy,
+.sigl-bar-split:hover .sigl-bar-split__sell,
+.sigl-layer-track:hover .sigl-layer-fill--buy,
+.sigl-layer-track:hover .sigl-layer-fill--sell{{
+  box-shadow:0 0 14px rgba(226,232,240,.12);
+}}
 div[data-testid="stCaptionContainer"] p,
 div[data-testid="stCaptionContainer"] span,
 p[data-testid="stCaption"]{{
@@ -1065,6 +1435,7 @@ p[data-testid="stCaption"]{{
   .sigl-price-top,
   .sigl-result-head,
   .sigl-page-head{{align-items:flex-start}}
+  .sigl-scanner-scope__meta{{margin-left:0;justify-content:flex-start}}
   .sigl-grid--5{{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}}
   .sigl-layer-row{{grid-template-columns:54px 1fr 54px;gap:8px}}
   .sigl-layer-track{{height:28px}}
@@ -1073,6 +1444,15 @@ p[data-testid="stCaption"]{{
 @media (max-width: 640px){{
   section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"]{{
     grid-template-columns:1fr!important;
+  }}
+  div[data-testid="stTabs"] [role="tablist"]{{
+    gap:6px!important;
+    padding:6px!important;
+  }}
+  div[data-testid="stTabs"] button{{
+    min-height:42px!important;
+    padding:.62rem .92rem!important;
+    border-radius:13px!important;
   }}
   .sigl-grid--2,
   .sigl-grid--3,
@@ -1083,6 +1463,7 @@ p[data-testid="stCaption"]{{
   .sigl-page-banner{{padding:18px 16px}}
   .sigl-empty-card{{padding:18px 16px}}
   .sigl-page-banner__meta{{justify-content:flex-start}}
+  .sigl-scanner-scope__codes{{max-height:none}}
   .sigl-price-value{{font-size:1.8rem}}
   .sigl-layer-row{{grid-template-columns:46px 1fr 46px;gap:6px}}
   .sigl-layer-track{{height:26px}}
@@ -1101,11 +1482,68 @@ p[data-testid="stCaption"]{{
   div[data-testid="stChatInput"]{{max-width:none}}
 }}
 @media (prefers-reduced-motion: reduce){{
+  div[data-testid="stTabs"] button,
+  div[data-baseweb="select"]>div,
+  div[data-testid="stTextInput"] input,
+  div[data-testid="stNumberInput"] input,
+  textarea,
+  div.stButton>button,
+  div[data-testid="stFormSubmitButton"] button,
+  div[data-testid="stChatInput"] button,
+  div[data-testid="stMultiSelect"] [data-baseweb="tag"],
+  .sigl-page-banner,
+  .sigl-card,
+  .sigl-metric-card,
+  .sigl-committee-card,
+  .sigl-result-card,
+  .analysis-nav,
+  div[data-testid="stChatMessage"],
+  div[data-testid="stExpander"],
+  .sigl-badge,
+  .sigl-chip,
+  .sigl-composer-tool,
+  .analysis-nav-chip,
+  .sigl-code-chip,
+  .sigl-progress__fill,
+  .sigl-bar-split__buy,
+  .sigl-bar-split__sell,
+  .sigl-layer-fill--buy,
+  .sigl-layer-fill--sell{{
+    transition:none!important;
+    transform:none!important;
+  }}
+  div[data-testid="stTabs"] [role="tabpanel"]{{
+    animation:none!important;
+  }}
+  div[data-testid="stTabs"] button::before,
+  div[data-testid="stTabs"] button::after{{
+    transition:none!important;
+  }}
+  div.stButton>button::before,
+  div[data-testid="stFormSubmitButton"] button::before{{
+    opacity:.35!important;
+    transition:none!important;
+  }}
+  .sigl-page-banner::after,
+  .sigl-card::after,
+  .sigl-metric-card::after,
+  .sigl-committee-card::after,
+  .sigl-result-card::after,
+  .analysis-nav::after,
+  div[data-testid="stChatMessage"]::after,
+  div[data-testid="stExpander"]::after{{
+    opacity:0!important;
+    transition:none!important;
+  }}
   section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"] > label[data-baseweb="radio"],
   section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"] > label[data-baseweb="radio"]::before,
   section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"] > label[data-baseweb="radio"]::after{{
     animation:none!important;
     transition:none!important;
+  }}
+  .sigl-scanner-scope__codes .sigl-code-chip{{
+    transition:none!important;
+    transform:none!important;
   }}
 }}
 </style>"""
@@ -1657,6 +2095,7 @@ html, body, [class*="css"] {{
 .hero-card,
 .signal-card,
 .invest-card,
+.invest-metric,
 .cluster-card,
 .score-pillar,
 .metric-rail-card,
@@ -1670,7 +2109,10 @@ html, body, [class*="css"] {{
 .n-item,
 .meta-item,
 .cd-chip,
-.opt-box {{
+.opt-box,
+.story-card,
+.consensus-corridor,
+.consensus-corridor__stat {{
   background:linear-gradient(180deg, rgba(19,28,45,.98), rgba(15,23,42,.92)) !important;
   border:1px solid var(--sigl-border-soft) !important;
   border-radius:16px !important;
@@ -1690,6 +2132,142 @@ html, body, [class*="css"] {{
 .section-pill,
 .nav-chip b {{
   color:#D6DFFF !important;
+}}
+.spotlight-card,
+.hero-card,
+.signal-card,
+.invest-card,
+.invest-metric,
+.cluster-card,
+.score-pillar,
+.metric-rail-card,
+.target-mini-card,
+.consensus-step,
+.range-legend-item,
+.ownership-row,
+.compact-chip,
+.n-item,
+.meta-item,
+.cd-chip,
+.opt-box,
+.story-card,
+.insight-shell,
+.consensus-corridor,
+.consensus-corridor__stat {{
+  position:relative;
+  isolation:isolate;
+  overflow:hidden;
+  transition:
+    transform .22s ease,
+    box-shadow .22s ease,
+    background .22s ease,
+    border-color .22s ease !important;
+}}
+.spotlight-card::after,
+.hero-card::after,
+.signal-card::after,
+.invest-card::after,
+.invest-metric::after,
+.cluster-card::after,
+.score-pillar::after,
+.metric-rail-card::after,
+.target-mini-card::after,
+.consensus-step::after,
+.range-legend-item::after,
+.ownership-row::after,
+.compact-chip::after,
+.n-item::after,
+.meta-item::after,
+.cd-chip::after,
+.opt-box::after,
+.story-card::after,
+.insight-shell::after,
+.consensus-corridor::after,
+.consensus-corridor__stat::after {{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:linear-gradient(112deg, rgba(255,255,255,0) 18%, rgba(255,255,255,.08) 48%, rgba(255,255,255,0) 78%);
+  opacity:0;
+  transform:translate3d(-14%, 0, 0);
+  transition:opacity .22s ease, transform .32s ease;
+}}
+.spotlight-card:hover,
+.hero-card:hover,
+.signal-card:hover,
+.invest-card:hover,
+.invest-metric:hover,
+.cluster-card:hover,
+.score-pillar:hover,
+.metric-rail-card:hover,
+.target-mini-card:hover,
+.consensus-step:hover,
+.range-legend-item:hover,
+.ownership-row:hover,
+.compact-chip:hover,
+.n-item:hover,
+.meta-item:hover,
+.cd-chip:hover,
+.opt-box:hover,
+.story-card:hover,
+.insight-shell:hover,
+.consensus-corridor:hover,
+.consensus-corridor__stat:hover {{
+  transform:translateY(-2px);
+  box-shadow:
+    0 18px 34px rgba(2,6,23,.20),
+    inset 0 1px 0 rgba(255,255,255,.04) !important;
+}}
+.spotlight-card:hover::after,
+.hero-card:hover::after,
+.signal-card:hover::after,
+.invest-card:hover::after,
+.invest-metric:hover::after,
+.cluster-card:hover::after,
+.score-pillar:hover::after,
+.metric-rail-card:hover::after,
+.target-mini-card:hover::after,
+.consensus-step:hover::after,
+.range-legend-item:hover::after,
+.ownership-row:hover::after,
+.compact-chip:hover::after,
+.n-item:hover::after,
+.meta-item:hover::after,
+.cd-chip:hover::after,
+.opt-box:hover::after,
+.story-card:hover::after,
+.insight-shell:hover::after,
+.consensus-corridor:hover::after,
+.consensus-corridor__stat:hover::after {{
+  opacity:1;
+  transform:translate3d(0, 0, 0);
+}}
+.spotlight-card:focus-within,
+.hero-card:focus-within,
+.signal-card:focus-within,
+.invest-card:focus-within,
+.invest-metric:focus-within,
+.cluster-card:focus-within,
+.score-pillar:focus-within,
+.metric-rail-card:focus-within,
+.target-mini-card:focus-within,
+.consensus-step:focus-within,
+.range-legend-item:focus-within,
+.ownership-row:focus-within,
+.compact-chip:focus-within,
+.n-item:focus-within,
+.meta-item:focus-within,
+.cd-chip:focus-within,
+.opt-box:focus-within,
+.story-card:focus-within,
+.insight-shell:focus-within,
+.consensus-corridor:focus-within,
+.consensus-corridor__stat:focus-within {{
+  box-shadow:
+    0 16px 30px rgba(2,6,23,.18),
+    0 0 0 1px rgba(142,164,255,.18),
+    inset 0 1px 0 rgba(255,255,255,.04) !important;
 }}
 .hero-copy,
 .invest-copy,

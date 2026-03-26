@@ -89,6 +89,7 @@ def init_session():
         'selected_sectors': [],
         'scan_tickers_override': None,
         'scan_sector_picker': [],
+        '_clear_scan_pending': False,
     }
     for k, v in defs.items():
         if k not in st.session_state:
@@ -378,20 +379,20 @@ def _render_scanner_selection_panel(selected_sectors, selected_list):
         for t in selected_list
     ) or "<span class='sigl-empty'>선택된 종목이 없습니다.</span>"
     panel_html = f"""
-        <div class="sigl-card sigl-card--accent">
+        <div class="sigl-card sigl-card--accent sigl-scanner-scope">
             <div class="sigl-page-head">
                 <div>
                     <p class="sigl-page-head__eyebrow">Scanner Scope</p>
                     <p class="sigl-page-head__title">{html.escape(str(title))}</p>
                     <p class="sigl-page-head__copy">여러 섹터를 묶어 하나의 스캔 유니버스로 사용할 수 있습니다.</p>
                 </div>
-                <div class="sigl-inline">
+                <div class="sigl-inline sigl-scanner-scope__meta">
                     {_sigl_badge(f'{count} 종목', 'accent')}
                     {_sigl_badge('점수 높은 순 정렬', 'muted')}
                 </div>
             </div>
-            <div class="sigl-chip-row">{sector_chips}</div>
-            <div class="sigl-code-list">{chips}</div>
+            <div class="sigl-chip-row sigl-scanner-scope__sectors">{sector_chips}</div>
+            <div class="sigl-code-list sigl-scanner-scope__codes">{chips}</div>
         </div>
         """
     _render_surface_html(panel_html, 0)
@@ -1020,87 +1021,7 @@ if current_mode == '스캐너':
     current_sector_selection = _normalized_selected_sectors(
         st.session_state.get('selected_sectors') or st.session_state.get('selected_sector')
     )
-    _apply_sector_selection(current_sector_selection)
-    selected_sector = st.session_state.get('selected_sector', None)
-    manual_preview = _parse_ticker_input(st.session_state.get('scan_in'))
-
-    _render_page_intro(
-        "Scanner Workspace",
-        "시장 유니버스를 구성하고 스캔 후보를 빠르게 정렬합니다.",
-        "섹터를 묶거나 직접 티커를 넣어서 현재 SIGN 분석 규칙과 같은 흐름으로 스캐너를 실행할 수 있습니다.",
-        badges=[
-            (f"선택 섹터 {len(current_sector_selection)}", "accent"),
-            (f"직접 입력 {len(manual_preview)}개", "warning"),
-            (f"전체 후보 {len(all_universe)}개", "muted"),
-        ],
-    )
-
-    _render_section_heading(
-        "유니버스 구성",
-        "여러 섹터를 한 번에 고르거나 전체 유니버스로 전환할 수 있습니다.",
-        badges=[
-            ("멀티 섹터 선택", "accent"),
-            ("직접 입력 우선 적용", "muted"),
-        ],
-        eyebrow="Scanner Setup",
-    )
-    _render_sector_button_picker(sector_names, current_sector_selection)
-
-    selected_sectors = _normalized_selected_sectors(
-        st.session_state.get('selected_sectors') or current_sector_selection
-    )
-    selected_sector = st.session_state.get('selected_sector', None)
-    st.markdown(
-        "<p class='sigl-flow-note'>`🌐 전체`를 고르면 전체 유니버스를 사용하고, 직접 입력한 티커가 있으면 그 목록이 섹터 선택보다 우선합니다.</p>",
-        unsafe_allow_html=True,
-    )
-
-    if selected_sectors:
-        sel_list = st.session_state.get('scan_tickers_override') or _sector_selection_tickers(selected_sectors) or []
-        sel_list = list(dict.fromkeys([str(t).strip().upper() for t in sel_list if str(t).strip()]))
-        _render_scanner_selection_panel(selected_sectors, sel_list)
-
-    active_preview = manual_preview or st.session_state.get('scan_tickers_override') or []
-    active_source = "직접 입력" if manual_preview else (selected_sector or "미선택")
-    composer_meta = "".join([
-        _sigl_badge(f"현재 후보 {len(active_preview)}개", 'accent'),
-        _sigl_badge(f"소스 {active_source}", 'muted'),
-        _sigl_badge("쉼표·공백 입력 지원", 'warning'),
-    ])
-    _render_section_heading(
-        "직접 입력 스캔",
-        "티커 목록을 직접 붙여 넣어 빠르게 스캔할 수 있습니다.",
-        badges=[
-            ("쉼표/공백 지원", "warning"),
-            ("섹터 선택보다 우선", "muted"),
-        ],
-        eyebrow="Direct Universe",
-        tight=True,
-    )
-    with st.form("scanner_direct_input", clear_on_submit=False):
-        st.markdown(
-            f"""
-            <div class="sigl-composer-meta">{composer_meta}</div>
-            """,
-            unsafe_allow_html=True,
-        )
-        ci = st.text_input(
-            "스캔 대상 티커 입력",
-            placeholder="NVDA, TSLA, AAPL, QQQ",
-            key="scan_in",
-            label_visibility="collapsed",
-        )
-        action_col, clear_col = st.columns(2)
-        with action_col:
-            scan_btn = st.form_submit_button("스캔 실행", type="primary", use_container_width=True)
-        with clear_col:
-            clear_scan = st.form_submit_button("초기화", type="secondary", use_container_width=True)
-        st.markdown(
-            "<p class='sigl-composer-note'>직접 입력이 있으면 현재 섹터 선택보다 우선합니다. 비워두면 선택된 섹터 유니버스를 사용합니다.</p>",
-            unsafe_allow_html=True,
-        )
-
-    if clear_scan:
+    if st.session_state.pop('_clear_scan_pending', False):
         st.session_state.pop('selected_sector', None)
         st.session_state.pop('selected_sectors', None)
         st.session_state.pop('scan_tickers_override', None)
@@ -1110,8 +1031,61 @@ if current_mode == '스캐너':
         st.session_state['scan_focus_idx'] = None
         st.session_state['scan_focus_ticker'] = None
         st.session_state['scan_nav_select_idx'] = None
-        st.session_state['scan_in'] = ''
+        st.session_state.pop('scan_in', None)
         st.session_state['scan_sector_picker'] = []
+        current_sector_selection = []
+    _apply_sector_selection(current_sector_selection)
+    selected_sector = st.session_state.get('selected_sector', None)
+    manual_preview = _parse_ticker_input(st.session_state.get('scan_in'))
+
+    _render_page_intro(
+        "Scanner",
+        "대상을 구성하고 스캔을 실행하세요.",
+        "스캔 결과를 확인하고, 분석 모드로 자세한 분석을 이어가실 수 있습니다.",
+        badges=[
+            (f"선택 섹터 {len(current_sector_selection)}", "accent"),
+            (f"직접 입력 {len(manual_preview)}개", "warning"),
+            (f"전체 후보 {len(all_universe)}개", "muted"),
+        ],
+    )
+
+    _render_section_heading(
+        "섹터를 선택 하거나 직접 티커를 입력해서 스캔 대상을 구성하세요.",
+        badges=[
+            ("멀티 섹터 선택", "accent"),
+            ("직접 입력 우선 적용", "muted"),
+        ],
+        eyebrow="스캔 대상 구성",
+    )
+    _render_sector_button_picker(sector_names, current_sector_selection)
+
+    selected_sectors = _normalized_selected_sectors(
+        st.session_state.get('selected_sectors') or current_sector_selection
+    )
+    selected_sector = st.session_state.get('selected_sector', None)
+
+    if selected_sectors:
+        sel_list = st.session_state.get('scan_tickers_override') or _sector_selection_tickers(selected_sectors) or []
+        sel_list = list(dict.fromkeys([str(t).strip().upper() for t in sel_list if str(t).strip()]))
+        _render_scanner_selection_panel(selected_sectors, sel_list)
+
+    active_preview = manual_preview or st.session_state.get('scan_tickers_override') or []
+
+    with st.form("scanner_direct_input", clear_on_submit=False):
+        ci = st.text_input(
+            "스캔 대상 티커 입력",
+            placeholder="추가로 스캔할 티커를 쉼표(,)로 구분해서 입력하세요.",
+            key="scan_in",
+            label_visibility="collapsed",
+        )
+        action_col, clear_col = st.columns(2)
+        with action_col:
+            scan_btn = st.form_submit_button("스캔 실행", type="primary", use_container_width=True)
+        with clear_col:
+            clear_scan = st.form_submit_button("초기화", type="secondary", use_container_width=True)
+  
+    if clear_scan:
+        st.session_state['_clear_scan_pending'] = True
         st.rerun()
 
     manual_tickers = _parse_ticker_input(ci)
@@ -1347,7 +1321,7 @@ if current_mode == '스캐너':
     else:
         _render_empty_state(
             "아직 스캔 결과가 없습니다",
-            "섹터를 선택하거나 직접 티커를 입력한 뒤 `스캔 실행`을 누르면 결과 카드가 여기에 정렬되어 표시됩니다.",
+            "섹터를 선택하거나 직접 티커를 입력한 뒤 `스캔 실행`을 누르면 결과 카드가 정렬되어 표시됩니다.",
             badges=[
                 ("유니버스 선택 필요", "warning"),
                 ("직접 입력 가능", "muted"),
@@ -1408,7 +1382,7 @@ else:
             eyebrow="Quick Actions",
             tight=bool(analysis_indices),
         )
-        quick_tickers = ["NVDA", "TSLA", "AAPL", "QQQ"]
+        quick_tickers = ["NVDA", "TSLA", "AAPL", "GOOGL", "AMZN", "META", "MSFT", "PLTR", "HIMS", "SNDK", "LITE", "COHR", "IREN", "ORCL", "RKLB", "ASTS"]
         for start in range(0, len(quick_tickers), 2):
             cols = st.columns(2)
             for idx, ticker in enumerate(quick_tickers[start:start + 2]):
@@ -1558,7 +1532,7 @@ else:
         st.caption("QUANT AUDIT는 보통 10~20초 정도 걸립니다. 시스템 판단 요약과 반론 포인트를 함께 정리합니다.")
         if st.button(f"🚀 {st.session_state.pending_ai_ticker.upper()} QUANT AUDIT", type="primary", use_container_width=True):
             _run_ai()
-    if ti := st.chat_input("분석할 티커를 입력하세요. 예: TSLA, AAPL, QQQ"):
+    if ti := st.chat_input("분석할 티커를 입력하세요."):
         parsed = _parse_ticker_input(ti)
         if not parsed:
             st.toast("분석할 티커를 입력해 주세요.", icon="⌨️")

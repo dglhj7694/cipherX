@@ -1,4 +1,4 @@
-import streamlit as st
+﻿import streamlit as st
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -281,19 +281,26 @@ def _get_plotly_combo_chart(rv, nv, rd):
         opacity=0.92,
         text=[_fmt_num(v, False) for v in rv_rev],
         textposition='auto',
-        textfont=dict(color='#E5E7EB', size=12, family=PLOTLY_FONT_FAMILY)
+        textfont=dict(color='#E5E7EB', size=12, family=PLOTLY_FONT_FAMILY),
+        hovertemplate="Revenue<br>%{x}: %{y:$,.0f}<extra></extra>"
     ))
     fig.add_trace(go.Scatter(
         x=labels, y=nv_rev, name='순이익', mode='lines+markers+text',
         line=dict(color='#63D9A2', width=3),
         marker=dict(size=9, color='#0F172A', line=dict(color='#63D9A2', width=2)),
+        fill='tozeroy',
+        fillcolor='rgba(99,217,162,.12)',
         yaxis='y2',
         text=[_fmt_num(v, False) for v in nv_rev],
         textposition='top center',
-        textfont=dict(color='#B8F1D5', size=12, family=PLOTLY_FONT_FAMILY)
+        textfont=dict(color='#B8F1D5', size=12, family=PLOTLY_FONT_FAMILY),
+        hovertemplate="Net income<br>%{x}: %{y:$,.0f}<extra></extra>"
     ))
     _apply_cipherx_chart_theme(fig, "연도별 재무 추이", height=320, show_legend=True)
-    fig.update_layout(yaxis2=dict(overlaying='y', side='right', showgrid=False, tickfont=dict(color='#63D9A2', size=11)))
+    fig.update_layout(
+        hovermode='x unified',
+        yaxis2=dict(overlaying='y', side='right', showgrid=False, tickfont=dict(color='#63D9A2', size=11))
+    )
     return fig
 
 def _get_plotly_yearly_bar(dates, y1, y2, name1, name2, c1, c2):
@@ -390,7 +397,7 @@ def _get_plotly_target_price(curr, low, mean, median, high):
             )
         ))
 
-    _apply_cipherx_chart_theme(fig, "목표가 코리도어", height=380, show_legend=False)
+    _apply_cipherx_chart_theme(fig, "목표가", height=380, show_legend=False)
     fig.update_xaxes(showgrid=False, zeroline=False, showticklabels=False, range=[-0.65, 0.65], fixedrange=True)
     fig.update_yaxes(
         showgrid=True,
@@ -426,6 +433,239 @@ def _get_plotly_gauge(val, color):
     return fig
 
 # ── 분석 함수들 ─────────────────────────────────────────
+
+def _prepare_story_series(values, dates=None, limit=4):
+    if not values:
+        return [], []
+    points = []
+    for idx, raw in enumerate(values[:limit]):
+        numeric = _first_valid_number(raw)
+        if numeric is None:
+            continue
+        label = ""
+        if dates and idx < len(dates):
+            stamp = dates[idx]
+            label = stamp.strftime('%Y') if hasattr(stamp, 'strftime') else str(stamp)[:4]
+        points.append((label, numeric))
+    points.reverse()
+    return [value for _, value in points], [label for label, _ in points]
+
+def _story_period_label(labels):
+    labels = [label for label in labels if label]
+    if not labels:
+        return "최근 흐름"
+    if len(labels) == 1:
+        return labels[0]
+    return f"{labels[0]}-{labels[-1]}"
+
+def _sparkline_svg(values, stroke, fill, width=240, height=82):
+    if len(values) < 2:
+        return "<div class='story-empty'>데이터가 더 필요합니다.</div>"
+    low, high = min(values), max(values)
+    span = high - low
+    if span == 0:
+        span = max(abs(high), 1)
+        low -= span * 0.5
+        high += span * 0.5
+        span = high - low
+    x_step = width / max(len(values) - 1, 1)
+    points = []
+    for idx, value in enumerate(values):
+        x_pos = idx * x_step
+        y_pos = height - 12 - ((value - low) / span) * (height - 24)
+        points.append((x_pos, y_pos))
+    line_points = " ".join(f"{x:.2f},{y:.2f}" for x, y in points)
+    area_points = f"0,{height - 8:.2f} {line_points} {width:.2f},{height - 8:.2f}"
+    end_x, end_y = points[-1]
+    return (
+        f"<svg class='story-sparkline' viewBox='0 0 {width} {height}' preserveAspectRatio='none' aria-hidden='true'>"
+        f"<line class='story-sparkline__baseline' x1='0' y1='{height - 8:.2f}' x2='{width}' y2='{height - 8:.2f}'></line>"
+        f"<polygon points='{area_points}' fill='{fill}'></polygon>"
+        f"<polyline class='story-sparkline__line' points='{line_points}' style='stroke:{stroke}'></polyline>"
+        f"<circle class='story-sparkline__end' cx='{end_x:.2f}' cy='{end_y:.2f}' r='4.5' style='stroke:{stroke}'></circle>"
+        f"</svg>"
+    )
+
+def _story_range_strip(current, low, median, high):
+    values = [v for v in [current, low, median, high] if isinstance(v, (int, float))]
+    if len(values) < 2:
+        return "<div class='story-empty'>목표가 데이터가 충분하지 않습니다.</div>"
+    low_bound = min(values)
+    high_bound = max(values)
+    span = max(high_bound - low_bound, max(abs(v) for v in values) * 0.08, 1)
+    floor = low_bound - span * 0.15
+    ceiling = high_bound + span * 0.15
+
+    def _pos(value):
+        if not isinstance(value, (int, float)):
+            return None
+        ratio = (value - floor) / max(ceiling - floor, 1e-9)
+        return max(4.0, min(96.0, ratio * 100))
+
+    low_pos = _pos(low)
+    high_pos = _pos(high)
+    band_style = ""
+    if low_pos is not None and high_pos is not None:
+        band_left = min(low_pos, high_pos)
+        band_width = max(abs(high_pos - low_pos), 4)
+        band_style = f"<span class='story-range-band' style='left:{band_left:.2f}%;width:{band_width:.2f}%'></span>"
+
+    markers = []
+    for tone, value, label in [
+        ("low", low, "저점"),
+        ("median", median, "중간"),
+        ("high", high, "고점"),
+        ("current", current, "현재"),
+    ]:
+        pos = _pos(value)
+        if pos is None:
+            continue
+        markers.append(
+            f"<span class='story-range-marker story-range-marker--{tone}' style='left:{pos:.2f}%'>"
+            f"<b>{label}</b><i>{_fmt_num(value)}</i></span>"
+        )
+    return (
+        "<div class='story-range-shell'>"
+        "<div class='story-range-track'>"
+        f"{band_style}{''.join(markers)}"
+        "</div>"
+        "</div>"
+    )
+
+def _story_card_html(kicker, value, note, visual_html, footer, tone="accent"):
+    footer_html = f"<div class='story-foot'>{footer}</div>" if footer else ""
+    return (
+        f"<article class='story-card story-card--{tone}'>"
+        f"<p class='story-kicker'>{_esc(kicker)}</p>"
+        f"<p class='story-value'>{_esc(value)}</p>"
+        f"<p class='story-note'>{_esc(note)}</p>"
+        f"<div class='story-visual'>{visual_html}</div>"
+        f"{footer_html}"
+        f"</article>"
+    )
+
+def _build_target_corridor_html(curr, low, mean, median, high, coverage_count=0):
+    values = [v for v in [curr, low, mean, median, high] if isinstance(v, (int, float))]
+    if len(values) < 2:
+        return ""
+
+    band_low = low if isinstance(low, (int, float)) else min(values)
+    band_high = high if isinstance(high, (int, float)) else max(values)
+    span = max(band_high - band_low, max(abs(v) for v in values) * 0.08, 1)
+    axis_min = band_low - span * 0.18
+    axis_max = band_high + span * 0.18
+    band_width = band_high - band_low
+    focus_value = median if isinstance(median, (int, float)) else mean
+    focus_gap_abs = (focus_value - curr) if isinstance(focus_value, (int, float)) and isinstance(curr, (int, float)) else None
+    focus_gap_pct = ((focus_value - curr) / curr * 100) if isinstance(focus_value, (int, float)) and isinstance(curr, (int, float)) and curr else None
+
+    def _pos(value):
+        if not isinstance(value, (int, float)):
+            return None
+        ratio = (value - axis_min) / max(axis_max - axis_min, 1e-9)
+        return max(2.0, min(98.0, ratio * 100))
+
+    def _tag_html(label, value, tone, position):
+        pos = _pos(value)
+        if pos is None:
+            return ""
+        return (
+            f"<div class='consensus-corridor__tag consensus-corridor__tag--{position}' "
+            f"style='left:{pos:.2f}%;--corridor-tone:{tone}'>"
+            f"<b>{_esc(label)}</b>"
+            f"<span>{_fmt_num(value)}</span>"
+            f"</div>"
+        )
+
+    def _dot_html(label, value, tone, emphasis=False):
+        pos = _pos(value)
+        if pos is None:
+            return ""
+        emphasis_class = " consensus-corridor__dot--focus" if emphasis else ""
+        return (
+            f"<span class='consensus-corridor__dot{emphasis_class}' "
+            f"title='{_esc(label)} {_fmt_num(value)}' "
+            f"style='left:{pos:.2f}%;--corridor-tone:{tone}'></span>"
+        )
+
+    band_left = _pos(band_low)
+    band_right = _pos(band_high)
+    focus_left = None
+    focus_right = None
+    if isinstance(mean, (int, float)) and isinstance(median, (int, float)):
+        focus_left = _pos(min(mean, median))
+        focus_right = _pos(max(mean, median))
+
+    top_tags = "".join([
+        _tag_html("평균", mean, "#38BDF8", "top"),
+        _tag_html("최고가", band_high, "#E2E8F0", "top"),
+        _tag_html("현재가", curr, "#F6C35E", "top"),
+    ])
+    bottom_tags = "".join([
+        _tag_html("최저가", band_low, "#94A3B8", "bottom"),
+        _tag_html("중앙값", median, "#63D9A2", "bottom"),
+    ])
+    dots = "".join([
+        _dot_html("최저가", band_low, "#94A3B8"),
+        _dot_html("평균", mean, "#38BDF8"),
+        _dot_html("중앙값", median, "#63D9A2"),
+        _dot_html("최고가", band_high, "#E2E8F0"),
+        _dot_html("현재가", curr, "#F6C35E", emphasis=True),
+    ])
+
+    focus_band_html = ""
+    if focus_left is not None and focus_right is not None:
+        focus_width = max(abs(focus_right - focus_left), 2.5)
+        focus_band_html = (
+            f"<span class='consensus-corridor__band consensus-corridor__band--focus' "
+            f"style='left:{min(focus_left, focus_right):.2f}%;width:{focus_width:.2f}%'></span>"
+        )
+
+    base_band_html = ""
+    if band_left is not None and band_right is not None:
+        base_band_html = (
+            f"<span class='consensus-corridor__band' "
+            f"style='left:{min(band_left, band_right):.2f}%;width:{max(abs(band_right - band_left), 4):.2f}%'></span>"
+        )
+
+    gap_text = f"{focus_gap_pct:+.1f}%" if isinstance(focus_gap_pct, (int, float)) else "N/A"
+    gap_cash = (
+        f"{'+' if focus_gap_abs >= 0 else '-'}${abs(focus_gap_abs):,.2f}"
+        if isinstance(focus_gap_abs, (int, float))
+        else "N/A"
+    )
+    summary_stats = (
+        f"<div class='consensus-corridor__stats'>"
+        f"<div class='consensus-corridor__stat'><p>목표 밴드 폭</p><strong>{_fmt_num(band_width)}</strong></div>"
+        f"<div class='consensus-corridor__stat'><p>현재가 vs 기준</p><strong>{gap_text}</strong><span>{gap_cash}</span></div>"
+        f"<div class='consensus-corridor__stat'><p>커버리지</p><strong>{coverage_count}명</strong><span>애널리스트 참여 수</span></div>"
+        f"</div>"
+    )
+
+    return (
+        "<div class='consensus-corridor'>"
+        "<div class='consensus-corridor__head'>"
+        "<div>"
+        "<p class='consensus-corridor__kicker'>CONSENSUS PRICE CORRIDOR</p>"
+        "</div>"
+        f"{summary_stats}"
+        "</div>"
+        "<div class='consensus-corridor__stage'>"
+        f"<div class='consensus-corridor__labels'>{top_tags}</div>"
+        "<div class='consensus-corridor__track'>"
+        "<span class='consensus-corridor__rail'></span>"
+        f"{base_band_html}{focus_band_html}{dots}"
+        "</div>"
+        f"<div class='consensus-corridor__labels consensus-corridor__labels--bottom'>{bottom_tags}</div>"
+        f"<div class='consensus-corridor__axis'><span>{_fmt_num(axis_min)}</span><span>{_fmt_num(axis_max)}</span></div>"
+        "</div>"
+        "<div class='consensus-corridor__legend'>"
+        "<span><i class='consensus-corridor__legend-dot consensus-corridor__legend-dot--slate'></i>저점/고점 밴드</span>"
+        "<span><i class='consensus-corridor__legend-dot consensus-corridor__legend-dot--green'></i>중앙값/평균 포커스 존</span>"
+        "<span><i class='consensus-corridor__legend-dot consensus-corridor__legend-dot--gold'></i>현재가 포지션</span>"
+        "</div>"
+        "</div>"
+    )
 
 def _growth_stage(info, fin, bs, cf):
     # ─── 기본 지표 추출 ───────────────────────────────────
@@ -947,7 +1187,7 @@ __SIGL_COMPANY_THEME__
 .n-title{display:block;color:#F8FAFC !important;font-size:.96rem;font-weight:800;line-height:1.55;text-decoration:none !important}
 .n-title:hover{color:#C7D2FE !important}
 .n-meta{margin-top:8px;color:#94A3B8;font-size:.76rem;font-weight:700}
-.hero-bento,.coverage-wrap,.section-nav{display:none}
+.hero-bento{display:none}
 .invest-hero{max-width:960px;margin:0 auto 20px;display:grid;grid-template-columns:1.45fr .95fr;gap:14px}
 .invest-card{background:
     linear-gradient(180deg,rgba(99,102,241,.08),rgba(99,102,241,0) 34%),
@@ -958,6 +1198,73 @@ __SIGL_COMPANY_THEME__
 .invest-copy{color:#CBD5E1;font-size:.92rem;line-height:1.7;font-weight:500}
 .invest-points{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
 .invest-point{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border-radius:999px;background:rgba(255,255,255,.03);border:1px solid rgba(148,163,184,.12);color:#E5E7EB;font-size:.78rem;font-weight:800}
+.coverage-pill,.nav-chip,.invest-point{transition:transform .22s ease,border-color .22s ease,background .22s ease,box-shadow .22s ease}
+.coverage-pill:hover,.nav-chip:hover,.invest-point:hover{transform:translateY(-2px);border-color:rgba(99,102,241,.28);background:rgba(255,255,255,.05);box-shadow:0 12px 24px rgba(2,6,23,.18)}
+.story-board{max-width:960px;margin:0 auto 22px}
+.story-board__head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.story-board__eyebrow{display:inline-flex;align-items:center;gap:8px;padding:5px 10px;border-radius:999px;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.22);color:#C7D2FE;font-size:.72rem;font-weight:900;letter-spacing:.05em;margin:0}
+.story-board__copy{color:#CBD5E1;font-size:.88rem;line-height:1.7;font-weight:600;max-width:680px;margin:0}
+.story-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.story-card{position:relative;overflow:hidden;padding:15px 15px 14px;border-radius:16px;background:linear-gradient(180deg,rgba(19,28,45,.98),rgba(15,23,42,.92));border:1px solid rgba(148,163,184,.12);box-shadow:0 14px 28px rgba(2,6,23,.14);transition:transform .24s ease,border-color .24s ease,box-shadow .24s ease}
+.story-card::before{content:'';position:absolute;inset:0 0 auto 0;height:42%;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,0));opacity:.85;pointer-events:none}
+.story-card:hover{transform:translateY(-3px);border-color:rgba(99,102,241,.26);box-shadow:0 18px 32px rgba(2,6,23,.2)}
+.story-card--accent{background:linear-gradient(180deg,rgba(99,102,241,.08),rgba(99,102,241,0) 34%),linear-gradient(180deg,rgba(19,28,45,.98),rgba(15,23,42,.92))}
+.story-card--positive{background:linear-gradient(180deg,rgba(99,217,162,.08),rgba(99,217,162,0) 34%),linear-gradient(180deg,rgba(19,28,45,.98),rgba(15,23,42,.92))}
+.story-card--negative{background:linear-gradient(180deg,rgba(255,143,150,.08),rgba(255,143,150,0) 34%),linear-gradient(180deg,rgba(19,28,45,.98),rgba(15,23,42,.92))}
+.story-card--warning{background:linear-gradient(180deg,rgba(246,195,94,.08),rgba(246,195,94,0) 34%),linear-gradient(180deg,rgba(19,28,45,.98),rgba(15,23,42,.92))}
+.story-kicker{color:#94A3B8;font-size:.72rem;font-weight:800;letter-spacing:.03em;text-transform:uppercase;margin:0 0 8px}
+.story-value{color:#F8FAFC;font-size:1.16rem;font-weight:900;line-height:1.2;margin:0 0 6px}
+.story-note{color:#CBD5E1;font-size:.8rem;line-height:1.55;font-weight:600;min-height:40px;margin:0 0 12px}
+.story-visual{display:flex;align-items:center;min-height:92px}
+.story-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#94A3B8;font-size:.72rem;font-weight:700;margin-top:10px;padding-top:10px;border-top:1px solid rgba(148,163,184,.12)}
+.story-empty{display:flex;align-items:center;justify-content:center;width:100%;min-height:82px;border-radius:12px;border:1px dashed rgba(148,163,184,.18);background:rgba(255,255,255,.02);color:#94A3B8;font-size:.78rem;font-weight:700}
+.story-sparkline{width:100%;height:84px;display:block}
+.story-sparkline__baseline{stroke:rgba(148,163,184,.16);stroke-width:1}
+.story-sparkline__line{fill:none;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 10px rgba(148,163,184,.14))}
+.story-sparkline__end{fill:#0F172A;stroke-width:2}
+.story-range-shell{width:100%;padding-top:8px}
+.story-range-track{position:relative;height:20px;border-radius:999px;background:linear-gradient(90deg,rgba(255,143,150,.24),rgba(246,195,94,.2),rgba(99,217,162,.24));border:1px solid rgba(148,163,184,.12);overflow:visible}
+.story-range-band{position:absolute;top:2px;bottom:2px;border-radius:999px;background:linear-gradient(90deg,rgba(99,102,241,.18),rgba(99,217,162,.2));box-shadow:0 0 18px rgba(99,102,241,.18)}
+.story-range-marker{position:absolute;top:-10px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:3px}
+.story-range-marker::before{content:'';width:12px;height:12px;border-radius:999px;border:2px solid #F8FAFC;box-shadow:0 0 0 4px rgba(15,23,42,.4)}
+.story-range-marker b{color:#E5E7EB;font-size:.65rem;line-height:1;font-weight:800}
+.story-range-marker i{color:#94A3B8;font-size:.64rem;line-height:1;font-style:normal;font-weight:700}
+.story-range-marker--low::before{background:#94A3B8}
+.story-range-marker--median::before{background:#63D9A2}
+.story-range-marker--high::before{background:#CBD5E1}
+.story-range-marker--current::before{background:#F6C35E}
+.consensus-corridor{padding:16px 16px 14px;border-radius:18px;background:linear-gradient(180deg,rgba(99,102,241,.08),rgba(99,102,241,0) 34%),linear-gradient(180deg,rgba(19,28,45,.98),rgba(15,23,42,.92));border:1px solid rgba(99,102,241,.20);box-shadow:0 16px 32px rgba(2,6,23,.16)}
+.consensus-corridor__head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.consensus-corridor__kicker{color:#94A3B8;font-size:.72rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;margin:0 0 6px}
+.consensus-corridor__title{color:#F8FAFC;font-size:1rem;font-weight:900;line-height:1.4;margin:0}
+.consensus-corridor__stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;flex:1 1 320px}
+.consensus-corridor__stat{padding:10px 11px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid rgba(148,163,184,.12)}
+.consensus-corridor__stat p{color:#94A3B8;font-size:.68rem;font-weight:800;margin:0 0 5px}
+.consensus-corridor__stat strong{display:block;color:#F8FAFC;font-size:.98rem;font-weight:900;line-height:1.2}
+.consensus-corridor__stat span{display:block;color:#CBD5E1;font-size:.68rem;font-weight:700;line-height:1.35;margin-top:4px}
+.consensus-corridor__stage{padding:4px 2px 0}
+.consensus-corridor__labels{position:relative;min-height:44px}
+.consensus-corridor__labels--bottom{min-height:50px;margin-top:16px}
+.consensus-corridor__tag{position:absolute;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;white-space:nowrap}
+.consensus-corridor__tag b{color:var(--corridor-tone);font-size:.67rem;font-weight:900;line-height:1}
+.consensus-corridor__tag span{color:#CBD5E1;font-size:.68rem;font-weight:700;line-height:1.2}
+.consensus-corridor__tag--top{top:0}
+.consensus-corridor__tag--bottom{top:0}
+.consensus-corridor__track{position:relative;height:34px}
+.consensus-corridor__rail{position:absolute;left:0;right:0;top:12px;height:10px;border-radius:999px;background:rgba(148,163,184,.10);border:1px solid rgba(148,163,184,.12)}
+.consensus-corridor__band{position:absolute;top:7px;height:20px;border-radius:999px;background:linear-gradient(90deg,rgba(142,164,255,.22),rgba(99,217,162,.18));border:1px solid rgba(142,164,255,.24);box-shadow:0 0 18px rgba(99,102,241,.14)}
+.consensus-corridor__band--focus{top:3px;height:28px;background:linear-gradient(90deg,rgba(56,189,248,.18),rgba(99,217,162,.22));border-color:rgba(99,217,162,.24)}
+.consensus-corridor__dot{position:absolute;top:4px;transform:translateX(-50%);width:26px;height:26px;border-radius:999px;background:rgba(15,23,42,.94);border:1px solid rgba(248,250,252,.14);box-shadow:0 8px 18px rgba(2,6,23,.18)}
+.consensus-corridor__dot::before{content:'';position:absolute;inset:6px;border-radius:999px;background:var(--corridor-tone)}
+.consensus-corridor__dot--focus{top:0;width:34px;height:34px;border-color:rgba(246,195,94,.24);box-shadow:0 0 0 1px rgba(246,195,94,.18),0 12px 22px rgba(2,6,23,.22)}
+.consensus-corridor__dot--focus::before{inset:7px}
+.consensus-corridor__axis{display:flex;justify-content:space-between;gap:12px;color:#94A3B8;font-size:.7rem;font-weight:700;margin-top:10px}
+.consensus-corridor__legend{display:flex;flex-wrap:wrap;gap:10px 14px;color:#CBD5E1;font-size:.72rem;font-weight:700;margin-top:12px}
+.consensus-corridor__legend span{display:inline-flex;align-items:center;gap:7px}
+.consensus-corridor__legend-dot{width:8px;height:8px;border-radius:999px;display:inline-block}
+.consensus-corridor__legend-dot--slate{background:#94A3B8;box-shadow:0 0 10px rgba(148,163,184,.35)}
+.consensus-corridor__legend-dot--green{background:#63D9A2;box-shadow:0 0 10px rgba(99,217,162,.35)}
+.consensus-corridor__legend-dot--gold{background:#F6C35E;box-shadow:0 0 10px rgba(246,195,94,.35)}
 .invest-grid{display:grid;grid-template-columns:1fr;gap:10px}
 .invest-metric{padding:13px 14px;border-radius:14px;background:linear-gradient(160deg,rgba(15,23,42,.9),rgba(15,23,42,.74));border:1px solid rgba(148,163,184,.12)}
 .invest-label{color:#94A3B8;font-size:.72rem;font-weight:800;margin:0 0 6px}
@@ -1021,9 +1328,19 @@ __SIGL_COMPANY_THEME__
   .hero-bento{grid-template-columns:1fr}
   .meta-grid{grid-template-columns:1fr}
   .invest-hero{grid-template-columns:1fr}
+  .story-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .consensus-corridor__stats{grid-template-columns:1fr}
   .cluster-grid{grid-template-columns:1fr}
   .consensus-scale{grid-template-columns:repeat(2,minmax(0,1fr))}
   .target-mini-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:640px){
+  .story-grid{grid-template-columns:1fr}
+  .story-board__copy{font-size:.82rem}
+  .consensus-corridor{padding:14px 14px 12px}
+  .consensus-corridor__labels{min-height:50px}
+  .consensus-corridor__tag b{font-size:.64rem}
+  .consensus-corridor__tag span{font-size:.64rem}
 }
 </style>
 """.replace("__SIGL_COMPANY_THEME__", COMPANY_DETAILS_THEME_OVERRIDES)
@@ -1230,6 +1547,85 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
         f"</div>"
     )
     st.markdown(invest_html, unsafe_allow_html=True)
+
+    revenue_story_raw, revenue_story_dates = _annual_values(fin, REV_ALIASES)
+    profit_story_raw, profit_story_dates = _annual_values(fin, NI_ALIASES)
+    cash_story_raw, cash_story_dates = _annual_values(cf, FCF_ALIASES)
+    cash_story_name = "잉여현금흐름"
+    if not cash_story_raw:
+        cash_story_raw, cash_story_dates = _annual_values(cf, CFO_ALIASES)
+        cash_story_name = "영업현금흐름"
+
+    revenue_story_values, revenue_story_labels = _prepare_story_series(revenue_story_raw, revenue_story_dates)
+    profit_story_values, profit_story_labels = _prepare_story_series(profit_story_raw, profit_story_dates)
+    cash_story_values, cash_story_labels = _prepare_story_series(cash_story_raw, cash_story_dates)
+
+    cash_total = _first_valid_number(info.get('totalCash'))
+    debt_total = _first_valid_number(info.get('totalDebt'))
+    cash_cover = cash_total / debt_total if cash_total is not None and debt_total not in (None, 0) else None
+    target_reference = target_median if isinstance(target_median, (int, float)) else target_mean
+
+    revenue_note = f"3년 CAGR {_fmt_cagr(cagr_rev)}" if cagr_rev is not None else "최근 연간 매출 흐름"
+    profit_note = f"순이익률 {_fmt_pct(info.get('profitMargins'))}" if info.get('profitMargins') is not None else "최근 연간 순이익 흐름"
+    cash_note = f"현금/부채 {cash_cover:.2f}x" if isinstance(cash_cover, (int, float)) else "현금 창출 체력 점검"
+    street_note = f"중간 목표가 {upside_pct_top:+.1f}%" if isinstance(upside_pct_top, (int, float)) else f"애널리스트 {analyst_count}명"
+
+    revenue_visual = _sparkline_svg(revenue_story_values, "#7AA2FF", "rgba(122,162,255,.14)")
+    profit_visual = _sparkline_svg(
+        profit_story_values,
+        "#63D9A2" if not profit_story_values or profit_story_values[-1] >= 0 else "#FF8F96",
+        "rgba(99,217,162,.12)" if not profit_story_values or profit_story_values[-1] >= 0 else "rgba(255,143,150,.12)",
+    )
+    cash_visual = _sparkline_svg(
+        cash_story_values,
+        "#63D9A2" if not cash_story_values or cash_story_values[-1] >= 0 else "#F6C35E",
+        "rgba(99,217,162,.12)" if not cash_story_values or cash_story_values[-1] >= 0 else "rgba(246,195,94,.12)",
+    )
+    street_visual = _story_range_strip(price, target_low, target_reference, target_high)
+
+    story_cards = [
+        _story_card_html(
+            "매출 흐름",
+            _fmt_num(revenue_story_values[-1]) if revenue_story_values else "N/A",
+            revenue_note,
+            revenue_visual,
+            _story_period_label(revenue_story_labels),
+            "accent" if isinstance(cagr_rev, float) and cagr_rev >= 0 else "negative" if isinstance(cagr_rev, float) and cagr_rev < 0 else "accent",
+        ),
+        _story_card_html(
+            "이익 흐름",
+            _fmt_num(profit_story_values[-1]) if profit_story_values else "N/A",
+            profit_note,
+            profit_visual,
+            _story_period_label(profit_story_labels),
+            "positive" if not profit_story_values or profit_story_values[-1] >= 0 else "negative",
+        ),
+        _story_card_html(
+            cash_story_name,
+            _fmt_num(cash_story_values[-1]) if cash_story_values else "N/A",
+            cash_note,
+            cash_visual,
+            _story_period_label(cash_story_labels),
+            "positive" if not cash_story_values or cash_story_values[-1] >= 0 else "warning",
+        ),
+        _story_card_html(
+            "목표가 범위",
+            f"{upside_pct_top:+.1f}%" if isinstance(upside_pct_top, (int, float)) else "N/A",
+            street_note,
+            street_visual,
+            f"현재가 {_fmt_num(price)} · 커버리지 {analyst_count}명",
+            "warning",
+        ),
+    ]
+    story_html = (
+        "<div class='story-board'>"
+        "<div class='story-board__head'>"
+        "<p class='story-board__eyebrow'>COMPANY STORY</p>"
+        "</div>"
+        f"<div class='story-grid'>{''.join(story_cards)}</div>"
+        "</div>"
+    )
+    st.markdown(story_html, unsafe_allow_html=True)
 
     all_verdicts = []
 
@@ -1744,7 +2140,7 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     up_pct = ((up_ref - price) / price * 100) if isinstance(up_ref, (int, float)) and price else None
     up_str = f"{up_pct:+.1f}%" if isinstance(up_pct, (int, float)) else "N/A"
 
-    fig9 = _get_plotly_target_price(price, t_low, t_mean, t_median, t_high)
+    target_corridor_html = _build_target_corridor_html(price, t_low, t_mean, t_median, t_high, n_ana)
     cc_pill_cls = "pill-green" if cc == "green" else ("pill-amber" if cc == "yellow" else "pill-red")
     if isinstance(rm, (int, float)):
         if rm <= 1.5: scale_idx = 0
@@ -1788,7 +2184,6 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
 
     with st.container(border=True):
         st.markdown('<div class="s-title"><span class="s-num">09</span> 전문가들의 의견 <span style="font-size:.8rem;color:#768390">Yahoo</span></div>', unsafe_allow_html=True)
-        st.markdown("<div class='section-lead'>컨센서스 숫자만 보기보다 현재가가 목표가 코리도어의 어디쯤 있는지 함께 보면 훨씬 직관적입니다.</div>", unsafe_allow_html=True)
         s9_spotlight = (
             f"<div style='display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px'><span class='section-pill {cc_pill_cls}'>{con}</span><span class='section-pill pill-amber'>{rk}</span></div>"
             f"<div class='spotlight-grid tight'>"
@@ -1818,7 +2213,7 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
         s9_read_html = (
             f"<div class='insight-shell'>"
             f"<div class='cluster-title'>읽는 법</div>"
-            f"<div class='cluster-sub'>현재가가 코리도어 상단에 가까우면 기대가 이미 많이 반영된 상태일 수 있고, 하단에 가까우면 리레이팅 여지가 남아 있을 수 있습니다. 컨센서스는 방향 힌트이지 확정 시그널은 아닙니다.</div>"
+            f"<div class='cluster-sub'>현재가가 목표가 상단에 가까우면 기대가 이미 많이 반영된 상태일 수 있고, 하단에 가까우면 리레이팅 여지가 남아 있을 수 있습니다. 컨센서스는 방향 힌트이지 확정 시그널은 아닙니다.</div>"
             f"{_metric_row('현재가 vs 목표가', up_str, 'm-green' if isinstance(up_pct, (int, float)) and up_pct >= 0 else 'm-red')}"
             f"{_metric_row('참여 애널리스트', f'{n_ana}명', 'm-value')}"
             f"{_metric_row('추천 키', rk, 'm-value m-blue')}"
@@ -1828,8 +2223,8 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
         st.markdown(s9_spotlight, unsafe_allow_html=True)
         col1, col2 = st.columns([1.12, 0.88])
         with col1:
-            if fig9: st.plotly_chart(fig9, use_container_width=True, config={'displayModeBar': False}, key=f"{key_prefix}_fig9")
-            else: st.markdown("<div class='note-box'>※ 목표가 데이터가 충분하지 않아 차트가 생략되었습니다.</div>", unsafe_allow_html=True)
+            if target_corridor_html: st.markdown(target_corridor_html, unsafe_allow_html=True)
+            else: st.markdown("<div class='note-box'>※ 목표가 데이터가 충분하지 않아 코리도어 뷰가 생략되었습니다.</div>", unsafe_allow_html=True)
             st.markdown(s9_target_tiles, unsafe_allow_html=True)
         with col2:
             st.markdown(s9_scale_html, unsafe_allow_html=True)
