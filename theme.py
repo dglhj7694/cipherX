@@ -393,10 +393,10 @@ div[data-testid="stMetricValue"]{{
   min-width:0;
 }}
 .sigl-stack-gap{{
-  height:10px;
+  height:6px;
 }}
 .sigl-stack-gap--lg{{
-  height:18px;
+  height:12px;
 }}
 .sigl-composer-head{{
   display:flex;

@@ -135,7 +135,6 @@ def _render_panel_html(inner_html, min_height=240):
         height=min_height,
         scrolling=False,
     )
-    st.markdown("<div class='sigl-stack-gap'></div>", unsafe_allow_html=True)
 
 
 def _progress_metric_card(label, value, sub, tone, fill):
@@ -301,24 +300,24 @@ def render_price_header(meta, key_prefix="analysis"):
 
 
 def _judgment_panel_height(detail_text="", contrast="", risk_tag_count=0):
-    height = 420
+    height = 320
     if detail_text:
-        height += 110
+        height += 80
     if contrast or risk_tag_count:
-        height += 120
+        height += 90
     return height
 
 
 def _committee_panel_height(card_count):
-    return max(420, 120 + max(int(card_count), 1) * 122)
+    return max(320, 120 + max(int(card_count), 1) * 44)
 
 
 def _leading_lagging_panel_height(stat_count):
-    return max(560, 250 + max(int(stat_count), 1) * 76)
+    return max(440, 220 + max(int(stat_count), 1) * 32)
 
 
 def _combined_scan_panel_height(card_count):
-    return max(320, 180 + max(int(card_count), 1) * 108)
+    return max(260, 160 + max(int(card_count), 1) * 48)
 
 
 def render_judgment_card(meta):
@@ -638,6 +637,7 @@ def render_analysis(msg, key_prefix="analysis"):
     with tab_judgment:
         if meta:
             render_judgment_card(meta)
+            st.markdown("<div class='sigl-stack-gap'></div>", unsafe_allow_html=True)
             render_committee_panel(meta)
             st.markdown("<div class='sigl-stack-gap sigl-stack-gap--lg'></div>", unsafe_allow_html=True)
             render_leading_lagging(meta)
