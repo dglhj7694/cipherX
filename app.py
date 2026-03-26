@@ -87,6 +87,7 @@ def init_session():
         'selected_sector': None,
         'selected_sectors': [],
         'scan_tickers_override': None,
+        'scan_sector_picker': [],
     }
     for k, v in defs.items():
         if k not in st.session_state:
@@ -110,6 +111,7 @@ def reset_session():
     st.session_state['selected_sector'] = None
     st.session_state['selected_sectors'] = []
     st.session_state['scan_tickers_override'] = None
+    st.session_state['scan_sector_picker'] = []
 
 init_session()
 
@@ -364,6 +366,7 @@ def _apply_sector_selection(selected_sectors):
     st.session_state['selected_sectors'] = normalized
     st.session_state['selected_sector'] = _sector_selection_title(normalized)
     st.session_state['scan_tickers_override'] = _sector_selection_tickers(normalized)
+    st.session_state['scan_sector_picker'] = normalized
 
 
 def _toggle_sector_selection(sector_name):
@@ -418,7 +421,9 @@ def _render_scanner_selection_panel(selected_sectors, selected_list):
             <div class="sigl-code-list">{chips}</div>
         </div>
         """
-    _render_surface_html(panel_html, 286)
+    chip_rows = max(1, math.ceil(max(count, 1) / 6))
+    panel_height = min(420, 226 + chip_rows * 30)
+    _render_surface_html(panel_html, panel_height)
 
 
 def _render_scanner_summary(results, total_count):
@@ -429,8 +434,8 @@ def _render_scanner_summary(results, total_count):
         ("매도 후보", str(sell_count), "판단이 SELL 계열인 종목 수", "negative"),
         ("매치 수", f"{len(results)}/{total_count}", "전체 스캔 대상 대비 현재 결과", "accent"),
     ]
-    cols = st.columns(3)
-    for col, (label, value, sub, tone) in zip(cols, cards):
+    top_cols = st.columns(2)
+    for col, (label, value, sub, tone) in zip(top_cols, cards[:2]):
         with col:
             card_html = f"""
             <div class="sigl-metric-card sigl-metric-card--summary sigl-metric-card--{tone}">
@@ -440,6 +445,15 @@ def _render_scanner_summary(results, total_count):
             </div>
             """
             _render_surface_html(card_html, 132)
+    label, value, sub, tone = cards[2]
+    card_html = f"""
+    <div class="sigl-metric-card sigl-metric-card--summary sigl-metric-card--{tone}">
+        <p class="sigl-metric-label">{html.escape(label)}</p>
+        <p class="sigl-metric-value">{html.escape(value)}</p>
+        <p class="sigl-metric-sub">{html.escape(sub)}</p>
+    </div>
+    """
+    _render_surface_html(card_html, 132)
 
 
 def _render_scanner_result_card(rank, row):
@@ -947,6 +961,78 @@ def _render_brand_board(payload, compact=False):
     if not compact:
         st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
+
+def _badge_html(badges):
+    rendered = []
+    for item in badges or []:
+        if isinstance(item, tuple):
+            label, tone = item
+        else:
+            label, tone = item, "muted"
+        rendered.append(_sigl_badge(label, tone))
+    return "".join(rendered)
+
+
+def _render_page_intro(eyebrow, title, copy, badges=None, tone="accent"):
+    tone_class = {
+        "accent": "sigl-card--accent",
+        "positive": "sigl-card--positive",
+        "negative": "sigl-card--negative",
+        "warning": "sigl-card--warning",
+    }.get(tone, "sigl-card--accent")
+    intro_html = f"""
+        <div class="sigl-page-banner sigl-card {tone_class}">
+            <div class="sigl-page-banner__grid">
+                <div>
+                    <p class="sigl-page-head__eyebrow">{html.escape(str(eyebrow))}</p>
+                    <p class="sigl-page-head__title">{html.escape(str(title))}</p>
+                    <p class="sigl-page-banner__copy">{html.escape(str(copy))}</p>
+                </div>
+                <div class="sigl-page-banner__meta">{_badge_html(badges)}</div>
+            </div>
+        </div>
+    """
+    st.markdown(intro_html, unsafe_allow_html=True)
+
+
+def _render_section_heading(title, copy="", badges=None, eyebrow=None, tight=False):
+    shell_class = "sigl-section-shell sigl-section-shell--tight" if tight else "sigl-section-shell"
+    eyebrow_html = f"<p class='sigl-page-head__eyebrow'>{html.escape(str(eyebrow))}</p>" if eyebrow else ""
+    heading_html = f"""
+        <div class="{shell_class}">
+            <div class="sigl-page-head">
+                <div>
+                    {eyebrow_html}
+                    <p class="sigl-page-head__title">{html.escape(str(title))}</p>
+                    {f"<p class='sigl-page-head__copy'>{html.escape(str(copy))}</p>" if copy else ""}
+                </div>
+                <div class="sigl-inline">{_badge_html(badges)}</div>
+            </div>
+        </div>
+    """
+    st.markdown(heading_html, unsafe_allow_html=True)
+
+
+def _render_empty_state(title, copy, badges=None, tone="accent"):
+    tone_class = {
+        "accent": "sigl-card--accent",
+        "positive": "sigl-card--positive",
+        "negative": "sigl-card--negative",
+        "warning": "sigl-card--warning",
+    }.get(tone, "sigl-card--accent")
+    empty_html = f"""
+        <div class="sigl-empty-card sigl-card {tone_class}">
+            <div class="sigl-section-head">
+                <div>
+                    <p class="sigl-empty-card__title">{html.escape(str(title))}</p>
+                    <p class="sigl-empty-card__copy">{html.escape(str(copy))}</p>
+                </div>
+                <div class="sigl-inline">{_badge_html(badges)}</div>
+            </div>
+        </div>
+    """
+    st.markdown(empty_html, unsafe_allow_html=True)
+
 with st.sidebar:
     _mi = 0 if st.session_state.get('_mode', '분석') == '분석' else 1
     app_mode = st.radio("모드", ['분석', '스캐너'], index=_mi)
@@ -970,35 +1056,58 @@ main_board_payload = _build_brand_payload(current_mode, chart_period)
 if current_mode == '스캐너':
     _render_brand_board(main_board_payload)
     all_universe = sorted({str(t).strip().upper() for ts in SECTOR_GROUPS.values() for t in ts if str(t).strip()})
-
-    st.markdown("#### 📂 섹터 선택")
     sector_names = list(SECTOR_GROUPS.keys())
-    selected_sectors = _normalized_selected_sectors(
+    current_sector_selection = _normalized_selected_sectors(
         st.session_state.get('selected_sectors') or st.session_state.get('selected_sector')
     )
-    _apply_sector_selection(selected_sectors)
+    _apply_sector_selection(current_sector_selection)
     selected_sector = st.session_state.get('selected_sector', None)
-    st.caption("여러 섹터를 동시에 선택할 수 있습니다.")
-    for rs in range(0, len(sector_names), 3):
-        ri = sector_names[rs:rs + 3]
-        cols = st.columns(3)
-        for i, sn in enumerate(ri):
-            with cols[i]:
-                if st.button(f"{sn}\n({len(SECTOR_GROUPS[sn])})", key=f"sec_{rs+i}", use_container_width=True,
-                             type="primary" if sn in selected_sectors else "secondary"):
-                    _toggle_sector_selection(sn)
-                    st.rerun()
-    if st.button(f"🌐 전체종목\n({len(all_universe)})", key="sec_all", use_container_width=True,
-                 type="primary" if selected_sectors == ['🌐 전체'] else "secondary"):
-        _toggle_sector_selection('🌐 전체')
-        st.rerun()
+    manual_preview = _parse_ticker_input(st.session_state.get('scan_in'))
+
+    _render_page_intro(
+        "Scanner Workspace",
+        "시장 유니버스를 구성하고 스캔 후보를 빠르게 정렬합니다.",
+        "섹터를 묶거나 직접 티커를 넣어서 현재 SIGL 분석 규칙과 같은 흐름으로 스캐너를 실행할 수 있습니다.",
+        badges=[
+            (f"선택 섹터 {len(current_sector_selection)}", "accent"),
+            (f"직접 입력 {len(manual_preview)}개", "warning"),
+            (f"전체 후보 {len(all_universe)}개", "muted"),
+        ],
+    )
+
+    _render_section_heading(
+        "유니버스 구성",
+        "여러 섹터를 한 번에 고르거나 전체 유니버스로 전환할 수 있습니다.",
+        badges=[
+            ("멀티 섹터 선택", "accent"),
+            ("직접 입력 우선 적용", "muted"),
+        ],
+        eyebrow="Scanner Setup",
+    )
+    sector_selection = st.multiselect(
+        "섹터/유니버스 선택",
+        options=['🌐 전체', *sector_names],
+        placeholder="섹터를 선택하세요",
+        key="scan_sector_picker",
+    )
+    normalized_selection = _normalized_selected_sectors(sector_selection)
+    if normalized_selection != current_sector_selection:
+        _apply_sector_selection(normalized_selection)
+
+    selected_sectors = _normalized_selected_sectors(
+        st.session_state.get('selected_sectors') or normalized_selection
+    )
+    selected_sector = st.session_state.get('selected_sector', None)
+    st.markdown(
+        "<p class='sigl-flow-note'>`🌐 전체`를 고르면 전체 유니버스를 사용하고, 직접 입력한 티커가 있으면 그 목록이 섹터 선택보다 우선합니다.</p>",
+        unsafe_allow_html=True,
+    )
 
     if selected_sectors:
         sel_list = st.session_state.get('scan_tickers_override') or _sector_selection_tickers(selected_sectors) or []
         sel_list = list(dict.fromkeys([str(t).strip().upper() for t in sel_list if str(t).strip()]))
         _render_scanner_selection_panel(selected_sectors, sel_list)
 
-    manual_preview = _parse_ticker_input(st.session_state.get('scan_in'))
     active_preview = manual_preview or st.session_state.get('scan_tickers_override') or []
     active_source = "직접 입력" if manual_preview else (selected_sector or "미선택")
     composer_meta = "".join([
@@ -1006,19 +1115,19 @@ if current_mode == '스캐너':
         _sigl_badge(f"소스 {active_source}", 'muted'),
         _sigl_badge("쉼표·공백 입력 지원", 'warning'),
     ])
+    _render_section_heading(
+        "직접 입력 스캔",
+        "티커 목록을 직접 붙여 넣어 빠르게 스캔할 수 있습니다.",
+        badges=[
+            ("쉼표/공백 지원", "warning"),
+            ("섹터 선택보다 우선", "muted"),
+        ],
+        eyebrow="Direct Universe",
+        tight=True,
+    )
     with st.form("scanner_direct_input", clear_on_submit=False):
         st.markdown(
             f"""
-            <div class="sigl-composer-head">
-                <div>
-                    <p class="sigl-composer-title">직접 입력 유니버스</p>
-                    <p class="sigl-composer-copy">스캔할 티커 묶음을 직접 입력해서 현재 시스템 카드와 같은 흐름으로 실행합니다.</p>
-                </div>
-                <div class="sigl-composer-tools">
-                    <span class="sigl-composer-tool">Scanner</span>
-                    <span class="sigl-composer-tool">Watchlist</span>
-                </div>
-            </div>
             <div class="sigl-composer-meta">{composer_meta}</div>
             """,
             unsafe_allow_html=True,
@@ -1050,6 +1159,7 @@ if current_mode == '스캐너':
         st.session_state['scan_focus_ticker'] = None
         st.session_state['scan_nav_select_idx'] = None
         st.session_state['scan_in'] = ''
+        st.session_state['scan_sector_picker'] = []
         st.rerun()
 
     manual_tickers = _parse_ticker_input(ci)
@@ -1261,6 +1371,16 @@ if current_mode == '스캐너':
     results = st.session_state.get('scan_results', [])
     if results:
         scan_total = st.session_state.get('scan_total', 0)
+        _render_section_heading(
+            "스캔 결과",
+            "현재 유니버스에서 조건과 점수가 높은 종목을 우선순위대로 정렬했습니다.",
+            badges=[
+                (f"매치 {len(results)}개", "accent"),
+                (f"전체 대상 {scan_total}개", "muted"),
+            ],
+            eyebrow="Result Board",
+            tight=True,
+        )
         st.caption("정렬 기준: 스캔 점수 → 강도 → 최근 시그널 순서입니다.")
         _render_scanner_summary(results, scan_total)
 
@@ -1272,6 +1392,16 @@ if current_mode == '스캐너':
                 st.session_state['_mode'] = '분석'
                 st.session_state['_auto'] = r['ticker']
                 st.rerun()
+    else:
+        _render_empty_state(
+            "아직 스캔 결과가 없습니다",
+            "섹터를 선택하거나 직접 티커를 입력한 뒤 `스캔 실행`을 누르면 결과 카드가 여기에 정렬되어 표시됩니다.",
+            badges=[
+                ("유니버스 선택 필요", "warning"),
+                ("직접 입력 가능", "muted"),
+            ],
+            tone="accent",
+        )
 
 # ══════════════════════════════════════════════════════════════
 #  분석 모드
@@ -1279,17 +1409,60 @@ if current_mode == '스캐너':
 else:
     _render_brand_board(main_board_payload)
 
-    if not st.session_state.last_ticker:
-        cols = st.columns(4)
-        for i, t in enumerate(["NVDA", "TSLA", "AAPL", "QQQ"]):
-            with cols[i]:
-                if st.button(t, use_container_width=True):
-                    st.session_state['quick'] = t
-
     analysis_indices = [i for i, msg in enumerate(st.session_state.messages) if msg.get("type") == "analysis"]
     report_indices = [i for i, msg in enumerate(st.session_state.messages) if msg.get("type") == "report"]
     latest_analysis_idx = analysis_indices[-1] if analysis_indices else None
     latest_report_idx = report_indices[-1] if report_indices else None
+
+    if not analysis_indices:
+        _render_page_intro(
+            "Analysis Workspace",
+            "대화형 티커 분석",
+            "티커를 입력하면 차트, 종합 판단, 10개 레이어, 콤보 스캔, 기업 정보를 한 흐름으로 정리합니다.",
+            badges=[
+                ("차트 + 판단 + 기업정보", "accent"),
+                ("리포트 생성 가능", "warning"),
+                ("대화형 입력", "muted"),
+            ],
+        )
+        _render_empty_state(
+            "아직 분석된 종목이 없습니다",
+            "아래 빠른 시작 버튼을 누르거나 하단 입력창에 티커를 넣어 첫 분석을 시작하세요.",
+            badges=[
+                ("예: NVDA, TSLA, AAPL", "accent"),
+            ],
+            tone="accent",
+        )
+    else:
+        _render_section_heading(
+            "Analysis Feed",
+            "최신 분석과 생성된 리포트가 시간순으로 쌓이며, 가장 최근 분석이 기본으로 펼쳐집니다.",
+            badges=[
+                (f"분석 {len(analysis_indices)}건", "accent"),
+                (f"리포트 {len(report_indices)}건", "warning"),
+            ],
+            eyebrow="Workspace",
+            tight=True,
+        )
+
+    if not st.session_state.last_ticker:
+        _render_section_heading(
+            "빠른 시작",
+            "자주 보는 종목을 눌러 바로 분석할 수 있습니다.",
+            badges=[
+                ("즉시 분석", "accent"),
+                ("입력창으로 다른 티커 가능", "muted"),
+            ],
+            eyebrow="Quick Actions",
+            tight=bool(analysis_indices),
+        )
+        quick_tickers = ["NVDA", "TSLA", "AAPL", "QQQ"]
+        for start in range(0, len(quick_tickers), 2):
+            cols = st.columns(2)
+            for idx, ticker in enumerate(quick_tickers[start:start + 2]):
+                with cols[idx]:
+                    if st.button(ticker, use_container_width=True, key=f"quick_{ticker}"):
+                        st.session_state['quick'] = ticker
 
     for i, msg in enumerate(st.session_state.messages):
         av = "✨" if msg["role"] == "assistant" else "🧑‍💻"

@@ -102,6 +102,16 @@ div[data-baseweb="select"] input,
 div[data-baseweb="select"] div{{
   color:var(--sigl-text)!important;
 }}
+div[data-testid="stMultiSelect"] [data-baseweb="tag"]{{
+  background:rgba(142,164,255,.12)!important;
+  border:1px solid rgba(142,164,255,.22)!important;
+  border-radius:999px!important;
+}}
+div[data-testid="stMultiSelect"] [data-baseweb="tag"] span,
+div[data-testid="stMultiSelect"] [data-baseweb="tag"] div{{
+  color:#D6DFFF!important;
+  font-weight:700!important;
+}}
 div[data-testid="stRadio"] label p,
 div[data-testid="stMarkdownContainer"] p,
 div[data-testid="stMarkdownContainer"] li{{
@@ -322,6 +332,68 @@ div[data-testid="stMetricValue"]{{
   margin:6px 0 0;
   color:var(--sigl-text-muted);
   font-size:.88rem;
+}}
+.sigl-page-banner{{
+  margin:0 0 18px;
+  padding:20px 22px;
+}}
+.sigl-page-banner__grid{{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:18px;
+  flex-wrap:wrap;
+}}
+.sigl-page-banner__grid > div:first-child{{
+  flex:1 1 320px;
+  min-width:0;
+}}
+.sigl-page-banner__copy{{
+  margin:10px 0 0;
+  color:var(--sigl-text-muted);
+  font-size:.92rem;
+  line-height:1.7;
+  max-width:760px;
+}}
+.sigl-page-banner__meta{{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  align-items:center;
+  justify-content:flex-end;
+}}
+.sigl-section-shell{{
+  margin:18px 0 12px;
+}}
+.sigl-section-shell--tight{{
+  margin-top:12px;
+}}
+.sigl-empty-card{{
+  margin:14px 0 18px;
+  padding:20px 22px;
+}}
+.sigl-empty-card__title{{
+  margin:0;
+  color:var(--sigl-text-strong);
+  font-size:1.08rem;
+  font-weight:900;
+}}
+.sigl-empty-card__copy{{
+  margin:8px 0 0;
+  color:var(--sigl-text-muted);
+  font-size:.9rem;
+  line-height:1.7;
+}}
+.sigl-quick-grid{{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(120px, 1fr));
+  gap:12px;
+}}
+.sigl-flow-note{{
+  margin:8px 0 0;
+  color:var(--sigl-text-muted);
+  font-size:.82rem;
+  line-height:1.6;
 }}
 .sigl-card{{
   background:linear-gradient(180deg, rgba(19,28,45,.98), rgba(15,23,42,.92));
@@ -792,6 +864,7 @@ p[data-testid="stCaption"]{{
 .prompt-caption{{color:var(--sigl-text-muted);font-size:.76rem;font-weight:700;margin-bottom:8px}}
 .soft-note{{color:var(--sigl-text-muted);font-size:.8rem;line-height:1.6;margin-top:10px}}
 @media (max-width: 980px){{
+  .sigl-page-banner__meta{{justify-content:flex-start}}
   .sigl-grid--5{{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}}
   .sigl-layer-row{{grid-template-columns:54px 1fr 54px;gap:8px}}
   .sigl-layer-track{{height:28px}}
@@ -804,6 +877,9 @@ p[data-testid="stCaption"]{{
   .sigl-grid--5,
   .sigl-result-summary{{grid-template-columns:1fr}}
   .block-container{{padding-left:1rem!important;padding-right:1rem!important}}
+  .sigl-page-banner{{padding:18px 16px}}
+  .sigl-empty-card{{padding:18px 16px}}
+  .sigl-page-banner__meta{{justify-content:flex-start}}
   .sigl-price-value{{font-size:1.8rem}}
   .sigl-layer-row{{grid-template-columns:46px 1fr 46px;gap:6px}}
   .sigl-layer-track{{height:26px}}
@@ -968,5 +1044,10 @@ html, body, [class*="css"] {{
 .target-mini-value,
 .score-pillar-value {{
   color:var(--sigl-text-strong) !important;
+}}
+@media (max-width: 640px) {{
+  [data-testid="stVerticalBlockBorderWrapper"] > div {{
+    padding:18px 18px !important;
+  }}
 }}
 """
