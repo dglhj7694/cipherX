@@ -3,45 +3,43 @@
 ## Core Identity
 - Canonical syntax: `[ SIGL ]`
 - Hidden meaning: `Signal`
-- Read order: ticker code first, meaning second
-- Tone: terminal-like, sharp, premium, restrained
+- Tone: premium signal terminal, LED logboard, disciplined and alive
 - Rule: no visible version text on user-facing surfaces
 
 ## Header System
-- The header should feel like a premium trading terminal, not a marketing hero.
+- The main header is a LED logboard, not a marketing hero.
 - Structure:
-  - left: `[ SIGL ]` banner
-  - top line: `STATUS: ... | FEED: ...` with one slow pulse indicator
-  - right: six terminal tiles for `MODE`, `TARGET`, `ES`, `SIGNAL`, `CTX`, `SPAN`
-  - bottom: scrolling ticker strip
-- Sidebar uses the same system in a compact mini-board layout.
+  - top rail with `MODE`, `STATUS`, `FEED`, and analysis log count
+  - left log wall filled by recent analyzed tickers
+  - right terminal fields for the current focus ticker
+  - bottom ticker strip that keeps moving through recent board items
+- The sidebar acts only as a control panel and does not render the brand board.
 
 ## Data Rules
-- Tiles must be backed by real app state when available.
-- Analysis defaults:
-  - `TARGET WAIT`
-  - `ES --`
-  - `SIGNAL IDLE`
-  - `CTX STANDBY`
-  - `SPAN 6M`
-- The ticker strip should prefer:
-  - recent analyzed tickers from app history
-  - current scan results
-  - branded placeholders only as a final fallback
-
-## Copy Voice
-- Keep the terminal voice strong in chrome, status text, and short action labels.
-- Preferred phrases:
-  - `READING THE TAPE`
-  - `DATA FEED ESTABLISHED`
-  - `SIGNAL READY`
-  - `QUANT AUDIT`
-- Keep long-form Korean analysis explanations readable and mostly unchanged.
+- `history_rows` comes from real `analysis` messages in session history.
+- Each log row uses `TIME / TICKER / SIGNAL / ES / CTX`.
+- `focus_recent_signals` comes from `meta.recent_signals` when available.
+- `focus_stack_summary` prioritizes:
+  - `B:S` agreement
+  - top combined scans
+  - veto flags
+  - lead/lag verdict fallback
+- The ticker strip prefers:
+  - recent analysis log summaries
+  - current focus recent signals
+  - scanner results as fallback
 
 ## Visual Rules
-- Use mono typography for brand syntax, tiles, status line, and ticker tape.
-- Motion stays restrained:
-  - slow pulse indicator
-  - continuous marquee strip
-- Avoid fake exchange claims such as `LIVE_NASDAQ`.
-- Avoid alternate brand syntaxes such as `$SIGL`, `SIGL:US`, or `SIGL.PRO`.
+- Base typography stays mono for labels and data.
+- Ticker codes and key numbers use a segmented LED-style treatment.
+- The board uses:
+  - dot-matrix texture
+  - CRT scanline overlay
+  - subtle bloom on key text
+  - afterimage on ticker strip text
+- Motion includes:
+  - strong pulse on the status dot
+  - slow sweep light across the board
+  - one-time flash on the newest log row
+  - continuous ticker movement
+- `prefers-reduced-motion` keeps the board readable and reduces the stronger effects.

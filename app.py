@@ -447,6 +447,116 @@ def _latest_analysis_message():
             return msg
     return None
 
+def _analysis_messages(limit=None):
+    collected = []
+    for msg in reversed(st.session_state.get('messages', [])):
+        if msg.get("type") != "analysis":
+            continue
+        collected.append(msg)
+        if limit is not None and len(collected) >= limit:
+            break
+    return collected
+
+def _format_board_time(value, fallback="--:--"):
+    text = str(value).strip() if value is not None else ""
+    if not text:
+        return fallback
+    try:
+        return datetime.fromisoformat(text).strftime("%H:%M")
+    except ValueError:
+        return text if len(text) <= 5 else text[-5:]
+
+def _terminal_signal_label(meta=None, fallback="IDLE"):
+    meta = meta or {}
+    action = str(meta.get('action_label', '')).strip()
+    judgment = str(meta.get('judgment', '')).strip()
+    combined = " ".join(part for part in (action, judgment) if part).upper()
+    if 'STRONG_BUY' in combined or '강한 매수' in action:
+        return 'STRONG_BUY'
+    if 'BUY' in combined or '매수' in action:
+        return 'BUY'
+    if 'STRONG_SELL' in combined or '강한 매도' in action:
+        return 'STRONG_SELL'
+    if 'SELL' in combined or '매도' in action:
+        return 'SELL'
+    if 'HOLD' in combined or '보유' in action:
+        return 'HOLD'
+    if 'WATCH' in combined or '관망' in action:
+        return 'WATCH'
+    if 'NEUTRAL' in combined or '중립' in action:
+        return 'NEUTRAL'
+    if judgment:
+        return _format_board_code(judgment, fallback)
+    if action:
+        return _format_board_code(action, fallback)
+    return fallback
+
+def _history_rows_from_messages(messages, limit=8):
+    rows = []
+    for idx, msg in enumerate(messages[:limit]):
+        meta = msg.get('meta') or {}
+        es_value = meta.get('ensemble_score')
+        rows.append({
+            'time': _format_board_time(msg.get('analyzed_at')),
+            'ticker': _format_board_code(msg.get('ticker'), 'WAIT'),
+            'signal': _terminal_signal_label(meta),
+            'es': _format_board_es(es_value),
+            'context': _format_board_text(meta.get('context_label'), 'STANDBY'),
+            'tone': _resolve_board_tone('ANALYSIS', meta.get('judgment') or meta.get('action_label'), es_value),
+            'fresh': idx == 0,
+        })
+    return rows
+
+def _focus_recent_signals_from_analysis(meta, limit=5):
+    items = []
+    recent = list((meta or {}).get('recent_signals') or [])
+    for icon, label, date, direction, is_combined in reversed(recent[-limit:]):
+        items.append({
+            'icon': _format_board_text(icon, '•'),
+            'label': _format_board_text(label, 'NO SIGNAL'),
+            'date': _format_board_text(date, '--/--'),
+            'dir': _format_board_text(direction, 'neutral').lower(),
+            'is_combined': bool(is_combined),
+        })
+    return items
+
+def _focus_recent_signals_from_scan(focus_row, limit=5):
+    if not focus_row:
+        return []
+    source_items = list(focus_row.get('multi_hits') or focus_row.get('scans') or [])
+    items = []
+    for raw in source_items[:limit]:
+        items.append({
+            'icon': _format_board_text(raw.get('icon'), '•'),
+            'label': _format_board_text(raw.get('label') or raw.get('kor'), 'SCAN READY'),
+            'date': _format_board_text(raw.get('date'), '--/--'),
+            'dir': _format_board_text(raw.get('dir'), 'neutral').lower(),
+            'is_combined': bool(raw.get('is_combined') or ('tier' in raw)),
+        })
+    return items
+
+def _focus_stack_summary_from_analysis(meta):
+    meta = meta or {}
+    return {
+        'buy_agree': int(_sf(meta.get('buy_agree', 0))),
+        'sell_agree': int(_sf(meta.get('sell_agree', 0))),
+        'combined_scans': list(meta.get('combined_scans') or [])[:2],
+        'veto_flags': _format_board_text(meta.get('veto_flags'), ''),
+        'leading_verdict': _format_board_text(meta.get('leading_verdict'), 'STANDBY'),
+        'lagging_verdict': _format_board_text(meta.get('lagging_verdict'), 'STANDBY'),
+    }
+
+def _focus_stack_summary_from_scan(focus_row):
+    focus_row = focus_row or {}
+    return {
+        'buy_agree': int(_sf(focus_row.get('ba', 0))),
+        'sell_agree': int(_sf(focus_row.get('sa', 0))),
+        'combined_scans': list(focus_row.get('scans') or [])[:2],
+        'veto_flags': '',
+        'leading_verdict': _format_board_text(focus_row.get('action'), 'SCANNER_READY'),
+        'lagging_verdict': _format_board_text(focus_row.get('ctx'), 'WATCHLIST'),
+    }
+
 def _dedupe_board_items(items, limit=12):
     unique = []
     seen = set()
@@ -460,23 +570,6 @@ def _dedupe_board_items(items, limit=12):
             break
     return unique
 
-def _recent_analysis_tape_items(limit=6):
-    items = []
-    seen = set()
-    for msg in reversed(st.session_state.get('messages', [])):
-        if msg.get("type") != "analysis":
-            continue
-        ticker = _format_board_code(msg.get('ticker'), "")
-        if not ticker or ticker in seen:
-            continue
-        seen.add(ticker)
-        meta = msg.get('meta') or {}
-        signal = _format_board_code(meta.get('judgment') or meta.get('action_label'), "IDLE")
-        items.append(f"{ticker} ES {_format_board_es(meta.get('ensemble_score'))} [{signal}]")
-        if len(items) >= limit:
-            break
-    return items
-
 def _scan_tape_items(limit=6):
     items = []
     for row in st.session_state.get('scan_results', [])[:limit]:
@@ -487,20 +580,41 @@ def _scan_tape_items(limit=6):
         items.append(f"{ticker} ES {_format_board_es(row.get('es'))} [{signal}]")
     return items
 
-def _build_board_marquee(base_items):
-    history_items = _recent_analysis_tape_items()
+def _history_marquee_items(history_rows, limit=8):
+    return [
+        f"{row.get('ticker', 'WAIT')} {row.get('signal', 'IDLE')} ES {row.get('es', '--')} CTX {row.get('context', 'STANDBY')}"
+        for row in (history_rows or [])[:limit]
+    ]
+
+def _focus_signal_marquee_items(signal_items, limit=5):
+    items = []
+    for item in (signal_items or [])[:limit]:
+        label = _format_board_text(item.get('label'), 'SIGNAL')
+        date = _format_board_text(item.get('date'), '')
+        icon = _format_board_text(item.get('icon'), '•')
+        parts = [icon, label]
+        if date and date != '--/--':
+            parts.append(date)
+        items.append(" ".join(parts))
+    return items
+
+def _build_board_marquee(base_items, history_rows=None, focus_recent_signals=None):
+    combined = [*base_items]
+    history_items = _history_marquee_items(history_rows or [])
+    focus_items = _focus_signal_marquee_items(focus_recent_signals or [])
     if history_items:
-        return _dedupe_board_items([*base_items, *history_items])
-    scan_items = _scan_tape_items()
-    if scan_items:
-        return _dedupe_board_items([*base_items, *scan_items])
+        combined.extend(history_items)
+    if focus_items:
+        combined.extend(focus_items)
+    if not history_items or len(combined) < 10:
+        combined.extend(_scan_tape_items())
     return _dedupe_board_items([
-        *base_items,
+        *combined,
         f"[ {BRAND_NAME} ] READY",
         "TARGET WAIT",
         "ES --",
         "SIGNAL IDLE",
-    ])
+    ], limit=16)
 
 def _resolve_board_tone(mode_label, judgment, es_value):
     judgment_text = str(judgment or "")
@@ -524,6 +638,9 @@ def _resolve_board_tone(mode_label, judgment, es_value):
 def _build_brand_payload(current_mode, chart_period):
     mode_label = 'SCANNER' if current_mode == '스캐너' else 'ANALYSIS'
     period_label = _short_period_label(chart_period)
+    analysis_messages = _analysis_messages()
+    analysis_count = len(analysis_messages)
+    history_rows = _history_rows_from_messages(analysis_messages, limit=8)
 
     if current_mode == '스캐너':
         results = st.session_state.get('scan_results', [])
@@ -538,7 +655,8 @@ def _build_brand_payload(current_mode, chart_period):
         selected_sector = _format_board_text(st.session_state.get('selected_sector'), fallback='READY')
         focus = _format_board_code(focus_row.get('ticker') if focus_row else selected_sector, fallback='READY')
         es_value = focus_row.get('es') if focus_row else None
-        judgment = _format_board_code(focus_row.get('jg_key') if focus_row else 'READY', fallback='READY')
+        judgment_source = (focus_row.get('action') or focus_row.get('jg_key')) if focus_row else 'READY'
+        judgment = _format_board_code(judgment_source, fallback='READY')
         context = _format_board_code(
             focus_row.get('ctx') if focus_row else (selected_sector if selected_sector != 'READY' else 'STANDBY'),
             fallback='STANDBY'
@@ -546,9 +664,11 @@ def _build_brand_payload(current_mode, chart_period):
         scan_source = _format_board_code(st.session_state.get('scan_source'), fallback='WATCHLIST')
         system_status = 'ACTIVE' if focus_row else 'READY'
         feed_status = 'WATCH_SYNC'
-        summary = "Sweep the tape, rank the field, then drill into the strongest setup."
+        focus_recent_signals = _focus_recent_signals_from_scan(focus_row)
+        focus_stack_summary = _focus_stack_summary_from_scan(focus_row)
+        summary = "Analysis logs stay live while the scanner keeps the field ranked."
         marquee_items = _build_board_marquee([
-            f"[ {BRAND_NAME} ] {mode_label} DESK",
+            f"[ {BRAND_NAME} ] LOGBOARD",
             f"STATUS {system_status}",
             f"TARGET {focus}",
             f"ES {_format_board_es(es_value)}",
@@ -556,8 +676,8 @@ def _build_brand_payload(current_mode, chart_period):
             f"CTX {context}",
             f"SPAN {period_label}",
             f"SOURCE {scan_source}",
-            f"COUNT {len(results)}",
-        ])
+            f"LOG {analysis_count:02d}",
+        ], history_rows=history_rows, focus_recent_signals=focus_recent_signals)
         return {
             'brand_code': BRAND_NAME,
             'mode': mode_label,
@@ -570,6 +690,10 @@ def _build_brand_payload(current_mode, chart_period):
             'summary': summary,
             'system_status': system_status,
             'feed_status': feed_status,
+            'analysis_count': analysis_count,
+            'history_rows': history_rows,
+            'focus_recent_signals': focus_recent_signals,
+            'focus_stack_summary': focus_stack_summary,
             'status_tone': _resolve_board_tone(mode_label, judgment, es_value),
         }
 
@@ -577,27 +701,32 @@ def _build_brand_payload(current_mode, chart_period):
     meta = analysis_msg.get('meta') if analysis_msg else None
     focus = _format_board_code((analysis_msg or {}).get('ticker'), fallback='WAIT')
     es_value = meta.get('ensemble_score') if meta else None
-    judgment = _format_board_code(meta.get('judgment') if meta else 'IDLE', fallback='IDLE')
+    judgment = _terminal_signal_label(meta, fallback='IDLE')
     context = _format_board_code(meta.get('context_label') if meta else 'STANDBY', fallback='STANDBY')
     system_status = 'ACTIVE' if meta else 'READY'
     feed_status = 'MARKET_SYNC'
+    focus_recent_signals = _focus_recent_signals_from_analysis(meta)
+    focus_stack_summary = _focus_stack_summary_from_analysis(meta)
     summary = (
-        f"Signal first. Structure next. {_format_board_text(meta.get('action_label'), 'READY')} is active on {focus}."
+        f"Signal ingress is live. {focus} is the latest structured read on the board."
         if meta and meta.get('action_label')
-        else "Read the quieter signal before price gets loud."
+        else "The logboard fills as new analyses arrive. Select a target ticker to light it up."
     )
     marquee_items = [
-        f"[ {BRAND_NAME} ] {mode_label} DESK",
+        f"[ {BRAND_NAME} ] LOGBOARD",
         f"STATUS {system_status}",
         f"TARGET {focus}",
         f"ES {_format_board_es(es_value)}",
         f"SIGNAL {judgment}",
         f"CTX {context}",
         f"SPAN {period_label}",
+        f"LOG {analysis_count:02d}",
     ]
-    if meta:
-        marquee_items.append(f"B{int(meta.get('buy_agree', 0))}:S{int(meta.get('sell_agree', 0))}")
-    marquee_items = _build_board_marquee(marquee_items)
+    marquee_items = _build_board_marquee(
+        marquee_items,
+        history_rows=history_rows,
+        focus_recent_signals=focus_recent_signals,
+    )
     return {
         'brand_code': BRAND_NAME,
         'mode': mode_label,
@@ -610,11 +739,15 @@ def _build_brand_payload(current_mode, chart_period):
         'summary': summary,
         'system_status': system_status,
         'feed_status': feed_status,
+        'analysis_count': analysis_count,
+        'history_rows': history_rows,
+        'focus_recent_signals': focus_recent_signals,
+        'focus_stack_summary': focus_stack_summary,
         'status_tone': _resolve_board_tone(mode_label, judgment, es_value),
     }
 
 def _render_brand_board(payload, compact=False):
-    height = 320 if compact else 336
+    height = 340 if compact else 468
     components.html(build_brand_board(payload, compact=compact), height=height, scrolling=False)
 
 def _render_scanner_guide(tickers, scan_source):
@@ -1185,6 +1318,7 @@ else:
                 st.session_state.messages.append({
                     "role": "assistant", "type": "analysis",
                     "ticker": tv, "content": content,
+                    "analyzed_at": datetime.now().isoformat(timespec="seconds"),
                     "fig_json": fj, "meta": meta, "prompt": prompt,
                 })
                 st.session_state.pending_ai_ticker = tv
