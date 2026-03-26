@@ -313,7 +313,6 @@ def _render_scanner_result_card(rank, row):
         'warning': 'sigl-card--warning',
         'muted': '',
     }.get(tone, '')
-    move_tone = 'positive' if float(row.get('chg', 0) or 0) >= 0 else 'negative'
     transitions = "".join(
         _sigl_badge(f"{t['icon']} {t['label']} {t['date']}", 'positive' if t.get('dir') == 'buy' else 'negative')
         for t in row.get('transitions', [])

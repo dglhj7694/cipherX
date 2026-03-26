@@ -55,8 +55,6 @@ def build_brand_board(payload, compact=False):
         _chip("Span", period, "warning"),
     ])
 
-    focus_tone = _tone_variant(judgment)
-    recent_tone = _tone_variant(recent_label)
     compact_copy = "현재 포커스 종목과 상태를 단순하고 명확하게 보여주는 SIGL 헤더입니다."
     full_copy = "시장 단말기 연출보다 정보 구조와 읽기 흐름에 집중한 SIGL 분석 작업공간입니다."
     copy = compact_copy if compact else full_copy
