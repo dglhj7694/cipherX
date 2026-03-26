@@ -15,6 +15,7 @@ from localization import (
     localize_regime_label,
     translate_chart_text,
 )
+from theme import FONT_IMPORT_URL, FONT_STACK
 
 SOFT_GREEN = '#63D9A2'
 SOFT_GREEN_TEXT = '#B8F1D5'
@@ -347,7 +348,7 @@ def render_10layer_bars(m, html_key="analysis"):
         "</div>"
     )
     panel_h=max(430,120+len(layer_names)*44)
-    html_doc=f"""<!doctype html><html><head><meta charset='utf-8'></head><body style='margin:0;background:transparent;color:#E2E8F0;font-family:Pretendard,system-ui,sans-serif'><!-- {html_key} -->{panel_html}</body></html>"""
+    html_doc=f"""<!doctype html><html><head><meta charset='utf-8'><link href='{FONT_IMPORT_URL}' rel='stylesheet'></head><body style='margin:0;background:transparent;color:#E2E8F0;font-family:{FONT_STACK}'><!-- {html_key} -->{panel_html}</body></html>"""
     components.html(html_doc,height=panel_h,scrolling=False)
 def render_leading_lagging(m):
     lv=m['leading_verdict'];lgv=m['lagging_verdict'];ac=m['composite_accel']
@@ -786,7 +787,7 @@ def render_10layer_bars(m, html_key="analysis"):
         "</div>"
     )
     panel_h = max(430, 120 + len(layer_names) * 44)
-    html_doc = f"<!doctype html><html><head><meta charset='utf-8'></head><body style='margin:0;background:transparent;color:#E2E8F0;font-family:Pretendard,system-ui,sans-serif'><!-- {html_key} -->{panel_html}</body></html>"
+    html_doc = f"<!doctype html><html><head><meta charset='utf-8'><link href='{FONT_IMPORT_URL}' rel='stylesheet'></head><body style='margin:0;background:transparent;color:#E2E8F0;font-family:{FONT_STACK}'><!-- {html_key} -->{panel_html}</body></html>"
     components.html(html_doc, height=panel_h, scrolling=False)
 
 

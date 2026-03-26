@@ -18,6 +18,7 @@ from localization import (
     localize_subplot_title,
     translate_chart_text,
 )
+from theme import PLOTLY_FONT_FAMILY
 
 SOFT_GREEN = '#63D9A2'
 SOFT_GREEN_FILL = 'rgba(99,217,162,.8)'
@@ -593,7 +594,7 @@ def _add_pattern_overlay(fig,dc,pattern,default_visible='legendonly'):
         mode='text',
         text=[f"{localize_pattern_name(pattern['name'])} · {localize_pattern_state(pattern['state'])}"],
         textposition='top right',
-        textfont=dict(size=10,color=edge_color,family='Pretendard'),
+        textfont=dict(size=10,color=edge_color,family=PLOTLY_FONT_FAMILY),
         name='Pattern Overlay',
         legendgroup='pattern_overlay',
         showlegend=False,
@@ -605,7 +606,7 @@ def build_chart(dc,ticker):
     mac={20:'#f1c40f',50:'#e74c3c',200:'#2ecc71'}
     fig=make_subplots(rows=8,cols=1,shared_xaxes=True,vertical_spacing=0.02,row_heights=[.32,.04,.09,.09,.09,.09,.09,.19],subplot_titles=(ticker,"Vol","WaveTrend","MACD","Money Flow","Stoch Slow","Squeeze Mom","5-Committee Ensemble"))
     hover=_build_candle_hover(dc)
-    fig.add_trace(go.Candlestick(x=dc.index,open=dc['Open'],high=dc['High'],low=dc['Low'],close=dc['Close'],name="Price",increasing_line_color=SOFT_GREEN,decreasing_line_color=SOFT_RED,increasing_fillcolor=SOFT_GREEN_FILL,decreasing_fillcolor=SOFT_RED_FILL,text=hover,hoverinfo='text',hoverlabel=dict(bgcolor='rgba(11,14,20,.97)',bordercolor='#334155',font=dict(size=11,family='Pretendard',color='#F1F5F9'),align='left')),row=1,col=1)
+    fig.add_trace(go.Candlestick(x=dc.index,open=dc['Open'],high=dc['High'],low=dc['Low'],close=dc['Close'],name="Price",increasing_line_color=SOFT_GREEN,decreasing_line_color=SOFT_RED,increasing_fillcolor=SOFT_GREEN_FILL,decreasing_fillcolor=SOFT_RED_FILL,text=hover,hoverinfo='text',hoverlabel=dict(bgcolor='rgba(11,14,20,.97)',bordercolor='#334155',font=dict(size=11,family=PLOTLY_FONT_FAMILY,color='#F1F5F9'),align='left')),row=1,col=1)
     for mp in [20,50,200]:fig.add_trace(go.Scatter(x=dc.index,y=dc[f'MA{mp}'],line=dict(color=mac[mp],width=1.2),name=f'{mp}MA',legendgroup='moving_average',hoverinfo='skip',showlegend=True,visible='legendonly'),row=1,col=1)
     for idx,(mc,clr) in enumerate([(dc['ST_Direction']==1,SOFT_GREEN),(dc['ST_Direction']==-1,SOFT_RED)],start=1):fig.add_trace(go.Scatter(x=dc.index,y=dc['SuperTrend'].where(mc),line=dict(color=clr,width=2),name='SuperTrend',legendgroup='supertrend',connectgaps=False,hoverinfo='skip',showlegend=(idx==1),visible='legendonly'),row=1,col=1)
     fig.add_trace(go.Scatter(x=dc.index,y=dc['BB_Up'],line=dict(color='#475569',width=1,dash='dot'),name='Bollinger Band',legendgroup='bollinger_band',hoverinfo='skip',showlegend=True,visible='legendonly'),row=1,col=1)
@@ -708,7 +709,7 @@ def build_chart(dc,ticker):
     fig.update_yaxes(range=[-50,50],row=5,col=1);fig.update_yaxes(range=[0,100],row=6,col=1)
     ad=pd.date_range(start=dc.index[0],end=dc.index[-1],freq='D');nt=ad.difference(dc.index.normalize())
     fig.update_xaxes(rangeslider_visible=False,rangebreaks=[dict(values=nt.tolist())],gridcolor='rgba(51,65,85,.3)',tickfont=dict(size=9,color='#64748B'))
-    for ann in fig['layout']['annotations']:ann['font']=dict(size=11,color='#94A3B8',family='Pretendard')
+    for ann in fig['layout']['annotations']:ann['font']=dict(size=11,color='#94A3B8',family=PLOTLY_FONT_FAMILY)
     return fig
 
 def build_metadata(dc,ticker):

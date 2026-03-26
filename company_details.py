@@ -1506,7 +1506,7 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     )
     st.markdown(hero_html, unsafe_allow_html=True)
     st.markdown(f"<div class='coverage-wrap'><div class='coverage-grid'>{coverage_html}</div></div>", unsafe_allow_html=True)
-    st.markdown(f"<div class='section-nav'>{nav_html}</div>", unsafe_allow_html=True)
+    # st.markdown(f"<div class='section-nav'>{nav_html}</div>", unsafe_allow_html=True)
 
     upside_ref = upside_ref_top
     short_float_top = info.get('shortPercentOfFloat')

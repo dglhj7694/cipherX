@@ -62,6 +62,47 @@ _ETF_UNIVERSE_PRESET_MAP = {item["key"]: item for item in _ETF_UNIVERSE_PRESETS}
 
 
 # ━━━ Constants ━━━
+def _render_sidebar_choice_buttons(label, options, state_key, columns=2, default_value=None):
+    items = [str(option) for option in options if str(option).strip()]
+    if not items:
+        return ""
+
+    fallback = str(default_value) if default_value in items else items[0]
+    current = str(st.session_state.get(state_key, fallback))
+    if current not in items:
+        current = fallback
+        st.session_state[state_key] = current
+
+    with st.container():
+        st.markdown("<div class='sigl-sidebar-choice-anchor'></div>", unsafe_allow_html=True)
+        st.markdown(
+            f"<div class='sigl-sidebar-control-label'>{html.escape(str(label))}</div>",
+            unsafe_allow_html=True,
+        )
+
+        for row_start in range(0, len(items), columns):
+            row_items = items[row_start:row_start + columns]
+            row_columns = st.columns(columns)
+            for col_idx, col in enumerate(row_columns):
+                with col:
+                    if col_idx >= len(row_items):
+                        st.markdown("<div class='sigl-sidebar-control-spacer'></div>", unsafe_allow_html=True)
+                        continue
+
+                    option = row_items[col_idx]
+                    if st.button(
+                        option,
+                        key=f"{state_key}_choice_{row_start + col_idx}",
+                        use_container_width=True,
+                        type="primary" if option == current else "secondary",
+                    ):
+                        if option != current:
+                            st.session_state[state_key] = option
+                            st.rerun()
+
+    return str(st.session_state.get(state_key, current))
+
+
 @st.cache_resource
 def get_gemini_model():
     if GEMINI_API_KEY:
@@ -1603,10 +1644,20 @@ def _render_empty_state(title, copy, badges=None, tone="accent"):
     st.markdown(_html_block(empty_html), unsafe_allow_html=True)
 
 with st.sidebar:
-    _mi = 0 if st.session_state.get('_mode', '분석') == '분석' else 1
-    app_mode = st.radio("모드", ['분석', '스캐너'], index=_mi)
-    st.session_state['_mode'] = app_mode
-    chart_period = st.radio("기간", ['3개월', '6개월', '1년', '2년'], index=1, horizontal=True, key="period")
+    app_mode = _render_sidebar_choice_buttons(
+        "모드",
+        ['분석', '스캐너'],
+        "_mode",
+        columns=2,
+        default_value='분석',
+    )
+    chart_period = _render_sidebar_choice_buttons(
+        "기간",
+        ['3개월', '6개월', '1년', '2년'],
+        "period",
+        columns=2,
+        default_value='6개월',
+    )
     chart_days = {'3개월': 63, '6개월': 126, '1년': 252, '2년': 504}[chart_period]
     st.markdown("---")
     if st.button("🗑️ 초기화", use_container_width=True, type="secondary"):

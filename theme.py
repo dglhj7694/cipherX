@@ -1,6 +1,6 @@
-FONT_IMPORT_URL = "https://cdn.jsdelivr.net/gh/moonspam/NanumSquare@2.0/nanumsquare.css"
-FONT_STACK = "'NanumSquare','Malgun Gothic','Apple SD Gothic Neo',sans-serif"
-PLOTLY_FONT_FAMILY = "NanumSquare, Malgun Gothic, Apple SD Gothic Neo, sans-serif"
+FONT_IMPORT_URL = "https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css"
+FONT_STACK = "'NanumSquareRound','Malgun Gothic','Apple SD Gothic Neo',sans-serif"
+PLOTLY_FONT_FAMILY = "NanumSquareRound, Malgun Gothic, Apple SD Gothic Neo, sans-serif"
 
 
 def _css_vars(scope=":root"):
@@ -94,14 +94,166 @@ header{{
   background:transparent!important;
 }}
 section[data-testid="stSidebar"]{{
+  --sigl-sidebar-control-h:46px;
+  --sigl-sidebar-control-radius:15px;
+  --sigl-sidebar-gap:12px;
   background:
     linear-gradient(180deg, rgba(142,164,255,.05), rgba(142,164,255,0) 24%),
     linear-gradient(180deg, #0D1424 0%, #0B1120 100%)!important;
   border-right:1px solid var(--sigl-border-soft)!important;
 }}
+section[data-testid="stSidebar"] > div{{
+  background:transparent!important;
+}}
+section[data-testid="stSidebar"] [data-testid="stSidebarContent"]{{
+  padding-top:.35rem!important;
+}}
+section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"]{{
+  padding:0 .45rem 1rem!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]{{
+  gap:var(--sigl-sidebar-gap)!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stElementContainer"]{{
+  margin:0!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"]{{
+  gap:8px!important;
+  align-items:stretch!important;
+}}
+section[data-testid="stSidebar"] hr{{
+  margin:4px 0 6px!important;
+  border-color:rgba(148,163,184,.12)!important;
+}}
 section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p,
 section[data-testid="stSidebar"] label p{{
   color:var(--sigl-text)!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stWidgetLabel"]{{
+  margin-bottom:8px!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stWidgetLabel"] p{{
+  color:var(--sigl-text-muted)!important;
+  font-size:.72rem!important;
+  font-weight:800!important;
+  letter-spacing:.08em!important;
+  text-transform:uppercase!important;
+}}
+section[data-testid="stSidebar"] p[data-testid="stCaption"]{{
+  color:var(--sigl-text-muted)!important;
+  font-size:.74rem!important;
+  line-height:1.45!important;
+}}
+.sigl-sidebar-control-label{{
+  color:var(--sigl-text-muted);
+  font-size:.72rem;
+  font-weight:800;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  margin:0 0 8px;
+}}
+.sigl-sidebar-choice-anchor{{
+  width:0;
+  height:0;
+  overflow:hidden;
+}}
+.sigl-sidebar-control-spacer{{
+  min-height:var(--sigl-sidebar-control-h);
+}}
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.sigl-sidebar-choice-anchor){{
+  gap:8px!important;
+  padding:6px!important;
+  border:1px solid rgba(148,163,184,.12)!important;
+  border-radius:16px!important;
+  background:linear-gradient(180deg, rgba(19,28,45,.72), rgba(15,23,42,.56))!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.03)!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.sigl-sidebar-choice-anchor) > div[data-testid="stHorizontalBlock"]{{
+  gap:8px!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.sigl-sidebar-choice-anchor) div.stButton{{
+  height:100%!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.sigl-sidebar-choice-anchor) div.stButton>button{{
+  position:relative!important;
+  min-height:var(--sigl-sidebar-control-h)!important;
+  border-radius:calc(var(--sigl-sidebar-control-radius) - 1px)!important;
+  border:1px solid rgba(148,163,184,.12)!important;
+  background:linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.015))!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.03)!important;
+  overflow:hidden!important;
+  justify-content:center!important;
+  transition:
+    transform .18s ease,
+    border-color .18s ease,
+    background .18s ease,
+    box-shadow .18s ease!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.sigl-sidebar-choice-anchor) div.stButton>button::before{{
+  content:"";
+  position:absolute;
+  inset:auto auto 9px 10px;
+  width:8px;
+  height:8px;
+  border-radius:999px;
+  background:rgba(148,163,184,.42);
+  opacity:.92;
+  transition:
+    transform .18s ease,
+    background .18s ease,
+    box-shadow .18s ease,
+    opacity .18s ease!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.sigl-sidebar-choice-anchor) div.stButton>button::after{{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+  background:radial-gradient(circle at center, rgba(142,164,255,.18), rgba(142,164,255,0) 62%);
+  opacity:0;
+  transform:scale(.76);
+  pointer-events:none;
+  transition:opacity .2s ease, transform .2s ease!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.sigl-sidebar-choice-anchor) div.stButton>button span,
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.sigl-sidebar-choice-anchor) div.stButton>button p,
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.sigl-sidebar-choice-anchor) div.stButton>button div{{
+  color:var(--sigl-text)!important;
+  font-size:.84rem!important;
+  font-weight:800!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.sigl-sidebar-choice-anchor) div.stButton>button:hover{{
+  transform:translateY(-1px)!important;
+  border-color:rgba(142,164,255,.22)!important;
+  background:linear-gradient(180deg, rgba(142,164,255,.10), rgba(142,164,255,.04))!important;
+  box-shadow:0 10px 20px rgba(2,6,23,.16)!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.sigl-sidebar-choice-anchor) div.stButton>button[kind="primary"]{{
+  transform:translateY(-1px)!important;
+  border-color:rgba(142,164,255,.34)!important;
+  background:linear-gradient(180deg, rgba(142,164,255,.18), rgba(93,123,255,.08))!important;
+  box-shadow:
+    0 10px 22px rgba(93,123,255,.18)!important,
+    inset 0 0 0 1px rgba(142,164,255,.14)!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.sigl-sidebar-choice-anchor) div.stButton>button[kind="primary"]::before{{
+  background:var(--sigl-success)!important;
+  box-shadow:
+    0 0 0 4px rgba(99,217,162,.12),
+    0 0 14px rgba(99,217,162,.26)!important;
+  transform:scale(1.12)!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.sigl-sidebar-choice-anchor) div.stButton>button[kind="primary"]::after{{
+  opacity:1!important;
+  transform:scale(1)!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.sigl-sidebar-choice-anchor) div.stButton>button[kind="primary"] span,
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.sigl-sidebar-choice-anchor) div.stButton>button[kind="primary"] p,
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.sigl-sidebar-choice-anchor) div.stButton>button[kind="primary"] div{{
+  color:var(--sigl-text-strong)!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.sigl-sidebar-choice-anchor) div.stButton>button:active{{
+  transform:scale(.985)!important;
 }}
 div[data-baseweb="select"]>div,
 div[data-testid="stTextInput"] input,
@@ -234,6 +386,42 @@ div[data-baseweb="select"] input::placeholder{{
   color:var(--sigl-text-muted)!important;
   opacity:1!important;
 }}
+section[data-testid="stSidebar"] div[data-baseweb="select"]>div,
+section[data-testid="stSidebar"] div[data-testid="stTextInput"] input,
+section[data-testid="stSidebar"] div[data-testid="stNumberInput"] input,
+section[data-testid="stSidebar"] textarea{{
+  min-height:var(--sigl-sidebar-control-h)!important;
+  border-radius:var(--sigl-sidebar-control-radius)!important;
+}}
+section[data-testid="stSidebar"] div[data-baseweb="select"]>div{{
+  padding-left:14px!important;
+  padding-right:10px!important;
+}}
+section[data-testid="stSidebar"] div[data-baseweb="select"] span,
+section[data-testid="stSidebar"] div[data-baseweb="select"] input,
+section[data-testid="stSidebar"] div[data-baseweb="select"] div,
+section[data-testid="stSidebar"] div[data-testid="stTextInput"] input,
+section[data-testid="stSidebar"] div[data-testid="stNumberInput"] input,
+section[data-testid="stSidebar"] textarea{{
+  font-size:.84rem!important;
+  font-weight:700!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stTextInput"] input,
+section[data-testid="stSidebar"] div[data-testid="stNumberInput"] input,
+section[data-testid="stSidebar"] textarea{{
+  padding-left:14px!important;
+  padding-right:14px!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stTextInput"] input::placeholder,
+section[data-testid="stSidebar"] div[data-testid="stNumberInput"] input::placeholder,
+section[data-testid="stSidebar"] textarea::placeholder{{
+  color:var(--sigl-text-muted)!important;
+  opacity:1!important;
+}}
+section[data-testid="stSidebar"] div[data-testid="stMultiSelect"] [data-baseweb="tag"]{{
+  min-height:28px!important;
+  padding:0 10px!important;
+}}
 div[data-baseweb="popover"]{{
   z-index:999!important;
 }}
@@ -325,11 +513,31 @@ div[data-testid="stMarkdownContainer"] li{{
   color:var(--sigl-text)!important;
 }}
 section[data-testid="stSidebar"] div[data-testid="stRadio"]{{
-  margin:0 0 14px!important;
+  margin:0!important;
+  width:100%!important;
+  max-width:none!important;
+  min-width:0!important;
+}}
+section[data-testid="stSidebar"] div.row-widget.stRadio{{
+  width:100%!important;
+  max-width:none!important;
+  min-width:0!important;
+}}
+section[data-testid="stSidebar"] div.row-widget.stRadio > div,
+section[data-testid="stSidebar"] div.row-widget.stRadio > div > div,
+section[data-testid="stSidebar"] div[data-testid="stRadio"] > div,
+section[data-testid="stSidebar"] div[data-testid="stRadio"] > div > div{{
+  width:100%!important;
+  max-width:none!important;
+  min-width:0!important;
+}}
+section[data-testid="stSidebar"] div.row-widget.stRadio > div{{
+  display:block!important;
 }}
 section[data-testid="stSidebar"] div[data-testid="stRadio"] > label{{
   display:block!important;
   margin:0 0 8px!important;
+  width:100%!important;
 }}
 section[data-testid="stSidebar"] div[data-testid="stRadio"] > label p{{
   color:var(--sigl-text-muted)!important;
@@ -338,28 +546,35 @@ section[data-testid="stSidebar"] div[data-testid="stRadio"] > label p{{
   letter-spacing:.08em!important;
   text-transform:uppercase!important;
 }}
+section[data-testid="stSidebar"] div.row-widget.stRadio > div[role="radiogroup"],
 section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"]{{
   display:grid!important;
   grid-template-columns:repeat(2, minmax(0, 1fr))!important;
   gap:8px!important;
   padding:6px!important;
+  width:100%!important;
+  max-width:none!important;
+  min-width:0!important;
+  box-sizing:border-box!important;
   border:1px solid rgba(148,163,184,.12)!important;
   border-radius:16px!important;
   background:linear-gradient(180deg, rgba(19,28,45,.72), rgba(15,23,42,.56))!important;
 }}
+section[data-testid="stSidebar"] div.row-widget.stRadio > div[role="radiogroup"] > label[data-baseweb="radio"],
 section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"] > label[data-baseweb="radio"]{{
   position:relative!important;
   display:flex!important;
   align-items:stretch!important;
   justify-content:center!important;
-  min-height:46px!important;
+  min-height:var(--sigl-sidebar-control-h)!important;
   margin:0!important;
-  border-radius:14px!important;
+  border-radius:calc(var(--sigl-sidebar-control-radius) - 1px)!important;
   border:1px solid rgba(148,163,184,.12)!important;
   background:linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.015))!important;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.03)!important;
   overflow:hidden!important;
   cursor:pointer!important;
+  width:100%!important;
   transition:transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease!important;
 }}
 section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"] > label[data-baseweb="radio"]:hover{{
@@ -403,14 +618,14 @@ section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"] 
   align-items:center!important;
   justify-content:center!important;
   width:100%!important;
-  min-height:46px!important;
+  min-height:var(--sigl-sidebar-control-h)!important;
   padding:10px 14px 10px 24px!important;
 }}
 section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"] > label[data-baseweb="radio"] > div:last-child p{{
   width:100%!important;
   margin:0!important;
   color:var(--sigl-text)!important;
-  font-size:.82rem!important;
+  font-size:.84rem!important;
   font-weight:800!important;
   text-align:center!important;
   letter-spacing:-.01em!important;
@@ -442,7 +657,30 @@ section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"] 
 section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"] > label[data-baseweb="radio"]:active{{
   transform:scale(.985)!important;
 }}
-div[data-testid="stTabs"] button{{
+/* Streamlit versions can render sidebar radios without stable stRadio wrappers. */
+section[data-testid="stSidebar"] [role="radiogroup"]{{
+  display:grid!important;
+  grid-template-columns:repeat(2, minmax(0, 1fr))!important;
+  gap:8px!important;
+  width:100%!important;
+  max-width:none!important;
+  min-width:0!important;
+  box-sizing:border-box!important;
+  align-items:stretch!important;
+  justify-items:stretch!important;
+}}
+section[data-testid="stSidebar"] [role="radiogroup"] > label,
+section[data-testid="stSidebar"] [role="radiogroup"] > label[data-baseweb="radio"]{{
+  width:100%!important;
+  max-width:none!important;
+  min-width:0!important;
+  justify-self:stretch!important;
+}}
+section[data-testid="stSidebar"] [role="radiogroup"] > label > div:last-child,
+section[data-testid="stSidebar"] [role="radiogroup"] > label[data-baseweb="radio"] > div:last-child{{
+  width:100%!important;
+}}
+div[data-testid="stTabs"] [role="tab"]{{
   position:relative!important;
   overflow:hidden!important;
   flex:0 0 auto!important;
@@ -463,7 +701,7 @@ div[data-testid="stTabs"] button{{
     color .18s ease,
     box-shadow .18s ease!important;
 }}
-div[data-testid="stTabs"] button::before{{
+div[data-testid="stTabs"] [role="tab"]::before{{
   content:"";
   position:absolute;
   inset:0;
@@ -472,7 +710,7 @@ div[data-testid="stTabs"] button::before{{
   background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,0) 42%);
   opacity:.55;
 }}
-div[data-testid="stTabs"] button::after{{
+div[data-testid="stTabs"] [role="tab"]::after{{
   content:"";
   position:absolute;
   left:14px;
@@ -485,7 +723,7 @@ div[data-testid="stTabs"] button::after{{
   transform:scaleX(.62);
   transition:opacity .18s ease, transform .18s ease;
 }}
-div[data-testid="stTabs"] button:hover{{
+div[data-testid="stTabs"] [role="tab"]:hover{{
   color:var(--sigl-text)!important;
   transform:translateY(-1px);
   border-color:rgba(148,163,184,.18)!important;
@@ -494,14 +732,14 @@ div[data-testid="stTabs"] button:hover{{
     0 10px 18px rgba(2,6,23,.12),
     inset 0 1px 0 rgba(255,255,255,.04)!important;
 }}
-div[data-testid="stTabs"] button:focus-visible{{
+div[data-testid="stTabs"] [role="tab"]:focus-visible{{
   outline:none!important;
   border-color:rgba(142,164,255,.30)!important;
   box-shadow:
     0 0 0 3px rgba(142,164,255,.10),
     inset 0 1px 0 rgba(255,255,255,.04)!important;
 }}
-div[data-testid="stTabs"] button[aria-selected="true"]{{
+div[data-testid="stTabs"] [role="tab"][aria-selected="true"]{{
   color:var(--sigl-text-strong)!important;
   transform:translateY(-1px);
   background:
@@ -512,7 +750,7 @@ div[data-testid="stTabs"] button[aria-selected="true"]{{
     0 12px 24px rgba(93,123,255,.16),
     inset 0 1px 0 rgba(255,255,255,.06)!important;
 }}
-div[data-testid="stTabs"] button[aria-selected="true"]::after{{
+div[data-testid="stTabs"] [role="tab"][aria-selected="true"]::after{{
   opacity:1;
   transform:scaleX(1);
 }}
@@ -619,6 +857,40 @@ div[data-testid="stFormSubmitButton"] button:not([kind="primary"]){{
     linear-gradient(180deg, rgba(19,28,45,.96), rgba(15,23,42,.90))!important;
   color:var(--sigl-text-strong)!important;
   border:1px solid rgba(148,163,184,.20)!important;
+}}
+section[data-testid="stSidebar"] div.stButton,
+section[data-testid="stSidebar"] div[data-testid="stFormSubmitButton"],
+section[data-testid="stSidebar"] div[data-testid="stDownloadButton"]{{
+  width:100%!important;
+}}
+section[data-testid="stSidebar"] div.stButton>button,
+section[data-testid="stSidebar"] div[data-testid="stFormSubmitButton"] button,
+section[data-testid="stSidebar"] div[data-testid="stDownloadButton"] button{{
+  min-height:var(--sigl-sidebar-control-h)!important;
+  border-radius:var(--sigl-sidebar-control-radius)!important;
+  padding:.78rem .95rem!important;
+  justify-content:center!important;
+}}
+section[data-testid="stSidebar"] div.stButton>button span,
+section[data-testid="stSidebar"] div.stButton>button p,
+section[data-testid="stSidebar"] div.stButton>button div,
+section[data-testid="stSidebar"] div[data-testid="stFormSubmitButton"] button span,
+section[data-testid="stSidebar"] div[data-testid="stFormSubmitButton"] button p,
+section[data-testid="stSidebar"] div[data-testid="stFormSubmitButton"] button div,
+section[data-testid="stSidebar"] div[data-testid="stDownloadButton"] button span,
+section[data-testid="stSidebar"] div[data-testid="stDownloadButton"] button p,
+section[data-testid="stSidebar"] div[data-testid="stDownloadButton"] button div{{
+  font-size:.83rem!important;
+  font-weight:800!important;
+  letter-spacing:-.01em!important;
+  line-height:1.2!important;
+}}
+section[data-testid="stSidebar"] div.stButton>button:disabled,
+section[data-testid="stSidebar"] div[data-testid="stFormSubmitButton"] button:disabled,
+section[data-testid="stSidebar"] div[data-testid="stDownloadButton"] button:disabled{{
+  opacity:.58!important;
+  transform:none!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.02)!important;
 }}
 div[data-testid="stExpander"]{{
   background:linear-gradient(180deg, rgba(19,28,45,.96), rgba(15,23,42,.90))!important;
@@ -1695,14 +1967,27 @@ p[data-testid="stCaption"]{{
   .sigl-layer-label{{font-size:.68rem;padding:3px 7px}}
 }}
 @media (max-width: 640px){{
-  section[data-testid="stSidebar"] div[data-testid="stRadio"] [role="radiogroup"]{{
-    grid-template-columns:1fr!important;
+  section[data-testid="stSidebar"]{{
+    --sigl-sidebar-control-h:44px;
+    --sigl-sidebar-gap:10px;
+  }}
+  section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"]{{
+    padding-left:.2rem!important;
+    padding-right:.2rem!important;
+  }}
+  section[data-testid="stSidebar"] [role="radiogroup"]{{
+    grid-template-columns:repeat(2, minmax(0, 1fr))!important;
+  }}
+  section[data-testid="stSidebar"] div.stButton>button,
+  section[data-testid="stSidebar"] div[data-testid="stFormSubmitButton"] button,
+  section[data-testid="stSidebar"] div[data-testid="stDownloadButton"] button{{
+    padding:.72rem .88rem!important;
   }}
   div[data-testid="stTabs"] [role="tablist"]{{
     gap:6px!important;
     padding:6px!important;
   }}
-  div[data-testid="stTabs"] button{{
+  div[data-testid="stTabs"] [role="tab"]{{
     min-height:42px!important;
     padding:.62rem .92rem!important;
     border-radius:13px!important;
@@ -1735,7 +2020,7 @@ p[data-testid="stCaption"]{{
   div[data-testid="stChatInput"]{{max-width:none}}
 }}
 @media (prefers-reduced-motion: reduce){{
-  div[data-testid="stTabs"] button,
+  div[data-testid="stTabs"] [role="tab"],
   div[data-baseweb="select"]>div,
   div[data-baseweb="select"]>div::before,
   div[data-baseweb="select"]>div::after,
@@ -1773,8 +2058,8 @@ p[data-testid="stCaption"]{{
   div[data-testid="stTabs"] [role="tabpanel"]{{
     animation:none!important;
   }}
-  div[data-testid="stTabs"] button::before,
-  div[data-testid="stTabs"] button::after{{
+  div[data-testid="stTabs"] [role="tab"]::before,
+  div[data-testid="stTabs"] [role="tab"]::after{{
     transition:none!important;
   }}
   div.stButton>button::before,
