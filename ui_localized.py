@@ -309,7 +309,8 @@ def _committee_panel_height(card_count):
 
 
 def _leading_lagging_panel_height(stat_count):
-    return max(440, 220 + max(int(stat_count), 1) * 32)
+    rows = max(1, (max(int(stat_count), 1) + 3) // 4)
+    return max(320, 220 + rows * 58)
 
 
 def _combined_scan_panel_height(card_count):
@@ -481,7 +482,7 @@ def render_leading_lagging(meta):
     flow_text = "\uC57D\uC138 \uB2E4\uC774\uBC84\uC804\uC2A4" if meta.get("smart_money_bearish_div") else ("\uC790\uAE08 \uC720\uC785 \uC9C0\uC9C0" if meta.get("smart_money_bullish_div") else "\uC911\uB9BD")
     flow_tone = "negative" if meta.get("smart_money_bearish_div") else ("positive" if meta.get("smart_money_bullish_div") else "muted")
     size_label, size_tone = _risk_size_hint(_safe_float(meta.get("atr_pct", 0)))
-    cards = "".join([
+    stat_cards = [
         _mini_stat_card("BB %B", f"{_safe_float(meta.get('percent_b', 0.5)) * 100:.0f}%", "positive" if _safe_float(meta.get("percent_b", 0.5)) < 0.3 else ("negative" if _safe_float(meta.get("percent_b", 0.5)) > 0.7 else "warning")),
         _mini_stat_card("CMF", f"{_safe_float(meta.get('cmf', 0)):+.3f}", "positive" if _safe_float(meta.get("cmf", 0)) > 0.05 else ("negative" if _safe_float(meta.get("cmf", 0)) < -0.05 else "muted")),
         _mini_stat_card("\uC790\uAE08 \uD750\uB984", flow_text, flow_tone),
@@ -491,7 +492,8 @@ def render_leading_lagging(meta):
         _mini_stat_card("\uAD8C\uC7A5 \uBE44\uC911", size_label, size_tone),
         _mini_stat_card("50\uC77C\uC120 \uAC70\uB9AC", f"{_safe_float(meta.get('ma50_dist', 0)):+.1f}%", "positive" if _safe_float(meta.get("ma50_dist", 0)) > 0 else "negative"),
         _mini_stat_card("200\uC77C\uC120 \uAC70\uB9AC", f"{_safe_float(meta.get('ma200_dist', 0)):+.1f}%", "positive" if _safe_float(meta.get("ma200_dist", 0)) > 0 else "negative"),
-    ])
+    ]
+    cards = "".join(stat_cards)
     panel_html = f"""
         <div class="sigl-grid sigl-grid--2">
           <div class="sigl-card">
@@ -541,7 +543,7 @@ def render_leading_lagging(meta):
         </div>
         <div class="sigl-grid sigl-grid--4" style="margin-top:12px">{cards}</div>
         """
-    _render_panel_html(panel_html, min_height=_leading_lagging_panel_height(len(cards)))
+    _render_panel_html(panel_html, min_height=_leading_lagging_panel_height(len(stat_cards)))
 
 
 def render_combined_scans(meta):
