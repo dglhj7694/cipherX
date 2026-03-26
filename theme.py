@@ -73,7 +73,7 @@ h1,h2,h3,h4,h5,h6{{
 .block-container{{
   max-width:1440px;
   padding-top:1rem!important;
-  padding-bottom:2rem!important;
+  padding-bottom:1rem!important;
 }}
 header{{
   background:transparent!important;
@@ -232,11 +232,10 @@ div[data-testid="stBottom"] > div,
 div.stChatFloatingInputContainer,
 div.stChatFloatingInputContainer > div,
 div[data-testid="stBottomBlockContainer"]{{
-  background:
-    linear-gradient(180deg, rgba(11,16,32,0) 0%, rgba(11,16,32,.92) 28%, #0B1020 100%)!important;
+  background:transparent!important;
   box-shadow:none!important;
-  padding-top:18px!important;
-  padding-bottom:12px!important;
+  padding-top:6px!important;
+  padding-bottom:4px!important;
 }}
 div[data-testid="stBottomBlockContainer"] > div{{
   background:transparent!important;

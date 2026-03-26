@@ -266,24 +266,29 @@ def _app_component_doc(inner_html):
         <script>
         (function () {
           const resizeFrame = () => {
+            const body = document.body;
+            const root = document.documentElement;
             const height = Math.max(
-              document.body ? document.body.scrollHeight : 0,
-              document.body ? document.body.offsetHeight : 0,
-              document.documentElement ? document.documentElement.scrollHeight : 0,
-              document.documentElement ? document.documentElement.offsetHeight : 0
+              body ? body.scrollHeight : 0,
+              body ? Math.ceil(body.getBoundingClientRect().height) : 0,
+              root ? root.scrollHeight : 0,
+              root ? Math.ceil(root.getBoundingClientRect().height) : 0
             );
             if (window.frameElement && height) {
-              window.frameElement.style.height = `${height + 12}px`;
+              const nextHeight = Math.ceil(height);
+              const currentHeight = parseFloat(window.frameElement.style.height || "0");
+              if (!currentHeight || Math.abs(currentHeight - nextHeight) > 2) {
+                window.frameElement.style.height = `${nextHeight}px`;
+              }
             }
           };
           const scheduleResize = () => window.requestAnimationFrame(resizeFrame);
           window.addEventListener('load', resizeFrame);
           window.addEventListener('resize', scheduleResize);
           document.addEventListener('DOMContentLoaded', scheduleResize);
-          if (window.ResizeObserver && document.body && document.documentElement) {
+          if (window.ResizeObserver && document.body) {
             const observer = new ResizeObserver(() => scheduleResize());
             observer.observe(document.body);
-            observer.observe(document.documentElement);
           }
           if (window.MutationObserver && document.body) {
             const mutationObserver = new MutationObserver(() => scheduleResize());
@@ -298,15 +303,6 @@ def _app_component_doc(inner_html):
           setTimeout(resizeFrame, 120);
           setTimeout(resizeFrame, 320);
           setTimeout(resizeFrame, 720);
-          setTimeout(resizeFrame, 1400);
-          let ticks = 0;
-          const interval = window.setInterval(() => {
-            resizeFrame();
-            ticks += 1;
-            if (ticks >= 20) {
-              window.clearInterval(interval);
-            }
-          }, 180);
         })();
         </script>
         </body></html>
