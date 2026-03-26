@@ -10,7 +10,7 @@ BRAND_REPORT_SLUG = "sigl"
 
 INITIAL_MESSAGE_CONTENT = (
     f"{BRAND_PAGE_ICON} **{BRAND_NAME}**\n"
-    "분석할 티커를 입력하면 차트, 시그널, 리스크, 기업 정보를 같은 톤으로 정리해 드립니다."
+    "분석할 티커를 입력하세요."
 )
 
 

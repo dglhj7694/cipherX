@@ -85,6 +85,7 @@ def init_session():
         'scan_focus_ticker': None,
         'scan_nav_select_idx': None,
         'selected_sector': None,
+        'selected_sectors': [],
         'scan_tickers_override': None,
     }
     for k, v in defs.items():
@@ -107,6 +108,7 @@ def reset_session():
     st.session_state['scan_focus_ticker'] = None
     st.session_state['scan_nav_select_idx'] = None
     st.session_state['selected_sector'] = None
+    st.session_state['selected_sectors'] = []
     st.session_state['scan_tickers_override'] = None
 
 init_session()
@@ -252,33 +254,118 @@ def _sigl_badge(label, tone='muted'):
     return f"<span class='sigl-badge sigl-badge--{tone}'>{safe}</span>"
 
 
-def _render_scanner_selection_panel(selected_sector, selected_list):
-    if not selected_sector:
+def _app_component_doc(inner_html):
+    return (
+        "<!doctype html><html><head><meta charset='utf-8'>"
+        f"{build_app_theme_css()}"
+        "</head><body style='margin:0;background:transparent'>"
+        f"{inner_html}"
+        "</body></html>"
+    )
+
+
+def _render_surface_html(inner_html, height):
+    components.html(_app_component_doc(inner_html), height=height, scrolling=False)
+
+
+def _normalized_selected_sectors(value):
+    if not value:
+        return []
+    if isinstance(value, str):
+        value = [value]
+    seen = set()
+    normalized = []
+    for raw in value:
+        text = str(raw).strip()
+        if not text or text in seen:
+            continue
+        if text != '🌐 전체' and text not in SECTOR_GROUPS:
+            continue
+        seen.add(text)
+        normalized.append(text)
+    if '🌐 전체' in normalized:
+        return ['🌐 전체']
+    return normalized
+
+
+def _sector_selection_title(selected_sectors):
+    selected_sectors = _normalized_selected_sectors(selected_sectors)
+    if not selected_sectors:
+        return None
+    if selected_sectors == ['🌐 전체']:
+        return '🌐 전체'
+    if len(selected_sectors) == 1:
+        return selected_sectors[0]
+    return f"{selected_sectors[0]} 외 {len(selected_sectors) - 1}"
+
+
+def _sector_selection_tickers(selected_sectors):
+    selected_sectors = _normalized_selected_sectors(selected_sectors)
+    if not selected_sectors:
+        return None
+    if selected_sectors == ['🌐 전체']:
+        return sorted({str(t).strip().upper() for ts in SECTOR_GROUPS.values() for t in ts if str(t).strip()})
+    tickers = []
+    for sector_name in selected_sectors:
+        tickers.extend(SECTOR_GROUPS.get(sector_name, []))
+    return list(dict.fromkeys([str(t).strip().upper() for t in tickers if str(t).strip()])) or None
+
+
+def _apply_sector_selection(selected_sectors):
+    normalized = _normalized_selected_sectors(selected_sectors)
+    st.session_state['selected_sectors'] = normalized
+    st.session_state['selected_sector'] = _sector_selection_title(normalized)
+    st.session_state['scan_tickers_override'] = _sector_selection_tickers(normalized)
+
+
+def _toggle_sector_selection(sector_name):
+    current = _normalized_selected_sectors(
+        st.session_state.get('selected_sectors') or st.session_state.get('selected_sector')
+    )
+    if sector_name == '🌐 전체':
+        next_selection = [] if current == ['🌐 전체'] else ['🌐 전체']
+        _apply_sector_selection(next_selection)
+        return
+    current = [name for name in current if name != '🌐 전체']
+    if sector_name in current:
+        current = [name for name in current if name != sector_name]
+    else:
+        current.append(sector_name)
+    _apply_sector_selection(current)
+
+
+def _render_scanner_selection_panel(selected_sectors, selected_list):
+    selected_sectors = _normalized_selected_sectors(selected_sectors)
+    if not selected_sectors:
         return
     count = len(selected_list)
+    title = _sector_selection_title(selected_sectors) or "선택 없음"
+    sector_chips = "".join(
+        _sigl_badge(name, 'accent' if name == '🌐 전체' else 'muted')
+        for name in selected_sectors
+    )
     chips = "".join(
         f"<span class='sigl-code-chip'>{html.escape(str(t))}</span>"
         for t in selected_list
     ) or "<span class='sigl-empty'>선택된 종목이 없습니다.</span>"
-    st.markdown(
-        f"""
+    panel_html = f"""
         <div class="sigl-card sigl-card--accent">
             <div class="sigl-page-head">
                 <div>
                     <p class="sigl-page-head__eyebrow">Scanner Scope</p>
-                    <p class="sigl-page-head__title">{html.escape(str(selected_sector))}</p>
-                    <p class="sigl-page-head__copy">현재 스캔 범위와 티커 구성을 한눈에 확인할 수 있습니다.</p>
+                    <p class="sigl-page-head__title">{html.escape(str(title))}</p>
+                    <p class="sigl-page-head__copy">여러 섹터를 묶어 하나의 스캔 유니버스로 사용할 수 있습니다.</p>
                 </div>
                 <div class="sigl-inline">
                     {_sigl_badge(f'{count} 종목', 'accent')}
                     {_sigl_badge('점수 높은 순 정렬', 'muted')}
                 </div>
             </div>
+            <div class="sigl-chip-row">{sector_chips}</div>
             <div class="sigl-code-list">{chips}</div>
         </div>
-        """,
-        unsafe_allow_html=True,
-    )
+        """
+    _render_surface_html(panel_html, 222)
 
 
 def _render_scanner_summary(results, total_count):
@@ -299,7 +386,7 @@ def _render_scanner_summary(results, total_count):
         """
         for label, value, sub, _tone in cards
     )
-    st.markdown(f"<div class='sigl-result-summary'>{html_cards}</div>", unsafe_allow_html=True)
+    _render_surface_html(f"<div class='sigl-result-summary'>{html_cards}</div>", 160)
 
 
 def _render_scanner_result_card(rank, row):
@@ -325,8 +412,7 @@ def _render_scanner_result_card(rank, row):
     if row.get('reason'):
         reason_html = f"<p class='sigl-summary'>{html.escape(str(row['reason'])[:120])}</p>"
     change_prefix = "+" if float(row.get('chg', 0) or 0) >= 0 else ""
-    st.markdown(
-        f"""
+    panel_html = f"""
         <div class="sigl-result-card {tone_class}">
             <div class="sigl-result-head">
                 <div>
@@ -346,9 +432,13 @@ def _render_scanner_result_card(rank, row):
             <div class="sigl-chip-row">{combo_hits}</div>
             {reason_html}
         </div>
-        """,
-        unsafe_allow_html=True,
-    )
+        """
+    card_height = 188
+    if row.get('reason'):
+        card_height += 34
+    if row.get('transitions'):
+        card_height += 8
+    _render_surface_html(panel_html, card_height)
 
 def _format_board_text(value, fallback="--"):
     text = str(value).strip() if value is not None else ""
@@ -679,7 +769,10 @@ def _build_brand_payload(current_mode, chart_period):
             else:
                 focus_row = results[0]
 
-        selected_sector = _format_board_text(st.session_state.get('selected_sector'), fallback='READY')
+        selected_sector = _format_board_text(
+            st.session_state.get('selected_sector') or _sector_selection_title(st.session_state.get('selected_sectors')),
+            fallback='READY'
+        )
         focus = _format_board_code(focus_row.get('ticker') if focus_row else selected_sector, fallback='READY')
         es_value = focus_row.get('es') if focus_row else None
         price_value = focus_row.get('price') if focus_row else None
@@ -796,10 +889,10 @@ def _build_brand_payload(current_mode, chart_period):
     }
 
 def _render_brand_board(payload, compact=False):
-    height = 230 if compact else 255
+    height = 240 if compact else 320
     components.html(build_brand_board(payload, compact=compact), height=height, scrolling=False)
     if not compact:
-        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
 
 with st.sidebar:
     _mi = 0 if st.session_state.get('_mode', '분석') == '분석' else 1
@@ -827,27 +920,30 @@ if current_mode == '스캐너':
 
     st.markdown("#### 📂 섹터 선택")
     sector_names = list(SECTOR_GROUPS.keys())
+    selected_sectors = _normalized_selected_sectors(
+        st.session_state.get('selected_sectors') or st.session_state.get('selected_sector')
+    )
+    _apply_sector_selection(selected_sectors)
     selected_sector = st.session_state.get('selected_sector', None)
+    st.caption("여러 섹터를 동시에 선택할 수 있습니다.")
     for rs in range(0, len(sector_names), 3):
         ri = sector_names[rs:rs + 3]
         cols = st.columns(3)
         for i, sn in enumerate(ri):
             with cols[i]:
                 if st.button(f"{sn}\n({len(SECTOR_GROUPS[sn])})", key=f"sec_{rs+i}", use_container_width=True,
-                             type="primary" if selected_sector == sn else "secondary"):
-                    st.session_state['selected_sector'] = sn
-                    st.session_state['scan_tickers_override'] = SECTOR_GROUPS[sn]
+                             type="primary" if sn in selected_sectors else "secondary"):
+                    _toggle_sector_selection(sn)
                     st.rerun()
     if st.button(f"🌐 전체종목\n({len(all_universe)})", key="sec_all", use_container_width=True,
-                 type="primary" if selected_sector == '🌐 전체' else "secondary"):
-        st.session_state['selected_sector'] = '🌐 전체'
-        st.session_state['scan_tickers_override'] = all_universe
+                 type="primary" if selected_sectors == ['🌐 전체'] else "secondary"):
+        _toggle_sector_selection('🌐 전체')
         st.rerun()
 
-    if selected_sector:
-        sel_list = st.session_state.get('scan_tickers_override', []) if selected_sector == '🌐 전체' else SECTOR_GROUPS.get(selected_sector, [])
+    if selected_sectors:
+        sel_list = st.session_state.get('scan_tickers_override') or _sector_selection_tickers(selected_sectors) or []
         sel_list = list(dict.fromkeys([str(t).strip().upper() for t in sel_list if str(t).strip()]))
-        _render_scanner_selection_panel(selected_sector, sel_list)
+        _render_scanner_selection_panel(selected_sectors, sel_list)
 
     st.markdown("#### ✏️ 직접 입력")
     ci = st.text_input("티커", placeholder="NVDA,TSLA...", key="scan_in")
@@ -856,7 +952,7 @@ if current_mode == '스캐너':
         scan_source = "직접"
     elif st.session_state.get('scan_tickers_override'):
         tickers = st.session_state['scan_tickers_override']
-        scan_source = selected_sector or "섹터"
+        scan_source = selected_sector or ("섹터" if selected_sectors else "직접")
     else:
         tickers = []
         scan_source = "직접"
@@ -868,6 +964,7 @@ if current_mode == '스캐너':
     with cb2:
         if st.button("🗑️", use_container_width=True, key="sr"):
             st.session_state.pop('selected_sector', None)
+            st.session_state.pop('selected_sectors', None)
             st.session_state.pop('scan_tickers_override', None)
             st.session_state['scan_results'] = []
             st.session_state['scan_source'] = ''
@@ -1246,5 +1343,5 @@ else:
         st.caption("QUANT AUDIT는 보통 10~20초 정도 걸립니다. 시스템 판단 요약과 반론 포인트를 함께 정리합니다.")
         if st.button(f"🚀 {st.session_state.pending_ai_ticker.upper()} QUANT AUDIT", type="primary", use_container_width=True):
             _run_ai()
-    if ti := st.chat_input("SELECT TARGET TICKER (예: TSLA, AAPL, QQQ)"):
+    if ti := st.chat_input("분석할 티커를 입력하세요. 예: TSLA, AAPL, QQQ"):
         process_ticker(ti)

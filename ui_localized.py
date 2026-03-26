@@ -3,6 +3,7 @@ import json
 
 import plotly.graph_objects as go
 import streamlit as st
+import streamlit.components.v1 as components
 
 from company_details import render_company_details
 from config import COMMITTEE_NAMES, CONTEXT_WEIGHTS, CTX_LABELS
@@ -14,7 +15,7 @@ from localization import (
     localize_regime_label,
     translate_chart_text,
 )
-from theme import PLOTLY_FONT_FAMILY
+from theme import PLOTLY_FONT_FAMILY, build_app_theme_css
 
 
 SOFT_GREEN = "#63D9A2"
@@ -68,6 +69,16 @@ def _badge(label, tone="muted"):
     if not safe:
         return ""
     return f"<span class='sigl-badge sigl-badge--{tone}'>{safe}</span>"
+
+
+def _component_doc(inner_html):
+    return (
+        "<!doctype html><html><head><meta charset='utf-8'>"
+        f"{build_app_theme_css()}"
+        "</head><body style='margin:0;background:transparent'>"
+        f"{inner_html}"
+        "</body></html>"
+    )
 
 
 def _progress_metric_card(label, value, sub, tone, fill):
@@ -311,17 +322,21 @@ def render_committee_panel(meta):
             </div>
             """
         )
-    st.markdown(
-        f"""
-        <div class="sigl-section-head">
-          <div>
-            <p class="sigl-section-title">5위원회 종합 판단</p>
-            <p class="sigl-section-copy">위원회별 점수와 확신도를 같은 규격으로 비교합니다.</p>
+    panel_html = f"""
+        <div class="sigl-card">
+          <div class="sigl-section-head">
+            <div>
+              <p class="sigl-section-title">5위원회 종합 판단</p>
+              <p class="sigl-section-copy">위원회별 점수와 확신도를 같은 규격으로 비교합니다.</p>
+            </div>
           </div>
+          <div class="sigl-grid sigl-grid--5">{''.join(cards)}</div>
         </div>
-        <div class="sigl-grid sigl-grid--5">{''.join(cards)}</div>
-        """,
-        unsafe_allow_html=True,
+        """
+    components.html(
+        _component_doc(panel_html),
+        height=280,
+        scrolling=False,
     )
     if meta.get("veto_flags"):
         st.warning(f"제한 조건: {meta.get('veto_flags')}")
@@ -364,8 +379,7 @@ def render_10layer_bars(meta, html_key="analysis"):
             </div>
             """
         )
-    st.markdown(
-        f"""
+    panel_html = f"""
         <div class="sigl-card">
           <div class="sigl-section-head">
             <div>
@@ -379,8 +393,11 @@ def render_10layer_bars(meta, html_key="analysis"):
           </div>
           <div class="sigl-layer-board">{''.join(rows)}</div>
         </div>
-        """,
-        unsafe_allow_html=True,
+        """
+    components.html(
+        _component_doc(panel_html),
+        height=max(500, 160 + len(layer_names) * 42),
+        scrolling=False,
     )
 
 

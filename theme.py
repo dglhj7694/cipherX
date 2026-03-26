@@ -159,6 +159,35 @@ div[data-testid="stChatMessage"]{{
   padding:16px 18px;
   box-shadow:var(--sigl-shadow-sm);
 }}
+div[data-testid="stChatInput"]{{
+  margin-top:14px;
+}}
+div[data-testid="stChatInput"] textarea{{
+  background:linear-gradient(180deg, rgba(19,28,45,.98), rgba(15,23,42,.92))!important;
+  border:1px solid var(--sigl-border-soft)!important;
+  border-radius:18px!important;
+  color:var(--sigl-text-strong)!important;
+  box-shadow:var(--sigl-shadow-sm)!important;
+  padding:.95rem 3.1rem .95rem 1rem!important;
+  min-height:56px!important;
+}}
+div[data-testid="stChatInput"] textarea::placeholder{{
+  color:var(--sigl-text-muted)!important;
+  opacity:1!important;
+}}
+div[data-testid="stChatInput"] button{{
+  background:linear-gradient(135deg, #7C93FF, #5D7BFF)!important;
+  border:none!important;
+  border-radius:12px!important;
+  color:white!important;
+  box-shadow:0 10px 20px rgba(93,123,255,.22)!important;
+}}
+div[data-testid="stChatInput"] button:hover{{
+  transform:translateY(-1px);
+}}
+div[data-testid="stChatInput"] button svg{{
+  fill:white!important;
+}}
 div[data-testid="stMetricValue"]{{
   color:var(--sigl-text-strong)!important;
 }}
@@ -546,6 +575,14 @@ div[data-testid="stMetricValue"]{{
   color:#D6DFFF;
   font-size:.74rem;
   font-weight:800;
+}}
+div[data-testid="stCaptionContainer"] p,
+div[data-testid="stCaptionContainer"] span,
+p[data-testid="stCaption"]{{
+  color:#CBD5E1!important;
+  font-size:.8rem!important;
+  font-weight:600!important;
+  line-height:1.58!important;
 }}
 .prompt-caption{{color:var(--sigl-text-muted);font-size:.76rem;font-weight:700;margin-bottom:8px}}
 .soft-note{{color:var(--sigl-text-muted);font-size:.8rem;line-height:1.6;margin-top:10px}}
