@@ -83,21 +83,45 @@ def _component_doc(inner_html):
           const resizeFrame = () => {
             const height = Math.max(
               document.body ? document.body.scrollHeight : 0,
-              document.documentElement ? document.documentElement.scrollHeight : 0
+              document.body ? document.body.offsetHeight : 0,
+              document.documentElement ? document.documentElement.scrollHeight : 0,
+              document.documentElement ? document.documentElement.offsetHeight : 0
             );
             if (window.frameElement && height) {
-              window.frameElement.style.height = `${height}px`;
+              window.frameElement.style.height = `${height + 12}px`;
             }
           };
+          const scheduleResize = () => window.requestAnimationFrame(resizeFrame);
           window.addEventListener('load', resizeFrame);
-          window.addEventListener('resize', resizeFrame);
-          if (window.ResizeObserver && document.body) {
-            const observer = new ResizeObserver(() => resizeFrame());
+          window.addEventListener('resize', scheduleResize);
+          document.addEventListener('DOMContentLoaded', scheduleResize);
+          if (window.ResizeObserver && document.body && document.documentElement) {
+            const observer = new ResizeObserver(() => scheduleResize());
             observer.observe(document.body);
+            observer.observe(document.documentElement);
+          }
+          if (window.MutationObserver && document.body) {
+            const mutationObserver = new MutationObserver(() => scheduleResize());
+            mutationObserver.observe(document.body, {
+              childList: true,
+              subtree: true,
+              attributes: true,
+              characterData: true
+            });
           }
           setTimeout(resizeFrame, 0);
           setTimeout(resizeFrame, 120);
           setTimeout(resizeFrame, 320);
+          setTimeout(resizeFrame, 720);
+          setTimeout(resizeFrame, 1400);
+          let ticks = 0;
+          const interval = window.setInterval(() => {
+            resizeFrame();
+            ticks += 1;
+            if (ticks >= 20) {
+              window.clearInterval(interval);
+            }
+          }, 180);
         })();
         </script>
         </body></html>
@@ -111,6 +135,7 @@ def _render_panel_html(inner_html, min_height=240):
         height=min_height,
         scrolling=False,
     )
+    st.markdown("<div class='sigl-stack-gap'></div>", unsafe_allow_html=True)
 
 
 def _progress_metric_card(label, value, sub, tone, fill):
@@ -275,6 +300,27 @@ def render_price_header(meta, key_prefix="analysis"):
     _render_ensemble_gauge(es, chart_key=f"{key_prefix}_ensemble_gauge")
 
 
+def _judgment_panel_height(detail_text="", contrast="", risk_tag_count=0):
+    height = 420
+    if detail_text:
+        height += 110
+    if contrast or risk_tag_count:
+        height += 120
+    return height
+
+
+def _committee_panel_height(card_count):
+    return max(420, 120 + max(int(card_count), 1) * 122)
+
+
+def _leading_lagging_panel_height(stat_count):
+    return max(560, 250 + max(int(stat_count), 1) * 76)
+
+
+def _combined_scan_panel_height(card_count):
+    return max(320, 180 + max(int(card_count), 1) * 108)
+
+
 def render_judgment_card(meta):
     raw_judgment = str(meta.get("judgment", "NEUTRAL"))
     action = localize_action_label(meta.get("action_label", ""))
@@ -324,7 +370,10 @@ def render_judgment_card(meta):
         contrast_html = f"<p class='sigl-summary' style='margin:0 0 10px'>{_esc(translate_chart_text(contrast))}</p>" if contrast else ""
         summary_html += f"<div class='sigl-note'><strong>리스크 체크</strong>{contrast_html}<div class='sigl-chip-row'>{''.join(risk_tags)}</div></div>"
     summary_html += "</div>"
-    _render_panel_html(summary_html, min_height=330)
+    _render_panel_html(
+        summary_html,
+        min_height=_judgment_panel_height(detail_text, contrast, len(risk_tags)),
+    )
 
 
 def render_committee_panel(meta):
@@ -365,7 +414,7 @@ def render_committee_panel(meta):
           <div class="sigl-grid sigl-grid--5">{''.join(cards)}</div>
         </div>
         """
-    _render_panel_html(panel_html, min_height=320)
+    _render_panel_html(panel_html, min_height=_committee_panel_height(len(cards)))
     if meta.get("veto_flags"):
         st.warning(f"제한 조건: {meta.get('veto_flags')}")
     if abs(_safe_float(meta.get("reversal_synergy", 0))) > 5:
@@ -497,7 +546,7 @@ def render_leading_lagging(meta):
         </div>
         <div class="sigl-grid sigl-grid--4" style="margin-top:12px">{cards}</div>
         """
-    _render_panel_html(panel_html, min_height=440)
+    _render_panel_html(panel_html, min_height=_leading_lagging_panel_height(len(cards)))
 
 
 def render_combined_scans(meta):
@@ -546,7 +595,7 @@ def render_combined_scans(meta):
         </div>
         <div class="sigl-grid sigl-grid--2" style="margin-top:12px">{''.join(cards)}</div>
         """
-    _render_panel_html(panel_html, min_height=280)
+    _render_panel_html(panel_html, min_height=_combined_scan_panel_height(len(cards)))
 
 
 def render_indicator_help():
@@ -590,7 +639,7 @@ def render_analysis(msg, key_prefix="analysis"):
         if meta:
             render_judgment_card(meta)
             render_committee_panel(meta)
-            st.markdown("---")
+            st.markdown("<div class='sigl-stack-gap sigl-stack-gap--lg'></div>", unsafe_allow_html=True)
             render_leading_lagging(meta)
             render_indicator_help()
 

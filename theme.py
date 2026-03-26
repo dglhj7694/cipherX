@@ -362,6 +362,10 @@ div[data-testid="stMetricValue"]{{
   flex-wrap:wrap;
   margin:0 0 12px;
 }}
+.sigl-section-head > div:first-child{{
+  flex:1 1 260px;
+  min-width:0;
+}}
 .sigl-section-title{{
   margin:0;
   color:var(--sigl-text-strong);
@@ -377,15 +381,22 @@ div[data-testid="stMetricValue"]{{
   display:grid;
   gap:12px;
 }}
-.sigl-grid--2{{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}}
-.sigl-grid--3{{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}}
-.sigl-grid--4{{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}}
-.sigl-grid--5{{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}}
+.sigl-grid--2{{grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))}}
+.sigl-grid--3{{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}}
+.sigl-grid--4{{grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr))}}
+.sigl-grid--5{{grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr))}}
 .sigl-inline{{
   display:flex;
   gap:8px;
   flex-wrap:wrap;
   align-items:center;
+  min-width:0;
+}}
+.sigl-stack-gap{{
+  height:10px;
+}}
+.sigl-stack-gap--lg{{
+  height:18px;
 }}
 .sigl-composer-head{{
   display:flex;
@@ -498,6 +509,10 @@ div[data-testid="stMetricValue"]{{
   gap:16px;
   flex-wrap:wrap;
 }}
+.sigl-price-top > div:first-child{{
+  flex:1 1 320px;
+  min-width:0;
+}}
 .sigl-price-meta{{
   margin:0;
   color:var(--sigl-text-muted);
@@ -523,6 +538,7 @@ div[data-testid="stMetricValue"]{{
   border-radius:14px;
   padding:14px 15px;
   min-height:112px;
+  min-width:0;
 }}
 .sigl-metric-card--summary{{
   min-height:104px;
@@ -583,6 +599,7 @@ div[data-testid="stMetricValue"]{{
   border-left:3px solid var(--tone,var(--sigl-accent));
   border-radius:14px;
   padding:13px 14px;
+  min-width:0;
 }}
 .sigl-committee-name{{
   margin:0 0 4px;
@@ -680,6 +697,10 @@ div[data-testid="stMetricValue"]{{
   gap:12px;
   flex-wrap:wrap;
 }}
+.sigl-result-head > div:first-child{{
+  flex:1 1 260px;
+  min-width:0;
+}}
 .sigl-result-title{{
   margin:0;
   color:var(--sigl-text-strong);
@@ -696,6 +717,7 @@ div[data-testid="stMetricValue"]{{
   gap:8px;
   flex-wrap:wrap;
   justify-content:flex-end;
+  min-width:0;
 }}
 .sigl-code-list{{
   display:flex;
@@ -718,6 +740,16 @@ div[data-testid="stMetricValue"]{{
 .sigl-empty{{
   color:var(--sigl-text-muted);
   font-size:.82rem;
+}}
+.sigl-note,
+.sigl-summary,
+.sigl-section-copy,
+.sigl-result-copy,
+.sigl-committee-name,
+.sigl-committee-foot,
+.sigl-price-meta{{
+  overflow-wrap:anywhere;
+  word-break:keep-all;
 }}
 .analysis-nav{{
   background:linear-gradient(180deg, rgba(19,28,45,.98), rgba(15,23,42,.92));
@@ -760,7 +792,7 @@ p[data-testid="stCaption"]{{
 .prompt-caption{{color:var(--sigl-text-muted);font-size:.76rem;font-weight:700;margin-bottom:8px}}
 .soft-note{{color:var(--sigl-text-muted);font-size:.8rem;line-height:1.6;margin-top:10px}}
 @media (max-width: 980px){{
-  .sigl-grid--5{{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}}
+  .sigl-grid--5{{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}}
   .sigl-layer-row{{grid-template-columns:54px 1fr 54px;gap:8px}}
   .sigl-layer-track{{height:28px}}
   .sigl-layer-label{{font-size:.68rem;padding:3px 7px}}
@@ -776,6 +808,9 @@ p[data-testid="stCaption"]{{
   .sigl-layer-row{{grid-template-columns:46px 1fr 46px;gap:6px}}
   .sigl-layer-track{{height:26px}}
   .sigl-layer-label{{font-size:.64rem;padding:2px 6px}}
+  .sigl-card{{padding:14px 14px}}
+  .sigl-metric-card,
+  .sigl-committee-card{{padding:13px 13px}}
   div[data-testid="stChatInput"]{{max-width:none}}
 }}
 </style>"""
