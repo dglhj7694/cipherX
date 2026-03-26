@@ -334,6 +334,11 @@ def _toggle_sector_selection(sector_name):
     _apply_sector_selection(current)
 
 
+def _parse_ticker_input(raw_text):
+    raw = str(raw_text or "").replace(",", " ").replace("\n", " ")
+    return list(dict.fromkeys([token.strip().upper() for token in raw.split() if token.strip()]))
+
+
 def _render_scanner_selection_panel(selected_sectors, selected_list):
     selected_sectors = _normalized_selected_sectors(selected_sectors)
     if not selected_sectors:
@@ -889,10 +894,10 @@ def _build_brand_payload(current_mode, chart_period):
     }
 
 def _render_brand_board(payload, compact=False):
-    height = 250 if compact else 380
+    height = 92 if compact else 122
     components.html(build_brand_board(payload, compact=compact), height=height, scrolling=False)
     if not compact:
-        st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
 with st.sidebar:
     _mi = 0 if st.session_state.get('_mode', '분석') == '분석' else 1
@@ -945,11 +950,65 @@ if current_mode == '스캐너':
         sel_list = list(dict.fromkeys([str(t).strip().upper() for t in sel_list if str(t).strip()]))
         _render_scanner_selection_panel(selected_sectors, sel_list)
 
-    st.markdown("#### ✏️ 직접 입력")
-    ci = st.text_input("티커", placeholder="NVDA,TSLA...", key="scan_in")
-    if ci and ci.strip():
-        tickers = [t.strip().upper() for t in ci.split(',') if t.strip()]
-        scan_source = "직접"
+    manual_preview = _parse_ticker_input(st.session_state.get('scan_in'))
+    active_preview = manual_preview or st.session_state.get('scan_tickers_override') or []
+    active_source = "직접 입력" if manual_preview else (selected_sector or "미선택")
+    composer_meta = "".join([
+        _sigl_badge(f"현재 후보 {len(active_preview)}개", 'accent'),
+        _sigl_badge(f"소스 {active_source}", 'muted'),
+        _sigl_badge("쉼표·공백 입력 지원", 'warning'),
+    ])
+    with st.form("scanner_direct_input", clear_on_submit=False):
+        st.markdown(
+            f"""
+            <div class="sigl-composer-head">
+                <div>
+                    <p class="sigl-composer-title">직접 입력 유니버스</p>
+                    <p class="sigl-composer-copy">스캔할 티커 묶음을 직접 입력해서 현재 시스템 카드와 같은 흐름으로 실행합니다.</p>
+                </div>
+                <div class="sigl-composer-tools">
+                    <span class="sigl-composer-tool">Scanner</span>
+                    <span class="sigl-composer-tool">Watchlist</span>
+                </div>
+            </div>
+            <div class="sigl-composer-meta">{composer_meta}</div>
+            """,
+            unsafe_allow_html=True,
+        )
+        input_col, scan_col, clear_col = st.columns([7.2, 1.8, 1.4])
+        with input_col:
+            ci = st.text_input(
+                "스캔 대상 티커 입력",
+                placeholder="NVDA, TSLA, AAPL, QQQ",
+                key="scan_in",
+                label_visibility="collapsed",
+            )
+        with scan_col:
+            scan_btn = st.form_submit_button("스캔 실행", type="primary", use_container_width=True)
+        with clear_col:
+            clear_scan = st.form_submit_button("초기화", use_container_width=True)
+        st.markdown(
+            "<p class='sigl-composer-note'>직접 입력이 있으면 현재 섹터 선택보다 우선합니다. 비워두면 선택된 섹터 유니버스를 사용합니다.</p>",
+            unsafe_allow_html=True,
+        )
+
+    if clear_scan:
+        st.session_state.pop('selected_sector', None)
+        st.session_state.pop('selected_sectors', None)
+        st.session_state.pop('scan_tickers_override', None)
+        st.session_state['scan_results'] = []
+        st.session_state['scan_source'] = ''
+        st.session_state['scan_total'] = 0
+        st.session_state['scan_focus_idx'] = None
+        st.session_state['scan_focus_ticker'] = None
+        st.session_state['scan_nav_select_idx'] = None
+        st.session_state['scan_in'] = ''
+        st.rerun()
+
+    manual_tickers = _parse_ticker_input(ci)
+    if manual_tickers:
+        tickers = manual_tickers
+        scan_source = "직접 입력"
     elif st.session_state.get('scan_tickers_override'):
         tickers = st.session_state['scan_tickers_override']
         scan_source = selected_sector or ("섹터" if selected_sectors else "직접")
@@ -957,22 +1016,6 @@ if current_mode == '스캐너':
         tickers = []
         scan_source = "직접"
     tickers = list(dict.fromkeys([t for t in tickers if t]))
-
-    cb1, cb2 = st.columns([3, 1])
-    with cb1:
-        scan_btn = st.button(f"🚀 스캔({len(tickers)})", type="primary", use_container_width=True)
-    with cb2:
-        if st.button("🗑️", use_container_width=True, key="sr"):
-            st.session_state.pop('selected_sector', None)
-            st.session_state.pop('selected_sectors', None)
-            st.session_state.pop('scan_tickers_override', None)
-            st.session_state['scan_results'] = []
-            st.session_state['scan_source'] = ''
-            st.session_state['scan_total'] = 0
-            st.session_state['scan_focus_idx'] = None
-            st.session_state['scan_focus_ticker'] = None
-            st.session_state['scan_nav_select_idx'] = None
-            st.rerun()
 
     if scan_btn and not tickers:
         st.warning("스캔할 티커가 없습니다. 섹터를 고르거나 직접 티커를 입력해 주세요.")
@@ -1343,5 +1386,47 @@ else:
         st.caption("QUANT AUDIT는 보통 10~20초 정도 걸립니다. 시스템 판단 요약과 반론 포인트를 함께 정리합니다.")
         if st.button(f"🚀 {st.session_state.pending_ai_ticker.upper()} QUANT AUDIT", type="primary", use_container_width=True):
             _run_ai()
-    if ti := st.chat_input("분석할 티커를 입력하세요. 예: TSLA, AAPL, QQQ"):
-        process_ticker(ti)
+    analysis_meta = "".join([
+        _sigl_badge("단일 티커 분석", 'accent'),
+        _sigl_badge("차트·위원회·리포트 연동", 'muted'),
+        _sigl_badge("예: NVDA TSLA QQQ", 'warning'),
+    ])
+    with st.form("analysis_ticker_input", clear_on_submit=True):
+        st.markdown(
+            f"""
+            <div class="sigl-composer-head">
+                <div>
+                    <p class="sigl-composer-title">분석 티커 입력</p>
+                    <p class="sigl-composer-copy">현재 시스템 카드와 같은 톤으로 티커를 입력하고 바로 SIGL 분석을 시작합니다.</p>
+                </div>
+                <div class="sigl-composer-tools">
+                    <span class="sigl-composer-tool">Analysis</span>
+                    <span class="sigl-composer-tool">Signal Read</span>
+                </div>
+            </div>
+            <div class="sigl-composer-meta">{analysis_meta}</div>
+            """,
+            unsafe_allow_html=True,
+        )
+        input_col, submit_col = st.columns([7.8, 1.8])
+        with input_col:
+            ti = st.text_input(
+                "분석 티커 입력",
+                placeholder="분석할 티커를 입력하세요. 예: TSLA, AAPL, QQQ",
+                key="analysis_input",
+                label_visibility="collapsed",
+            )
+        with submit_col:
+            analyze_submit = st.form_submit_button("분석 시작", type="primary", use_container_width=True)
+        st.markdown(
+            "<p class='sigl-composer-note'>여러 티커를 넣으면 첫 번째 티커를 기준으로 분석합니다.</p>",
+            unsafe_allow_html=True,
+        )
+    if analyze_submit:
+        parsed = _parse_ticker_input(ti)
+        if not parsed:
+            st.toast("분석할 티커를 입력해 주세요.", icon="⌨️")
+        else:
+            if len(parsed) > 1:
+                st.toast(f"{parsed[0]} 기준으로 먼저 분석합니다.", icon="📌")
+            process_ticker(parsed[0])

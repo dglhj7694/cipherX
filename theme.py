@@ -159,6 +159,37 @@ div[data-testid="stChatMessage"]{{
   padding:16px 18px;
   box-shadow:var(--sigl-shadow-sm);
 }}
+div[data-testid="stForm"]{{
+  margin:16px 0 18px!important;
+  padding:18px!important;
+  border:1px solid var(--sigl-border-soft)!important;
+  border-radius:18px!important;
+  background:linear-gradient(180deg, rgba(19,28,45,.98), rgba(15,23,42,.94))!important;
+  box-shadow:var(--sigl-shadow-sm)!important;
+}}
+div[data-testid="stForm"] > div{{
+  border:none!important;
+  background:transparent!important;
+}}
+div[data-testid="stForm"] [data-baseweb="base-input"],
+div[data-testid="stForm"] [data-baseweb="input"]{{
+  background:transparent!important;
+  border:none!important;
+  box-shadow:none!important;
+}}
+div[data-testid="stForm"] div[data-testid="stTextInput"] input{{
+  min-height:54px!important;
+  padding-left:14px!important;
+  border-radius:16px!important;
+  background:rgba(11,16,32,.74)!important;
+}}
+div[data-testid="stForm"] div[data-testid="stFormSubmitButton"] button{{
+  min-height:54px!important;
+  border-radius:16px!important;
+}}
+div[data-testid="stForm"] div[data-testid="stHorizontalBlock"]{{
+  align-items:end!important;
+}}
 div[data-testid="stBottomBlockContainer"]{{
   background:transparent!important;
   padding-top:18px!important;
@@ -179,8 +210,15 @@ div[data-testid="stChatInput"] > div{{
   background:transparent!important;
   border:none!important;
 }}
+div[data-testid="stChatInput"] form,
+div[data-testid="stChatInput"] [data-baseweb="textarea"],
+div[data-testid="stChatInput"] [data-baseweb="base-input"]{{
+  background:transparent!important;
+  border:none!important;
+  box-shadow:none!important;
+}}
 div[data-testid="stChatInput"] textarea{{
-  background:rgba(255,255,255,.03)!important;
+  background:rgba(15,23,42,.92)!important;
   border:1px solid rgba(148,163,184,.14)!important;
   border-radius:16px!important;
   color:var(--sigl-text-strong)!important;
@@ -302,6 +340,57 @@ div[data-testid="stMetricValue"]{{
   gap:8px;
   flex-wrap:wrap;
   align-items:center;
+}}
+.sigl-composer-head{{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:14px;
+  flex-wrap:wrap;
+  margin:0 0 14px;
+}}
+.sigl-composer-title{{
+  margin:0;
+  color:var(--sigl-text-strong);
+  font-size:1.02rem;
+  font-weight:900;
+}}
+.sigl-composer-copy{{
+  margin:5px 0 0;
+  color:var(--sigl-text-muted);
+  font-size:.82rem;
+  line-height:1.6;
+}}
+.sigl-composer-tools{{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  align-items:center;
+}}
+.sigl-composer-tool{{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:6px 11px;
+  border-radius:999px;
+  border:1px solid rgba(148,163,184,.16);
+  background:rgba(255,255,255,.04);
+  color:var(--sigl-text);
+  font-size:.74rem;
+  font-weight:800;
+}}
+.sigl-composer-meta{{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  align-items:center;
+  margin-top:12px;
+}}
+.sigl-composer-note{{
+  margin-top:12px;
+  color:var(--sigl-text-muted);
+  font-size:.8rem;
+  line-height:1.6;
 }}
 .sigl-badge{{
   display:inline-flex;
@@ -629,125 +718,47 @@ html,body{{
 }}
 *{{box-sizing:border-box}}
 .sigl-brand-shell{{
-  background:
-    radial-gradient(circle at top right, rgba(142,164,255,.10), transparent 34%),
-    linear-gradient(180deg, rgba(19,28,45,.98), rgba(15,23,42,.92));
-  border:1px solid var(--sigl-border-soft);
-  border-radius:22px;
-  box-shadow:var(--sigl-shadow-md);
-  overflow:hidden;
-}}
-.sigl-brand-top{{
   display:flex;
-  justify-content:space-between;
-  align-items:flex-start;
-  gap:18px;
-  flex-wrap:wrap;
-  padding:20px 22px 18px;
-  border-bottom:1px solid var(--sigl-border-soft);
+  align-items:center;
+  justify-content:flex-start;
+  min-height:96px;
+  padding:16px 22px;
+  background:linear-gradient(180deg, rgba(19,28,45,.98), rgba(15,23,42,.92));
+  border:1px solid var(--sigl-border-soft);
+  border-radius:20px;
+  box-shadow:var(--sigl-shadow-sm);
 }}
-.sigl-brand-mark{{
-  display:grid;
-  gap:8px;
+.sigl-brand-lockup{{
+  display:flex;
+  align-items:center;
+  gap:14px;
 }}
-.sigl-brand-eyebrow{{
-  margin:0;
-  color:var(--sigl-accent);
-  font-size:.78rem;
-  font-weight:800;
-  letter-spacing:.08em;
-  text-transform:uppercase;
+.sigl-brand-logo{{
+  width:48px;
+  height:48px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 auto;
 }}
+.sigl-brand-logo svg{{
+  width:48px;
+  height:48px;
+  display:block;
+}}
+.sigl-brand-mark{{display:flex;align-items:center}}
 .sigl-brand-name{{
   margin:0;
   color:var(--sigl-text-strong);
-  font-size:2rem;
+  font-size:2.15rem;
   font-weight:900;
   letter-spacing:-.03em;
 }}
-.sigl-brand-copy{{
-  margin:0;
-  color:var(--sigl-text-muted);
-  font-size:.88rem;
-  line-height:1.6;
-  max-width:56ch;
-}}
-.sigl-brand-chip-row{{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-  align-items:flex-start;
-}}
-.sigl-brand-chip{{
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  padding:8px 11px;
-  border-radius:999px;
-  border:1px solid rgba(148,163,184,.16);
-  background:rgba(255,255,255,.03);
-  color:var(--sigl-text);
-  font-size:.76rem;
-  font-weight:800;
-}}
-.sigl-brand-chip strong{{
-  color:var(--sigl-text-strong);
-}}
-.sigl-brand-chip--accent{{background:rgba(142,164,255,.14);border-color:rgba(142,164,255,.24);color:#D6DFFF}}
-.sigl-brand-chip--positive{{background:rgba(99,217,162,.14);border-color:rgba(99,217,162,.24);color:#C9F8E0}}
-.sigl-brand-chip--negative{{background:rgba(255,143,150,.14);border-color:rgba(255,143,150,.24);color:#FFD6DB}}
-.sigl-brand-chip--warning{{background:rgba(246,195,94,.14);border-color:rgba(246,195,94,.24);color:#FBE7B1}}
-.sigl-brand-main{{
-  display:grid;
-  grid-template-columns:minmax(0, 1.3fr) minmax(260px, .9fr);
-  gap:14px;
-  padding:18px 22px 22px;
-  align-items:stretch;
-}}
-.sigl-brand-card{{
-  background:rgba(255,255,255,.03);
-  border:1px solid rgba(148,163,184,.14);
-  border-radius:18px;
-  padding:16px 18px;
-}}
-.sigl-brand-card p{{margin:0}}
-.sigl-brand-label{{
-  color:var(--sigl-text-muted);
-  font-size:.76rem;
-  font-weight:800;
-  margin-bottom:8px!important;
-  text-transform:uppercase;
-  letter-spacing:.06em;
-}}
-.sigl-brand-focus{{
-  color:var(--sigl-text-strong);
-  font-size:1.55rem;
-  font-weight:900;
-  letter-spacing:-.03em;
-}}
-.sigl-brand-summary{{
-  color:var(--sigl-text);
-  font-size:.92rem;
-  line-height:1.65;
-}}
-.sigl-brand-grid{{
-  display:grid;
-  grid-template-columns:repeat(2, minmax(0,1fr));
-  gap:10px;
-}}
-.sigl-brand-mini{{
-  padding:12px 13px;
-  border-radius:14px;
-  border:1px solid rgba(148,163,184,.14);
-  background:rgba(255,255,255,.03);
-}}
-.sigl-brand-mini-value{{
-  color:var(--sigl-text-strong);
-  font-size:.98rem;
-  font-weight:800;
-}}
-@media (max-width: 860px){{
-  .sigl-brand-main{{grid-template-columns:1fr}}
+@media (max-width: 640px){{
+  .sigl-brand-shell{{padding:14px 18px;min-height:88px}}
+  .sigl-brand-logo,
+  .sigl-brand-logo svg{{width:42px;height:42px}}
+  .sigl-brand-name{{font-size:1.82rem}}
 }}
 """
 
