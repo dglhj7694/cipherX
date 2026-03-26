@@ -994,34 +994,47 @@ html,body{{
   max-width:100%;
 }}
 .sigl-brand-shell{{
+  position:relative;
   display:flex;
   align-items:center;
-  justify-content:center;
-  min-height:126px;
-  padding:22px 28px;
+  justify-content:space-between;
+  min-height:138px;
+  padding:24px 30px;
   background:
-    radial-gradient(circle at 12% 22%, rgba(34,197,94,.14), rgba(34,197,94,0) 28%),
-    radial-gradient(circle at 88% 26%, rgba(251,113,133,.12), rgba(251,113,133,0) 30%),
-    linear-gradient(180deg, rgba(19,28,45,.98), rgba(15,23,42,.92));
-  border:1px solid rgba(142,164,255,.22);
+    radial-gradient(circle at 10% 22%, rgba(34,197,94,.12), rgba(34,197,94,0) 30%),
+    radial-gradient(circle at 88% 20%, rgba(239,68,68,.12), rgba(239,68,68,0) 28%),
+    linear-gradient(135deg, rgba(15,23,42,.98), rgba(17,24,39,.96) 58%, rgba(27,36,56,.92));
+  border:1px solid rgba(148,163,184,.18);
   border-radius:22px;
-  box-shadow:0 18px 36px rgba(8,15,30,.24);
+  box-shadow:0 16px 36px rgba(8,15,30,.26);
   width:100%;
   max-width:100%;
   min-width:0;
+  overflow:hidden;
 }}
-.sigl-brand-lockup{{
+.sigl-brand-left,
+.sigl-brand-spacer{{
+  width:110px;
+  flex:0 0 110px;
   display:flex;
   align-items:center;
-  gap:20px;
-  min-width:0;
-  margin:0 auto;
-  width:100%;
+}}
+.sigl-brand-left{{justify-content:flex-start;z-index:2}}
+.sigl-brand-spacer{{justify-content:flex-end}}
+.sigl-brand-center{{
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%, -50%);
+  width:min(calc(100% - 260px), 620px);
+  display:flex;
+  align-items:center;
   justify-content:center;
+  pointer-events:none;
 }}
 .sigl-brand-logo{{
-  width:72px;
-  height:72px;
+  width:84px;
+  height:84px;
   display:flex;
   align-items:center;
   justify-content:center;
@@ -1029,54 +1042,79 @@ html,body{{
   filter:drop-shadow(0 12px 20px rgba(8,15,30,.22));
 }}
 .sigl-brand-logo svg{{
-  width:72px;
-  height:72px;
+  width:84px;
+  height:84px;
   display:block;
 }}
-.sigl-brand-mark{{
+.sigl-brand-wordmark{{
   display:flex;
   flex-direction:column;
   align-items:center;
   justify-content:center;
-  gap:2px;
-  min-width:220px;
+  gap:4px;
+  width:100%;
+  min-width:0;
   text-align:center;
 }}
-.sigl-brand-name{{
+.sigl-brand-root .sigl-brand-name,
+.sigl-brand-root .sigl-brand-name *{{
   margin:0;
-  color:#F8FAFC;
-  font-size:62px;
+  color:#F8FAFC !important;
+  font-size:66px !important;
   font-weight:900;
-  line-height:.92;
-  letter-spacing:-.065em;
-  overflow-wrap:anywhere;
-  text-shadow:0 0 18px rgba(93,123,255,.16);
+  line-height:.9;
+  letter-spacing:-.055em;
+  text-shadow:0 0 18px rgba(96,165,250,.11);
   white-space:nowrap;
+  font-family:{FONT_STACK} !important;
 }}
-.sigl-brand-prefix{{
-  color:#8EA4FF;
-  margin-right:.06em;
+.sigl-brand-root .sigl-brand-prefix{{
+  color:#4ADE80 !important;
+  margin-right:.04em;
 }}
-.sigl-brand-word{{
-  color:#F8FAFC;
+.sigl-brand-root .sigl-brand-word{{
+  color:#F8FAFC !important;
 }}
-.sigl-brand-sub{{
+.sigl-brand-root .sigl-brand-cursor{{
+  display:inline-block;
+  width:.42em;
+  height:.12em;
+  margin-left:.12em;
+  border-radius:999px;
+  background:linear-gradient(90deg, rgba(248,250,252,.32), rgba(239,68,68,.95));
+  vertical-align:middle;
+  transform:translateY(-.08em);
+  box-shadow:0 0 12px rgba(239,68,68,.22);
+}}
+.sigl-brand-root .sigl-brand-sub{{
   margin:0;
-  color:#94A3B8;
-  font-size:11px;
-  font-weight:800;
-  letter-spacing:.2em;
-  text-transform:uppercase;
+  color:#94A3B8 !important;
+  font-size:11px !important;
+  font-weight:700;
+  letter-spacing:.16em;
   white-space:nowrap;
+  text-transform:none;
+  font-family:{FONT_STACK} !important;
+}}
+@media (max-width: 920px){{
+  .sigl-brand-shell{{min-height:122px;padding:20px 22px}}
+  .sigl-brand-left,
+  .sigl-brand-spacer{{width:88px;flex-basis:88px}}
+  .sigl-brand-logo,
+  .sigl-brand-logo svg{{width:68px;height:68px}}
+  .sigl-brand-center{{width:min(calc(100% - 200px), 520px)}}
+  .sigl-brand-root .sigl-brand-name,
+  .sigl-brand-root .sigl-brand-name *{{font-size:56px !important}}
+  .sigl-brand-root .sigl-brand-sub{{font-size:10px !important;letter-spacing:.15em}}
 }}
 @media (max-width: 640px){{
-  .sigl-brand-shell{{padding:18px 18px;min-height:104px}}
-  .sigl-brand-logo,
-  .sigl-brand-logo svg{{width:56px;height:56px}}
-  .sigl-brand-lockup{{gap:14px}}
-  .sigl-brand-mark{{min-width:170px}}
-  .sigl-brand-name{{font-size:42px}}
-  .sigl-brand-sub{{font-size:9px;letter-spacing:.16em}}
+  .sigl-brand-shell{{padding:18px 18px;min-height:102px;justify-content:center}}
+  .sigl-brand-left,
+  .sigl-brand-spacer{{display:none}}
+  .sigl-brand-center{{position:static;transform:none;width:100%}}
+  .sigl-brand-root .sigl-brand-name,
+  .sigl-brand-root .sigl-brand-name *{{font-size:42px !important}}
+  .sigl-brand-root .sigl-brand-sub{{font-size:9px !important;letter-spacing:.12em}}
 }}
 """
 
