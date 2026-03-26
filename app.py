@@ -4,7 +4,6 @@
 # ══════════════════════════════════════════════════════════════
 
 import streamlit as st, google.generativeai as genai
-import streamlit.components.v1 as components
 import time, math, html
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -256,66 +255,9 @@ def _sigl_badge(label, tone='muted'):
     return f"<span class='sigl-badge sigl-badge--{tone}'>{safe}</span>"
 
 
-def _app_component_doc(inner_html):
-    return (
-        "<!doctype html><html><head><meta charset='utf-8'>"
-        f"{build_app_theme_css()}"
-        "</head><body style='margin:0;background:transparent;overflow:hidden'>"
-        f"<div id='sigl-root' style='display:block'>{inner_html}</div>"
-        """
-        <script>
-        (function () {
-          const resizeFrame = () => {
-            const rootEl = document.getElementById('sigl-root');
-            if (!window.frameElement || !rootEl) {
-              return;
-            }
-            const height = Math.max(
-              rootEl.scrollHeight || 0,
-              Math.ceil(rootEl.getBoundingClientRect().height || 0)
-            );
-            if (height) {
-              const nextHeight = Math.ceil(height);
-              const currentHeight = parseFloat(
-                window.frameElement.style.height || window.frameElement.getAttribute('height') || "0"
-              );
-              if (!currentHeight || Math.abs(currentHeight - nextHeight) > 1) {
-                window.frameElement.style.height = `${nextHeight}px`;
-              }
-            }
-          };
-          const scheduleResize = () => window.requestAnimationFrame(resizeFrame);
-          window.addEventListener('load', resizeFrame);
-          window.addEventListener('resize', scheduleResize);
-          document.addEventListener('DOMContentLoaded', scheduleResize);
-          const rootEl = document.getElementById('sigl-root');
-          if (window.ResizeObserver && rootEl) {
-            const observer = new ResizeObserver(() => scheduleResize());
-            observer.observe(rootEl);
-          }
-          if (window.MutationObserver && rootEl) {
-            const mutationObserver = new MutationObserver(() => scheduleResize());
-            mutationObserver.observe(rootEl, {
-              childList: true,
-              subtree: true,
-              attributes: true,
-              characterData: true
-            });
-          }
-          setTimeout(resizeFrame, 0);
-          setTimeout(resizeFrame, 120);
-          setTimeout(resizeFrame, 320);
-          setTimeout(resizeFrame, 720);
-        })();
-        </script>
-        </body></html>
-        """
-    )
-
-
 def _render_surface_html(inner_html, height):
     del height
-    st.markdown(inner_html, unsafe_allow_html=True)
+    st.markdown(f"<div class='sigl-html-block'>{inner_html}</div>", unsafe_allow_html=True)
 
 
 def _normalized_selected_sectors(value):
@@ -421,9 +363,7 @@ def _render_scanner_selection_panel(selected_sectors, selected_list):
             <div class="sigl-code-list">{chips}</div>
         </div>
         """
-    chip_rows = max(1, math.ceil(max(count, 1) / 6))
-    panel_height = min(420, 226 + chip_rows * 30)
-    _render_surface_html(panel_html, panel_height)
+    _render_surface_html(panel_html, 0)
 
 
 def _render_scanner_summary(results, total_count):
@@ -434,26 +374,17 @@ def _render_scanner_summary(results, total_count):
         ("매도 후보", str(sell_count), "판단이 SELL 계열인 종목 수", "negative"),
         ("매치 수", f"{len(results)}/{total_count}", "전체 스캔 대상 대비 현재 결과", "accent"),
     ]
-    top_cols = st.columns(2)
-    for col, (label, value, sub, tone) in zip(top_cols, cards[:2]):
-        with col:
-            card_html = f"""
-            <div class="sigl-metric-card sigl-metric-card--summary sigl-metric-card--{tone}">
-                <p class="sigl-metric-label">{html.escape(label)}</p>
-                <p class="sigl-metric-value">{html.escape(value)}</p>
-                <p class="sigl-metric-sub">{html.escape(sub)}</p>
-            </div>
-            """
-            _render_surface_html(card_html, 132)
-    label, value, sub, tone = cards[2]
-    card_html = f"""
-    <div class="sigl-metric-card sigl-metric-card--summary sigl-metric-card--{tone}">
-        <p class="sigl-metric-label">{html.escape(label)}</p>
-        <p class="sigl-metric-value">{html.escape(value)}</p>
-        <p class="sigl-metric-sub">{html.escape(sub)}</p>
-    </div>
-    """
-    _render_surface_html(card_html, 132)
+    cards_html = "".join(
+        f"""
+        <div class="sigl-metric-card sigl-metric-card--summary sigl-metric-card--{tone}">
+            <p class="sigl-metric-label">{html.escape(label)}</p>
+            <p class="sigl-metric-value">{html.escape(value)}</p>
+            <p class="sigl-metric-sub">{html.escape(sub)}</p>
+        </div>
+        """
+        for label, value, sub, tone in cards
+    )
+    _render_surface_html(f"<div class='sigl-result-summary'>{cards_html}</div>", 0)
 
 
 def _render_scanner_result_card(rank, row):
@@ -477,7 +408,11 @@ def _render_scanner_result_card(rank, row):
     ) or _sigl_badge("최근 다중 시그널 없음", 'muted')
     reason_html = ""
     if row.get('reason'):
-        reason_html = f"<p class='sigl-summary'>{html.escape(str(row['reason'])[:120])}</p>"
+        reason_html = (
+            f"<div class='sigl-note'>"
+            f"<span class='sigl-summary'>{html.escape(str(row['reason'])[:120])}</span>"
+            f"</div>"
+        )
     change_prefix = "+" if float(row.get('chg', 0) or 0) >= 0 else ""
     panel_html = f"""
         <div class="sigl-result-card {tone_class}">
@@ -500,12 +435,7 @@ def _render_scanner_result_card(rank, row):
             {reason_html}
         </div>
         """
-    card_height = 188
-    if row.get('reason'):
-        card_height += 34
-    if row.get('transitions'):
-        card_height += 8
-    _render_surface_html(panel_html, card_height)
+    _render_surface_html(panel_html, 0)
 
 def _format_board_text(value, fallback="--"):
     text = str(value).strip() if value is not None else ""
@@ -956,8 +886,7 @@ def _build_brand_payload(current_mode, chart_period):
     }
 
 def _render_brand_board(payload, compact=False):
-    height = 92 if compact else 122
-    components.html(build_brand_board(payload, compact=compact), height=height, scrolling=False)
+    st.markdown(build_brand_board(payload, compact=compact), unsafe_allow_html=True)
     if not compact:
         st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 

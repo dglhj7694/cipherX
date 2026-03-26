@@ -22,13 +22,9 @@ def _esc(value, fallback="--"):
 def build_brand_board(payload, compact=False):
     brand_code = _esc(payload.get("brand_code"), BRAND_NAME)
 
-    return f"""<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <style>{build_brand_theme_css()}</style>
-</head>
-<body>
+    return f"""
+<style>{build_brand_theme_css()}</style>
+<div class="sigl-html-block sigl-brand-root">
   <div class="sigl-brand-shell">
     <div class="sigl-brand-lockup">
       <div class="sigl-brand-logo" aria-hidden="true">
@@ -51,5 +47,4 @@ def build_brand_board(payload, compact=False):
       </div>
     </div>
   </div>
-</body>
-</html>"""
+</div>"""

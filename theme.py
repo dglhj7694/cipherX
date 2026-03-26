@@ -44,6 +44,12 @@ html,body,[class*="css"]{{
   font-family:{FONT_STACK}!important;
   color:var(--sigl-text)!important;
 }}
+html,body{{
+  overflow-x:hidden!important;
+}}
+*,*::before,*::after{{
+  box-sizing:border-box;
+}}
 body{{
   background:var(--sigl-bg-app);
 }}
@@ -51,6 +57,7 @@ body{{
   background:
     radial-gradient(circle at top left, rgba(142,164,255,.10), transparent 28%),
     linear-gradient(180deg, #0B1020 0%, #0E1425 100%);
+  overflow-x:hidden!important;
 }}
 div[data-testid="stAppViewContainer"],
 div[data-testid="stAppViewContainer"] > .main,
@@ -61,6 +68,14 @@ section.main > div,
 section[data-testid="stMain"] > div,
 div[data-testid="stMainBlockContainer"]{{
   background:linear-gradient(180deg, #0B1020 0%, #0E1425 100%)!important;
+  min-width:0!important;
+  overflow-x:hidden!important;
+}}
+div[data-testid="stVerticalBlock"],
+div[data-testid="stHorizontalBlock"],
+div[data-testid="column"],
+.element-container{{
+  min-width:0!important;
 }}
 p,li,span,div{{
   color:inherit;
@@ -126,6 +141,13 @@ div[data-testid="stTabs"] button{{
 div[data-testid="stTabs"] button[aria-selected="true"]{{
   color:var(--sigl-text-strong)!important;
   border-bottom-color:var(--sigl-accent)!important;
+}}
+div[data-testid="stTabs"] [role="tablist"]{{
+  flex-wrap:wrap!important;
+  gap:6px!important;
+}}
+div[data-testid="stTabs"] [role="tabpanel"]{{
+  min-width:0!important;
 }}
 div.stButton>button{{
   border-radius:14px!important;
@@ -227,6 +249,9 @@ div[data-testid="stForm"] div[data-testid="stFormSubmitButton"] button:not([kind
 div[data-testid="stForm"] div[data-testid="stHorizontalBlock"]{{
   align-items:end!important;
 }}
+div[data-testid="stForm"] div[data-testid="stHorizontalBlock"] > div{{
+  min-width:0!important;
+}}
 div[data-testid="stBottom"],
 div[data-testid="stBottom"] > div,
 div.stChatFloatingInputContainer,
@@ -326,6 +351,8 @@ div[data-testid="stMetricValue"]{{
   color:var(--sigl-text-strong);
   font-size:1.28rem;
   font-weight:900;
+  line-height:1.25;
+  overflow-wrap:anywhere;
 }}
 .sigl-page-head__copy{{
   margin:6px 0 0;
@@ -360,6 +387,12 @@ div[data-testid="stMetricValue"]{{
   flex-wrap:wrap;
   align-items:center;
   justify-content:flex-end;
+  min-width:0;
+}}
+.sigl-html-block{{
+  width:100%;
+  max-width:100%;
+  min-width:0;
 }}
 .sigl-section-shell{{
   margin:18px 0 12px;
@@ -548,6 +581,7 @@ div[data-testid="stMetricValue"]{{
   gap:8px;
   flex-wrap:wrap;
   margin-top:12px;
+  align-items:flex-start;
 }}
 .sigl-chip{{
   display:inline-flex;
@@ -600,6 +634,7 @@ div[data-testid="stMetricValue"]{{
   font-size:2.15rem;
   font-weight:900;
   letter-spacing:-.03em;
+  overflow-wrap:anywhere;
 }}
 .sigl-price-change--up{{color:var(--sigl-success)!important}}
 .sigl-price-change--down{{color:var(--sigl-danger)!important}}
@@ -607,6 +642,7 @@ div[data-testid="stMetricValue"]{{
 .sigl-focus-stack{{
   display:grid;
   gap:10px;
+  min-width:0;
 }}
 .sigl-metric-card{{
   background:rgba(255,255,255,.03);
@@ -615,6 +651,8 @@ div[data-testid="stMetricValue"]{{
   padding:14px 15px;
   min-height:112px;
   min-width:0;
+  width:100%;
+  max-width:100%;
 }}
 .sigl-metric-card--summary{{
   min-height:104px;
@@ -676,6 +714,8 @@ div[data-testid="stMetricValue"]{{
   border-radius:14px;
   padding:13px 14px;
   min-width:0;
+  width:100%;
+  max-width:100%;
 }}
 .sigl-committee-name{{
   margin:0 0 4px;
@@ -729,6 +769,7 @@ div[data-testid="stMetricValue"]{{
   overflow:hidden;
   border:1px solid rgba(148,163,184,.16);
   background:linear-gradient(90deg,rgba(99,217,162,.08),rgba(148,163,184,.04),rgba(255,143,150,.08));
+  min-width:0;
 }}
 .sigl-layer-fill--buy,
 .sigl-layer-fill--sell{{
@@ -751,10 +792,14 @@ div[data-testid="stMetricValue"]{{
   color:var(--sigl-text);
   font-size:.72rem;
   font-weight:800;
+  max-width:calc(100% - 14px);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
 }}
 .sigl-result-summary{{
   display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));
   gap:12px;
   margin-bottom:14px;
 }}
@@ -765,6 +810,8 @@ div[data-testid="stMetricValue"]{{
   padding:16px 18px;
   box-shadow:var(--sigl-shadow-sm);
   margin:8px 0;
+  width:100%;
+  max-width:100%;
 }}
 .sigl-result-head{{
   display:flex;
@@ -794,6 +841,7 @@ div[data-testid="stMetricValue"]{{
   flex-wrap:wrap;
   justify-content:flex-end;
   min-width:0;
+  align-items:flex-start;
 }}
 .sigl-code-list{{
   display:flex;
@@ -801,6 +849,8 @@ div[data-testid="stMetricValue"]{{
   flex-wrap:wrap;
   max-height:120px;
   overflow:auto;
+  align-items:flex-start;
+  max-width:100%;
 }}
 .sigl-code-chip{{
   display:inline-flex;
@@ -812,6 +862,9 @@ div[data-testid="stMetricValue"]{{
   color:var(--sigl-text);
   font-size:.76rem;
   font-weight:800;
+  max-width:100%;
+  overflow-wrap:anywhere;
+  word-break:break-word;
 }}
 .sigl-empty{{
   color:var(--sigl-text-muted);
@@ -869,6 +922,10 @@ p[data-testid="stCaption"]{{
 .soft-note{{color:var(--sigl-text-muted);font-size:.8rem;line-height:1.6;margin-top:10px}}
 @media (max-width: 980px){{
   .sigl-page-banner__meta{{justify-content:flex-start}}
+  .sigl-result-tags{{justify-content:flex-start}}
+  .sigl-price-top,
+  .sigl-result-head,
+  .sigl-page-head{{align-items:flex-start}}
   .sigl-grid--5{{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}}
   .sigl-layer-row{{grid-template-columns:54px 1fr 54px;gap:8px}}
   .sigl-layer-track{{height:28px}}
@@ -891,6 +948,14 @@ p[data-testid="stCaption"]{{
   .sigl-card{{padding:14px 14px}}
   .sigl-metric-card,
   .sigl-committee-card{{padding:13px 13px}}
+  div[data-testid="stForm"] div[data-testid="stHorizontalBlock"]{{
+    flex-direction:column!important;
+    align-items:stretch!important;
+    gap:10px!important;
+  }}
+  div[data-testid="stForm"] div[data-testid="stHorizontalBlock"] > div{{
+    width:100%!important;
+  }}
   div[data-testid="stChatInput"]{{max-width:none}}
 }}
 </style>"""
@@ -908,6 +973,10 @@ html,body{{
   color:var(--sigl-text);
 }}
 *{{box-sizing:border-box}}
+.sigl-brand-root{{
+  width:100%;
+  max-width:100%;
+}}
 .sigl-brand-shell{{
   display:flex;
   align-items:center;
@@ -918,11 +987,15 @@ html,body{{
   border:1px solid var(--sigl-border-soft);
   border-radius:20px;
   box-shadow:var(--sigl-shadow-sm);
+  width:100%;
+  max-width:100%;
+  min-width:0;
 }}
 .sigl-brand-lockup{{
   display:flex;
   align-items:center;
   gap:14px;
+  min-width:0;
 }}
 .sigl-brand-logo{{
   width:48px;
@@ -937,13 +1010,14 @@ html,body{{
   height:48px;
   display:block;
 }}
-.sigl-brand-mark{{display:flex;align-items:center}}
+.sigl-brand-mark{{display:flex;align-items:center;min-width:0}}
 .sigl-brand-name{{
   margin:0;
   color:var(--sigl-text-strong);
   font-size:2.15rem;
   font-weight:900;
   letter-spacing:-.03em;
+  overflow-wrap:anywhere;
 }}
 @media (max-width: 640px){{
   .sigl-brand-shell{{padding:14px 18px;min-height:88px}}

@@ -14,7 +14,7 @@ from localization import (
     localize_regime_label,
     translate_chart_text,
 )
-from theme import PLOTLY_FONT_FAMILY, build_app_theme_css
+from theme import PLOTLY_FONT_FAMILY
 
 
 SOFT_GREEN = "#63D9A2"
@@ -72,7 +72,7 @@ def _badge(label, tone="muted"):
 
 def _render_panel_html(inner_html, min_height=240):
     del min_height
-    st.markdown(inner_html, unsafe_allow_html=True)
+    st.markdown(f"<div class='sigl-html-block'>{inner_html}</div>", unsafe_allow_html=True)
 
 
 def _progress_metric_card(label, value, sub, tone, fill):
