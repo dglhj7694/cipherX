@@ -819,10 +819,10 @@ def _build_brand_payload(current_mode, chart_period):
     }
 
 def _render_brand_board(payload, compact=False):
-    height = 340 if compact else 560
+    height = 340 if compact else 760
     components.html(build_brand_board(payload, compact=compact), height=height, scrolling=False)
     if not compact:
-        st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
 def _render_scanner_guide(tickers, scan_source):
     target_count = len(tickers)
