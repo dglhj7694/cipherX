@@ -87,10 +87,6 @@ textarea{{
   color:var(--sigl-text-strong)!important;
   border-radius:14px!important;
 }}
-div[data-testid="stTextInput"] input{{
-  min-height:50px!important;
-  padding-left:14px!important;
-}}
 div[data-baseweb="select"] span,
 div[data-baseweb="select"] input,
 div[data-baseweb="select"] div{{
@@ -163,40 +159,8 @@ div[data-testid="stChatMessage"]{{
   padding:16px 18px;
   box-shadow:var(--sigl-shadow-sm);
 }}
-div[data-testid="stForm"],
-form[data-testid="stForm"]{{
-  margin:16px 0 18px!important;
-  padding:18px!important;
-  border:1px solid var(--sigl-border-soft)!important;
-  border-radius:24px!important;
-  background:
-    linear-gradient(180deg, rgba(142,164,255,.08), rgba(142,164,255,0) 34%),
-    linear-gradient(180deg, rgba(19,28,45,.98), rgba(15,23,42,.94))!important;
-  box-shadow:var(--sigl-shadow-md)!important;
-}}
-div[data-testid="stForm"] div[data-testid="stTextInput"] input,
-form[data-testid="stForm"] div[data-testid="stTextInput"] input{{
-  min-height:58px!important;
-  border-radius:18px!important;
-  border-color:rgba(148,163,184,.18)!important;
-  background:rgba(9,15,28,.54)!important;
-  font-size:.98rem!important;
-  padding-left:16px!important;
-}}
-div[data-testid="stForm"] div.stButton>button,
-form[data-testid="stForm"] div.stButton>button,
-div[data-testid="stForm"] div[data-testid="stFormSubmitButton"] button,
-form[data-testid="stForm"] div[data-testid="stFormSubmitButton"] button{{
-  min-height:58px!important;
-  border-radius:18px!important;
-}}
-div[data-testid="stForm"] div[data-testid="stHorizontalBlock"],
-form[data-testid="stForm"] div[data-testid="stHorizontalBlock"]{{
-  align-items:end!important;
-}}
 div[data-testid="stBottomBlockContainer"]{{
-  background:
-    linear-gradient(180deg, rgba(11,16,32,0) 0%, rgba(11,16,32,.82) 32%, rgba(11,16,32,.98) 100%)!important;
+  background:transparent!important;
   padding-top:18px!important;
 }}
 div[data-testid="stBottomBlockContainer"] > div{{
@@ -205,13 +169,11 @@ div[data-testid="stBottomBlockContainer"] > div{{
 div[data-testid="stChatInput"]{{
   margin:0 auto 10px!important;
   max-width:980px;
-  padding:10px 12px!important;
-  border-radius:22px!important;
-  border:1px solid var(--sigl-border-soft)!important;
-  background:
-    linear-gradient(180deg, rgba(142,164,255,.08), rgba(142,164,255,0) 36%),
-    linear-gradient(180deg, rgba(19,28,45,.98), rgba(15,23,42,.94))!important;
-  box-shadow:var(--sigl-shadow-md)!important;
+  padding:0!important;
+  border:none!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
 }}
 div[data-testid="stChatInput"] > div{{
   background:transparent!important;
@@ -340,57 +302,6 @@ div[data-testid="stMetricValue"]{{
   gap:8px;
   flex-wrap:wrap;
   align-items:center;
-}}
-.sigl-composer-head{{
-  display:flex;
-  justify-content:space-between;
-  align-items:flex-start;
-  gap:14px;
-  flex-wrap:wrap;
-  margin:0 0 14px;
-}}
-.sigl-composer-title{{
-  margin:0;
-  color:var(--sigl-text-strong);
-  font-size:1.02rem;
-  font-weight:900;
-}}
-.sigl-composer-copy{{
-  margin:5px 0 0;
-  color:var(--sigl-text-muted);
-  font-size:.82rem;
-  line-height:1.6;
-}}
-.sigl-composer-tools{{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-  align-items:center;
-}}
-.sigl-composer-tool{{
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  padding:6px 11px;
-  border-radius:999px;
-  border:1px solid rgba(148,163,184,.16);
-  background:rgba(255,255,255,.04);
-  color:var(--sigl-text);
-  font-size:.74rem;
-  font-weight:800;
-}}
-.sigl-composer-meta{{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-  align-items:center;
-  margin-top:12px;
-}}
-.sigl-composer-note{{
-  margin-top:12px;
-  color:var(--sigl-text-muted);
-  font-size:.8rem;
-  line-height:1.6;
 }}
 .sigl-badge{{
   display:inline-flex;
@@ -634,9 +545,8 @@ div[data-testid="stMetricValue"]{{
   display:flex;
   gap:8px;
   flex-wrap:wrap;
-  max-height:180px;
+  max-height:120px;
   overflow:auto;
-  padding-right:4px;
 }}
 .sigl-code-chip{{
   display:inline-flex;
@@ -789,9 +699,9 @@ html,body{{
 .sigl-brand-chip--warning{{background:rgba(246,195,94,.14);border-color:rgba(246,195,94,.24);color:#FBE7B1}}
 .sigl-brand-main{{
   display:grid;
-  grid-template-columns:minmax(0, 1.35fr) minmax(300px, 1fr);
+  grid-template-columns:minmax(0, 1.3fr) minmax(260px, .9fr);
   gap:14px;
-  padding:16px 20px 18px;
+  padding:18px 22px 22px;
   align-items:stretch;
 }}
 .sigl-brand-card{{
@@ -819,13 +729,11 @@ html,body{{
   color:var(--sigl-text);
   font-size:.92rem;
   line-height:1.65;
-  margin-top:8px!important;
 }}
 .sigl-brand-grid{{
   display:grid;
   grid-template-columns:repeat(2, minmax(0,1fr));
   gap:10px;
-  align-content:start;
 }}
 .sigl-brand-mini{{
   padding:12px 13px;
@@ -835,12 +743,10 @@ html,body{{
 }}
 .sigl-brand-mini-value{{
   color:var(--sigl-text-strong);
-  font-size:.95rem;
+  font-size:.98rem;
   font-weight:800;
-  line-height:1.42;
-  overflow-wrap:anywhere;
 }}
-@media (max-width: 980px){{
+@media (max-width: 860px){{
   .sigl-brand-main{{grid-template-columns:1fr}}
 }}
 """
