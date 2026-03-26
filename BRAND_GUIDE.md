@@ -1,37 +1,47 @@
 # SIGL Brand Guide
 
 ## Core Identity
-- Public name: `SIGL`
+- Canonical syntax: `[ SIGL ]`
 - Hidden meaning: `Signal`
 - Read order: ticker code first, meaning second
-- Tone: terminal-like, sharp, understated, credible
+- Tone: terminal-like, sharp, premium, restrained
 - Rule: no visible version text on user-facing surfaces
 
-## Logo Direction
-- The logo is text-first, not symbol-first.
-- `SIGL` should look like a real 4-letter market code on a trading screen.
-- Avoid badges, shields, compass marks, or decorative emblems as the primary identity.
-- The personality comes from layout, spacing, board styling, and motion rather than a standalone icon.
-
 ## Header System
-- Main header should feel like a live HTS/MTS board.
+- The header should feel like a premium trading terminal, not a marketing hero.
 - Structure:
-  - left: dominant `SIGL` code block
-  - right: live tiles for `MODE`, `FOCUS`, `ES`, `JUDG`, `CTX`, `PERIOD`
+  - left: `[ SIGL ]` banner
+  - top line: `STATUS: ... | FEED: ...` with one slow pulse indicator
+  - right: six terminal tiles for `MODE`, `TARGET`, `ES`, `SIGNAL`, `CTX`, `SPAN`
   - bottom: scrolling ticker strip
-- Sidebar should use a compact mini-board version of the same system.
-- Supporting copy should hint at signal-reading, but `SIGL` remains the hero.
+- Sidebar uses the same system in a compact mini-board layout.
 
-## Copy Rules
-- Keep brand copy short and market-aware.
-- Prefer phrases like:
-  - `Read the quieter market signal before price gets loud.`
-  - `Signal first. Structure next. Conviction last.`
-- Do not spell out `SIGL = Signal` as a headline.
-- Do not show version labels in headers, prompts, downloads, or lockups.
+## Data Rules
+- Tiles must be backed by real app state when available.
+- Analysis defaults:
+  - `TARGET WAIT`
+  - `ES --`
+  - `SIGNAL IDLE`
+  - `CTX STANDBY`
+  - `SPAN 6M`
+- The ticker strip should prefer:
+  - recent analyzed tickers from app history
+  - current scan results
+  - branded placeholders only as a final fallback
 
-## UI Notes
-- Use dark exchange-board tones with restrained accent color shifts.
-- Values should feel dense and scannable, like terminal cells.
-- Motion should be limited to the ticker strip and subtle ambient emphasis.
-- Empty state must still look intentional with placeholders such as `WAIT`, `IDLE`, `READY`, and `--`.
+## Copy Voice
+- Keep the terminal voice strong in chrome, status text, and short action labels.
+- Preferred phrases:
+  - `READING THE TAPE`
+  - `DATA FEED ESTABLISHED`
+  - `SIGNAL READY`
+  - `QUANT AUDIT`
+- Keep long-form Korean analysis explanations readable and mostly unchanged.
+
+## Visual Rules
+- Use mono typography for brand syntax, tiles, status line, and ticker tape.
+- Motion stays restrained:
+  - slow pulse indicator
+  - continuous marquee strip
+- Avoid fake exchange claims such as `LIVE_NASDAQ`.
+- Avoid alternate brand syntaxes such as `$SIGL`, `SIGL:US`, or `SIGL.PRO`.

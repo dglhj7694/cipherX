@@ -114,55 +114,6 @@ border:1px solid rgba(99,102,241,.28);border-radius:16px;padding:14px 16px;margi
 .guide-step-title{color:#F8FAFC;font-size:.84rem;font-weight:800;margin:0 0 4px}
 .guide-step-copy{color:#94A3B8;font-size:.77rem;line-height:1.55;margin:0}
 .soft-note{color:#94A3B8;font-size:.76rem;line-height:1.55;margin-top:10px}
-.sigl-board{--sigl-accent:#A5B4FC;--sigl-accent-soft:rgba(165,180,252,.18);--sigl-accent-strong:rgba(165,180,252,.34);
-background:
-linear-gradient(180deg,rgba(4,7,12,.98),rgba(11,14,20,.98)),
-radial-gradient(circle at top right,rgba(165,180,252,.08),transparent 34%);
-border:1px solid rgba(148,163,184,.16);border-radius:18px;overflow:hidden;position:relative;margin:0 0 16px;
-box-shadow:0 18px 42px rgba(2,6,23,.34)}
-.sigl-board:before{content:"";position:absolute;inset:0;background:
-linear-gradient(90deg,transparent 0,transparent calc(100% - 1px),rgba(148,163,184,.04) calc(100% - 1px)),
-linear-gradient(0deg,transparent 0,transparent calc(100% - 1px),rgba(148,163,184,.04) calc(100% - 1px));
-background-size:28px 28px;pointer-events:none;opacity:.55}
-.sigl-board--bull{--sigl-accent:#63D9A2;--sigl-accent-soft:rgba(99,217,162,.18);--sigl-accent-strong:rgba(99,217,162,.34)}
-.sigl-board--bear{--sigl-accent:#FF8F96;--sigl-accent-soft:rgba(255,143,150,.16);--sigl-accent-strong:rgba(255,143,150,.34)}
-.sigl-board--neutral{--sigl-accent:#F6C35E;--sigl-accent-soft:rgba(246,195,94,.16);--sigl-accent-strong:rgba(246,195,94,.32)}
-.sigl-board--scanner{--sigl-accent:#7DD3FC;--sigl-accent-soft:rgba(125,211,252,.16);--sigl-accent-strong:rgba(125,211,252,.32)}
-.sigl-board-shell{position:relative;display:grid;grid-template-columns:minmax(240px,300px) 1fr;gap:14px;padding:16px}
-.sigl-code-panel,.sigl-data-panel{position:relative;z-index:1}
-.sigl-code-panel{display:flex;flex-direction:column;justify-content:space-between;gap:12px;
-background:linear-gradient(180deg,rgba(9,12,18,.96),rgba(7,10,15,.9));border:1px solid rgba(148,163,184,.14);
-border-radius:14px;padding:14px;box-shadow:inset 0 1px 0 rgba(248,250,252,.04)}
-.sigl-kicker{margin:0;color:var(--sigl-accent);font-size:.72rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
-.sigl-code-row{display:grid;grid-template-columns:repeat(4,minmax(42px,1fr));gap:8px}
-.sigl-code-cell{display:grid;place-items:center;min-height:62px;border-radius:12px;
-background:linear-gradient(180deg,#151A24,#0B0E14);border:1px solid rgba(226,232,240,.10);border-bottom-color:var(--sigl-accent-strong);
-color:#F8FAFC;font-family:"JetBrains Mono","SFMono-Regular",Consolas,monospace;font-size:2rem;font-weight:800;letter-spacing:.08em;
-box-shadow:inset 0 1px 0 rgba(248,250,252,.03)}
-.sigl-code-cell--accent{color:var(--sigl-accent);text-shadow:0 0 16px rgba(255,255,255,.04)}
-.sigl-board-summary{margin:0;color:#94A3B8;font-size:.82rem;line-height:1.55;max-width:30ch}
-.sigl-data-panel{background:linear-gradient(180deg,rgba(9,12,18,.94),rgba(7,10,15,.86));border:1px solid rgba(148,163,184,.14);
-border-radius:14px;padding:12px}
-.sigl-tile-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
-.sigl-tile{background:linear-gradient(180deg,rgba(15,19,28,.96),rgba(10,13,20,.88));border:1px solid rgba(148,163,184,.12);
-border-radius:12px;padding:10px 12px;min-height:74px;display:flex;flex-direction:column;justify-content:center}
-.sigl-tile-label{margin:0 0 6px;color:#64748B;font-size:.66rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
-.sigl-tile-value{margin:0;color:#F8FAFC;font-size:1.08rem;font-weight:800;line-height:1.2;
-font-family:"JetBrains Mono","SFMono-Regular",Consolas,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sigl-tape{position:relative;z-index:1;border-top:1px solid rgba(148,163,184,.12);background:rgba(7,10,15,.92);overflow:hidden}
-.sigl-tape-track{display:flex;gap:26px;width:max-content;padding:10px 0;animation:siglMarquee 30s linear infinite}
-.sigl-tape-item{display:inline-flex;align-items:center;gap:10px;color:#CBD5E1;font-size:.78rem;font-weight:700;letter-spacing:.04em;white-space:nowrap}
-.sigl-tape-dot{width:7px;height:7px;border-radius:999px;background:var(--sigl-accent);box-shadow:0 0 10px var(--sigl-accent)}
-.sigl-board--compact{margin:12px 0 10px}
-.sigl-board--compact .sigl-board-shell{grid-template-columns:1fr;padding:12px;gap:10px}
-.sigl-board--compact .sigl-code-panel,.sigl-board--compact .sigl-data-panel{padding:10px}
-.sigl-board--compact .sigl-code-cell{min-height:48px;font-size:1.35rem}
-.sigl-board--compact .sigl-board-summary{display:none}
-.sigl-board--compact .sigl-tile-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-.sigl-board--compact .sigl-tile{min-height:62px;padding:9px 10px}
-.sigl-board--compact .sigl-tile-value{font-size:.92rem}
-.sigl-board--compact .sigl-tape-track{gap:18px;padding:8px 0;animation-duration:24s}
-@keyframes siglMarquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 div[data-testid="stExpander"]{
   background:linear-gradient(160deg,rgba(15,23,42,.94),rgba(17,24,39,.86))!important;
   border:1px solid rgba(148,163,184,.16)!important;
@@ -267,9 +218,6 @@ div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] blockquote{
   .price-big{font-size:1.78rem}
   .analysis-nav{padding:12px}
   .guide-grid{grid-template-columns:1fr}
-  .sigl-board-shell{grid-template-columns:1fr}
-  .sigl-tile-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .sigl-code-cell{min-height:54px;font-size:1.55rem}
 }
 </style>""", unsafe_allow_html=True)
 
@@ -476,6 +424,9 @@ def _format_board_text(value, fallback="--"):
     text = str(value).strip() if value is not None else ""
     return text or fallback
 
+def _format_board_code(value, fallback="--"):
+    return _format_board_text(value, fallback).upper()
+
 def _format_board_es(value):
     try:
         return f"{float(value):+.1f}"
@@ -495,6 +446,61 @@ def _latest_analysis_message():
         if msg.get("type") == "analysis":
             return msg
     return None
+
+def _dedupe_board_items(items, limit=12):
+    unique = []
+    seen = set()
+    for item in items:
+        text = str(item).strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        unique.append(text)
+        if len(unique) >= limit:
+            break
+    return unique
+
+def _recent_analysis_tape_items(limit=6):
+    items = []
+    seen = set()
+    for msg in reversed(st.session_state.get('messages', [])):
+        if msg.get("type") != "analysis":
+            continue
+        ticker = _format_board_code(msg.get('ticker'), "")
+        if not ticker or ticker in seen:
+            continue
+        seen.add(ticker)
+        meta = msg.get('meta') or {}
+        signal = _format_board_code(meta.get('judgment') or meta.get('action_label'), "IDLE")
+        items.append(f"{ticker} ES {_format_board_es(meta.get('ensemble_score'))} [{signal}]")
+        if len(items) >= limit:
+            break
+    return items
+
+def _scan_tape_items(limit=6):
+    items = []
+    for row in st.session_state.get('scan_results', [])[:limit]:
+        ticker = _format_board_code(row.get('ticker'), "")
+        if not ticker:
+            continue
+        signal = _format_board_code(row.get('jg_key') or row.get('action') or row.get('jg'), "READY")
+        items.append(f"{ticker} ES {_format_board_es(row.get('es'))} [{signal}]")
+    return items
+
+def _build_board_marquee(base_items):
+    history_items = _recent_analysis_tape_items()
+    if history_items:
+        return _dedupe_board_items([*base_items, *history_items])
+    scan_items = _scan_tape_items()
+    if scan_items:
+        return _dedupe_board_items([*base_items, *scan_items])
+    return _dedupe_board_items([
+        *base_items,
+        f"[ {BRAND_NAME} ] READY",
+        "TARGET WAIT",
+        "ES --",
+        "SIGNAL IDLE",
+    ])
 
 def _resolve_board_tone(mode_label, judgment, es_value):
     judgment_text = str(judgment or "")
@@ -530,25 +536,28 @@ def _build_brand_payload(current_mode, chart_period):
                 focus_row = results[0]
 
         selected_sector = _format_board_text(st.session_state.get('selected_sector'), fallback='READY')
-        focus = _format_board_text(focus_row.get('ticker') if focus_row else selected_sector, fallback='READY')
+        focus = _format_board_code(focus_row.get('ticker') if focus_row else selected_sector, fallback='READY')
         es_value = focus_row.get('es') if focus_row else None
-        judgment = _format_board_text(focus_row.get('jg_key') if focus_row else 'READY', fallback='READY')
-        context = _format_board_text(
+        judgment = _format_board_code(focus_row.get('jg_key') if focus_row else 'READY', fallback='READY')
+        context = _format_board_code(
             focus_row.get('ctx') if focus_row else (selected_sector if selected_sector != 'READY' else 'STANDBY'),
             fallback='STANDBY'
         )
-        scan_source = _format_board_text(st.session_state.get('scan_source'), fallback='WATCHLIST').upper()
-        summary = "Let the quieter market signal rise to the top before you drill down."
-        marquee_items = [
-            f"{BRAND_NAME} {mode_label} ACTIVE",
-            f"FOCUS {focus}",
+        scan_source = _format_board_code(st.session_state.get('scan_source'), fallback='WATCHLIST')
+        system_status = 'ACTIVE' if focus_row else 'READY'
+        feed_status = 'WATCH_SYNC'
+        summary = "Sweep the tape, rank the field, then drill into the strongest setup."
+        marquee_items = _build_board_marquee([
+            f"[ {BRAND_NAME} ] {mode_label} DESK",
+            f"STATUS {system_status}",
+            f"TARGET {focus}",
             f"ES {_format_board_es(es_value)}",
-            f"JUDG {judgment}",
+            f"SIGNAL {judgment}",
             f"CTX {context}",
+            f"SPAN {period_label}",
             f"SOURCE {scan_source}",
             f"COUNT {len(results)}",
-            f"PERIOD {period_label}",
-        ]
+        ])
         return {
             'brand_code': BRAND_NAME,
             'mode': mode_label,
@@ -559,30 +568,36 @@ def _build_brand_payload(current_mode, chart_period):
             'period': period_label,
             'marquee_items': marquee_items,
             'summary': summary,
+            'system_status': system_status,
+            'feed_status': feed_status,
             'status_tone': _resolve_board_tone(mode_label, judgment, es_value),
         }
 
     analysis_msg = _latest_analysis_message()
     meta = analysis_msg.get('meta') if analysis_msg else None
-    focus = _format_board_text((analysis_msg or {}).get('ticker') or st.session_state.get('last_ticker'), fallback='WAIT').upper()
+    focus = _format_board_code((analysis_msg or {}).get('ticker'), fallback='WAIT')
     es_value = meta.get('ensemble_score') if meta else None
-    judgment = _format_board_text(meta.get('judgment') if meta else 'IDLE', fallback='IDLE')
-    context = _format_board_text(meta.get('context_label') if meta else 'STANDBY', fallback='STANDBY')
+    judgment = _format_board_code(meta.get('judgment') if meta else 'IDLE', fallback='IDLE')
+    context = _format_board_code(meta.get('context_label') if meta else 'STANDBY', fallback='STANDBY')
+    system_status = 'ACTIVE' if meta else 'READY'
+    feed_status = 'MARKET_SYNC'
     summary = (
-        f"Quiet signal first. Then structure. Then conviction. {meta.get('action_label')} is live on {focus}."
+        f"Signal first. Structure next. {_format_board_text(meta.get('action_label'), 'READY')} is active on {focus}."
         if meta and meta.get('action_label')
-        else "Built to read the quieter market signal before price gets loud."
+        else "Read the quieter signal before price gets loud."
     )
     marquee_items = [
-        f"{BRAND_NAME} {mode_label} ACTIVE",
-        f"FOCUS {focus}",
+        f"[ {BRAND_NAME} ] {mode_label} DESK",
+        f"STATUS {system_status}",
+        f"TARGET {focus}",
         f"ES {_format_board_es(es_value)}",
-        f"JUDG {judgment}",
+        f"SIGNAL {judgment}",
         f"CTX {context}",
-        f"PERIOD {period_label}",
+        f"SPAN {period_label}",
     ]
     if meta:
         marquee_items.append(f"B{int(meta.get('buy_agree', 0))}:S{int(meta.get('sell_agree', 0))}")
+    marquee_items = _build_board_marquee(marquee_items)
     return {
         'brand_code': BRAND_NAME,
         'mode': mode_label,
@@ -593,11 +608,13 @@ def _build_brand_payload(current_mode, chart_period):
         'period': period_label,
         'marquee_items': marquee_items,
         'summary': summary,
+        'system_status': system_status,
+        'feed_status': feed_status,
         'status_tone': _resolve_board_tone(mode_label, judgment, es_value),
     }
 
 def _render_brand_board(payload, compact=False):
-    height = 300 if compact else 240
+    height = 320 if compact else 290
     components.html(build_brand_board(payload, compact=compact), height=height, scrolling=False)
 
 def _render_scanner_guide(tickers, scan_source):
@@ -904,7 +921,7 @@ if current_mode == '스캐너':
             except Exception:
                 return None
 
-        with st.status(f"🔍 {len(tickers)}개 종목 스캔 준비 중...", expanded=True) as scan_status:
+        with st.status(f"MARKET SWEEP ACTIVE · {len(tickers)} TICKERS", expanded=True) as scan_status:
             scan_note.caption("1/3 시그널 레지스트리와 캐시 상태를 확인했습니다.")
 
             # 병렬 스캔 실행
@@ -914,12 +931,12 @@ if current_mode == '스캐너':
                 for idx_f, f in enumerate(as_completed(futs)):
                     done_ticker = futs[f]
                     pb.progress((idx_f + 1) / len(tickers))
-                    scan_note.caption(f"병렬 스캔 중 · 최근 완료 {done_ticker} · {idx_f + 1}/{len(tickers)}")
+                    scan_note.caption(f"READING THE TAPE · {done_ticker} · {idx_f + 1}/{len(tickers)}")
                     r = f.result()
                     if r:
                         results.append(r)
             scan_note.caption("3/3 결과를 정렬하고 스캐너 카드를 준비합니다.")
-            scan_status.update(label=f"✅ 스캔 완료 · 결과 {len(results)}개", state="complete", expanded=False)
+            scan_status.update(label=f"SCAN BOOK READY · {len(results)} MATCHES", state="complete", expanded=False)
         pb.empty()
         scan_note.empty()
 
@@ -1059,7 +1076,7 @@ else:
                     with st.expander(f"{msg.get('ticker', '')} 지난 분석", expanded=False):
                         render_analysis(msg, key_prefix=f"analysis_{i}_{msg.get('ticker', 'na')}")
             elif msg.get("type") == "report":
-                with st.expander(f"{msg.get('ticker', '')} AI 리포트", expanded=i == latest_report_idx):
+                with st.expander(f"{msg.get('ticker', '')} QUANT AUDIT", expanded=i == latest_report_idx):
                     st.markdown(msg["content"])
                 st.download_button(
                     "📥", key=f"dl_{i}",
@@ -1071,9 +1088,9 @@ else:
             else:
                 st.markdown(msg.get("content", ""))
             if msg.get("prompt") and msg.get("type") == "analysis":
-                with st.expander(f"{msg.get('ticker', '')} 프롬프트"):
+                with st.expander(f"{msg.get('ticker', '')} PROMPT TAPE"):
                     st.markdown(
-                        "<div class='prompt-caption'>이 종목 분석에 실제로 사용된 AI 프롬프트입니다. 코드 블록 우측 상단 복사 아이콘을 사용하세요.</div>",
+                        "<div class='prompt-caption'>QUANT AUDIT에 실제로 사용된 프롬프트입니다. 코드 블록 우측 상단 복사 아이콘을 사용하세요.</div>",
                         unsafe_allow_html=True,
                     )
                     st.code(msg["prompt"], language="markdown")
@@ -1087,12 +1104,12 @@ else:
             try:
                 model = get_gemini_model()
                 pb.progress(12)
-                ai_note.caption("1/3 AI 모델을 준비하고 있습니다.")
+                ai_note.caption("1/3 QUANT AUDIT 엔진을 준비하고 있습니다.")
                 col_ = []
 
                 def gen():
                     pb.progress(32)
-                    ai_note.caption("2/3 리포트 초안을 생성하고 있습니다. 종목과 시장 컨텍스트를 함께 요약합니다.")
+                    ai_note.caption("2/3 QUANT AUDIT 초안을 생성하고 있습니다. 종목과 시장 컨텍스트를 함께 요약합니다.")
                     for ch in model.generate_content(pp, stream=True):
                         if ch.text:
                             col_.append(ch.text)
@@ -1101,7 +1118,7 @@ else:
                     ai_note.caption("3/3 문장을 정리하고 화면에 반영합니다.")
                     pb.progress(100)
 
-                with st.expander(f"{tp.upper()} AI 리포트", expanded=True):
+                with st.expander(f"{tp.upper()} QUANT AUDIT", expanded=True):
                     st.write_stream(gen())
                 time.sleep(.3)
                 pb.empty()
@@ -1132,28 +1149,27 @@ else:
         st.session_state.last_ticker = tv
         _set_scan_focus(tv)
         with st.chat_message("assistant", avatar="✨"):
-            with st.status(f"🔍 {tv} 분석 중...", expanded=True) as status:
+            with st.status(f"READING THE TAPE · {tv}", expanded=True) as status:
                 st.write("1. 입력 형식과 티커 유효성을 확인했습니다.")
-                status.update(label=f"📦 {tv} 기본 정보 수집 중...", state="running", expanded=True)
+                status.update(label=f"VALIDATING TARGET · {tv}", state="running", expanded=True)
                 st.write("2. 기업 기본 정보와 부가 메타데이터를 불러오고 있습니다.")
                 fund = fetch_fundamentals(tv)
-                status.update(label=f"📊 {tv} 가격·지표 계산 중...", state="running", expanded=True)
+                status.update(label=f"DATA FEED ESTABLISHED · {tv}", state="running", expanded=True)
                 st.write("3. 가격 데이터, 기술 지표, 위원회 점수, 차트 메타데이터를 계산합니다.")
                 fj, phist, meta = analyze(tv, chart_days, refresh)
                 if fj and meta:
-                    jg  = meta['judgment']
                     act = meta.get('action_label', '')
                     es  = meta.get('ensemble_score', 0)
-                    status.update(label=f"🧠 {tv} 프롬프트 정리 중...", state="running", expanded=True)
-                    st.write("4. AI 리포트용 프롬프트와 화면 카드 요약을 구성합니다.")
+                    status.update(label=f"ASSEMBLING QUANT AUDIT · {tv}", state="running", expanded=True)
+                    st.write("4. QUANT AUDIT용 프롬프트와 화면 카드 요약을 구성합니다.")
                     st.write(f"📍 {act} | ES {es:+.1f}")
                     _show_analysis_toasts(tv, meta)
                     prompt = build_ai_prompt(tv, phist, fund)
                     st.write("5. 분석 카드와 리포트 버튼을 표시할 준비가 끝났습니다.")
-                    status.update(label=f"✅ {tv} - {act}", state="complete", expanded=False)
+                    status.update(label=f"SIGNAL READY · {tv} | {act}", state="complete", expanded=False)
                 else:
                     prompt = None
-                    status.update(label=f"⚠️ {tv} 분석 실패", state="error")
+                    status.update(label=f"SIGNAL BUILD FAILED · {tv}", state="error")
             if fj:
                 syn  = meta.get('reversal_synergy', 0)
                 pred = meta.get('prediction_boost', 0)
@@ -1187,8 +1203,8 @@ else:
     if st.session_state.get('quick'):
         process_ticker(st.session_state.pop('quick'))
     if st.session_state.pending_ai_ticker and st.session_state.pending_ai_prompt:
-        st.caption("AI 리포트는 보통 10~20초 정도 걸립니다. 시스템 판단 요약과 반론 포인트를 함께 정리합니다.")
-        if st.button(f"🚀 {st.session_state.pending_ai_ticker.upper()} AI 리포트 만들기", type="primary", use_container_width=True):
+        st.caption("QUANT AUDIT는 보통 10~20초 정도 걸립니다. 시스템 판단 요약과 반론 포인트를 함께 정리합니다.")
+        if st.button(f"🚀 {st.session_state.pending_ai_ticker.upper()} QUANT AUDIT", type="primary", use_container_width=True):
             _run_ai()
-    if ti := st.chat_input("티커 입력 (예: TSLA, AAPL, QQQ)"):
+    if ti := st.chat_input("SELECT TARGET TICKER (예: TSLA, AAPL, QQQ)"):
         process_ticker(ti)
