@@ -381,17 +381,17 @@ def _render_scanner_summary(results, total_count):
         ("매도 후보", str(sell_count), "판단이 SELL 계열인 종목 수", "negative"),
         ("매치 수", f"{len(results)}/{total_count}", "전체 스캔 대상 대비 현재 결과", "accent"),
     ]
-    html_cards = "".join(
-        f"""
-        <div class="sigl-metric-card">
-            <p class="sigl-metric-label">{html.escape(label)}</p>
-            <p class="sigl-metric-value">{html.escape(value)}</p>
-            <p class="sigl-metric-sub">{html.escape(sub)}</p>
-        </div>
-        """
-        for label, value, sub, _tone in cards
-    )
-    _render_surface_html(f"<div class='sigl-result-summary'>{html_cards}</div>", 160)
+    cols = st.columns(3)
+    for col, (label, value, sub, tone) in zip(cols, cards):
+        with col:
+            card_html = f"""
+            <div class="sigl-metric-card sigl-metric-card--summary sigl-metric-card--{tone}">
+                <p class="sigl-metric-label">{html.escape(label)}</p>
+                <p class="sigl-metric-value">{html.escape(value)}</p>
+                <p class="sigl-metric-sub">{html.escape(sub)}</p>
+            </div>
+            """
+            _render_surface_html(card_html, 132)
 
 
 def _render_scanner_result_card(rank, row):
@@ -986,7 +986,7 @@ if current_mode == '스캐너':
         with scan_col:
             scan_btn = st.form_submit_button("스캔 실행", type="primary", use_container_width=True)
         with clear_col:
-            clear_scan = st.form_submit_button("초기화", use_container_width=True)
+            clear_scan = st.form_submit_button("초기화", type="secondary", use_container_width=True)
         st.markdown(
             "<p class='sigl-composer-note'>직접 입력이 있으면 현재 섹터 선택보다 우선합니다. 비워두면 선택된 섹터 유니버스를 사용합니다.</p>",
             unsafe_allow_html=True,

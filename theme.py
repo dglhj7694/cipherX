@@ -202,10 +202,17 @@ div[data-testid="stForm"] div[data-testid="stFormSubmitButton"] button{{
   min-height:54px!important;
   border-radius:16px!important;
 }}
-div[data-testid="stForm"] div[data-testid="stFormSubmitButton"] button[kind="secondary"]{{
+div[data-testid="stForm"] div[data-testid="stFormSubmitButton"] button:not([kind="primary"]){{
   background:linear-gradient(180deg, rgba(29,40,64,.96), rgba(22,32,51,.92))!important;
-  color:#E2E8F0!important;
+  color:#F8FAFC!important;
   border:1px solid rgba(148,163,184,.24)!important;
+  box-shadow:none!important;
+}}
+div[data-testid="stForm"] div[data-testid="stFormSubmitButton"] button:not([kind="primary"]) span,
+div[data-testid="stForm"] div[data-testid="stFormSubmitButton"] button:not([kind="primary"]) p,
+div[data-testid="stForm"] div[data-testid="stFormSubmitButton"] button:not([kind="primary"]) div{{
+  color:#F8FAFC!important;
+  opacity:1!important;
 }}
 div[data-testid="stForm"] div[data-testid="stHorizontalBlock"]{{
   align-items:end!important;
@@ -516,6 +523,27 @@ div[data-testid="stMetricValue"]{{
   border-radius:14px;
   padding:14px 15px;
   min-height:112px;
+}}
+.sigl-metric-card--summary{{
+  min-height:104px;
+}}
+.sigl-metric-card--positive{{
+  border-color:rgba(99,217,162,.24);
+  background:
+    linear-gradient(180deg, rgba(99,217,162,.10), rgba(99,217,162,0) 34%),
+    rgba(255,255,255,.03);
+}}
+.sigl-metric-card--negative{{
+  border-color:rgba(255,143,150,.24);
+  background:
+    linear-gradient(180deg, rgba(255,143,150,.10), rgba(255,143,150,0) 34%),
+    rgba(255,255,255,.03);
+}}
+.sigl-metric-card--accent{{
+  border-color:rgba(142,164,255,.24);
+  background:
+    linear-gradient(180deg, rgba(142,164,255,.10), rgba(142,164,255,0) 34%),
+    rgba(255,255,255,.03);
 }}
 .sigl-metric-label{{
   margin:0 0 6px;
