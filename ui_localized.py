@@ -1,5 +1,7 @@
 import html
 import json
+import re
+import textwrap
 
 import plotly.graph_objects as go
 import streamlit as st
@@ -70,9 +72,19 @@ def _badge(label, tone="muted"):
     return f"<span class='sigl-badge sigl-badge--{tone}'>{safe}</span>"
 
 
+def _html_block(markup):
+    text = textwrap.dedent(str(markup or "")).strip()
+    text = re.sub(r"\n[ \t]+(?=<)", "\n", text)
+    return text
+
+
+def _join_html(parts):
+    return "".join(_html_block(part) for part in parts if str(part or "").strip())
+
+
 def _render_panel_html(inner_html, min_height=240):
     del min_height
-    st.markdown(f"<div class='sigl-html-block'>{inner_html}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='sigl-html-block'>{_html_block(inner_html)}</div>", unsafe_allow_html=True)
 
 
 def _progress_metric_card(label, value, sub, tone, fill):
@@ -558,6 +570,104 @@ def render_combined_scans(meta):
     _render_panel_html(panel_html, min_height=_combined_scan_panel_height(len(cards)))
 
 
+def render_committee_panel_clean(meta):
+    committee = meta.get("committee", {})
+    if not committee:
+        return
+    ctx_code = meta.get("context", 0)
+    ctx_name = CTX_LABELS.get(ctx_code, "default")
+    weights = CONTEXT_WEIGHTS.get(ctx_name, CONTEXT_WEIGHTS["default"])
+    vote_map = {"BUY": "매수", "SELL": "매도", "NEUTRAL": "중립", "ABSTAIN": "보류"}
+    cards = []
+    for idx, committee_name in enumerate(COMMITTEE_NAMES):
+        data = committee.get(committee_name, {})
+        score = _safe_float(data.get("score", 0))
+        conviction = _safe_float(data.get("conviction", 0))
+        vote = str(data.get("vote", "NEUTRAL"))
+        weight = weights[idx] if idx < len(weights) else 0.2
+        tone = "positive" if score > 0 else ("negative" if score < 0 else "warning")
+        cards.append(
+            (
+                f"<div class='sigl-committee-card' style='--tone:{_tone_color(tone)}'>"
+                f"<p class='sigl-committee-name'>{_esc(localize_committee_name(committee_name))} · 비중 {weight:.0%}</p>"
+                f"<p class='sigl-committee-score'>{score:+.0f}</p>"
+                f"{_badge(vote_map.get(vote, vote), tone if tone != 'warning' else 'warning')}"
+                f"<p class='sigl-committee-foot'>확신도 {conviction:.0f}%</p>"
+                f"<div class='sigl-progress'><div class='sigl-progress__fill' style='--fill:{min(abs(score) / 40 * 100, 100):.1f}%;--tone:{_tone_color(tone)}'></div></div>"
+                "</div>"
+            )
+        )
+    panel_html = (
+        "<div class='sigl-card'>"
+        "<div class='sigl-section-head'>"
+        "<div>"
+        "<p class='sigl-section-title'>5위원회 종합 판단</p>"
+        "<p class='sigl-section-copy'>위원회별 점수와 확신도를 같은 규격으로 비교합니다.</p>"
+        "</div>"
+        "</div>"
+        f"<div class='sigl-grid sigl-grid--5'>{_join_html(cards)}</div>"
+        "</div>"
+    )
+    _render_panel_html(panel_html, min_height=_committee_panel_height(len(cards)))
+    if meta.get("veto_flags"):
+        st.warning(f"제한 조건: {meta.get('veto_flags')}")
+    if abs(_safe_float(meta.get("reversal_synergy", 0))) > 5:
+        st.info(f"반전 시너지: {_safe_float(meta.get('reversal_synergy', 0)):+.1f}")
+
+
+def render_10layer_bars_clean(meta, html_key="analysis"):
+    del html_key
+    layer_names = ["Trend", "Momentum", "Candle", "BB", "Volume", "MF", "Pattern", "Combined", "Leading", "Lagging"]
+    layer_labels = {
+        "Trend": "추세",
+        "Momentum": "모멘텀",
+        "Candle": "캔들",
+        "BB": "볼린저",
+        "Volume": "거래량",
+        "MF": "자금 흐름",
+        "Pattern": "패턴",
+        "Combined": "콤보",
+        "Leading": "선행",
+        "Lagging": "후행",
+    }
+    rows = []
+    for name in layer_names:
+        buy_value = max(_safe_float(meta.get("buy_layers", {}).get(name, 0)), 0.0)
+        sell_value = max(_safe_float(meta.get("sell_layers", {}).get(name, 0)), 0.0)
+        buy_pct = min((buy_value / 12.0) * 50.0, 50.0)
+        sell_pct = min((sell_value / 12.0) * 50.0, 50.0)
+        rows.append(
+            (
+                "<div class='sigl-layer-row'>"
+                f"<div class='sigl-layer-score--buy'>{buy_value:.1f}</div>"
+                "<div class='sigl-layer-track'>"
+                f"<div class='sigl-layer-fill--buy' style='--buy-left:{50.0 - buy_pct:.2f}%;--buy-width:{buy_pct:.2f}%'></div>"
+                f"<div class='sigl-layer-fill--sell' style='--sell-width:{sell_pct:.2f}%'></div>"
+                "<div class='sigl-layer-center'></div>"
+                f"<div class='sigl-layer-label'>{_esc(layer_labels.get(name, name))}</div>"
+                "</div>"
+                f"<div class='sigl-layer-score--sell'>{sell_value:.1f}</div>"
+                "</div>"
+            )
+        )
+    panel_html = (
+        "<div class='sigl-card'>"
+        "<div class='sigl-section-head'>"
+        "<div>"
+        "<p class='sigl-section-title'>10개 레이어 비교</p>"
+        "<p class='sigl-section-copy'>매수와 매도 쪽에 각 레이어가 얼마나 기여하는지 보여줍니다.</p>"
+        "</div>"
+        "<div class='sigl-inline'>"
+        f"{_badge(f'매수 {_safe_int(meta.get('buy_active', 0))}/10', 'positive')}"
+        f"{_badge(f'매도 {_safe_int(meta.get('sell_active', 0))}/10', 'negative')}"
+        "</div>"
+        "</div>"
+        f"<div class='sigl-layer-board'>{_join_html(rows)}</div>"
+        "</div>"
+    )
+    _render_panel_html(panel_html, min_height=max(520, 170 + len(layer_names) * 42))
+
+
 def render_indicator_help():
     with st.expander("차트 보는 법 / 지표 설명", expanded=False):
         st.markdown(
@@ -599,14 +709,14 @@ def render_analysis(msg, key_prefix="analysis"):
         if meta:
             render_judgment_card(meta)
             st.markdown("<div class='sigl-stack-gap'></div>", unsafe_allow_html=True)
-            render_committee_panel(meta)
+            render_committee_panel_clean(meta)
             st.markdown("<div class='sigl-stack-gap sigl-stack-gap--lg'></div>", unsafe_allow_html=True)
             render_leading_lagging(meta)
             render_indicator_help()
 
     with tab_layers:
         if meta:
-            render_10layer_bars(meta, html_key=f"{key_prefix}_10layer")
+            render_10layer_bars_clean(meta, html_key=f"{key_prefix}_10layer")
 
     with tab_scans:
         if meta:

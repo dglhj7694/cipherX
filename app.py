@@ -5,6 +5,8 @@
 
 import streamlit as st, google.generativeai as genai
 import time, math, html
+import re
+import textwrap
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from sectors import SECTOR_GROUPS
@@ -255,9 +257,15 @@ def _sigl_badge(label, tone='muted'):
     return f"<span class='sigl-badge sigl-badge--{tone}'>{safe}</span>"
 
 
+def _html_block(markup):
+    text = textwrap.dedent(str(markup or "")).strip()
+    text = re.sub(r"\n[ \t]+(?=<)", "\n", text)
+    return text
+
+
 def _render_surface_html(inner_html, height):
     del height
-    st.markdown(f"<div class='sigl-html-block'>{inner_html}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='sigl-html-block'>{_html_block(inner_html)}</div>", unsafe_allow_html=True)
 
 
 def _normalized_selected_sectors(value):
@@ -325,6 +333,29 @@ def _toggle_sector_selection(sector_name):
     else:
         current.append(sector_name)
     _apply_sector_selection(current)
+
+
+def _render_sector_button_picker(sector_names, selected_sectors):
+    selected_sectors = _normalized_selected_sectors(selected_sectors)
+    options = ['🌐 전체', *sector_names]
+    columns_per_row = 3
+    for start in range(0, len(options), columns_per_row):
+        cols = st.columns(columns_per_row)
+        for idx, sector_name in enumerate(options[start:start + columns_per_row]):
+            is_selected = (
+                selected_sectors == ['🌐 전체']
+                if sector_name == '🌐 전체'
+                else sector_name in selected_sectors
+            )
+            with cols[idx]:
+                if st.button(
+                    sector_name,
+                    key=f"sector_pick_{sector_name}",
+                    use_container_width=True,
+                    type="primary" if is_selected else "secondary",
+                ):
+                    _toggle_sector_selection(sector_name)
+                    st.rerun()
 
 
 def _parse_ticker_input(raw_text):
@@ -886,7 +917,7 @@ def _build_brand_payload(current_mode, chart_period):
     }
 
 def _render_brand_board(payload, compact=False):
-    st.markdown(build_brand_board(payload, compact=compact), unsafe_allow_html=True)
+    st.markdown(_html_block(build_brand_board(payload, compact=compact)), unsafe_allow_html=True)
     if not compact:
         st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
@@ -921,7 +952,7 @@ def _render_page_intro(eyebrow, title, copy, badges=None, tone="accent"):
             </div>
         </div>
     """
-    st.markdown(intro_html, unsafe_allow_html=True)
+    st.markdown(_html_block(intro_html), unsafe_allow_html=True)
 
 
 def _render_section_heading(title, copy="", badges=None, eyebrow=None, tight=False):
@@ -939,7 +970,7 @@ def _render_section_heading(title, copy="", badges=None, eyebrow=None, tight=Fal
             </div>
         </div>
     """
-    st.markdown(heading_html, unsafe_allow_html=True)
+    st.markdown(_html_block(heading_html), unsafe_allow_html=True)
 
 
 def _render_empty_state(title, copy, badges=None, tone="accent"):
@@ -960,7 +991,7 @@ def _render_empty_state(title, copy, badges=None, tone="accent"):
             </div>
         </div>
     """
-    st.markdown(empty_html, unsafe_allow_html=True)
+    st.markdown(_html_block(empty_html), unsafe_allow_html=True)
 
 with st.sidebar:
     _mi = 0 if st.session_state.get('_mode', '분석') == '분석' else 1
@@ -1013,18 +1044,10 @@ if current_mode == '스캐너':
         ],
         eyebrow="Scanner Setup",
     )
-    sector_selection = st.multiselect(
-        "섹터/유니버스 선택",
-        options=['🌐 전체', *sector_names],
-        placeholder="섹터를 선택하세요",
-        key="scan_sector_picker",
-    )
-    normalized_selection = _normalized_selected_sectors(sector_selection)
-    if normalized_selection != current_sector_selection:
-        _apply_sector_selection(normalized_selection)
+    _render_sector_button_picker(sector_names, current_sector_selection)
 
     selected_sectors = _normalized_selected_sectors(
-        st.session_state.get('selected_sectors') or normalized_selection
+        st.session_state.get('selected_sectors') or current_sector_selection
     )
     selected_sector = st.session_state.get('selected_sector', None)
     st.markdown(

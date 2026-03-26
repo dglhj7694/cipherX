@@ -135,19 +135,35 @@ div[data-testid="stMarkdownContainer"] li{{
 div[data-testid="stTabs"] button{{
   color:var(--sigl-text-muted)!important;
   font-weight:800!important;
-  border-bottom:2px solid transparent!important;
-  border-radius:0!important;
+  border:1px solid transparent!important;
+  border-radius:12px!important;
+  background:transparent!important;
+  min-height:42px!important;
+  padding:.55rem .95rem!important;
+  transition:background .18s ease, border-color .18s ease, color .18s ease, box-shadow .18s ease!important;
+}}
+div[data-testid="stTabs"] button:hover{{
+  color:var(--sigl-text)!important;
+  background:rgba(255,255,255,.04)!important;
 }}
 div[data-testid="stTabs"] button[aria-selected="true"]{{
   color:var(--sigl-text-strong)!important;
-  border-bottom-color:var(--sigl-accent)!important;
+  background:linear-gradient(180deg, rgba(142,164,255,.16), rgba(93,123,255,.10))!important;
+  border-color:rgba(142,164,255,.28)!important;
+  box-shadow:0 10px 20px rgba(93,123,255,.14)!important;
 }}
 div[data-testid="stTabs"] [role="tablist"]{{
   flex-wrap:wrap!important;
   gap:6px!important;
+  padding:6px!important;
+  border:1px solid var(--sigl-border-soft)!important;
+  border-radius:16px!important;
+  background:linear-gradient(180deg, rgba(19,28,45,.96), rgba(15,23,42,.88))!important;
+  margin-bottom:14px!important;
 }}
 div[data-testid="stTabs"] [role="tabpanel"]{{
   min-width:0!important;
+  padding-top:4px!important;
 }}
 div.stButton>button{{
   border-radius:14px!important;
