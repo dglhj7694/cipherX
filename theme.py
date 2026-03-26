@@ -52,6 +52,16 @@ body{{
     radial-gradient(circle at top left, rgba(142,164,255,.10), transparent 28%),
     linear-gradient(180deg, #0B1020 0%, #0E1425 100%);
 }}
+div[data-testid="stAppViewContainer"],
+div[data-testid="stAppViewContainer"] > .main,
+section[data-testid="stMain"],
+section.main,
+main,
+section.main > div,
+section[data-testid="stMain"] > div,
+div[data-testid="stMainBlockContainer"]{{
+  background:linear-gradient(180deg, #0B1020 0%, #0E1425 100%)!important;
+}}
 p,li,span,div{{
   color:inherit;
 }}
