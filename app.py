@@ -433,6 +433,18 @@ def _format_board_es(value):
     except (TypeError, ValueError):
         return "--"
 
+def _format_board_price(value):
+    try:
+        return f"{float(value):,.2f}"
+    except (TypeError, ValueError):
+        return "--"
+
+def _format_board_change_pct(value):
+    try:
+        return f"{float(value):+.1f}%"
+    except (TypeError, ValueError):
+        return "--"
+
 def _short_period_label(period_label):
     return {
         '3개월': '3M',
@@ -491,17 +503,59 @@ def _terminal_signal_label(meta=None, fallback="IDLE"):
         return _format_board_code(action, fallback)
     return fallback
 
+def _latest_recent_signal_label(meta=None, fallback="STANDBY"):
+    meta = meta or {}
+    recent = list(meta.get('recent_signals') or [])
+    if recent:
+        return _format_board_text(recent[-1][1], fallback)
+    scans = list(meta.get('combined_scans') or [])
+    if scans:
+        return _format_board_text(scans[0].get('kor') or scans[0].get('name'), fallback)
+    return fallback
+
+def _primary_recent_signal_label(signal_items, fallback="STANDBY"):
+    if signal_items:
+        return _format_board_text(signal_items[0].get('label'), fallback)
+    return fallback
+
+def _latest_recent_signal_tone(meta=None, fallback="neutral"):
+    meta = meta or {}
+    recent = list(meta.get('recent_signals') or [])
+    if recent:
+        return _format_board_text(recent[-1][3], fallback).lower()
+    scans = list(meta.get('combined_scans') or [])
+    if scans:
+        return _format_board_text(scans[0].get('dir'), fallback).lower()
+    return fallback
+
+def _primary_recent_signal_tone(signal_items, fallback="neutral"):
+    if signal_items:
+        return _format_board_text(signal_items[0].get('dir'), fallback).lower()
+    return fallback
+
+def _change_tone_from_value(value):
+    if isinstance(value, (int, float)):
+        if value > 0:
+            return 'up'
+        if value < 0:
+            return 'down'
+    return 'flat'
+
 def _history_rows_from_messages(messages, limit=8):
     rows = []
     for idx, msg in enumerate(messages[:limit]):
         meta = msg.get('meta') or {}
         es_value = meta.get('ensemble_score')
+        change_value = meta.get('price_change_pct')
         rows.append({
             'time': _format_board_time(msg.get('analyzed_at')),
             'ticker': _format_board_code(msg.get('ticker'), 'WAIT'),
+            'price': _format_board_price(meta.get('price')),
+            'change': _format_board_change_pct(change_value),
+            'change_tone': _change_tone_from_value(change_value),
             'signal': _terminal_signal_label(meta),
-            'es': _format_board_es(es_value),
-            'context': _format_board_text(meta.get('context_label'), 'STANDBY'),
+            'recent': _latest_recent_signal_label(meta),
+            'recent_tone': _latest_recent_signal_tone(meta),
             'tone': _resolve_board_tone('ANALYSIS', meta.get('judgment') or meta.get('action_label'), es_value),
             'fresh': idx == 0,
         })
@@ -582,7 +636,7 @@ def _scan_tape_items(limit=6):
 
 def _history_marquee_items(history_rows, limit=8):
     return [
-        f"{row.get('ticker', 'WAIT')} {row.get('signal', 'IDLE')} ES {row.get('es', '--')} CTX {row.get('context', 'STANDBY')}"
+        f"{row.get('ticker', 'WAIT')} PX {row.get('price', '--')} {row.get('change', '--')} SIGNAL {row.get('signal', 'IDLE')} RECENT {row.get('recent', 'STANDBY')}"
         for row in (history_rows or [])[:limit]
     ]
 
@@ -655,6 +709,8 @@ def _build_brand_payload(current_mode, chart_period):
         selected_sector = _format_board_text(st.session_state.get('selected_sector'), fallback='READY')
         focus = _format_board_code(focus_row.get('ticker') if focus_row else selected_sector, fallback='READY')
         es_value = focus_row.get('es') if focus_row else None
+        price_value = focus_row.get('price') if focus_row else None
+        change_value = focus_row.get('chg') if focus_row else None
         judgment_source = (focus_row.get('action') or focus_row.get('jg_key')) if focus_row else 'READY'
         judgment = _format_board_code(judgment_source, fallback='READY')
         context = _format_board_code(
@@ -666,6 +722,8 @@ def _build_brand_payload(current_mode, chart_period):
         feed_status = 'WATCH_SYNC'
         focus_recent_signals = _focus_recent_signals_from_scan(focus_row)
         focus_stack_summary = _focus_stack_summary_from_scan(focus_row)
+        recent_label = _primary_recent_signal_label(focus_recent_signals, 'SCAN READY')
+        recent_tone = _primary_recent_signal_tone(focus_recent_signals, 'neutral')
         summary = "Analysis logs stay live while the scanner keeps the field ranked."
         marquee_items = _build_board_marquee([
             f"[ {BRAND_NAME} ] LOGBOARD",
@@ -682,10 +740,15 @@ def _build_brand_payload(current_mode, chart_period):
             'brand_code': BRAND_NAME,
             'mode': mode_label,
             'focus': focus,
+            'price': _format_board_price(price_value),
+            'change': _format_board_change_pct(change_value),
+            'change_tone': _change_tone_from_value(change_value),
             'es': _format_board_es(es_value),
             'judgment': judgment,
             'context': context,
             'period': period_label,
+            'recent_label': recent_label,
+            'recent_tone': recent_tone,
             'marquee_items': marquee_items,
             'summary': summary,
             'system_status': system_status,
@@ -707,6 +770,10 @@ def _build_brand_payload(current_mode, chart_period):
     feed_status = 'MARKET_SYNC'
     focus_recent_signals = _focus_recent_signals_from_analysis(meta)
     focus_stack_summary = _focus_stack_summary_from_analysis(meta)
+    price_value = meta.get('price') if meta else None
+    change_value = meta.get('price_change_pct') if meta else None
+    recent_label = _primary_recent_signal_label(focus_recent_signals, _latest_recent_signal_label(meta))
+    recent_tone = _primary_recent_signal_tone(focus_recent_signals, _latest_recent_signal_tone(meta))
     summary = (
         f"Signal ingress is live. {focus} is the latest structured read on the board."
         if meta and meta.get('action_label')
@@ -731,10 +798,15 @@ def _build_brand_payload(current_mode, chart_period):
         'brand_code': BRAND_NAME,
         'mode': mode_label,
         'focus': focus,
+        'price': _format_board_price(price_value),
+        'change': _format_board_change_pct(change_value),
+        'change_tone': _change_tone_from_value(change_value),
         'es': _format_board_es(es_value),
         'judgment': judgment,
         'context': context,
         'period': period_label,
+        'recent_label': recent_label,
+        'recent_tone': recent_tone,
         'marquee_items': marquee_items,
         'summary': summary,
         'system_status': system_status,
@@ -747,8 +819,10 @@ def _build_brand_payload(current_mode, chart_period):
     }
 
 def _render_brand_board(payload, compact=False):
-    height = 340 if compact else 468
+    height = 340 if compact else 560
     components.html(build_brand_board(payload, compact=compact), height=height, scrolling=False)
+    if not compact:
+        st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
 
 def _render_scanner_guide(tickers, scan_source):
     target_count = len(tickers)
