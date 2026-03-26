@@ -190,9 +190,16 @@ div[data-testid="stForm"] div[data-testid="stFormSubmitButton"] button{{
 div[data-testid="stForm"] div[data-testid="stHorizontalBlock"]{{
   align-items:end!important;
 }}
+div[data-testid="stBottom"],
+div[data-testid="stBottom"] > div,
+div.stChatFloatingInputContainer,
+div.stChatFloatingInputContainer > div,
 div[data-testid="stBottomBlockContainer"]{{
-  background:transparent!important;
+  background:
+    linear-gradient(180deg, rgba(11,16,32,0) 0%, rgba(11,16,32,.92) 28%, #0B1020 100%)!important;
+  box-shadow:none!important;
   padding-top:18px!important;
+  padding-bottom:12px!important;
 }}
 div[data-testid="stBottomBlockContainer"] > div{{
   background:transparent!important;
