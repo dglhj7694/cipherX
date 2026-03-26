@@ -105,6 +105,14 @@ def _component_doc(inner_html):
     )
 
 
+def _render_panel_html(inner_html, min_height=240):
+    components.html(
+        _component_doc(inner_html),
+        height=min_height,
+        scrolling=False,
+    )
+
+
 def _progress_metric_card(label, value, sub, tone, fill):
     return (
         f"<div class='sigl-metric-card'>"
@@ -316,7 +324,7 @@ def render_judgment_card(meta):
         contrast_html = f"<p class='sigl-summary' style='margin:0 0 10px'>{_esc(translate_chart_text(contrast))}</p>" if contrast else ""
         summary_html += f"<div class='sigl-note'><strong>리스크 체크</strong>{contrast_html}<div class='sigl-chip-row'>{''.join(risk_tags)}</div></div>"
     summary_html += "</div>"
-    st.markdown(summary_html, unsafe_allow_html=True)
+    _render_panel_html(summary_html, min_height=330)
 
 
 def render_committee_panel(meta):
@@ -357,7 +365,7 @@ def render_committee_panel(meta):
           <div class="sigl-grid sigl-grid--5">{''.join(cards)}</div>
         </div>
         """
-    st.markdown(panel_html, unsafe_allow_html=True)
+    _render_panel_html(panel_html, min_height=320)
     if meta.get("veto_flags"):
         st.warning(f"제한 조건: {meta.get('veto_flags')}")
     if abs(_safe_float(meta.get("reversal_synergy", 0))) > 5:
@@ -414,7 +422,7 @@ def render_10layer_bars(meta, html_key="analysis"):
           <div class="sigl-layer-board">{''.join(rows)}</div>
         </div>
         """
-    st.markdown(panel_html, unsafe_allow_html=True)
+    _render_panel_html(panel_html, min_height=max(520, 170 + len(layer_names) * 42))
 
 
 def render_leading_lagging(meta):
@@ -440,8 +448,7 @@ def render_leading_lagging(meta):
         _mini_stat_card("50\uC77C\uC120 \uAC70\uB9AC", f"{_safe_float(meta.get('ma50_dist', 0)):+.1f}%", "positive" if _safe_float(meta.get("ma50_dist", 0)) > 0 else "negative"),
         _mini_stat_card("200\uC77C\uC120 \uAC70\uB9AC", f"{_safe_float(meta.get('ma200_dist', 0)):+.1f}%", "positive" if _safe_float(meta.get("ma200_dist", 0)) > 0 else "negative"),
     ])
-    st.markdown(
-        f"""
+    panel_html = f"""
         <div class="sigl-grid sigl-grid--2">
           <div class="sigl-card">
             <div class="sigl-section-head">
@@ -489,9 +496,8 @@ def render_leading_lagging(meta):
           </div>
         </div>
         <div class="sigl-grid sigl-grid--4" style="margin-top:12px">{cards}</div>
-        """,
-        unsafe_allow_html=True,
-    )
+        """
+    _render_panel_html(panel_html, min_height=440)
 
 
 def render_combined_scans(meta):
@@ -524,8 +530,7 @@ def render_combined_scans(meta):
             </div>
             """
         )
-    st.markdown(
-        f"""
+    panel_html = f"""
         <div class="sigl-card sigl-card--{'warning' if tone == 'warning' else 'positive' if tone == 'positive' else 'negative' if tone == 'negative' else 'accent'}">
           <div class="sigl-section-head">
             <div>
@@ -540,9 +545,8 @@ def render_combined_scans(meta):
           </div>
         </div>
         <div class="sigl-grid sigl-grid--2" style="margin-top:12px">{''.join(cards)}</div>
-        """,
-        unsafe_allow_html=True,
-    )
+        """
+    _render_panel_html(panel_html, min_height=280)
 
 
 def render_indicator_help():
