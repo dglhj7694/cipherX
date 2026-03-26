@@ -412,6 +412,8 @@ def render_10layer_bars(meta, html_key="analysis"):
     _render_panel_html(panel_html, min_height=max(520, 170 + len(layer_names) * 42))
 
 
+
+
 def render_leading_lagging(meta):
     leading = translate_chart_text(meta.get("leading_verdict", ""))
     lagging = translate_chart_text(meta.get("lagging_verdict", ""))
@@ -421,9 +423,20 @@ def render_leading_lagging(meta):
     max_setup = max(setup_buy, setup_sell, 1)
     buy_width = min(setup_buy / max_setup * 50, 50)
     sell_width = min(setup_sell / max_setup * 50, 50)
-    flow_text = "\uC57D\uC138 \uB2E4\uC774\uBC84\uC804\uC2A4" if meta.get("smart_money_bearish_div") else ("\uC790\uAE08 \uC720\uC785 \uC9C0\uC9C0" if meta.get("smart_money_bullish_div") else "\uC911\uB9BD")
+
+    flow_text = (
+        "\uC57D\uC138 \uB2E4\uC774\uBC84\uC804\uC2A4"
+        if meta.get("smart_money_bearish_div")
+        else ("\uC790\uAE08 \uC720\uC785 \uC9C0\uC9C0" if meta.get("smart_money_bullish_div") else "\uC911\uB9BD")
+    )
     flow_tone = "negative" if meta.get("smart_money_bearish_div") else ("positive" if meta.get("smart_money_bullish_div") else "muted")
     size_label, size_tone = _risk_size_hint(_safe_float(meta.get("atr_pct", 0)))
+
+    utbot_dir = _safe_int(meta.get("utbot_dir", 0))
+    utbot_label = "UT \uB9E4\uC218" if utbot_dir == 1 else ("UT \uB9E4\uB3C4" if utbot_dir == -1 else "UT \uC911\uB9BD")
+    utbot_tone = "positive" if utbot_dir == 1 else ("negative" if utbot_dir == -1 else "accent")
+    hma_rising = bool(meta.get("hma_rising"))
+
     stat_cards = [
         _mini_stat_card("BB %B", f"{_safe_float(meta.get('percent_b', 0.5)) * 100:.0f}%", "positive" if _safe_float(meta.get("percent_b", 0.5)) < 0.3 else ("negative" if _safe_float(meta.get("percent_b", 0.5)) > 0.7 else "warning")),
         _mini_stat_card("CMF", f"{_safe_float(meta.get('cmf', 0)):+.3f}", "positive" if _safe_float(meta.get("cmf", 0)) > 0.05 else ("negative" if _safe_float(meta.get("cmf", 0)) < -0.05 else "muted")),
@@ -435,111 +448,28 @@ def render_leading_lagging(meta):
         _mini_stat_card("50\uC77C\uC120 \uAC70\uB9AC", f"{_safe_float(meta.get('ma50_dist', 0)):+.1f}%", "positive" if _safe_float(meta.get("ma50_dist", 0)) > 0 else "negative"),
         _mini_stat_card("200\uC77C\uC120 \uAC70\uB9AC", f"{_safe_float(meta.get('ma200_dist', 0)):+.1f}%", "positive" if _safe_float(meta.get("ma200_dist", 0)) > 0 else "negative"),
     ]
-    cards = "".join(stat_cards)
-    panel_html = f"""
-        <div class="sigl-grid sigl-grid--2">
-          <div class="sigl-card">
-            <div class="sigl-section-head">
-              <div>
-                <p class="sigl-section-title">선행 지표</p>
-                <p class="sigl-section-copy">속도와 전환 신호 중심의 해석입니다.</p>
-              </div>
-            </div>
-            <p class="sigl-metric-value" style="font-size:1.18rem;color:{_tone_color('positive' if accel >= 0 else 'negative')}">{_esc(leading)}</p>
-            <div class="sigl-chip-row">
-              {_badge(f'가속도 {accel:+.2f}', 'positive' if accel > 0 else 'negative')}
-              {_badge('UT 매수' if _safe_int(meta.get('utbot_dir', 0)) == 1 else 'UT 매도' if _safe_int(meta.get('utbot_dir', 0)) == -1 else 'UT 중립', 'accent')}
-              {_badge('HMA 상승' if meta.get('hma_rising') else 'HMA 하락', 'positive' if meta.get('hma_rising') else 'negative')}
-            </div>
-          </div>
-          <div class="sigl-card">
-            <div class="sigl-section-head">
-              <div>
-                <p class="sigl-section-title">후행 지표</p>
-                <p class="sigl-section-copy">구조와 누적 추세를 중심으로 봅니다.</p>
-              </div>
-            </div>
-            <p class="sigl-metric-value" style="font-size:1.18rem;color:{_tone_color(_tone_from_text(lagging))}">{_esc(lagging)}</p>
-            <div class="sigl-chip-row">
-              {_badge(localize_regime_label(meta.get('regime'), meta.get('regime_label')), 'accent')}
-              {_badge(f"RS { _safe_float(meta.get('rs_ratio', 1)):.3f}", 'muted')}
-            </div>
-          </div>
-        </div>
-        <div class="sigl-card" style="margin-top:12px">
-          <div class="sigl-section-head">
-            <div>
-              <p class="sigl-section-title">매수/매도 압력</p>
-              <p class="sigl-section-copy">현재 셋업 압력이 어느 쪽으로 더 기울었는지 보여줍니다.</p>
-            </div>
-          </div>
-          <div class="sigl-inline" style="justify-content:space-between">
-            <span class="sigl-summary">매수 압력 {setup_buy:.1f}</span>
-            <span class="sigl-summary">매도 압력 {setup_sell:.1f}</span>
-          </div>
-          <div class="sigl-bar-split" style="--buy:{buy_width:.2f}%;--sell:{sell_width:.2f}%">
-            <div class="sigl-bar-split__buy"></div>
-            <div class="sigl-bar-split__sell"></div>
-            <div class="sigl-bar-split__center"></div>
-          </div>
-        </div>
-        <div class="sigl-grid sigl-grid--4" style="margin-top:12px">{cards}</div>
-        """
-    _render_panel_html(panel_html, min_height=_leading_lagging_panel_height(len(stat_cards)))
-
-
-def render_leading_lagging(meta):
-    leading = translate_chart_text(meta.get("leading_verdict", ""))
-    lagging = translate_chart_text(meta.get("lagging_verdict", ""))
-    accel = _safe_float(meta.get("composite_accel", 0))
-    setup_buy = _safe_float(meta.get("setup_pressure_buy", 0))
-    setup_sell = _safe_float(meta.get("setup_pressure_sell", 0))
-    max_setup = max(setup_buy, setup_sell, 1)
-    buy_width = min(setup_buy / max_setup * 50, 50)
-    sell_width = min(setup_sell / max_setup * 50, 50)
-
-    flow_text = "약세 다이버전스" if meta.get("smart_money_bearish_div") else ("자금 유입 지지" if meta.get("smart_money_bullish_div") else "중립")
-    flow_tone = "negative" if meta.get("smart_money_bearish_div") else ("positive" if meta.get("smart_money_bullish_div") else "muted")
-    size_label, size_tone = _risk_size_hint(_safe_float(meta.get("atr_pct", 0)))
-
-    utbot_dir = _safe_int(meta.get("utbot_dir", 0))
-    utbot_label = "UT 매수" if utbot_dir == 1 else ("UT 매도" if utbot_dir == -1 else "UT 중립")
-    utbot_tone = "positive" if utbot_dir == 1 else ("negative" if utbot_dir == -1 else "accent")
-    hma_rising = bool(meta.get("hma_rising"))
-
-    stat_cards = [
-        _mini_stat_card("BB %B", f"{_safe_float(meta.get('percent_b', 0.5)) * 100:.0f}%", "positive" if _safe_float(meta.get("percent_b", 0.5)) < 0.3 else ("negative" if _safe_float(meta.get("percent_b", 0.5)) > 0.7 else "warning")),
-        _mini_stat_card("CMF", f"{_safe_float(meta.get('cmf', 0)):+.3f}", "positive" if _safe_float(meta.get("cmf", 0)) > 0.05 else ("negative" if _safe_float(meta.get("cmf", 0)) < -0.05 else "muted")),
-        _mini_stat_card("자금 흐름", flow_text, flow_tone),
-        _mini_stat_card("OBV 기울기", f"{_safe_float(meta.get('obv_slope', 0)):+.2f}", "positive" if _safe_float(meta.get("obv_slope", 0)) > 0 else ("negative" if _safe_float(meta.get("obv_slope", 0)) < 0 else "muted")),
-        _mini_stat_card("최근 거래량", f"{_safe_float(meta.get('volume_ratio_20', 1)):.1f}x", "positive" if _safe_float(meta.get("volume_ratio_20", 1)) >= 1 else ("warning" if _safe_float(meta.get("volume_ratio_20", 1)) >= 0.7 else "negative")),
-        _mini_stat_card("ATR%", f"{_safe_float(meta.get('atr_pct', 0)):.1f}%", "accent"),
-        _mini_stat_card("권장 비중", size_label, size_tone),
-        _mini_stat_card("50일선 거리", f"{_safe_float(meta.get('ma50_dist', 0)):+.1f}%", "positive" if _safe_float(meta.get("ma50_dist", 0)) > 0 else "negative"),
-        _mini_stat_card("200일선 거리", f"{_safe_float(meta.get('ma200_dist', 0)):+.1f}%", "positive" if _safe_float(meta.get("ma200_dist", 0)) > 0 else "negative"),
-    ]
 
     panel_html = f"""
         <div class="sigl-grid sigl-grid--2">
           <div class="sigl-card">
             <div class="sigl-section-head">
               <div>
-                <p class="sigl-section-title">선행 지표</p>
-                <p class="sigl-section-copy">속도와 전환 신호 중심의 해석입니다.</p>
+                <p class="sigl-section-title">\uC120\uD589 \uC9C0\uD45C</p>
+                <p class="sigl-section-copy">\uC18D\uB3C4\uC640 \uC804\uD658 \uC2E0\uD638 \uC911\uC2EC\uC758 \uD574\uC11D\uC785\uB2C8\uB2E4.</p>
               </div>
             </div>
             <p class="sigl-metric-value" style="font-size:1.18rem;color:{_tone_color('positive' if accel >= 0 else 'negative')}">{_esc(leading)}</p>
             <div class="sigl-chip-row">
-              {_badge(f'가속도 {accel:+.2f}', 'positive' if accel > 0 else ('negative' if accel < 0 else 'muted'))}
+              {_badge(f'\uAC00\uC18D\uB3C4 {accel:+.2f}', 'positive' if accel > 0 else ('negative' if accel < 0 else 'muted'))}
               {_badge(utbot_label, utbot_tone)}
-              {_badge('HMA 상승' if hma_rising else 'HMA 하락', 'positive' if hma_rising else 'negative')}
+              {_badge('HMA \uC0C1\uC2B9' if hma_rising else 'HMA \uD558\uB77D', 'positive' if hma_rising else 'negative')}
             </div>
           </div>
           <div class="sigl-card">
             <div class="sigl-section-head">
               <div>
-                <p class="sigl-section-title">후행 지표</p>
-                <p class="sigl-section-copy">구조와 누적 추세를 중심으로 봅니다.</p>
+                <p class="sigl-section-title">\uD6C4\uD589 \uC9C0\uD45C</p>
+                <p class="sigl-section-copy">\uAD6C\uC870\uC640 \uB204\uC801 \uCD94\uC138\uB97C \uC911\uC2EC\uC73C\uB85C \uBD05\uB2C8\uB2E4.</p>
               </div>
             </div>
             <p class="sigl-metric-value" style="font-size:1.18rem;color:{_tone_color(_tone_from_text(lagging))}">{_esc(lagging)}</p>
@@ -552,13 +482,13 @@ def render_leading_lagging(meta):
         <div class="sigl-card" style="margin-top:12px">
           <div class="sigl-section-head">
             <div>
-              <p class="sigl-section-title">매수/매도 압력</p>
-              <p class="sigl-section-copy">현재 셋업 압력이 어느 쪽으로 더 기울었는지 보여줍니다.</p>
+              <p class="sigl-section-title">\uB9E4\uC218/\uB9E4\uB3C4 \uC555\uB825</p>
+              <p class="sigl-section-copy">\uD604\uC7AC \uC14B\uC5C5 \uC555\uB825\uC774 \uC5B4\uB290 \uCABD\uC73C\uB85C \uB354 \uAE30\uC6B8\uC5C8\uB294\uC9C0 \uBCF4\uC5EC\uC90D\uB2C8\uB2E4.</p>
             </div>
           </div>
           <div class="sigl-inline" style="justify-content:space-between">
-            <span class="sigl-summary">매수 압력 {setup_buy:.1f}</span>
-            <span class="sigl-summary">매도 압력 {setup_sell:.1f}</span>
+            <span class="sigl-summary">\uB9E4\uC218 \uC555\uB825 {setup_buy:.1f}</span>
+            <span class="sigl-summary">\uB9E4\uB3C4 \uC555\uB825 {setup_sell:.1f}</span>
           </div>
           <div class="sigl-bar-split" style="--buy:{buy_width:.2f}%;--sell:{sell_width:.2f}%">
             <div class="sigl-bar-split__buy"></div>
@@ -569,8 +499,8 @@ def render_leading_lagging(meta):
         <div class="sigl-card" style="margin-top:12px">
           <div class="sigl-section-head">
             <div>
-              <p class="sigl-section-title">보조 지표 스냅샷</p>
-              <p class="sigl-section-copy">과열, 자금 흐름, 변동성, 위치 정보를 같은 규격으로 봅니다.</p>
+              <p class="sigl-section-title">\uBCF4\uC870 \uC9C0\uD45C \uC2A4\uB0C5\uC0F7</p>
+              <p class="sigl-section-copy">\uACFC\uC5F4, \uC790\uAE08 \uD750\uB984, \uBCC0\uB3D9\uC131, \uC704\uCE58 \uC815\uBCF4\uB97C \uAC19\uC740 \uADDC\uACA9\uC73C\uB85C \uBD05\uB2C8\uB2E4.</p>
             </div>
           </div>
           <div class="sigl-grid sigl-grid--4">{''.join(stat_cards)}</div>
