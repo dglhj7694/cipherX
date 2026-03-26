@@ -32,8 +32,8 @@ st.set_page_config(page_title=BRAND_PAGE_TITLE, page_icon=BRAND_PAGE_ICON, layou
 
 # ━━━ CSS ━━━
 st.markdown("""<style>
-@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
-html,body,[class*="css"]{font-family:'Pretendard',sans-serif!important}
+@import url('https://cdn.jsdelivr.net/gh/moonspam/NanumSquare@2.0/nanumsquare.css');
+html,body,[class*="css"]{font-family:'NanumSquare','Malgun Gothic','Apple SD Gothic Neo',sans-serif!important}
 .stApp{background-color:#0B0E14}
 p,li{color:#E8ECF1!important} h1,h2{color:#FFF!important;font-weight:800!important}
 h3{color:#F0F4F8!important;font-weight:700!important}
@@ -428,6 +428,12 @@ def _format_board_price(value):
     except (TypeError, ValueError):
         return "--"
 
+def _format_board_change_value(value):
+    try:
+        return f"{float(value):+,.2f}"
+    except (TypeError, ValueError):
+        return "--"
+
 def _format_board_change_pct(value):
     try:
         return f"{float(value):+.1f}%"
@@ -535,13 +541,15 @@ def _history_rows_from_messages(messages, limit=8):
     for idx, msg in enumerate(messages[:limit]):
         meta = msg.get('meta') or {}
         es_value = meta.get('ensemble_score')
-        change_value = meta.get('price_change_pct')
+        change_amount = meta.get('price_change')
+        change_pct = meta.get('price_change_pct')
         rows.append({
             'time': _format_board_time(msg.get('analyzed_at')),
             'ticker': _format_board_code(msg.get('ticker'), 'WAIT'),
             'price': _format_board_price(meta.get('price')),
-            'change': _format_board_change_pct(change_value),
-            'change_tone': _change_tone_from_value(change_value),
+            'change_value': _format_board_change_value(change_amount),
+            'change_pct': _format_board_change_pct(change_pct),
+            'change_tone': _change_tone_from_value(change_amount if isinstance(change_amount, (int, float)) else change_pct),
             'signal': _terminal_signal_label(meta),
             'recent': _latest_recent_signal_label(meta),
             'recent_tone': _latest_recent_signal_tone(meta),
@@ -625,7 +633,7 @@ def _scan_tape_items(limit=6):
 
 def _history_marquee_items(history_rows, limit=8):
     return [
-        f"{row.get('ticker', 'WAIT')} PX {row.get('price', '--')} {row.get('change', '--')} SIGNAL {row.get('signal', 'IDLE')} RECENT {row.get('recent', 'STANDBY')}"
+        f"{row.get('ticker', 'WAIT')} PX {row.get('price', '--')} {row.get('change_value', '--')} {row.get('change_pct', '--')} SIGNAL {row.get('signal', 'IDLE')} RECENT {row.get('recent', 'STANDBY')}"
         for row in (history_rows or [])[:limit]
     ]
 
@@ -699,7 +707,8 @@ def _build_brand_payload(current_mode, chart_period):
         focus = _format_board_code(focus_row.get('ticker') if focus_row else selected_sector, fallback='READY')
         es_value = focus_row.get('es') if focus_row else None
         price_value = focus_row.get('price') if focus_row else None
-        change_value = focus_row.get('chg') if focus_row else None
+        change_amount = focus_row.get('chg_value') if focus_row else None
+        change_pct = focus_row.get('chg') if focus_row else None
         judgment_source = (focus_row.get('action') or focus_row.get('jg_key')) if focus_row else 'READY'
         judgment = _format_board_code(judgment_source, fallback='READY')
         context = _format_board_code(
@@ -730,8 +739,9 @@ def _build_brand_payload(current_mode, chart_period):
             'mode': mode_label,
             'focus': focus,
             'price': _format_board_price(price_value),
-            'change': _format_board_change_pct(change_value),
-            'change_tone': _change_tone_from_value(change_value),
+            'change_value': _format_board_change_value(change_amount),
+            'change_pct': _format_board_change_pct(change_pct),
+            'change_tone': _change_tone_from_value(change_amount if isinstance(change_amount, (int, float)) else change_pct),
             'es': _format_board_es(es_value),
             'judgment': judgment,
             'context': context,
@@ -760,7 +770,8 @@ def _build_brand_payload(current_mode, chart_period):
     focus_recent_signals = _focus_recent_signals_from_analysis(meta)
     focus_stack_summary = _focus_stack_summary_from_analysis(meta)
     price_value = meta.get('price') if meta else None
-    change_value = meta.get('price_change_pct') if meta else None
+    change_amount = meta.get('price_change') if meta else None
+    change_pct = meta.get('price_change_pct') if meta else None
     recent_label = _primary_recent_signal_label(focus_recent_signals, _latest_recent_signal_label(meta))
     recent_tone = _primary_recent_signal_tone(focus_recent_signals, _latest_recent_signal_tone(meta))
     summary = (
@@ -788,8 +799,9 @@ def _build_brand_payload(current_mode, chart_period):
         'mode': mode_label,
         'focus': focus,
         'price': _format_board_price(price_value),
-        'change': _format_board_change_pct(change_value),
-        'change_tone': _change_tone_from_value(change_value),
+        'change_value': _format_board_change_value(change_amount),
+        'change_pct': _format_board_change_pct(change_pct),
+        'change_tone': _change_tone_from_value(change_amount if isinstance(change_amount, (int, float)) else change_pct),
         'es': _format_board_es(es_value),
         'judgment': judgment,
         'context': context,
@@ -974,6 +986,7 @@ if current_mode == '스캐너':
                         })
 
                 # ── 3. 기본 지표 수치 ──────────────────────────────────────────
+                chv = _sf(lt['Close'] - dc_.iloc[-2]['Close']) if len(dc_) >= 2 else 0
                 ch  = _sf((lt['Close'] - dc_.iloc[-2]['Close']) / dc_.iloc[-2]['Close'] * 100) if len(dc_) >= 2 else 0
                 bt  = _sf(lt.get('Buy_Total', 0))
                 stt = _sf(lt.get('Sell_Total', 0))
@@ -1032,6 +1045,7 @@ if current_mode == '스캐너':
                 return {
                     'ticker':       t,
                     'price':        _sf(lt['Close']),
+                    'chg_value':    chv,
                     'chg':          ch,
                     'scans':        sorted(acs, key=lambda x: x['tier']),
                     'transitions':  trs,

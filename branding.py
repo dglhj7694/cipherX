@@ -6,15 +6,12 @@ BRAND_PAGE_ICON = "📟"
 BRAND_REPORT_SLUG = "sigl"
 
 _BOARD_CSS = """
-@font-face{
-  font-family:'SIGL Segment';
-  src:local('DSEG7 Classic'),local('DS-Digital'),local('Digital-7'),local('JetBrains Mono'),local('Consolas');
-}
+@import url('https://cdn.jsdelivr.net/gh/moonspam/NanumSquare@2.0/nanumsquare.css');
 html,body{
   margin:0;
   padding:0;
   background:transparent;
-  font-family:'Pretendard',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  font-family:'NanumSquare','Malgun Gothic','Apple SD Gothic Neo',sans-serif;
 }
 *{box-sizing:border-box}
 .sigl-board{
@@ -117,7 +114,7 @@ html,body{
 .sigl-meta-chip,
 .sigl-lane-key,
 .sigl-lane-time{
-  font-family:'JetBrains Mono','IBM Plex Mono','SFMono-Regular',Consolas,monospace;
+  font-family:'NanumSquare','Malgun Gothic','Apple SD Gothic Neo',sans-serif;
   text-transform:uppercase;
 }
 .sigl-topbar-badge{
@@ -406,7 +403,7 @@ html,body{
   border:1px solid rgba(148,163,184,.16);
   background:linear-gradient(180deg,rgba(15,19,28,.96),rgba(10,13,20,.9));
   box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
-  font-family:'JetBrains Mono','IBM Plex Mono','SFMono-Regular',Consolas,monospace;
+  font-family:'NanumSquare','Malgun Gothic','Apple SD Gothic Neo',sans-serif;
 }
 .sigl-flow-chip--bull{
   color:#B8F1D5;
@@ -534,7 +531,7 @@ html,body{
   padding:11px 22px 11px 14px;
   color:#D8E2EC;
   text-transform:uppercase;
-  font-family:'JetBrains Mono','IBM Plex Mono','SFMono-Regular',Consolas,monospace;
+  font-family:'NanumSquare','Malgun Gothic','Apple SD Gothic Neo',sans-serif;
   text-shadow:0 0 7px currentColor,0 0 16px rgba(255,255,255,.08);
 }
 .sigl-lane-time{
@@ -544,7 +541,7 @@ html,body{
   letter-spacing:.16em;
 }
 .sigl-led{
-  font-family:'SIGL Segment','JetBrains Mono','IBM Plex Mono','SFMono-Regular',Consolas,monospace !important;
+  font-family:'NanumSquare','Malgun Gothic','Apple SD Gothic Neo',sans-serif !important;
   letter-spacing:.16em;
   text-transform:uppercase;
   text-shadow:0 0 10px currentColor,0 0 22px rgba(255,255,255,.08);
@@ -718,7 +715,8 @@ def _placeholder_history_rows():
             "time": "--:--",
             "ticker": "WAIT",
             "price": "--",
-            "change": "--",
+            "change_value": "--",
+            "change_pct": "--",
             "change_tone": "flat",
             "signal": "IDLE",
             "recent": "STANDBY",
@@ -821,7 +819,8 @@ def _build_lane_group(row):
         </span>
         <span class="sigl-lane-field">
             <span class="sigl-lane-key">D1</span>
-            <span class="sigl-lane-value sigl-lane-value--{change_tone}">{_esc(row.get("change"), "--")}</span>
+            <span class="sigl-lane-value sigl-lane-value--{change_tone}">{_esc(row.get("change_value"), "--")}</span>
+            <span class="sigl-lane-value sigl-lane-value--{change_tone}">{_esc(row.get("change_pct"), "--")}</span>
         </span>
         <span class="sigl-lane-badge sigl-lane-badge--{signal_tone}">{_esc(row.get("signal"), "IDLE")}</span>
         <span class="sigl-lane-key">RECENT</span>
@@ -831,7 +830,9 @@ def _build_lane_group(row):
 
 
 def _build_log_lanes(rows):
-    active_rows = list(rows or [])[:5] or _placeholder_history_rows()
+    active_rows = list(rows or [])[:5]
+    if len(active_rows) < 5:
+        active_rows.extend(_placeholder_history_rows()[len(active_rows):5])
     durations = [14, 16, 18, 15, 17]
     delays = [0, -3, -6, -2, -5]
     lanes = []
@@ -875,7 +876,8 @@ def build_brand_board(payload, compact=False):
     feed_status = _esc(payload.get("feed_status"), "MARKET_SYNC")
     focus = _esc(payload.get("focus"), "WAIT")
     price = _esc(payload.get("price"), "--")
-    change = _esc(payload.get("change"), "--")
+    change_value = _esc(payload.get("change_value"), "--")
+    change_pct = _esc(payload.get("change_pct"), "--")
     change_tone = _change_tone(payload.get("change_tone"))
     signal = _esc(payload.get("judgment"), "IDLE")
     signal_tone = _signal_tone(payload.get("judgment"), "neutral")
@@ -923,7 +925,8 @@ def build_brand_board(payload, compact=False):
                                 <div class="sigl-focus-ticker sigl-led">{focus}</div>
                                 <div class="sigl-focus-price-row">
                                     <span class="sigl-focus-price sigl-led sigl-led--soft">{price}</span>
-                                    <span class="sigl-change sigl-change--{change_tone}">{change}</span>
+                                    <span class="sigl-change sigl-change--{change_tone}">{change_value}</span>
+                                    <span class="sigl-change sigl-change--{change_tone}">{change_pct}</span>
                                 </div>
                             </div>
                         </div>
