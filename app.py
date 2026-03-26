@@ -9,6 +9,7 @@ import re
 import textwrap
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import yfinance as yf
 from sectors import SECTOR_GROUPS
 from config import GEMINI_API_KEY, COMBINED_SCAN_REGISTRY, CTX_KOR
 from utils import _valid_fmt, _sf, fetch_fundamentals, validate_ticker, compute_and_cache, _compute_cached
@@ -40,6 +41,24 @@ INITIAL_MESSAGE = {
     "type": "text",
     "content": INITIAL_MESSAGE_CONTENT,
 }
+
+_SCAN_SYMBOL_PATTERN = re.compile(r"\b[A-Z]{1,6}(?:[.-][A-Z0-9]{1,4})?\b")
+_ETF_UNIVERSE_PRESETS = [
+    {"key": "IVES", "label": "IVES", "symbol": "IVES"},
+    {"key": "FFTY", "label": "FFTY", "symbol": "FFTY"},
+    {"key": "QMOM", "label": "QMOM", "symbol": "QMOM"},
+    {"key": "ARKK", "label": "ARKK", "symbol": "ARKK"},
+    {"key": "ARKQ", "label": "ARKQ", "symbol": "ARKQ"},
+    {"key": "ARKW", "label": "ARKW", "symbol": "ARKW"},
+    {"key": "ARKG", "label": "ARKG", "symbol": "ARKG"},
+    {"key": "ARKF", "label": "ARKF", "symbol": "ARKF"},
+    {"key": "NASDAQ100", "label": "나스닥100", "symbol": "QQQ"},
+    {"key": "SP500", "label": "S&P500", "symbol": "SPY"},
+    {"key": "IGV", "label": "IGV", "symbol": "IGV"},
+    {"key": "SKYY", "label": "SKYY", "symbol": "SKYY"},
+    {"key": "WCBR", "label": "WCBR", "symbol": "WCBR"},
+]
+_ETF_UNIVERSE_PRESET_MAP = {item["key"]: item for item in _ETF_UNIVERSE_PRESETS}
 
 
 # ━━━ Constants ━━━
@@ -88,6 +107,11 @@ def init_session():
         'selected_sector': None,
         'selected_sectors': [],
         'scan_tickers_override': None,
+        'scan_etf_items': [],
+        'scan_etf_tickers_override': None,
+        'scan_etf_note': '',
+        'scan_etf_errors': [],
+        'scan_etf_picker': [],
         'scan_sector_picker': [],
         '_clear_scan_pending': False,
     }
@@ -113,6 +137,11 @@ def reset_session():
     st.session_state['selected_sector'] = None
     st.session_state['selected_sectors'] = []
     st.session_state['scan_tickers_override'] = None
+    st.session_state['scan_etf_items'] = []
+    st.session_state['scan_etf_tickers_override'] = None
+    st.session_state['scan_etf_note'] = ''
+    st.session_state['scan_etf_errors'] = []
+    st.session_state['scan_etf_picker'] = []
     st.session_state['scan_sector_picker'] = []
 
 init_session()
@@ -360,8 +389,552 @@ def _render_sector_button_picker(sector_names, selected_sectors):
 
 
 def _parse_ticker_input(raw_text):
-    raw = str(raw_text or "").replace(",", " ").replace("\n", " ")
-    return list(dict.fromkeys([token.strip().upper() for token in raw.split() if token.strip()]))
+    raw = str(raw_text or "").upper()
+    return list(dict.fromkeys(_SCAN_SYMBOL_PATTERN.findall(raw)))
+
+
+def _short_collection_title(values):
+    items = [str(v).strip() for v in (values or []) if str(v).strip()]
+    if not items:
+        return None
+    if len(items) == 1:
+        return items[0]
+    return f"{items[0]} 외 {len(items) - 1}"
+
+
+def _normalized_selected_etf_presets(value):
+    if not value:
+        return []
+    if isinstance(value, str):
+        value = [value]
+    seen = set()
+    normalized = []
+    for raw in value:
+        text = str(raw or "").strip().upper()
+        if not text or text in seen or text not in _ETF_UNIVERSE_PRESET_MAP:
+            continue
+        seen.add(text)
+        normalized.append(text)
+    return normalized
+
+
+def _build_etf_payload(symbol, tickers, source_label, as_of=""):
+    tickers = list(dict.fromkeys([str(t).strip().upper() for t in tickers if str(t).strip()]))
+    if not tickers:
+        return {"symbol": symbol, "tickers": [], "note": "", "error": "스캔 가능한 종목이 없습니다.", "as_of": ""}
+    basis = f"As of {as_of}" if as_of else "기준일 표기 없음"
+    return {
+        "symbol": symbol,
+        "tickers": tickers,
+        "note": f"{source_label} · {basis} · {len(tickers)}종목",
+        "error": "",
+        "as_of": as_of,
+    }
+
+
+@st.cache_data(ttl=60 * 60 * 6, show_spinner=False)
+def _fetch_wikipedia_index_constituents(symbol):
+    symbol = str(symbol or "").strip().upper()
+    page_map = {
+        "QQQ": ("https://en.wikipedia.org/wiki/Nasdaq-100", "Ticker", "Wikipedia Nasdaq-100 구성종목 기준"),
+        "SPY": ("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies", "Symbol", "Wikipedia S&P500 구성종목 기준"),
+    }
+    if symbol not in page_map:
+        return {"symbol": symbol, "tickers": [], "note": "", "error": "지원하지 않는 지수입니다.", "as_of": ""}
+
+    import re
+    import requests
+    from bs4 import BeautifulSoup
+
+    url, ticker_header, note = page_map[symbol]
+    response = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
+    response.raise_for_status()
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    target_table = None
+    for table in soup.select("table.wikitable"):
+        headers = [th.get_text(" ", strip=True) for th in table.select("tr th")[:20]]
+        if ticker_header in headers:
+            target_table = table
+            break
+    if target_table is None:
+        return {"symbol": symbol, "tickers": [], "note": "", "error": "구성종목 표를 찾지 못했습니다.", "as_of": ""}
+
+    tickers = []
+    for row in target_table.select("tr")[1:]:
+        cells = row.select("th,td")
+        if not cells:
+            continue
+        ticker = str(cells[0].get_text(" ", strip=True) or "").upper().replace(".", "-")
+        if _SCAN_SYMBOL_PATTERN.fullmatch(ticker):
+            tickers.append(ticker)
+
+    tickers = list(dict.fromkeys(tickers))
+    if not tickers:
+        return {"symbol": symbol, "tickers": [], "note": "", "error": "구성종목 티커를 찾지 못했습니다.", "as_of": ""}
+    lastmod = soup.select_one("#footer-info-lastmod")
+    as_of = ""
+    if lastmod:
+        text = lastmod.get_text(" ", strip=True)
+        date_match = re.search(r"edited on\s+(.+?)\s+\(UTC\)", text, flags=re.I)
+        as_of = date_match.group(1).strip() if date_match else ""
+
+    return _build_etf_payload(symbol, tickers, f"{note} (Wikipedia 페이지 수정일)", as_of)
+
+
+@st.cache_data(ttl=60 * 60 * 6, show_spinner=False)
+def _fetch_first_trust_holdings(symbol):
+    symbol = str(symbol or "").strip().upper()
+    import requests
+    from bs4 import BeautifulSoup
+
+    url = f"https://www.ftportfolios.com/Retail/Etf/EtfHoldings.aspx?Ticker={symbol}&Print=Y"
+    response = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
+    response.raise_for_status()
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    import re
+
+    as_of_match = re.search(r'Holdings of the Fund as of\s+([0-9/]+)', response.text, flags=re.I)
+    as_of = as_of_match.group(1) if as_of_match else ""
+
+    collecting = False
+    tickers = []
+    for row in soup.find_all("tr"):
+        cells = [cell.get_text(" ", strip=True) for cell in row.find_all("td")]
+        if not cells:
+            continue
+        if cells[:2] == ["Security Name", "Identifier"]:
+            collecting = True
+            continue
+        if not collecting or len(cells) < 7:
+            continue
+        ticker = str(cells[1] or "").strip().upper().replace(".", "-")
+        if _SCAN_SYMBOL_PATTERN.fullmatch(ticker):
+            tickers.append(ticker)
+
+    tickers = list(dict.fromkeys(tickers))
+    if not tickers:
+        return {"symbol": symbol, "tickers": [], "note": "", "error": "First Trust holdings 표를 찾지 못했습니다.", "as_of": as_of}
+
+    return _build_etf_payload(symbol, tickers, "First Trust 공식 holdings", as_of)
+
+
+@st.cache_data(ttl=60 * 60 * 6, show_spinner=False)
+def _fetch_ishares_holdings(symbol):
+    symbol = str(symbol or "").strip().upper()
+    import csv
+    import io
+    import requests
+    import re
+
+    page_map = {
+        "IGV": "https://www.ishares.com/us/products/239771/ishares-north-american-techsoftware-etf",
+    }
+    page_url = page_map.get(symbol)
+    if not page_url:
+        return {"symbol": symbol, "tickers": [], "note": "", "error": "지원하지 않는 iShares ETF입니다.", "as_of": ""}
+
+    page_text = requests.get(page_url, timeout=20, headers={"User-Agent": "Mozilla/5.0"}).text
+    match = re.search(
+        rf'href="([^"]*fileType=csv[^"]*fileName={symbol}_holdings[^"]*dataType=fund)"',
+        page_text,
+        flags=re.I,
+    )
+    if not match:
+        return {"symbol": symbol, "tickers": [], "note": "", "error": "iShares CSV 링크를 찾지 못했습니다.", "as_of": ""}
+
+    csv_url = requests.compat.urljoin("https://www.ishares.com", match.group(1))
+    raw_csv = requests.get(csv_url, timeout=20, headers={"User-Agent": "Mozilla/5.0"}).content
+    csv_text = raw_csv.decode("utf-8-sig", errors="ignore")
+    as_of_match = re.search(r'Fund Holdings as of,\s*"?([^"\n]+)"?', csv_text, flags=re.I)
+    as_of = as_of_match.group(1).strip() if as_of_match else ""
+    reader = csv.DictReader(io.StringIO(csv_text))
+
+    tickers = []
+    for row in reader:
+        ticker = str(row.get("Ticker") or "").strip().upper().replace(".", "-")
+        if _SCAN_SYMBOL_PATTERN.fullmatch(ticker):
+            tickers.append(ticker)
+
+    tickers = list(dict.fromkeys(tickers))
+    if not tickers:
+        return {"symbol": symbol, "tickers": [], "note": "", "error": "iShares holdings CSV에서 티커를 찾지 못했습니다.", "as_of": as_of}
+
+    return _build_etf_payload(symbol, tickers, "iShares 공식 CSV", as_of)
+
+
+@st.cache_data(ttl=60 * 60 * 6, show_spinner=False)
+def _fetch_alpha_architect_holdings(symbol):
+    symbol = str(symbol or "").strip().upper()
+    import requests
+    from bs4 import BeautifulSoup
+
+    url = f"https://funds.alphaarchitect.com/{symbol.lower()}/"
+    response = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
+    response.raise_for_status()
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    target_table = None
+    for table in soup.find_all("table"):
+        headers = [th.get_text(" ", strip=True) for th in table.find_all("th")[:12]]
+        if {"Ticker", "Name"}.issubset(set(headers)) and "% of Net Assets" in headers:
+            target_table = table
+            break
+    if target_table is None:
+        return {"symbol": symbol, "tickers": [], "note": "", "error": "Alpha Architect holdings 표를 찾지 못했습니다.", "as_of": ""}
+
+    import re
+    date_hits = re.findall(r"\b\d{2}/\d{2}/\d{4}\b", response.text)
+    as_of = date_hits[0] if date_hits else ""
+
+    tickers = []
+    for row in target_table.find_all("tr")[1:]:
+        cells = [cell.get_text(" ", strip=True) for cell in row.find_all(["th", "td"])]
+        if not cells:
+            continue
+        ticker = str(cells[0] or "").strip().upper().replace(".", "-")
+        if _SCAN_SYMBOL_PATTERN.fullmatch(ticker):
+            tickers.append(ticker)
+
+    tickers = list(dict.fromkeys(tickers))
+    if not tickers:
+        return {"symbol": symbol, "tickers": [], "note": "", "error": "Alpha Architect 구성종목을 찾지 못했습니다.", "as_of": as_of}
+
+    return _build_etf_payload(symbol, tickers, "Alpha Architect 공식 holdings", as_of)
+
+
+@st.cache_data(ttl=60 * 60 * 6, show_spinner=False)
+def _fetch_innovator_holdings(symbol):
+    symbol = str(symbol or "").strip().upper()
+    import requests
+    import re
+    from bs4 import BeautifulSoup
+
+    page_map = {
+        "FFTY": "https://www.innovatoretfs.com/ffty",
+    }
+    page_url = page_map.get(symbol)
+    if not page_url:
+        return {"symbol": symbol, "tickers": [], "note": "", "error": "지원하지 않는 Innovator ETF입니다.", "as_of": ""}
+
+    response = requests.get(page_url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
+    response.raise_for_status()
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    date_hits = re.findall(r"As of\s+(\d{1,2}/\d{1,2}/\d{4})", response.text)
+    as_of = date_hits[0] if date_hits else ""
+
+    tickers = []
+    for row in soup.select("tr.hold_row"):
+        cells = [cell.get_text(" ", strip=True) for cell in row.find_all("td")]
+        if not cells:
+            continue
+        ticker = str(cells[0] or "").strip().upper().replace(".", "-")
+        if _SCAN_SYMBOL_PATTERN.fullmatch(ticker):
+            tickers.append(ticker)
+
+    tickers = list(dict.fromkeys(tickers))
+    if not tickers:
+        return {"symbol": symbol, "tickers": [], "note": "", "error": "Innovator 공식 holdings 표에서 티커를 찾지 못했습니다.", "as_of": as_of}
+
+    return _build_etf_payload(symbol, tickers, "Innovator 공식 holdings", as_of)
+
+
+@st.cache_data(ttl=60 * 60 * 6, show_spinner=False)
+def _fetch_ark_holdings(symbol):
+    symbol = str(symbol or "").strip().upper()
+    import csv
+    import io
+    import json
+    import re
+    import urllib.parse
+    import cloudscraper
+    import requests
+    from bs4 import BeautifulSoup
+
+    page_text = cloudscraper.create_scraper().get(
+        f"https://www.ark-funds.com/funds/{symbol}",
+        timeout=20,
+    ).text
+    api_match = re.search(r"/api/fund/holdings/(\d+)\?fundHoldingData=", page_text)
+    if not api_match:
+        return {"symbol": symbol, "tickers": [], "note": "", "error": "ARK holdings API를 찾지 못했습니다.", "as_of": ""}
+
+    payload = {
+        "Heading": "Top 10 Holdings",
+        "PdfLinkText": "Full Holdings PDF",
+        "CsvLinkText": "Full Holdings CSV",
+        "Link": {"Style": "", "Href": "", "Aria": "", "Target": "", "Text": ""},
+    }
+    data_json = urllib.parse.quote(json.dumps(payload, separators=(",", ":")))
+    api_url = f"https://www.ark-funds.com/api/fund/holdings/{api_match.group(1)}?fundHoldingData={data_json}"
+    html = cloudscraper.create_scraper().get(api_url, timeout=20).text
+    soup = BeautifulSoup(html, "html.parser")
+    csv_link_el = soup.find("a", href=re.compile(r"csv", re.I))
+    as_of_match = re.search(r"As of\s+([0-9/]+)", soup.get_text(" ", strip=True), flags=re.I)
+    as_of = as_of_match.group(1) if as_of_match else ""
+    if not csv_link_el:
+        return {"symbol": symbol, "tickers": [], "note": "", "error": "ARK 공식 CSV 링크를 찾지 못했습니다.", "as_of": as_of}
+
+    csv_text = requests.get(csv_link_el["href"], timeout=20, headers={"User-Agent": "Mozilla/5.0"}).text
+    reader = csv.DictReader(io.StringIO(csv_text))
+    tickers = []
+    for row in reader:
+        ticker = str(row.get("ticker") or "").strip().upper().replace(".", "-")
+        if _SCAN_SYMBOL_PATTERN.fullmatch(ticker):
+            tickers.append(ticker)
+        if not as_of and row.get("date"):
+            as_of = str(row.get("date")).strip()
+
+    tickers = list(dict.fromkeys(tickers))
+    if not tickers:
+        return {"symbol": symbol, "tickers": [], "note": "", "error": "ARK 공식 CSV에서 티커를 찾지 못했습니다.", "as_of": as_of}
+
+    return _build_etf_payload(symbol, tickers, "ARK 공식 CSV", as_of)
+
+
+@st.cache_data(ttl=60 * 60 * 6, show_spinner=False)
+def _fetch_wisdomtree_holdings(symbol):
+    symbol = str(symbol or "").strip().upper()
+    import cloudscraper
+    import re
+    from bs4 import BeautifulSoup
+
+    page_map = {
+        "WCBR": "https://www.wisdomtree.com/investments/etfs/megatrends/wcbr",
+    }
+    page_url = page_map.get(symbol)
+    if not page_url:
+        return {"symbol": symbol, "tickers": [], "note": "", "error": "지원하지 않는 WisdomTree ETF입니다.", "as_of": ""}
+
+    scraper = cloudscraper.create_scraper()
+    page_text = scraper.get(page_url, timeout=20).text
+    modal_match = re.search(r'data-href="([^"]*all-holdings[^"]+)"', page_text)
+    if not modal_match:
+        return {"symbol": symbol, "tickers": [], "note": "", "error": "WisdomTree holdings 모달 링크를 찾지 못했습니다.", "as_of": ""}
+
+    modal_html = scraper.get(modal_match.group(1), timeout=20).text
+    soup = BeautifulSoup(modal_html, "html.parser")
+    timestamp = soup.select_one(".timestamp")
+    as_of = ""
+    if timestamp:
+        date_parts = [span.get_text(" ", strip=True) for span in timestamp.select("span")]
+        if date_parts:
+            as_of = date_parts[-1]
+
+    tickers = []
+    for table in soup.select("table.table"):
+        title_cell = table.select_one("tr.table-section-head td")
+        if not title_cell or "Securities" not in title_cell.get_text(" ", strip=True):
+            continue
+        for row in table.select("tbody tr"):
+            cells = [cell.get_text(" ", strip=True) for cell in row.select("td")]
+            if len(cells) < 2:
+                continue
+            raw_ticker = str(cells[1] or "").strip().upper()
+            ticker = raw_ticker.split()[0].replace(".", "-") if raw_ticker else ""
+            if _SCAN_SYMBOL_PATTERN.fullmatch(ticker):
+                tickers.append(ticker)
+
+    tickers = list(dict.fromkeys(tickers))
+    if not tickers:
+        return {"symbol": symbol, "tickers": [], "note": "", "error": "WisdomTree holdings 모달에서 티커를 찾지 못했습니다.", "as_of": as_of}
+
+    return _build_etf_payload(symbol, tickers, "WisdomTree 공식 holdings", as_of)
+
+
+@st.cache_data(ttl=60 * 60 * 6, show_spinner=False)
+def _fetch_wedbush_holdings(symbol):
+    symbol = str(symbol or "").strip().upper()
+    import csv
+    import io
+    import re
+    import requests
+
+    page_map = {
+        "IVES": "https://wedbushfunds.com/funds/ives/",
+    }
+    page_url = page_map.get(symbol)
+    if not page_url:
+        return {"symbol": symbol, "tickers": [], "note": "", "error": "지원하지 않는 Wedbush ETF입니다.", "as_of": ""}
+
+    page_text = requests.get(page_url, timeout=20, headers={"User-Agent": "Mozilla/5.0", "Accept-Language": "en-US,en;q=0.9"}).text
+    date_match = re.search(r"Top Holdings\s+As of\s+([0-9/]+)", page_text, flags=re.I)
+    csv_match = re.search(r'href="(https://wedbushfunds\.com/latest-sod-holdings-ives)"', page_text, flags=re.I)
+    as_of = date_match.group(1) if date_match else ""
+    if not csv_match:
+        return {"symbol": symbol, "tickers": [], "note": "", "error": "Wedbush 공식 CSV 링크를 찾지 못했습니다.", "as_of": as_of}
+
+    csv_text = requests.get(csv_match.group(1), timeout=20, headers={"User-Agent": "Mozilla/5.0"}).text
+    header_match = re.search(r'Holdings:,\s*"As of ([^"]+)"', csv_text, flags=re.I)
+    if header_match:
+        as_of = header_match.group(1).strip()
+
+    lines = [line for line in csv_text.splitlines() if line.strip()]
+    data_start = 0
+    for idx, line in enumerate(lines):
+        if line.startswith("Ticker,Name,"):
+            data_start = idx
+            break
+    reader = csv.DictReader(io.StringIO("\n".join(lines[data_start:])))
+    tickers = []
+    for row in reader:
+        ticker = str(row.get("Ticker") or "").strip().upper().replace(".", "-")
+        if _SCAN_SYMBOL_PATTERN.fullmatch(ticker):
+            tickers.append(ticker)
+
+    tickers = list(dict.fromkeys(tickers))
+    if not tickers:
+        return {"symbol": symbol, "tickers": [], "note": "", "error": "Wedbush 공식 CSV에서 티커를 찾지 못했습니다.", "as_of": as_of}
+
+    return _build_etf_payload(symbol, tickers, "Wedbush 공식 CSV", as_of)
+
+
+@st.cache_data(ttl=60 * 60, show_spinner=False)
+def _fetch_etf_holdings_preview(symbol):
+    symbol = str(symbol or "").strip().upper()
+    if not symbol:
+        return {"symbol": symbol, "tickers": [], "note": "", "error": "ETF 심볼이 비어 있습니다.", "as_of": ""}
+    if symbol in {"QQQ", "SPY"}:
+        try:
+            wiki_payload = _fetch_wikipedia_index_constituents(symbol)
+            if wiki_payload.get("tickers"):
+                return wiki_payload
+        except Exception as exc:
+            print(f"[ETF-WIKI]{symbol}: {exc}")
+    official_fetchers = {
+        "SKYY": _fetch_first_trust_holdings,
+        "IGV": _fetch_ishares_holdings,
+        "QMOM": _fetch_alpha_architect_holdings,
+        "FFTY": _fetch_innovator_holdings,
+        "IVES": _fetch_wedbush_holdings,
+        "ARKK": _fetch_ark_holdings,
+        "ARKQ": _fetch_ark_holdings,
+        "ARKW": _fetch_ark_holdings,
+        "ARKG": _fetch_ark_holdings,
+        "ARKF": _fetch_ark_holdings,
+        "WCBR": _fetch_wisdomtree_holdings,
+    }
+    if symbol in official_fetchers:
+        try:
+            official_payload = official_fetchers[symbol](symbol)
+            if official_payload.get("tickers"):
+                return official_payload
+        except Exception as exc:
+            print(f"[ETF-OFFICIAL]{symbol}: {exc}")
+    try:
+        holdings = yf.Ticker(symbol).funds_data.top_holdings
+    except Exception as exc:
+        return {"symbol": symbol, "tickers": [], "note": "", "error": str(exc), "as_of": ""}
+
+    if holdings is None or holdings.empty:
+        return {"symbol": symbol, "tickers": [], "note": "", "error": "구성종목 정보를 찾지 못했습니다.", "as_of": ""}
+
+    tickers = []
+    for raw in holdings.index.tolist():
+        ticker = str(raw or "").strip().upper()
+        if not ticker or ticker in {symbol, "$USD", "USD", "CASH"}:
+            continue
+        if _SCAN_SYMBOL_PATTERN.fullmatch(ticker):
+            tickers.append(ticker)
+
+    tickers = list(dict.fromkeys(tickers))
+    if not tickers:
+        return {"symbol": symbol, "tickers": [], "note": "", "error": "스캔 가능한 종목이 없습니다.", "as_of": ""}
+
+    return _build_etf_payload(symbol, tickers, "Yahoo Finance 상위 보유")
+
+
+def _resolve_etf_universe(etf_items):
+    resolved_items, combined, alias_notes, errors, date_notes = [], [], [], [], []
+    for item in etf_items or []:
+        requested = str(item.get("requested") or "").strip()
+        resolved = str(item.get("resolved") or "").strip().upper()
+        if not resolved:
+            continue
+        payload = _fetch_etf_holdings_preview(resolved)
+        if payload.get("tickers"):
+            resolved_items.append({
+                "requested": requested or resolved,
+                "resolved": resolved,
+                "note": payload.get("note", ""),
+                "as_of": payload.get("as_of", ""),
+            })
+            combined.extend(payload["tickers"])
+            if requested and requested.upper() != resolved:
+                alias_notes.append(f"{requested} -> {resolved}")
+            date_notes.append(f"{resolved} {payload.get('as_of') or '기준일 표기 없음'}")
+        else:
+            errors.append(f"{requested or resolved}: {payload.get('error') or '불러오기 실패'}")
+
+    combined = list(dict.fromkeys([str(t).strip().upper() for t in combined if str(t).strip()]))
+    summary = ""
+    if resolved_items and combined:
+        summary = ""
+    if date_notes:
+        summary = f"{summary} 데이터 기준일: {' / '.join(date_notes)}".strip()
+    if alias_notes:
+        summary = f"{summary} 매핑: {' / '.join(alias_notes)}".strip()
+
+    return {
+        "items": resolved_items,
+        "tickers": combined,
+        "note": summary,
+        "errors": errors,
+    }
+
+
+def _apply_etf_selection(selected_keys):
+    normalized = _normalized_selected_etf_presets(selected_keys)
+    st.session_state['scan_etf_picker'] = normalized
+    if not normalized:
+        st.session_state['scan_etf_items'] = []
+        st.session_state['scan_etf_tickers_override'] = None
+        st.session_state['scan_etf_note'] = ''
+        st.session_state['scan_etf_errors'] = []
+        return
+
+    request_items = [
+        {
+            "requested": _ETF_UNIVERSE_PRESET_MAP[key]["label"],
+            "resolved": _ETF_UNIVERSE_PRESET_MAP[key]["symbol"],
+        }
+        for key in normalized
+    ]
+    with st.spinner("ETF 구성종목을 불러오는 중입니다..."):
+        etf_payload = _resolve_etf_universe(request_items)
+    st.session_state['scan_etf_items'] = etf_payload['items']
+    st.session_state['scan_etf_tickers_override'] = etf_payload['tickers'] or None
+    st.session_state['scan_etf_note'] = etf_payload['note']
+    st.session_state['scan_etf_errors'] = etf_payload['errors']
+
+
+def _toggle_etf_selection(preset_key):
+    current = _normalized_selected_etf_presets(st.session_state.get('scan_etf_picker'))
+    if preset_key in current:
+        current = [key for key in current if key != preset_key]
+    else:
+        current.append(preset_key)
+    _apply_etf_selection(current)
+
+
+def _render_etf_button_picker(selected_keys):
+    selected_keys = _normalized_selected_etf_presets(selected_keys)
+    columns_per_row = 4
+    option_keys = [item["key"] for item in _ETF_UNIVERSE_PRESETS]
+    for start in range(0, len(option_keys), columns_per_row):
+        cols = st.columns(columns_per_row)
+        for idx, key in enumerate(option_keys[start:start + columns_per_row]):
+            with cols[idx]:
+                if st.button(
+                    _ETF_UNIVERSE_PRESET_MAP[key]["label"],
+                    key=f"etf_pick_{key}",
+                    use_container_width=True,
+                    type="primary" if key in selected_keys else "secondary",
+                ):
+                    _toggle_etf_selection(key)
+                    st.rerun()
 
 
 def _render_scanner_selection_panel(selected_sectors, selected_list):
@@ -392,6 +965,41 @@ def _render_scanner_selection_panel(selected_sectors, selected_list):
                 </div>
             </div>
             <div class="sigl-chip-row sigl-scanner-scope__sectors">{sector_chips}</div>
+            <div class="sigl-code-list sigl-scanner-scope__codes">{chips}</div>
+        </div>
+        """
+    _render_surface_html(panel_html, 0)
+
+
+def _render_etf_universe_panel(etf_items, selected_list, note=""):
+    if not etf_items:
+        return
+    count = len(selected_list)
+    title = _short_collection_title([item.get("resolved") for item in etf_items]) or "ETF"
+    etf_chips = "".join(
+        _sigl_badge(
+            item["resolved"] if item.get("requested", "").upper() == item.get("resolved", "") else f"{item['requested']}→{item['resolved']}",
+            'warning' if item.get("requested", "").upper() != item.get("resolved", "") else 'muted'
+        )
+        for item in etf_items
+    )
+    chips = "".join(
+        f"<span class='sigl-code-chip'>{html.escape(str(t))}</span>"
+        for t in selected_list
+    ) or "<span class='sigl-empty'>선택된 종목이 없습니다.</span>"
+    panel_html = f"""
+        <div class="sigl-card sigl-card--accent sigl-scanner-scope">
+            <div class="sigl-page-head">
+                <div>
+                    <p class="sigl-page-head__eyebrow">ETF 구성종목</p>
+                    <p class="sigl-page-head__title">{html.escape(str(title))}</p>
+                    <p class="sigl-page-head__copy">{html.escape(note or 'ETF 또는 지수 입력으로 임시 스캔 유니버스를 구성했습니다.')}</p>
+                </div>
+                <div class="sigl-inline sigl-scanner-scope__meta">
+                    {_sigl_badge(f'{count} 종목', 'warning')}
+                </div>
+            </div>
+            <div class="sigl-chip-row sigl-scanner-scope__sectors">{etf_chips}</div>
             <div class="sigl-code-list sigl-scanner-scope__codes">{chips}</div>
         </div>
         """
@@ -1025,6 +1633,11 @@ if current_mode == '스캐너':
         st.session_state.pop('selected_sector', None)
         st.session_state.pop('selected_sectors', None)
         st.session_state.pop('scan_tickers_override', None)
+        st.session_state['scan_etf_picker'] = []
+        st.session_state['scan_etf_items'] = []
+        st.session_state['scan_etf_tickers_override'] = None
+        st.session_state['scan_etf_note'] = ''
+        st.session_state['scan_etf_errors'] = []
         st.session_state['scan_results'] = []
         st.session_state['scan_source'] = ''
         st.session_state['scan_total'] = 0
@@ -1037,6 +1650,9 @@ if current_mode == '스캐너':
     _apply_sector_selection(current_sector_selection)
     selected_sector = st.session_state.get('selected_sector', None)
     manual_preview = _parse_ticker_input(st.session_state.get('scan_in'))
+    current_etf_selection = _normalized_selected_etf_presets(st.session_state.get('scan_etf_picker'))
+    active_etf_items = st.session_state.get('scan_etf_items') or []
+    active_etf_tickers = st.session_state.get('scan_etf_tickers_override') or []
 
     _render_page_intro(
         "Scanner",
@@ -1044,15 +1660,17 @@ if current_mode == '스캐너':
         "스캔 결과를 확인하고, 분석 모드로 자세한 분석을 이어가실 수 있습니다.",
         badges=[
             (f"선택 섹터 {len(current_sector_selection)}", "accent"),
+            (f"ETF 선택 {len(current_etf_selection)}", "warning"),
             (f"직접 입력 {len(manual_preview)}개", "warning"),
             (f"전체 후보 {len(all_universe)}개", "muted"),
         ],
     )
 
     _render_section_heading(
-        "섹터를 선택 하거나 직접 티커를 입력해서 스캔 대상을 구성하세요.",
+        "섹터, ETF, 직접 티커 입력으로 스캔 대상을 구성하세요.",
         badges=[
             ("멀티 섹터 선택", "accent"),
+            ("ETF 임시 유니버스", "warning"),
             ("직접 입력 우선 적용", "muted"),
         ],
         eyebrow="스캔 대상 구성",
@@ -1071,7 +1689,33 @@ if current_mode == '스캐너':
         sel_list = list(dict.fromkeys([str(t).strip().upper() for t in sel_list if str(t).strip()]))
         _render_scanner_selection_panel(selected_sectors, sel_list)
 
-    active_preview = manual_preview or st.session_state.get('scan_tickers_override') or []
+    _render_section_heading(
+        "ETF 또는 지수를 선택하여 스캔 대상을 구성할 수 있습니다.",
+        badges=[
+            ("전체 종목 미포함", "accent"),
+            ("ETF 임시 유니버스", "warning"),
+        ],
+        eyebrow="ETF 선택",
+        tight=True,
+    )
+    with st.container():
+        st.markdown("<div class='sigl-sector-picker-anchor'></div>", unsafe_allow_html=True)
+        _render_etf_button_picker(current_etf_selection)
+    etf_clear_col1, etf_clear_col2 = st.columns([2, 1])
+    with etf_clear_col2:
+        if st.button("ETF 선택 해제", use_container_width=True):
+            _apply_etf_selection([])
+            st.rerun()
+
+    current_etf_selection = _normalized_selected_etf_presets(st.session_state.get('scan_etf_picker'))
+    active_etf_items = st.session_state.get('scan_etf_items') or []
+    active_etf_tickers = st.session_state.get('scan_etf_tickers_override') or []
+    if active_etf_tickers:
+        _render_etf_universe_panel(active_etf_items, active_etf_tickers, st.session_state.get('scan_etf_note', ''))
+    if st.session_state.get('scan_etf_errors'):
+        st.caption("일부 ETF는 불러오지 못했습니다: " + " | ".join(st.session_state['scan_etf_errors']))
+
+    active_preview = manual_preview or active_etf_tickers or st.session_state.get('scan_tickers_override') or []
 
     with st.form("scanner_direct_input", clear_on_submit=False):
         ci = st.text_input(
@@ -1094,6 +1738,9 @@ if current_mode == '스캐너':
     if manual_tickers:
         tickers = manual_tickers
         scan_source = "직접 입력"
+    elif active_etf_tickers:
+        tickers = active_etf_tickers
+        scan_source = _short_collection_title([item.get("resolved") for item in active_etf_items]) or "ETF"
     elif st.session_state.get('scan_tickers_override'):
         tickers = st.session_state['scan_tickers_override']
         scan_source = selected_sector or ("섹터" if selected_sectors else "직접")
@@ -1103,7 +1750,7 @@ if current_mode == '스캐너':
     tickers = list(dict.fromkeys([t for t in tickers if t]))
 
     if scan_btn and not tickers:
-        st.warning("스캔할 티커가 없습니다. 섹터를 고르거나 직접 티커를 입력해 주세요.")
+        st.warning("스캔할 티커가 없습니다. 섹터를 고르거나 ETF 종목을 불러오거나 직접 티커를 입력해 주세요.")
 
     if scan_btn and tickers:
         pb = st.progress(0)

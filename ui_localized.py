@@ -205,7 +205,6 @@ def render_price_header(meta, key_prefix="analysis"):
       <div class="sigl-price-header">
         <div class="sigl-price-top">
           <div>
-            <p class="sigl-page-head__eyebrow">Analysis Snapshot</p>
             <p class="sigl-price-meta">{_esc(meta.get('ticker'))} · {_esc(meta.get('last_date'))} · {_esc(regime_label)} · {_esc(context_label)}</p>
             <p class="sigl-price-value">
               ${_safe_float(meta.get('price', 0)):.2f}

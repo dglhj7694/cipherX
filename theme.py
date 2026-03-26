@@ -117,12 +117,63 @@ textarea{{
     background .18s ease,
     transform .18s ease!important;
 }}
+div[data-baseweb="select"]{{
+  position:relative;
+}}
+div[data-baseweb="select"]>div{{
+  position:relative;
+  isolation:isolate;
+  overflow:hidden;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.04),
+    0 8px 18px rgba(2,6,23,.08)!important;
+}}
+div[data-baseweb="select"]>div::before{{
+  content:"";
+  position:absolute;
+  inset:auto auto 11px 12px;
+  width:8px;
+  height:8px;
+  border-radius:999px;
+  background:rgba(148,163,184,.42);
+  box-shadow:none;
+  opacity:.92;
+  pointer-events:none;
+  transition:
+    transform .18s ease,
+    background .18s ease,
+    box-shadow .18s ease,
+    opacity .18s ease!important;
+}}
+div[data-baseweb="select"]>div::after{{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  border-radius:inherit;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,0) 42%),
+    radial-gradient(circle at center, rgba(142,164,255,.16), rgba(142,164,255,0) 62%);
+  opacity:0;
+  transform:scale(.78);
+  transition:opacity .2s ease, transform .2s ease!important;
+}}
 div[data-baseweb="select"]>div:hover,
 div[data-testid="stTextInput"] input:hover,
 div[data-testid="stNumberInput"] input:hover,
 textarea:hover{{
   background:rgba(15,23,42,.84)!important;
   border-color:rgba(148,163,184,.22)!important;
+}}
+div[data-baseweb="select"]>div:hover{{
+  transform:translateY(-1px)!important;
+  box-shadow:
+    0 12px 22px rgba(2,6,23,.16),
+    inset 0 1px 0 rgba(255,255,255,.05)!important;
+}}
+div[data-baseweb="select"]>div:hover::after{{
+  opacity:1;
+  transform:scale(1);
 }}
 div[data-baseweb="select"]>div:focus-within,
 div[data-testid="stTextInput"] input:focus,
@@ -138,10 +189,111 @@ textarea:focus-visible{{
     0 10px 20px rgba(2,6,23,.12)!important;
   outline:none!important;
 }}
+div[data-baseweb="select"]>div:focus-within,
+div[data-baseweb="select"]>div[aria-expanded="true"],
+div[data-baseweb="select"] [aria-expanded="true"]{{
+  transform:translateY(1px)!important;
+  background:
+    linear-gradient(180deg, rgba(99,217,162,.12), rgba(99,217,162,.03)),
+    rgba(15,23,42,.90)!important;
+  border-color:rgba(99,217,162,.30)!important;
+  box-shadow:
+    0 0 0 3px rgba(99,217,162,.10),
+    0 14px 24px rgba(2,6,23,.16),
+    inset 0 1px 0 rgba(255,255,255,.05)!important;
+}}
+div[data-baseweb="select"]>div:focus-within::before,
+div[data-baseweb="select"]>div[aria-expanded="true"]::before,
+div[data-baseweb="select"] [aria-expanded="true"]::before{{
+  background:var(--sigl-success)!important;
+  box-shadow:
+    0 0 0 4px rgba(99,217,162,.12),
+    0 0 14px rgba(99,217,162,.26)!important;
+  transform:scale(1.12)!important;
+}}
+div[data-baseweb="select"]>div:focus-within::after,
+div[data-baseweb="select"]>div[aria-expanded="true"]::after,
+div[data-baseweb="select"] [aria-expanded="true"]::after{{
+  opacity:1;
+  transform:scale(1)!important;
+}}
 div[data-baseweb="select"] span,
 div[data-baseweb="select"] input,
 div[data-baseweb="select"] div{{
   color:var(--sigl-text)!important;
+}}
+div[data-baseweb="select"] svg{{
+  transition:transform .18s ease, color .18s ease!important;
+}}
+div[data-baseweb="select"]>div[aria-expanded="true"] svg,
+div[data-baseweb="select"] [aria-expanded="true"] svg{{
+  transform:rotate(180deg);
+  color:#B8F1D5!important;
+}}
+div[data-baseweb="select"] input::placeholder{{
+  color:var(--sigl-text-muted)!important;
+  opacity:1!important;
+}}
+div[data-baseweb="popover"]{{
+  z-index:999!important;
+}}
+div[data-baseweb="popover"] > div,
+div[data-baseweb="popover"] [data-baseweb="menu"]{{
+  background:
+    linear-gradient(180deg, rgba(142,164,255,.06), rgba(142,164,255,0) 26%),
+    linear-gradient(180deg, rgba(19,28,45,.98), rgba(15,23,42,.94))!important;
+  border:1px solid rgba(148,163,184,.14)!important;
+  border-radius:16px!important;
+  box-shadow:
+    0 22px 44px rgba(2,6,23,.28),
+    inset 0 1px 0 rgba(255,255,255,.04)!important;
+  backdrop-filter:blur(14px);
+  overflow:auto!important;
+}}
+div[data-baseweb="popover"] ul,
+div[data-baseweb="popover"] ol{{
+  margin:0!important;
+  padding:0!important;
+  background:transparent!important;
+}}
+div[data-baseweb="popover"] [role="listbox"]{{
+  padding:6px 0!important;
+  border-radius:16px!important;
+  border:none!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}}
+div[data-baseweb="popover"] [role="option"]{{
+  margin:0!important;
+  padding:10px 14px!important;
+  min-height:auto!important;
+  border-radius:0!important;
+  border:none!important;
+  background:transparent!important;
+  color:var(--sigl-text)!important;
+  line-height:1.35!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  transition:
+    background .16s ease,
+    color .16s ease!important;
+}}
+div[data-baseweb="popover"] [role="option"] > div,
+div[data-baseweb="popover"] [role="option"] span,
+div[data-baseweb="popover"] [role="option"] p{{
+  min-width:0!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+  line-height:1.25!important;
+}}
+div[data-baseweb="popover"] [role="option"]:hover{{
+  background:linear-gradient(180deg, rgba(142,164,255,.10), rgba(142,164,255,.04))!important;
+}}
+div[data-baseweb="popover"] [role="option"][aria-selected="true"]{{
+  background:linear-gradient(180deg, rgba(99,217,162,.16), rgba(99,217,162,.06))!important;
+  color:var(--sigl-text-strong)!important;
 }}
 div[data-testid="stMultiSelect"] [data-baseweb="tag"]{{
   background:rgba(142,164,255,.12)!important;
@@ -1585,6 +1737,11 @@ p[data-testid="stCaption"]{{
 @media (prefers-reduced-motion: reduce){{
   div[data-testid="stTabs"] button,
   div[data-baseweb="select"]>div,
+  div[data-baseweb="select"]>div::before,
+  div[data-baseweb="select"]>div::after,
+  div[data-baseweb="select"] svg,
+  div[data-baseweb="popover"] [role="option"],
+  div[data-baseweb="popover"] [role="option"]::before,
   div[data-testid="stTextInput"] input,
   div[data-testid="stNumberInput"] input,
   textarea,
