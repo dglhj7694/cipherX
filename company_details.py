@@ -6,6 +6,7 @@ import html as html_module
 import logging
 from datetime import datetime
 import plotly.graph_objects as go
+from theme import COMPANY_DETAILS_THEME_OVERRIDES, PLOTLY_FONT_FAMILY
 
 # [SURGE] 로깅 설정
 logger = logging.getLogger(__name__)
@@ -231,10 +232,10 @@ def _score_dot_row(items):
 
 def _apply_cipherx_chart_theme(fig, title_text, height=320, show_legend=True):
     fig.update_layout(
-        title=dict(text=f"<b>{title_text}</b>", font=dict(size=16, color='#F8FAFC', family="Pretendard")),
+        title=dict(text=f"<b>{title_text}</b>", font=dict(size=16, color='#F8FAFC', family=PLOTLY_FONT_FAMILY)),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(15,23,42,.35)',
-        font=dict(color='#E5E7EB', size=12, family='Pretendard'),
+        font=dict(color='#E5E7EB', size=12, family=PLOTLY_FONT_FAMILY),
         margin=dict(l=14, r=14, t=48, b=14),
         height=height,
         legend=dict(
@@ -250,7 +251,7 @@ def _apply_cipherx_chart_theme(fig, title_text, height=320, show_legend=True):
         hoverlabel=dict(
             bgcolor='rgba(11,14,20,.96)',
             bordercolor='#334155',
-            font=dict(color='#F8FAFC', size=11, family='Pretendard')
+            font=dict(color='#F8FAFC', size=11, family=PLOTLY_FONT_FAMILY)
         ),
     )
     fig.update_xaxes(
@@ -280,7 +281,7 @@ def _get_plotly_combo_chart(rv, nv, rd):
         opacity=0.92,
         text=[_fmt_num(v, False) for v in rv_rev],
         textposition='auto',
-        textfont=dict(color='#E5E7EB', size=12, family='Pretendard')
+        textfont=dict(color='#E5E7EB', size=12, family=PLOTLY_FONT_FAMILY)
     ))
     fig.add_trace(go.Scatter(
         x=labels, y=nv_rev, name='순이익', mode='lines+markers+text',
@@ -289,7 +290,7 @@ def _get_plotly_combo_chart(rv, nv, rd):
         yaxis='y2',
         text=[_fmt_num(v, False) for v in nv_rev],
         textposition='top center',
-        textfont=dict(color='#B8F1D5', size=12, family='Pretendard')
+        textfont=dict(color='#B8F1D5', size=12, family=PLOTLY_FONT_FAMILY)
     ))
     _apply_cipherx_chart_theme(fig, "연도별 재무 추이", height=320, show_legend=True)
     fig.update_layout(yaxis2=dict(overlaying='y', side='right', showgrid=False, tickfont=dict(color='#63D9A2', size=11)))
@@ -305,7 +306,7 @@ def _get_plotly_yearly_bar(dates, y1, y2, name1, name2, c1, c2):
         opacity=0.92,
         text=[_fmt_num(v, False) for v in y1[::-1]],
         textposition='auto',
-        textfont=dict(color='#E5E7EB', size=12, family='Pretendard')
+        textfont=dict(color='#E5E7EB', size=12, family=PLOTLY_FONT_FAMILY)
     ))
     fig.add_trace(go.Bar(
         x=labels, y=y2[::-1], name=name2,
@@ -313,7 +314,7 @@ def _get_plotly_yearly_bar(dates, y1, y2, name1, name2, c1, c2):
         opacity=0.92,
         text=[_fmt_num(v, False) for v in y2[::-1]],
         textposition='auto',
-        textfont=dict(color='#E5E7EB', size=12, family='Pretendard')
+        textfont=dict(color='#E5E7EB', size=12, family=PLOTLY_FONT_FAMILY)
     ))
     _apply_cipherx_chart_theme(fig, "연도별 자산/부채 추이", height=320, show_legend=True)
     fig.update_layout(barmode='group')
@@ -385,7 +386,7 @@ def _get_plotly_target_price(curr, low, mean, median, high):
             font=dict(
                 color=color if name in ['현재가', '중앙값', '평균'] else '#E5E7EB',
                 size=12,
-                family='Pretendard'
+                family=PLOTLY_FONT_FAMILY
             )
         ))
 
@@ -409,7 +410,7 @@ def _get_plotly_donut(labels, values, colors):
         labels=labels, values=values, hole=.62,
         marker=dict(colors=colors, line=dict(color='rgba(15,23,42,.92)', width=2)),
         textinfo='label+percent',
-        textfont=dict(color='#F8FAFC', size=13, family='Pretendard'),
+        textfont=dict(color='#F8FAFC', size=13, family=PLOTLY_FONT_FAMILY),
         hoverinfo='label+percent'
     )])
     _apply_cipherx_chart_theme(fig, "지분 구성 비율", height=280, show_legend=False)
@@ -840,8 +841,7 @@ def _fetch_company_news_items(ticker_str):
 
 CSS = """
 <style>
-@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
-html, body, [class*="css"] { font-family:'Pretendard', sans-serif !important; }
+__SIGL_COMPANY_THEME__
 @keyframes fadeUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
 [data-testid="stVerticalBlockBorderWrapper"] {
     background:
@@ -1026,7 +1026,7 @@ html, body, [class*="css"] { font-family:'Pretendard', sans-serif !important; }
   .target-mini-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 </style>
-"""
+""".replace("__SIGL_COMPANY_THEME__", COMPANY_DETAILS_THEME_OVERRIDES)
 
 # ═══════════════════════════════════════════════════════════════
 # 🏗️ 메인 렌더링

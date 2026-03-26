@@ -5,7 +5,7 @@
 
 import streamlit as st, google.generativeai as genai
 import streamlit.components.v1 as components
-import time, math
+import time, math, html
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from sectors import SECTOR_GROUPS
@@ -28,187 +28,11 @@ from branding import (
     INITIAL_MESSAGE_CONTENT,
     build_brand_board,
 )
+from theme import build_app_theme_css
 st.set_page_config(page_title=BRAND_PAGE_TITLE, page_icon=BRAND_PAGE_ICON, layout="wide", initial_sidebar_state="collapsed")
 
 # ━━━ CSS ━━━
-st.markdown("""<style>
-@import url('https://cdn.jsdelivr.net/gh/moonspam/NanumSquare@2.0/nanumsquare.css');
-html,body,[class*="css"]{font-family:'NanumSquare','Malgun Gothic','Apple SD Gothic Neo',sans-serif!important}
-.stApp{background-color:#0B0E14}
-p,li{color:#E8ECF1!important} h1,h2{color:#FFF!important;font-weight:800!important}
-h3{color:#F0F4F8!important;font-weight:700!important}
-h4{color:#CBD5E1!important;font-weight:600!important;font-size:1rem!important}
-.block-container{padding-top:1rem!important;max-width:1400px}
-div.stButton>button[kind="primary"]{background:linear-gradient(135deg,#6366F1,#8B5CF6)!important;color:#fff!important;border:none!important;border-radius:12px!important;font-weight:700!important;width:100%}
-div.stButton>button[kind="secondary"]{background-color:#12161F!important;color:#C4CDD8!important;border:1px solid #2A3040!important;border-radius:12px!important;width:100%}
-.price-header{background:linear-gradient(160deg,#0F1320,#141926);border:1px solid #1C2233;border-radius:16px;padding:20px 24px;margin-bottom:18px}
-.price-big{font-size:2.2rem;font-weight:800;margin:0}
-.price-change-up{color:#63D9A2!important} .price-change-down{color:#FF8F96!important}
-.ind-mini{display:inline-block;padding:4px 10px;margin:2px;border-radius:8px;font-size:.76rem;font-weight:600}
-.ind-b{background:rgba(99,217,162,.16);color:#B8F1D5}
-.ind-s{background:rgba(255,143,150,.16);color:#FFD2D7}
-.ind-n{background:rgba(246,195,94,.14);color:#F8DE9A}
-.layer-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)}
-.layer-bar{background:#151921;border-radius:4px;height:8px;flex:1;margin:0 8px;overflow:hidden}
-.layer-fill-b{height:8px;border-radius:4px;background:linear-gradient(90deg,#247A55,#63D9A2)}
-.layer-fill-s{height:8px;border-radius:4px;background:linear-gradient(90deg,#B85B65,#FF8F96)}
-.score-card{border-radius:14px;padding:20px;text-align:center;position:relative;overflow:hidden}
-.score-card-buy{background:linear-gradient(160deg,#0E261D,#101C24);border:1px solid rgba(99,217,162,.26)}
-.score-card-sell{background:linear-gradient(160deg,#281518,#16131B);border:1px solid rgba(255,143,150,.26)}
-.score-card-neutral{background:linear-gradient(160deg,#21180B,#19160F);border:1px solid rgba(246,195,94,.22)}
-.fade-up{animation:fadeUp .35s ease both}
-@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-.conf-ring{position:relative;width:80px;height:80px;display:inline-block}
-.conf-ring svg{width:80px;height:80px;transform:rotate(-90deg)}
-.ring-bg{fill:none;stroke:rgba(148,163,184,.2);stroke-width:8}
-.ring-fg{fill:none;stroke-width:8;stroke-linecap:round}
-.ring-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:.92rem;font-weight:800}
-.vote-dot{width:8px;height:8px;border-radius:999px;display:inline-block}
-.vote-dot.buy{background:#63D9A2;box-shadow:0 0 7px rgba(99,217,162,.58)}
-.vote-dot.sell{background:#FF8F96;box-shadow:0 0 7px rgba(255,143,150,.58)}
-.vote-dot.neutral{background:#F6C35E;box-shadow:0 0 7px rgba(246,195,94,.48)}
-.vote-dot.abstain{background:#64748B}
-.cm-card{background:rgba(255,255,255,.03);border:1px solid rgba(148,163,184,.12);border-radius:10px;padding:10px}
-.cm-name{color:#94A3B8;font-size:.7rem;font-weight:700;margin:0 0 4px}
-.cm-score{font-size:1.15rem;font-weight:800;margin:0 0 6px}
-.cm-vote{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.65rem;font-weight:700}
-.cm-mini-bar{height:4px;background:rgba(148,163,184,.18);border-radius:999px;overflow:hidden;margin-top:6px}
-.cm-mini-fill{height:100%;border-radius:999px}
-.tow-bar{position:relative;height:14px;border-radius:999px;background:rgba(148,163,184,.15);overflow:hidden}
-.tow-buy{position:absolute;right:50%;top:0;bottom:0;background:linear-gradient(90deg,#237650,#63D9A2)}
-.tow-sell{position:absolute;left:50%;top:0;bottom:0;background:linear-gradient(90deg,#FF8F96,#8A4B54)}
-.tow-center{position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(226,232,240,.55)}
-.stat-mini{background:rgba(255,255,255,.025);border:1px solid rgba(148,163,184,.16);border-radius:10px;padding:10px 8px;text-align:center;min-height:78px;display:flex;flex-direction:column;justify-content:center}
-.sm-label{color:#64748B;font-size:.66rem;font-weight:700;margin:0 0 4px}
-.sm-value{color:#E2E8F0;font-size:1rem;font-weight:800;margin:0}
-.cs-card{border-radius:10px;padding:10px 14px;margin:5px 0;border-left:4px solid}
-.reason-card{background:rgba(255,255,255,.04);border-radius:10px;padding:12px 16px;margin-top:12px;text-align:left}
-div[data-baseweb="select"]>div{background-color:#12161F!important;border-color:#2A3040!important;color:#E8ECF1!important}
-div[data-baseweb="popover"] ul{background-color:#FFFFFF!important;border-radius:10px!important}
-div[data-baseweb="popover"] li{color:#1E293B!important}
-div[data-testid="stRadio"] label p{color:#CBD5E1!important}
-div[data-testid="stTextInput"] input{background-color:#12161F!important;border-color:#2A3040!important;color:#E8ECF1!important}
-div[data-testid="stTabs"] button{color:#64748B!important;font-weight:700!important;border-bottom:3px solid transparent!important}
-div[data-testid="stTabs"] button[aria-selected="true"]{color:#A5B4FC!important;border-bottom-color:#6366F1!important}
-section[data-testid="stSidebar"]{background-color:#080A10;border-right:1px solid #151921}
-header{background-color:transparent!important}
-div[data-testid="stMetricValue"]{color:#F8FAFC!important}
-::-webkit-scrollbar{width:6px} ::-webkit-scrollbar-track{background:#0B0E14} ::-webkit-scrollbar-thumb{background:#2A3040;border-radius:3px}
-div[data-testid="stToastContainer"]{top:4.75rem!important}
-div[data-testid="stToast"]{background:linear-gradient(160deg,rgba(15,23,42,.96),rgba(17,24,39,.94))!important;border:1px solid rgba(99,102,241,.30)!important;border-radius:14px!important;box-shadow:0 18px 40px rgba(2,6,23,.42)!important;backdrop-filter:blur(12px)}
-div[data-testid="stToast"] p{color:#E8ECF1!important;font-weight:600!important}
-.analysis-nav{background:linear-gradient(160deg,rgba(15,23,42,.94),rgba(17,24,39,.86));border:1px solid rgba(99,102,241,.22);border-radius:16px;padding:14px 16px;margin:0 0 14px;box-shadow:0 14px 34px rgba(2,6,23,.26)}
-.analysis-nav-meta{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
-.analysis-nav-title{color:#F8FAFC;font-weight:800;font-size:1rem}
-.analysis-nav-sub{color:#94A3B8;font-size:.78rem}
-.analysis-nav-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.24);color:#C7D2FE;font-size:.74rem;font-weight:700}
-.prompt-caption{color:#94A3B8;font-size:.74rem;font-weight:700;margin-bottom:8px}
-.soft-note{color:#94A3B8;font-size:.76rem;line-height:1.55;margin-top:10px}
-div[data-testid="stExpander"]{
-  background:linear-gradient(160deg,rgba(15,23,42,.94),rgba(17,24,39,.86))!important;
-  border:1px solid rgba(148,163,184,.16)!important;
-  border-radius:14px!important;
-  overflow:hidden!important;
-}
-div[data-testid="stExpander"] details{
-  background:transparent!important;
-  border:none!important;
-}
-div[data-testid="stExpander"] summary{
-  background:transparent!important;
-}
-div[data-testid="stExpander"] summary > div,
-div[data-testid="stExpander"] summary > div > div{
-  background:transparent!important;
-}
-div[data-testid="stExpander"] summary:hover{
-  background:rgba(255,255,255,.02)!important;
-}
-div[data-testid="stExpander"] summary p{
-  color:#E8ECF1!important;
-  font-weight:700!important;
-}
-div[data-testid="stExpander"] summary svg{
-  color:#CBD5E1!important;
-  fill:#CBD5E1!important;
-}
-div[data-testid="stExpander"] div[data-testid="stExpanderDetails"]{
-  background:linear-gradient(180deg,rgba(15,23,42,.86),rgba(15,23,42,.72))!important;
-  border-top:1px solid rgba(148,163,184,.12)!important;
-}
-div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] p,
-div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] span,
-div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] li{
-  color:#E8ECF1!important;
-}
-div[data-testid="stExpander"] pre,
-div[data-testid="stExpander"] code{
-  background:#0F172A!important;
-}
-div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"]{
-  font-size:.95rem!important;
-  line-height:1.72!important;
-}
-div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h1,
-div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h2,
-div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h3,
-div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h4,
-div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h5,
-div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h6{
-  color:#F8FAFC!important;
-  font-weight:800!important;
-  letter-spacing:-.01em!important;
-  line-height:1.35!important;
-  margin:1.05rem 0 .55rem!important;
-}
-div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h1{font-size:1.12rem!important}
-div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h2{font-size:1.05rem!important}
-div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h3{font-size:.99rem!important}
-div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h4,
-div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h5,
-div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] h6{font-size:.95rem!important}
-div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] p,
-div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] li{
-  color:#E5E7EB!important;
-  font-size:.95rem!important;
-  line-height:1.72!important;
-  margin:.2rem 0 .62rem!important;
-}
-div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] ul,
-div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] ol{
-  padding-left:1.15rem!important;
-  margin:.25rem 0 .8rem!important;
-}
-div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] strong,
-div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] b{
-  color:#F8FAFC!important;
-  font-size:inherit!important;
-  font-weight:800!important;
-}
-div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] em{
-  color:#CBD5E1!important;
-  font-size:inherit!important;
-}
-div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] hr{
-  border:none!important;
-  border-top:1px solid rgba(148,163,184,.18)!important;
-  margin:.95rem 0!important;
-}
-div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] blockquote{
-  border-left:3px solid rgba(99,102,241,.45)!important;
-  background:rgba(15,23,42,.55)!important;
-  color:#CBD5E1!important;
-  margin:.8rem 0!important;
-  padding:.65rem .9rem!important;
-  border-radius:0 10px 10px 0!important;
-}
-@media (max-width:900px){
-  .block-container{padding-left:1rem!important;padding-right:1rem!important}
-  .price-header{padding:16px 18px}
-  .price-big{font-size:1.78rem}
-  .analysis-nav{padding:12px}
-}
-</style>""", unsafe_allow_html=True)
+st.markdown(build_app_theme_css(), unsafe_allow_html=True)
 
 INITIAL_MESSAGE = {
     "role": "assistant",
@@ -408,6 +232,124 @@ def _show_analysis_toasts(ticker, meta):
         warning_parts.append(f"핵심 콤보 {', '.join(tier1[:2])}")
     if warning_parts:
         st.toast(" · ".join(warning_parts[:2]), icon='⚠️')
+
+
+def _tone_suffix(raw_text):
+    text = str(raw_text or "").upper()
+    if 'BUY' in text or '상승' in text or '긍정' in text:
+        return 'positive'
+    if 'SELL' in text or '하락' in text or '부정' in text:
+        return 'negative'
+    if 'WATCH' in text or 'HOLD' in text or 'NEUTRAL' in text or '관망' in text or '보유' in text:
+        return 'warning'
+    return 'muted'
+
+
+def _sigl_badge(label, tone='muted'):
+    safe = html.escape(str(label or '').strip())
+    if not safe:
+        return ""
+    return f"<span class='sigl-badge sigl-badge--{tone}'>{safe}</span>"
+
+
+def _render_scanner_selection_panel(selected_sector, selected_list):
+    if not selected_sector:
+        return
+    count = len(selected_list)
+    chips = "".join(
+        f"<span class='sigl-code-chip'>{html.escape(str(t))}</span>"
+        for t in selected_list
+    ) or "<span class='sigl-empty'>선택된 종목이 없습니다.</span>"
+    st.markdown(
+        f"""
+        <div class="sigl-card sigl-card--accent">
+            <div class="sigl-page-head">
+                <div>
+                    <p class="sigl-page-head__eyebrow">Scanner Scope</p>
+                    <p class="sigl-page-head__title">{html.escape(str(selected_sector))}</p>
+                    <p class="sigl-page-head__copy">현재 스캔 범위와 티커 구성을 한눈에 확인할 수 있습니다.</p>
+                </div>
+                <div class="sigl-inline">
+                    {_sigl_badge(f'{count} 종목', 'accent')}
+                    {_sigl_badge('점수 높은 순 정렬', 'muted')}
+                </div>
+            </div>
+            <div class="sigl-code-list">{chips}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _render_scanner_summary(results, total_count):
+    buy_count = len([r for r in results if 'BUY' in str(r.get('jg_key', ''))])
+    sell_count = len([r for r in results if 'SELL' in str(r.get('jg_key', ''))])
+    cards = [
+        ("매수 후보", str(buy_count), "판단이 BUY 계열인 종목 수", "positive"),
+        ("매도 후보", str(sell_count), "판단이 SELL 계열인 종목 수", "negative"),
+        ("매치 수", f"{len(results)}/{total_count}", "전체 스캔 대상 대비 현재 결과", "accent"),
+    ]
+    html_cards = "".join(
+        f"""
+        <div class="sigl-metric-card">
+            <p class="sigl-metric-label">{html.escape(label)}</p>
+            <p class="sigl-metric-value">{html.escape(value)}</p>
+            <p class="sigl-metric-sub">{html.escape(sub)}</p>
+        </div>
+        """
+        for label, value, sub, _tone in cards
+    )
+    st.markdown(f"<div class='sigl-result-summary'>{html_cards}</div>", unsafe_allow_html=True)
+
+
+def _render_scanner_result_card(rank, row):
+    judgment_key = str(row.get('jg_key', ''))
+    judgment_label = str(row.get('jg', 'N/A'))
+    action_label = str(row.get('action', '')).strip()
+    tone = _tone_suffix(judgment_key or action_label)
+    tone_class = {
+        'positive': 'sigl-card--positive',
+        'negative': 'sigl-card--negative',
+        'warning': 'sigl-card--warning',
+        'muted': '',
+    }.get(tone, '')
+    move_tone = 'positive' if float(row.get('chg', 0) or 0) >= 0 else 'negative'
+    transitions = "".join(
+        _sigl_badge(f"{t['icon']} {t['label']} {t['date']}", 'positive' if t.get('dir') == 'buy' else 'negative')
+        for t in row.get('transitions', [])
+    ) or _sigl_badge("UT/HULL 전환 없음", 'muted')
+    combo_hits = "".join(
+        _sigl_badge(f"{m['icon']} {m['label']} {m['date']}", _tone_suffix(m.get('dir')))
+        for m in row.get('multi_hits', [])
+    ) or _sigl_badge("최근 다중 시그널 없음", 'muted')
+    reason_html = ""
+    if row.get('reason'):
+        reason_html = f"<p class='sigl-summary'>{html.escape(str(row['reason'])[:120])}</p>"
+    change_prefix = "+" if float(row.get('chg', 0) or 0) >= 0 else ""
+    st.markdown(
+        f"""
+        <div class="sigl-result-card {tone_class}">
+            <div class="sigl-result-head">
+                <div>
+                    <p class="sigl-result-title">#{rank} {html.escape(str(row.get('ticker', '')))}</p>
+                    <p class="sigl-result-copy">
+                        현재가 {float(row.get('price', 0) or 0):.2f} · 변동 {change_prefix}{float(row.get('chg', 0) or 0):.1f}%
+                    </p>
+                </div>
+                <div class="sigl-result-tags">
+                    {_sigl_badge(f"SCAN {float(row.get('scan_score', 0) or 0):+.1f}", 'accent')}
+                    {_sigl_badge(f"ES {float(row.get('es', 0) or 0):+.0f}", tone)}
+                    {_sigl_badge(f"{judgment_label} ({float(row.get('cf', 0) or 0):.0f}%)", tone)}
+                    {_sigl_badge(f"CTX {row.get('ctx', 'N/A')}", 'muted')}
+                </div>
+            </div>
+            <div class="sigl-chip-row">{transitions}</div>
+            <div class="sigl-chip-row">{combo_hits}</div>
+            {reason_html}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 def _format_board_text(value, fallback="--"):
     text = str(value).strip() if value is not None else ""
@@ -855,10 +797,10 @@ def _build_brand_payload(current_mode, chart_period):
     }
 
 def _render_brand_board(payload, compact=False):
-    height = 340 if compact else 760
+    height = 230 if compact else 255
     components.html(build_brand_board(payload, compact=compact), height=height, scrolling=False)
     if not compact:
-        st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
 with st.sidebar:
     _mi = 0 if st.session_state.get('_mode', '분석') == '분석' else 1
@@ -906,18 +848,7 @@ if current_mode == '스캐너':
     if selected_sector:
         sel_list = st.session_state.get('scan_tickers_override', []) if selected_sector == '🌐 전체' else SECTOR_GROUPS.get(selected_sector, [])
         sel_list = list(dict.fromkeys([str(t).strip().upper() for t in sel_list if str(t).strip()]))
-        sel_cnt = len(sel_list)
-        st.markdown(f"<div style='background:rgba(99,102,241,.08);border:1px solid #6366F133;border-radius:10px;padding:10px 14px;margin:8px 0'>"
-                    f"<span style='color:#A5B4FC;font-weight:700'>{selected_sector}</span>"
-                    f"<span style='color:#64748B;margin-left:8px'>{sel_cnt}종목</span>"
-                    f"<span style='color:#64748B;margin-left:8px'>· 점수 높은 순 정렬</span></div>", unsafe_allow_html=True)
-        if sel_list:
-            chips = "".join([f"<span style='display:inline-block;margin:3px 4px 0 0;padding:3px 8px;border-radius:999px;"
-                             f"background:rgba(30,41,59,.8);border:1px solid #334155;color:#CBD5E1;font-size:.76rem;font-weight:600'>{t}</span>"
-                             for t in sel_list])
-            st.markdown(f"<div style='background:rgba(15,23,42,.55);border:1px solid #1E293B;border-radius:10px;padding:10px 12px;margin:6px 0 10px'>"
-                        f"<p style='margin:0 0 6px;color:#94A3B8;font-size:.74rem;font-weight:700'>선택 종목 목록</p>"
-                        f"<div style='max-height:110px;overflow:auto'>{chips}</div></div>", unsafe_allow_html=True)
+        _render_scanner_selection_panel(selected_sector, sel_list)
 
     st.markdown("#### ✏️ 직접 입력")
     ci = st.text_input("티커", placeholder="NVDA,TSLA...", key="scan_in")
@@ -1143,94 +1074,12 @@ if current_mode == '스캐너':
     # ── 결과 렌더링 ──────────────────────────────────────────────────────────
     results = st.session_state.get('scan_results', [])
     if results:
-        bt_  = [r for r in results if 'BUY'  in str(r.get('jg_key', ''))]
-        st_  = [r for r in results if 'SELL' in str(r.get('jg_key', ''))]
         scan_total = st.session_state.get('scan_total', 0)
         st.caption("정렬 기준: 스캔 점수 → 강도 → 최근 시그널 순서입니다.")
-
-        st.markdown(
-            f"<div style='display:flex;gap:12px;margin-bottom:12px'>"
-            f"<div style='flex:1;background:rgba(99,217,162,.10);border:1px solid rgba(99,217,162,.28);border-radius:10px;padding:10px;text-align:center'>"
-            f"<span style='color:#63D9A2;font-weight:800;font-size:1.3rem'>{len(bt_)}</span>"
-            f"<span style='color:#64748B;font-size:.8rem'> 매수</span></div>"
-            f"<div style='flex:1;background:rgba(255,143,150,.10);border:1px solid rgba(255,143,150,.28);border-radius:10px;padding:10px;text-align:center'>"
-            f"<span style='color:#FF8F96;font-weight:800;font-size:1.3rem'>{len(st_)}</span>"
-            f"<span style='color:#64748B;font-size:.8rem'> 매도</span></div>"
-            f"<div style='flex:1;background:rgba(99,102,241,.06);border:1px solid #6366F133;border-radius:10px;padding:10px;text-align:center'>"
-            f"<span style='color:#A5B4FC;font-weight:800;font-size:1.3rem'>{len(results)}</span>"
-            f"<span style='color:#64748B;font-size:.8rem'>/{scan_total}</span></div></div>",
-            unsafe_allow_html=True
-        )
+        _render_scanner_summary(results, scan_total)
 
         for rk, r in enumerate(results, start=1):
-            chc = '#63D9A2' if r['chg'] >= 0 else '#FF8F96'
-            chi = '▲' if r['chg'] >= 0 else '▼'
-            jg_key = str(r.get('jg_key', ''))
-            jc  = '#63D9A2' if 'BUY' in jg_key else ('#FF8F96' if 'SELL' in jg_key else '#F8DE9A')
-
-            # 콤보 스캔 목록은 mx 배지 태그로만 표시 — 불릿 리스트(sh) 제거
-
-            # UT/Hull 전환 배지
-            th = "".join([
-                f"<span style='display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;"
-                f"background:rgba({'52,211,153' if t['dir']=='buy' else '248,113,113'},.12);"
-                f"color:{'#63D9A2' if t['dir']=='buy' else '#FF8F96'};"
-                f"font-size:.72rem;font-weight:700;margin-right:6px'>{t['icon']} {t['label']} {t['date']}</span>"
-                for t in r.get('transitions', [])
-            ]) if r.get('transitions') else "<span style='color:#475569;font-size:.78rem'>UT/HULL 전환 없음</span>"
-
-            # Multi-Signal 배지 — 엔진 컬럼 기반 (오늘 기준)
-            mh = (
-                f"<div style='margin:6px 0 2px'>"
-                f"<span style='display:inline-block;padding:2px 8px;border-radius:999px;"
-                f"background:rgba({'52,211,153' if r.get('multi_sig') else '148,163,184'},.16);"
-                f"color:{'#63D9A2' if r.get('multi_sig') else '#94A3B8'};"
-                f"font-size:.72rem;font-weight:700'>"
-                f"MULTI-SIGNAL {'ON' if r.get('multi_sig') else 'OFF'} ({r.get('multi_cnt', 0)})</span>"
-                f"<span style='color:#64748B;font-size:.7rem;margin-left:6px'>"
-                f"ENGINE B:{r.get('multi_buy', 0)} S:{r.get('multi_sell', 0)} N:{r.get('multi_neutral', 0)} "
-                f"| Imb:{r.get('multi_imb', 0):+.0f}</span></div>"
-            )
-
-            # 최근 콤보 태그 (acs 기반, 표시 전용)
-            mx = "".join([
-                f"<span style='display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:999px;"
-                f"background:rgba({'52,211,153' if m['dir']=='buy' else '248,113,113' if m['dir']=='sell' else '148,163,184'},.10);"
-                f"border:1px solid rgba(148,163,184,.25);"
-                f"color:{'#A7E7CF' if m['dir']=='buy' else '#F6C2C2' if m['dir']=='sell' else '#CBD5E1'};"
-                f"font-size:.7rem;font-weight:600;margin:2px 4px 2px 0'>"
-                f"{m['icon']} {m['label']} {m['date']}</span>"
-                for m in r.get('multi_hits', [])
-            ]) if r.get('multi_hits') else "<span style='color:#475569;font-size:.74rem'>최근 3일 다중시그널 후보 없음</span>"
-
-            esc = '#63D9A2' if r['es'] > 10 else ('#FF8F96' if r['es'] < -10 else '#F8DE9A')
-            bd  = '#1E293B' if r['scans'] else '#0F172A'
-            op  = '1' if r['scans'] else '.6'
-            sc  = '#63D9A2' if r['scan_score'] > 0 else ('#FF8F96' if r['scan_score'] < 0 else '#F8DE9A')
-
-            rh = ""
-            if r.get('reason'):
-                rc = '#A7E7CF' if 'BUY' in jg_key else ('#F6C2C2' if 'SELL' in jg_key else '#F5D79A')
-                rh = (f"<div style='padding:4px 0;border-top:1px solid rgba(255,255,255,.04);margin-top:4px'>"
-                      f"<span style='color:{rc};font-size:.78rem'>💬 {r['reason'][:80]}</span></div>")
-
-            st.markdown(
-                f"<div style='background:linear-gradient(160deg,#0F1320,#141926);"
-                f"border:1px solid {bd};border-radius:14px;padding:14px 18px;margin:6px 0;opacity:{op}'>"
-                f"<div style='display:flex;justify-content:space-between;margin-bottom:8px'>"
-                f"<span style='color:#A5B4FC;font-weight:800;font-size:1.15rem'>#{rk} {r['ticker']}</span>"
-                f"<div style='display:flex;align-items:center;gap:8px'>"
-                f"<span style='color:{sc};font-size:.75rem;font-weight:700'>SCAN:{r['scan_score']:+.1f}</span>"
-                f"<span style='color:{esc};font-size:.75rem;font-weight:700'>ES:{r['es']:+.0f}</span>"
-                f"<span style='color:{jc};font-size:.8rem;font-weight:600'>{r['jg']}({r['cf']:.0f}%)</span>"
-                f"<span style='color:{chc};font-size:.8rem'>{chi}{abs(r['chg']):.1f}%</span>"
-                f"</div></div>"
-                f"<div style='margin:4px 0 8px'>{th}</div>"
-                f"{mh}"
-                f"<div style='margin:2px 0 7px'>{mx}</div>"
-                f"{rh}</div>",
-                unsafe_allow_html=True
-            )
+            _render_scanner_result_card(rk, r)
 
             if st.button(f"{r['ticker']} 분석", key=f"sc_{r['ticker']}", use_container_width=True):
                 _set_scan_focus(r['ticker'], rk - 1)

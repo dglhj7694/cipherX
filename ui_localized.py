@@ -1,9 +1,9 @@
+import html
 import json
 from textwrap import dedent
 
 import plotly.graph_objects as go
 import streamlit as st
-import streamlit.components.v1 as components
 
 from company_details import render_company_details
 from config import COMMITTEE_NAMES, CONTEXT_WEIGHTS, CTX_LABELS
@@ -15,23 +15,80 @@ from localization import (
     localize_regime_label,
     translate_chart_text,
 )
+from theme import PLOTLY_FONT_FAMILY
 
 
-SOFT_GREEN = '#63D9A2'
-SOFT_GREEN_TEXT = '#B8F1D5'
-SOFT_RED = '#FF8F96'
-SOFT_RED_TEXT = '#FFD2D7'
-SOFT_AMBER = '#F6C35E'
-SOFT_AMBER_TEXT = '#F8DE9A'
-SOFT_BLUE = '#A5B4FC'
+SOFT_GREEN = "#63D9A2"
+SOFT_RED = "#FF8F96"
+SOFT_AMBER = "#F6C35E"
+SOFT_BLUE = "#8EA4FF"
+SOFT_MUTED = "#94A3B8"
 
 
-def _mini_stat_card(label, value, color, tooltip):
+def _safe_float(value, default=0.0):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_int(value, default=0):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _esc(value):
+    return html.escape(str(value or ""))
+
+
+def _tone_from_text(value):
+    text = str(value or "").upper()
+    if any(token in text for token in ("BUY", "\uB9E4\uC218")):
+        return "positive"
+    if any(token in text for token in ("SELL", "\uB9E4\uB3C4")):
+        return "negative"
+    if any(token in text for token in ("WATCH", "HOLD", "NEUTRAL", "\uAD00\uB9DD", "\uBCF4\uC720")):
+        return "warning"
+    return "muted"
+
+
+def _tone_color(tone):
+    return {
+        "positive": SOFT_GREEN,
+        "negative": SOFT_RED,
+        "warning": SOFT_AMBER,
+        "accent": SOFT_BLUE,
+        "muted": SOFT_MUTED,
+    }.get(tone, SOFT_BLUE)
+
+
+def _badge(label, tone="muted"):
+    safe = _esc(label)
+    if not safe:
+        return ""
+    return f"<span class='sigl-badge sigl-badge--{tone}'>{safe}</span>"
+
+
+def _progress_metric_card(label, value, sub, tone, fill):
     return (
-        f"<div class='stat-mini' title='{tooltip}'>"
-        f"<p class='sm-label'>{label}</p>"
-        f"<p class='sm-value' style='color:{color}'>{value}</p>"
-        "</div>"
+        f"<div class='sigl-metric-card'>"
+        f"<p class='sigl-metric-label'>{_esc(label)}</p>"
+        f"<p class='sigl-metric-value' style='color:{_tone_color(tone)}'>{_esc(value)}</p>"
+        f"<p class='sigl-metric-sub'>{_esc(sub)}</p>"
+        f"<div class='sigl-progress'><div class='sigl-progress__fill' style='--fill:{max(0, min(fill, 100)):.1f}%;--tone:{_tone_color(tone)}'></div></div>"
+        f"</div>"
+    )
+
+
+def _mini_stat_card(label, value, tone="muted", tooltip=""):
+    title_attr = f" title='{_esc(tooltip)}'" if tooltip else ""
+    return (
+        f"<div class='sigl-metric-card'{title_attr}>"
+        f"<p class='sigl-metric-label'>{_esc(label)}</p>"
+        f"<p class='sigl-metric-value' style='font-size:1.02rem;color:{_tone_color(tone)}'>{_esc(value)}</p>"
+        f"</div>"
     )
 
 
@@ -39,424 +96,476 @@ def _render_ensemble_gauge(es, chart_key=None):
     gauge = go.Figure(go.Indicator(
         mode="gauge+number",
         value=es,
-        number={'font': {'size': 28}},
+        number={"font": {"size": 28, "family": PLOTLY_FONT_FAMILY}},
         gauge={
-            'axis': {'range': [-100, 100], 'tickwidth': 1, 'tickcolor': '#64748B'},
-            'bar': {'color': '#A5B4FC', 'thickness': 0.35},
-            'bgcolor': 'rgba(0,0,0,0)',
-            'borderwidth': 0,
-            'steps': [
-                {'range': [-100, -30], 'color': 'rgba(243,165,165,0.32)'},
-                {'range': [-30, 30], 'color': 'rgba(245,199,123,0.22)'},
-                {'range': [30, 100], 'color': 'rgba(126,216,182,0.32)'},
+            "axis": {"range": [-100, 100], "tickwidth": 1, "tickcolor": "#64748B"},
+            "bar": {"color": SOFT_BLUE, "thickness": 0.35},
+            "bgcolor": "rgba(0,0,0,0)",
+            "borderwidth": 0,
+            "steps": [
+                {"range": [-100, -30], "color": "rgba(255,143,150,0.24)"},
+                {"range": [-30, 30], "color": "rgba(246,195,94,0.18)"},
+                {"range": [30, 100], "color": "rgba(99,217,162,0.24)"},
             ],
-            'threshold': {'line': {'color': '#E2E8F0', 'width': 2}, 'thickness': 0.8, 'value': es},
+            "threshold": {"line": {"color": "#E2E8F0", "width": 2}, "thickness": 0.8, "value": es},
         },
     ))
     gauge.update_layout(
         height=180,
         margin=dict(l=6, r=6, t=8, b=8),
-        paper_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#E2E8F0'),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#E2E8F0", family=PLOTLY_FONT_FAMILY),
     )
-    st.plotly_chart(gauge, use_container_width=True, theme=None, config={'displayModeBar': False}, key=chart_key)
+    st.plotly_chart(
+        gauge,
+        use_container_width=True,
+        theme=None,
+        config={"displayModeBar": False},
+        key=chart_key,
+    )
 
 
 def _risk_size_hint(atr_pct):
     if atr_pct >= 6:
-        return '작게(Small)', SOFT_RED
+        return "작게", "negative"
     if atr_pct >= 3.5:
-        return '줄여서(Reduced)', SOFT_AMBER_TEXT
-    return '기본(Standard)', SOFT_GREEN
+        return "축소", "warning"
+    return "기본", "positive"
 
 
-def _bottom_line_text(m):
-    action = localize_action_label(m.get('action_label', '').strip() or m.get('judgment', 'NEUTRAL'))
-    es = float(m.get('ensemble_score', 0))
-    ctx = localize_context_label(m.get('context', 0))
-    raw_judgment = str(m.get('judgment', ''))
-    if 'BUY' in raw_judgment:
-        return f"결론: {action}. 지금은 매수 우위 구간으로 보이며 분할 접근이 유리합니다. (ES {es:+.1f}, {ctx})"
-    if 'SELL' in raw_judgment:
-        return f"결론: {action}. 지금은 매도 우위 구간으로 보여 비중 축소나 리스크 관리가 먼저입니다. (ES {es:+.1f}, {ctx})"
-    if 'MIXED' in raw_judgment:
-        return f"결론: {action}. 방향성이 섞인 구간이라 추격 진입보다 관찰이 낫습니다. (ES {es:+.1f}, {ctx})"
-    return f"결론: {action}. 확정 신호가 약해 확인 후 진입이 적절합니다. (ES {es:+.1f}, {ctx})"
+def _bottom_line_text(meta):
+    action = localize_action_label(meta.get("action_label", "").strip() or meta.get("judgment", "NEUTRAL"))
+    es = _safe_float(meta.get("ensemble_score", 0))
+    context = localize_context_label(meta.get("context", 0))
+    judgment = str(meta.get("judgment", "")).upper()
+    if "BUY" in judgment:
+        return f"결론은 {action}입니다. 현재는 매수 우위 구간으로 보이며 ES {es:+.1f}, 시장 맥락은 {context}입니다."
+    if "SELL" in judgment:
+        return f"결론은 {action}입니다. 지금은 매도 우위 구간으로 보이며 ES {es:+.1f}, 시장 맥락은 {context}입니다."
+    if "MIXED" in judgment:
+        return f"결론은 {action}입니다. 방향성이 갈리는 구간이라 ES {es:+.1f}, 시장 맥락 {context}를 함께 봐야 합니다."
+    return f"결론은 {action}입니다. 추가 확인이 필요한 중립 구간이며 ES {es:+.1f}, 시장 맥락은 {context}입니다."
 
 
-def _narrative_text(m):
-    rsi = float(m.get('rsi', 50))
-    wt = float(m.get('wt1', 0))
-    mom = float(m.get('buy_layers', {}).get('Momentum', 0) - m.get('sell_layers', {}).get('Momentum', 0))
-    cmf = float(m.get('cmf', 0))
-    bbp = float(m.get('percent_b', 0.5))
-    if rsi >= 70 and mom > 0:
-        return "RSI는 높지만 모멘텀이 남아 있어 과열 추세의 막바지인지 함께 봐야 합니다."
-    if rsi <= 30 and mom < 0:
-        return "RSI가 낮고 모멘텀도 약해 아직은 반등 기대보다 확인 신호가 더 중요합니다."
-    if wt < -55 and cmf > 0:
-        return "WaveTrend는 과매도권이지만 자금 흐름은 버티고 있어 바닥 반전 후보로 볼 수 있습니다."
-    if wt > 55 and cmf < 0:
-        return "WaveTrend는 과열권인데 자금 흐름이 약해 고점 소진 가능성을 경계해야 합니다."
-    if bbp < 0.2 and mom > 0:
-        return "가격은 밴드 하단 근처지만 모멘텀이 개선돼 눌림목 뒤 재상승 가능성을 볼 수 있습니다."
-    if bbp > 0.8 and mom < 0:
-        return "가격은 밴드 상단 근처인데 모멘텀이 둔해져 단기 조정 위험이 커진 구간입니다."
-    return "추세, 모멘텀, 자금 흐름이 한쪽으로 강하게 정렬되지는 않아 확인 신호를 더 보는 편이 좋습니다."
+def _narrative_text(meta):
+    rsi = _safe_float(meta.get("rsi", 50))
+    wt = _safe_float(meta.get("wt1", 0))
+    cmf = _safe_float(meta.get("cmf", 0))
+    bbp = _safe_float(meta.get("percent_b", 0.5))
+    if rsi >= 70 and wt > 20:
+        return "단기 과열 해석이 가능해 추격 진입보다 눌림 확인이 중요합니다."
+    if rsi <= 30 and wt < -20:
+        return "과매도 해석이 가능하지만 반전 확인 전까지는 분할 대응이 더 안전합니다."
+    if cmf > 0.05 and bbp < 0.3:
+        return "가격 위치는 낮지만 자금 흐름이 버티고 있어 바닥 탐색 신호로 볼 수 있습니다."
+    if cmf < -0.05 and bbp > 0.7:
+        return "가격은 높은 편이지만 자금 흐름이 약해 조정 위험을 함께 점검해야 합니다."
+    return "추세, 모멘텀, 자금 흐름이 완전히 정렬된 상태는 아니므로 확인 신호를 함께 보는 편이 좋습니다."
 
 
-def render_price_header(m, key_prefix="analysis"):
-    chg = m['price_change']
-    cp = m['price_change_pct']
-    cc = 'price-change-up' if chg >= 0 else 'price-change-down'
-    ci = '+' if chg >= 0 else '-'
-    vr_ = m['volume'] / max(m['avg_volume'], 1)
-    raw_jg = str(m.get('judgment', 'NEUTRAL'))
-    cf = float(m.get('confidence', 0))
-    es = float(m.get('ensemble_score', 0))
-    jc = SOFT_GREEN if 'BUY' in raw_jg else (SOFT_RED if 'SELL' in raw_jg else SOFT_AMBER)
-    act = localize_action_label(m.get('action_label', ''))
-    regime_label = localize_regime_label(m.get('regime'), m.get('regime_label'))
-    context_label = localize_context_label(m.get('context', 0))
-    hero_chip = f"<span class='ind-mini' style='background:{jc}22;color:{jc};border:1px solid {jc}44' title='최종 판단과 신뢰도'>[{act}] {cf:.0f}%</span>"
-    specs = [
-        ('ind-b' if m['wt1'] < -20 else ('ind-s' if m['wt1'] > 20 else 'ind-n'), f"WT {m['wt1']:.0f}", "웨이브트렌드 압력"),
-        ('ind-b' if m['rsi'] < 40 else ('ind-s' if m['rsi'] > 60 else 'ind-n'), f"RSI {m['rsi']:.0f}", "RSI 모멘텀"),
-        ('ind-b' if vr_ > 1.5 else 'ind-n', f"거래량 {vr_:.1f}x", "평균 대비 거래량"),
-        ('ind-b' if m['adx'] > 25 else 'ind-n', f"ADX {m['adx']:.0f}", "추세 강도"),
-        ('ind-b' if m.get('utbot_dir', 0) == 1 else ('ind-s' if m.get('utbot_dir', 0) == -1 else 'ind-n'), 'UT 매수' if m.get('utbot_dir', 0) == 1 else ('UT 매도' if m.get('utbot_dir', 0) == -1 else 'UT 중립'), "UTBot 방향"),
-        ('ind-b' if m.get('hma_rising') else 'ind-s', 'HMA 상승' if m.get('hma_rising') else 'HMA 하락', "헐 이동평균 방향"),
-    ]
-    chips = hero_chip + "".join([f"<span class='ind-mini {c}' title='{tip}'>{label}</span>" for c, label, tip in specs])
-    insight = f"<p style='margin:0;color:#F8FAFC;font-weight:700'>{_bottom_line_text(m)}</p>"
-    note = _narrative_text(m).strip()
-    if note:
-        insight += f"<p style='margin:6px 0 0;color:#CBD5E1;font-size:.86rem;font-weight:500'>{note}</p>"
+def render_price_header(meta, key_prefix="analysis"):
+    change = _safe_float(meta.get("price_change", 0))
+    change_pct = _safe_float(meta.get("price_change_pct", 0))
+    change_class = "up" if change > 0 else ("down" if change < 0 else "flat")
+    tone = _tone_from_text(meta.get("judgment") or meta.get("action_label"))
+    regime_label = localize_regime_label(meta.get("regime"), meta.get("regime_label"))
+    context_label = localize_context_label(meta.get("context", 0))
+    action_label = localize_action_label(meta.get("action_label", ""))
+    confidence = _safe_float(meta.get("confidence", 0))
+    es = _safe_float(meta.get("ensemble_score", 0))
+    volume_ratio = _safe_float(meta.get("volume", 0)) / max(_safe_float(meta.get("avg_volume", 1), 1), 1)
+    chips = "".join([
+        _badge(action_label or localize_judgment_label(meta.get("judgment", "")), tone),
+        _badge(f"신뢰도 {confidence:.0f}%", tone),
+        _badge(f"맥락 {context_label}", "accent"),
+        _badge(f"WT { _safe_float(meta.get('wt1', 0)):.0f}", "positive" if _safe_float(meta.get("wt1", 0)) < -20 else ("negative" if _safe_float(meta.get("wt1", 0)) > 20 else "warning")),
+        _badge(f"RSI { _safe_float(meta.get('rsi', 0)):.0f}", "positive" if _safe_float(meta.get("rsi", 0)) < 40 else ("negative" if _safe_float(meta.get("rsi", 0)) > 60 else "warning")),
+        _badge(f"거래량 {volume_ratio:.1f}x", "positive" if volume_ratio > 1.5 else "muted"),
+        _badge(f"ADX { _safe_float(meta.get('adx', 0)):.0f}", "positive" if _safe_float(meta.get("adx", 0)) > 25 else "muted"),
+    ])
+    header_html = f"""
+    <div class="sigl-card sigl-card--accent">
+      <div class="sigl-price-header">
+        <div class="sigl-price-top">
+          <div>
+            <p class="sigl-page-head__eyebrow">Analysis Snapshot</p>
+            <p class="sigl-price-meta">{_esc(meta.get('ticker'))} · {_esc(meta.get('last_date'))} · {_esc(regime_label)} · {_esc(context_label)}</p>
+            <p class="sigl-price-value">
+              ${_safe_float(meta.get('price', 0)):.2f}
+              <span class="sigl-price-change--{change_class}" style="font-size:1.08rem;margin-left:10px;font-weight:800">
+                {change:+.2f} ({change_pct:+.2f}%)
+              </span>
+            </p>
+          </div>
+          <div class="sigl-focus-stack">
+            {_badge(f"ES {es:+.1f}", tone if tone != 'muted' else 'accent')}
+            {_badge(f"B:S {_safe_int(meta.get('buy_agree', 0))}:{_safe_int(meta.get('sell_agree', 0))}", "muted")}
+            {_badge(_esc(regime_label), "accent")}
+          </div>
+        </div>
+        <div class="sigl-chip-row">{chips}</div>
+        <div class="sigl-note">
+          <strong>{_esc(_bottom_line_text(meta))}</strong><br>
+          <span class="sigl-summary">{_esc(_narrative_text(meta))}</span>
+        </div>
+      </div>
+    </div>
+    """
+    st.markdown(header_html, unsafe_allow_html=True)
+
+    buy_total = _safe_float(meta.get("buy_total", 0))
+    sell_total = _safe_float(meta.get("sell_total", 0))
+    buy_active = _safe_int(meta.get("buy_active", 0))
+    sell_active = _safe_int(meta.get("sell_active", 0))
+    high_52 = _safe_float(meta.get("high_52w", meta.get("price", 0)), _safe_float(meta.get("price", 0)))
+    low_52 = _safe_float(meta.get("low_52w", meta.get("price", 0)), _safe_float(meta.get("price", 0)))
+    range_52 = max(high_52 - low_52, 0.01)
+    pos_52 = min(max((_safe_float(meta.get("price", 0)) - low_52) / range_52 * 100, 0), 100)
+
+    metric_html = "".join([
+        _progress_metric_card("종합 점수", f"{es:+.1f}", f"매수 합의 {buy_active} · 매도 합의 {sell_active}", tone if tone != "muted" else "accent", min(abs(es) / 80 * 100, 100)),
+        _progress_metric_card("매수 강도", f"{buy_total:.1f}", f"활성 레이어 {buy_active}/10", "positive", min(buy_total / 40 * 100, 100)),
+        _progress_metric_card("매도 강도", f"{sell_total:.1f}", f"활성 레이어 {sell_active}/10", "negative", min(sell_total / 40 * 100, 100)),
+        _progress_metric_card("52주 위치", f"{pos_52:.0f}%", f"저점 {low_52:.2f} · 고점 {high_52:.2f}", "accent", pos_52),
+    ])
+    st.markdown(f"<div class='sigl-grid sigl-grid--4'>{metric_html}</div>", unsafe_allow_html=True)
+    _render_ensemble_gauge(es, chart_key=f"{key_prefix}_ensemble_gauge")
+
+
+def render_judgment_card(meta):
+    raw_judgment = str(meta.get("judgment", "NEUTRAL"))
+    action = localize_action_label(meta.get("action_label", ""))
+    tone = _tone_from_text(raw_judgment or action)
+    title = action or localize_judgment_label(raw_judgment)
+    es = _safe_float(meta.get("ensemble_score", 0))
+    confidence = _safe_float(meta.get("confidence", 0))
+    buy_agree = _safe_int(meta.get("buy_agree", 0))
+    sell_agree = _safe_int(meta.get("sell_agree", 0))
+    detail_text = str(meta.get("judgment_detail") or meta.get("judgment_reason") or "").strip()
+    contrast = str(meta.get("contrast_notes", "")).strip()
+    badges = []
+    if abs(_safe_float(meta.get("reversal_synergy", 0))) > 5:
+        badges.append(_badge(f"반전 시너지 {_safe_float(meta.get('reversal_synergy', 0)):+.1f}", "positive" if _safe_float(meta.get("reversal_synergy", 0)) > 0 else "negative"))
+    if abs(_safe_float(meta.get("prediction_boost", 0))) > 3:
+        badges.append(_badge(f"예측 보정 {_safe_float(meta.get('prediction_boost', 0)):+.1f}", "positive" if _safe_float(meta.get("prediction_boost", 0)) > 0 else "negative"))
+    if meta.get("veto_flags"):
+        badges.append(_badge(f"제한 조건 {meta.get('veto_flags')}", "warning"))
+    risk_tags = []
+    if meta.get("smart_money_bearish_div"):
+        risk_tags.append(_badge("\uC2A4\uB9C8\uD2B8\uBA38\uB2C8 \uC57D\uC138 \uB2E4\uC774\uBC84\uC804\uC2A4", "negative"))
+    elif meta.get("smart_money_bullish_div"):
+        risk_tags.append(_badge("\uC2A4\uB9C8\uD2B8\uBA38\uB2C8 \uC9C0\uC9C0", "positive"))
+    if _safe_float(meta.get("volume_ratio_20", 1)) < 0.7:
+        risk_tags.append(_badge(f"\uC800\uAC70\uB798\uB7C9 {_safe_float(meta.get('volume_ratio_20', 1)):.1f}x", "warning"))
+    if meta.get("blowoff_top_hard"):
+        risk_tags.append(_badge("\uAE09\uB4F1 \uACFC\uC5F4 \uACBD\uACE0", "negative"))
+
+    summary_html = f"""
+    <div class="sigl-card sigl-card--{'positive' if tone == 'positive' else 'negative' if tone == 'negative' else 'warning'}">
+      <div class="sigl-section-head">
+        <div>
+          <p class="sigl-section-title">종합 판단</p>
+          <p class="sigl-section-copy">현재 가격, 시그널 합의, 리스크를 한 번에 요약합니다.</p>
+        </div>
+        <div class="sigl-inline">{''.join(badges)}</div>
+      </div>
+      <div class="sigl-grid sigl-grid--3">
+        {_progress_metric_card('결론', title or '중립', localize_judgment_label(raw_judgment), tone, confidence)}
+        {_progress_metric_card('종합 점수', f'{es:+.1f}', f'신뢰도 {confidence:.0f}%', tone if tone != 'muted' else 'accent', min(abs(es) / 80 * 100, 100))}
+        {_progress_metric_card('합의 비율', f'{buy_agree}:{sell_agree}', localize_context_label(meta.get('context', 0)), 'accent', buy_agree / max(buy_agree + sell_agree, 1) * 100)}
+      </div>
+    """
+    if detail_text:
+        summary_html += f"<div class='sigl-note'><strong>판단 요약</strong><br><span class='sigl-summary'>{_esc(translate_chart_text(detail_text))}</span></div>"
+    if contrast or risk_tags:
+        contrast_html = f"<p class='sigl-summary' style='margin:0 0 10px'>{_esc(translate_chart_text(contrast))}</p>" if contrast else ""
+        summary_html += f"<div class='sigl-note'><strong>리스크 체크</strong>{contrast_html}<div class='sigl-chip-row'>{''.join(risk_tags)}</div></div>"
+    summary_html += "</div>"
+    st.markdown(summary_html, unsafe_allow_html=True)
+
+
+def render_committee_panel(meta):
+    committee = meta.get("committee", {})
+    if not committee:
+        return
+    ctx_code = meta.get("context", 0)
+    ctx_name = CTX_LABELS.get(ctx_code, "default")
+    weights = CONTEXT_WEIGHTS.get(ctx_name, CONTEXT_WEIGHTS["default"])
+    vote_map = {"BUY": "매수", "SELL": "매도", "NEUTRAL": "중립", "ABSTAIN": "보류"}
+    cards = []
+    for idx, committee_name in enumerate(COMMITTEE_NAMES):
+        data = committee.get(committee_name, {})
+        score = _safe_float(data.get("score", 0))
+        conviction = _safe_float(data.get("conviction", 0))
+        vote = str(data.get("vote", "NEUTRAL"))
+        weight = weights[idx] if idx < len(weights) else 0.2
+        tone = "positive" if score > 0 else ("negative" if score < 0 else "warning")
+        cards.append(
+            f"""
+            <div class="sigl-committee-card" style="--tone:{_tone_color(tone)}">
+              <p class="sigl-committee-name">{_esc(localize_committee_name(committee_name))} · 비중 {weight:.0%}</p>
+              <p class="sigl-committee-score">{score:+.0f}</p>
+              {_badge(vote_map.get(vote, vote), tone if tone != 'warning' else 'warning')}
+              <p class="sigl-committee-foot">확신도 {conviction:.0f}%</p>
+              <div class="sigl-progress"><div class="sigl-progress__fill" style="--fill:{min(abs(score) / 40 * 100, 100):.1f}%;--tone:{_tone_color(tone)}"></div></div>
+            </div>
+            """
+        )
     st.markdown(
         f"""
-        <div class="price-header fade-up">
-            <p style="color:#64748B;font-size:.8rem;margin:0">{m['ticker']} · {m['last_date']} · <b style="color:#A5B4FC">{regime_label}</b> · <span style='color:#A5B4FC'>시장 맥락 {context_label}</span></p>
-            <p class="price-big" style="color:#F8FAFC">${m['price']:.2f}<span class="{cc}" style="font-size:1.1rem;margin-left:10px;font-weight:700">{ci}{abs(chg):.2f}({abs(cp):.2f}%)</span></p>
-            <div style="margin-top:10px;display:flex;gap:4px;flex-wrap:wrap">{chips}</div>
-            <div style='margin-top:12px;background:linear-gradient(140deg,rgba(99,102,241,.13),rgba(15,23,42,.75));border:1px solid rgba(99,102,241,.28);border-radius:10px;padding:10px 12px'>{insight}</div>
+        <div class="sigl-section-head">
+          <div>
+            <p class="sigl-section-title">5위원회 종합 판단</p>
+            <p class="sigl-section-copy">위원회별 점수와 확신도를 같은 규격으로 비교합니다.</p>
+          </div>
+        </div>
+        <div class="sigl-grid sigl-grid--5">{''.join(cards)}</div>
+        """,
+        unsafe_allow_html=True,
+    )
+    if meta.get("veto_flags"):
+        st.warning(f"제한 조건: {meta.get('veto_flags')}")
+    if abs(_safe_float(meta.get("reversal_synergy", 0))) > 5:
+        st.info(f"반전 시너지: {_safe_float(meta.get('reversal_synergy', 0)):+.1f}")
+
+
+def render_10layer_bars(meta, html_key="analysis"):
+    del html_key
+    layer_names = ["Trend", "Momentum", "Candle", "BB", "Volume", "MF", "Pattern", "Combined", "Leading", "Lagging"]
+    layer_labels = {
+        "Trend": "\uCD94\uC138",
+        "Momentum": "\uBAA8\uBA58\uD140",
+        "Candle": "\uCEA4\uB4E4",
+        "BB": "\uBCFC\uB9B0\uC800",
+        "Volume": "\uAC70\uB798\uB7C9",
+        "MF": "\uC790\uAE08 \uD750\uB984",
+        "Pattern": "\uD328\uD134",
+        "Combined": "\uCF64\uBCF4",
+        "Leading": "\uC120\uD589",
+        "Lagging": "\uD6C4\uD589",
+    }
+    rows = []
+    for name in layer_names:
+        buy_value = max(_safe_float(meta.get("buy_layers", {}).get(name, 0)), 0.0)
+        sell_value = max(_safe_float(meta.get("sell_layers", {}).get(name, 0)), 0.0)
+        buy_pct = min((buy_value / 12.0) * 50.0, 50.0)
+        sell_pct = min((sell_value / 12.0) * 50.0, 50.0)
+        rows.append(
+            f"""
+            <div class="sigl-layer-row">
+              <div class="sigl-layer-score--buy">{buy_value:.1f}</div>
+              <div class="sigl-layer-track">
+                <div class="sigl-layer-fill--buy" style="--buy-left:{50.0 - buy_pct:.2f}%;--buy-width:{buy_pct:.2f}%"></div>
+                <div class="sigl-layer-fill--sell" style="--sell-width:{sell_pct:.2f}%"></div>
+                <div class="sigl-layer-center"></div>
+                <div class="sigl-layer-label">{_esc(layer_labels.get(name, name))}</div>
+              </div>
+              <div class="sigl-layer-score--sell">{sell_value:.1f}</div>
+            </div>
+            """
+        )
+    st.markdown(
+        f"""
+        <div class="sigl-card">
+          <div class="sigl-section-head">
+            <div>
+              <p class="sigl-section-title">10개 레이어 비교</p>
+              <p class="sigl-section-copy">매수와 매도 쪽에 각 레이어가 얼마나 기여하는지 보여줍니다.</p>
+            </div>
+            <div class="sigl-inline">
+              {_badge(f"매수 {_safe_int(meta.get('buy_active', 0))}/10", 'positive')}
+              {_badge(f"매도 {_safe_int(meta.get('sell_active', 0))}/10", 'negative')}
+            </div>
+          </div>
+          <div class="sigl-layer-board">{''.join(rows)}</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    def metric_card(title, value, sub, color, fill):
-        return (
-            f"<div style='background:linear-gradient(165deg,rgba(15,23,42,.92),rgba(2,6,23,.86));border:1px solid rgba(148,163,184,.18);border-left:3px solid {color};border-radius:12px;padding:12px 14px;min-height:108px'>"
-            f"<p style='margin:0 0 6px;color:#94A3B8;font-size:.74rem;font-weight:700'>{title}</p>"
-            f"<p style='margin:0;color:{color};font-size:1.55rem;font-weight:800;line-height:1.1'>{value}</p>"
-            f"<p style='margin:4px 0 8px;color:#CBD5E1;font-size:.78rem'>{sub}</p>"
-            f"<div style='height:7px;background:rgba(148,163,184,.15);border-radius:999px;overflow:hidden'><div style='height:100%;width:{fill:.1f}%;background:{color};border-radius:999px'></div></div>"
-            "</div>"
-        )
 
-    bt_ = float(m.get('buy_total', 0))
-    st_ = float(m.get('sell_total', 0))
-    ba_ = int(m.get('buy_active', 0))
-    sa_ = int(m.get('sell_active', 0))
-    h52 = float(m.get('high_52w', m['price']))
-    l52 = float(m.get('low_52w', m['price']))
-    rng = max(h52 - l52, 0.01)
-    pos52 = min(max((m['price'] - l52) / rng * 100, 0), 100)
-    metric_html = "".join([
-        metric_card("종합 점수", f"{es:+.1f}", f"매수 합의 {m.get('buy_agree', 0)} · 매도 합의 {m.get('sell_agree', 0)}", jc, min(abs(es) / 80 * 100, 100)),
-        metric_card("매수 압력", f"{bt_:.1f}", f"활성 레이어 {ba_}/10", SOFT_GREEN, min(bt_ / 40 * 100, 100)),
-        metric_card("매도 압력", f"{st_:.1f}", f"활성 레이어 {sa_}/10", SOFT_RED, min(st_ / 40 * 100, 100)),
-        metric_card("52주 위치", f"{pos52:.0f}%", f"저점 {l52:.2f} · 고점 {h52:.2f}", SOFT_BLUE, pos52),
+def render_leading_lagging(meta):
+    leading = translate_chart_text(meta.get("leading_verdict", ""))
+    lagging = translate_chart_text(meta.get("lagging_verdict", ""))
+    accel = _safe_float(meta.get("composite_accel", 0))
+    setup_buy = _safe_float(meta.get("setup_pressure_buy", 0))
+    setup_sell = _safe_float(meta.get("setup_pressure_sell", 0))
+    max_setup = max(setup_buy, setup_sell, 1)
+    buy_width = min(setup_buy / max_setup * 50, 50)
+    sell_width = min(setup_sell / max_setup * 50, 50)
+    flow_text = "\uC57D\uC138 \uB2E4\uC774\uBC84\uC804\uC2A4" if meta.get("smart_money_bearish_div") else ("\uC790\uAE08 \uC720\uC785 \uC9C0\uC9C0" if meta.get("smart_money_bullish_div") else "\uC911\uB9BD")
+    flow_tone = "negative" if meta.get("smart_money_bearish_div") else ("positive" if meta.get("smart_money_bullish_div") else "muted")
+    size_label, size_tone = _risk_size_hint(_safe_float(meta.get("atr_pct", 0)))
+    cards = "".join([
+        _mini_stat_card("BB %B", f"{_safe_float(meta.get('percent_b', 0.5)) * 100:.0f}%", "positive" if _safe_float(meta.get("percent_b", 0.5)) < 0.3 else ("negative" if _safe_float(meta.get("percent_b", 0.5)) > 0.7 else "warning")),
+        _mini_stat_card("CMF", f"{_safe_float(meta.get('cmf', 0)):+.3f}", "positive" if _safe_float(meta.get("cmf", 0)) > 0.05 else ("negative" if _safe_float(meta.get("cmf", 0)) < -0.05 else "muted")),
+        _mini_stat_card("\uC790\uAE08 \uD750\uB984", flow_text, flow_tone),
+        _mini_stat_card("OBV \uAE30\uC6B8\uAE30", f"{_safe_float(meta.get('obv_slope', 0)):+.2f}", "positive" if _safe_float(meta.get("obv_slope", 0)) > 0 else ("negative" if _safe_float(meta.get("obv_slope", 0)) < 0 else "muted")),
+        _mini_stat_card("\uCD5C\uADFC \uAC70\uB798\uB7C9", f"{_safe_float(meta.get('volume_ratio_20', 1)):.1f}x", "positive" if _safe_float(meta.get("volume_ratio_20", 1)) >= 1 else ("warning" if _safe_float(meta.get("volume_ratio_20", 1)) >= 0.7 else "negative")),
+        _mini_stat_card("ATR%", f"{_safe_float(meta.get('atr_pct', 0)):.1f}%", "accent"),
+        _mini_stat_card("\uAD8C\uC7A5 \uBE44\uC911", size_label, size_tone),
+        _mini_stat_card("50\uC77C\uC120 \uAC70\uB9AC", f"{_safe_float(meta.get('ma50_dist', 0)):+.1f}%", "positive" if _safe_float(meta.get("ma50_dist", 0)) > 0 else "negative"),
+        _mini_stat_card("200\uC77C\uC120 \uAC70\uB9AC", f"{_safe_float(meta.get('ma200_dist', 0)):+.1f}%", "positive" if _safe_float(meta.get("ma200_dist", 0)) > 0 else "negative"),
     ])
-    st.markdown(f"<div style='display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:10px 0 14px'>{metric_html}</div>", unsafe_allow_html=True)
-    _render_ensemble_gauge(es, chart_key=f"{key_prefix}_ensemble_gauge")
-
-
-def render_judgment_card(m):
-    raw_jg = str(m.get('judgment', 'NEUTRAL'))
-    jg = localize_judgment_label(raw_jg)
-    action = localize_action_label(m.get('action_label', ''))
-    es = float(m.get('ensemble_score', 0))
-    cf = float(m.get('confidence', 0))
-    ba = int(m.get('buy_agree', 0))
-    sa = int(m.get('sell_agree', 0))
-    veto = str(m.get('veto_flags', '')).strip()
-    syn = float(m.get('reversal_synergy', 0))
-    pred = float(m.get('prediction_boost', 0))
-    detail_text = (str(m.get('judgment_detail', '')).strip() or str(m.get('judgment_reason', '')).strip())
-    contrast = str(m.get('contrast_notes', '')).strip()
-    jc = SOFT_GREEN if 'BUY' in raw_jg else (SOFT_RED if 'SELL' in raw_jg else SOFT_AMBER)
-    cc = 'score-card-buy' if 'BUY' in raw_jg else ('score-card-sell' if 'SELL' in raw_jg else 'score-card-neutral')
-    risk_tags = []
-    if m.get('smart_money_bearish_div'):
-        risk_tags.append(("스마트 머니 약세 다이버전스", SOFT_RED))
-    elif m.get('smart_money_bullish_div'):
-        risk_tags.append(("자금 흐름 지지", SOFT_GREEN))
-    if float(m.get('volume_ratio_20', 1) or 1) < 0.7:
-        risk_tags.append((f"저거래량 {float(m.get('volume_ratio_20', 1)):.1f}x", SOFT_AMBER_TEXT))
-    if m.get('blowoff_top_hard'):
-        risk_tags.append(("급등 과열 경고", SOFT_RED))
-    chips = "".join([f"<span style='display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border-radius:999px;background:{col}22;border:1px solid {col}44;color:{col};font-size:.72rem;font-weight:700'>{label}</span>" for label, col in risk_tags])
-    detail_html = ""
-    if detail_text:
-        detail_html = (
-            f"<div style='margin:16px 0;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:14px 18px;border-left:3px solid {jc}'>"
-            "<p style='color:#94A3B8;font-size:.72rem;font-weight:700;margin:0 0 6px'>판단 근거 요약</p>"
-            f"<p style='color:#CBD5E1;font-size:.82rem;margin:0'>{translate_chart_text(detail_text)}</p>"
-            "</div>"
-        )
-    risk_html = ""
-    if contrast or risk_tags:
-        contrast_html = f"<p style='color:#CBD5E1;font-size:.8rem;margin:0 0 10px'>{translate_chart_text(contrast)}</p>" if contrast else ""
-        risk_html = (
-            "<div style='margin:14px 0 0;background:rgba(15,23,42,.58);border:1px solid rgba(148,163,184,.14);border-radius:12px;padding:14px 16px'>"
-            "<p style='color:#94A3B8;font-size:.72rem;font-weight:700;margin:0 0 8px'>위험 점검(Risk Check)</p>"
-            f"{contrast_html}<div style='display:flex;gap:8px;flex-wrap:wrap'>{chips}</div>"
-            "</div>"
-        )
-    badge_parts = []
-    if abs(syn) > 5:
-        badge_parts.append(f"<span style='background:rgba({'52,211,153' if syn > 0 else '248,113,113'},.12);color:{SOFT_GREEN if syn > 0 else SOFT_RED};padding:3px 8px;border-radius:6px;font-size:.72rem;font-weight:700'>반전 시너지 {syn:+.1f}</span>")
-    if abs(pred) > 3:
-        badge_parts.append(f"<span style='background:rgba({'52,211,153' if pred > 0 else '248,113,113'},.12);color:{SOFT_GREEN if pred > 0 else SOFT_RED};padding:3px 8px;border-radius:6px;font-size:.72rem;font-weight:700'>예측 보정 {pred:+.1f}</span>")
-    badges = "".join(badge_parts)
-    veto_html = f"<div style='margin-top:8px;text-align:center'><span style='background:rgba(243,165,165,.15);color:{SOFT_RED_TEXT};padding:4px 10px;border-radius:6px;font-size:.72rem;font-weight:700'>제한 조건 {veto}</span></div>" if veto else ""
-    circ = 2 * 3.14159 * 36
-    offset = circ * (1 - cf / 100)
-    es_norm = min(max((es + 80) / 160 * 100, 0), 100)
-    ba_pct = ba / max(ba + sa, 1) * 100
     st.markdown(
-        dedent(
-            f"""
-            <div class="score-card {cc} fade-up">
-                <div style="display:flex;align-items:center;justify-content:center;gap:28px;flex-wrap:wrap">
-                    <div class="conf-ring"><svg viewBox="0 0 80 80"><circle class="ring-bg" cx="40" cy="40" r="36"/><circle class="ring-fg" cx="40" cy="40" r="36" stroke="{jc}" stroke-dasharray="{circ:.1f}" stroke-dashoffset="{offset:.1f}"/></svg><span class="ring-text" style="color:{jc}">{cf:.0f}%</span></div>
-                    <div>
-                        <p style="font-size:1.8rem;font-weight:800;color:{jc};margin:0;letter-spacing:-.5px">{action or jg}</p>
-                        <p style="margin:8px 0 0;color:#CBD5E1;font-size:.8rem;text-align:center">{jg}</p>
-                    </div>
-                </div>{detail_html}{risk_html}
-                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:14px">
-                    <div style="background:rgba(255,255,255,.03);border-radius:10px;padding:12px;text-align:center">
-                        <p style="color:#64748B;font-size:.68rem;font-weight:700;margin:0 0 4px">종합 점수</p>
-                        <p style="color:{jc};font-size:1.3rem;font-weight:800;margin:0">{es:+.1f}</p>
-                        <div style="height:3px;background:rgba(255,255,255,.06);border-radius:2px;margin-top:6px;overflow:hidden"><div style="height:100%;width:{es_norm}%;background:{jc};border-radius:2px"></div></div>
-                    </div>
-                    <div style="background:rgba(255,255,255,.03);border-radius:10px;padding:12px;text-align:center">
-                        <p style="color:#64748B;font-size:.68rem;font-weight:700;margin:0 0 4px">매수:매도 합의</p>
-                        <p style="color:#F8FAFC;font-size:1.3rem;font-weight:800;margin:0">{ba}:{sa}</p>
-                        <div style="height:3px;background:rgba(243,165,165,.28);border-radius:2px;margin-top:6px;overflow:hidden"><div style="height:100%;width:{ba_pct}%;background:{SOFT_GREEN};border-radius:2px"></div></div>
-                    </div>
-                    <div style="background:rgba(255,255,255,.03);border-radius:10px;padding:12px;text-align:center">
-                        <p style="color:#64748B;font-size:.68rem;font-weight:700;margin:0 0 4px">시장 맥락</p>
-                        <p style="color:#A5B4FC;font-size:1.05rem;font-weight:800;margin:0">{localize_context_label(m.get('context', 0))}</p>
-                        <div style="height:3px;background:rgba(165,180,252,.15);border-radius:2px;margin-top:6px;overflow:hidden"><div style="height:100%;width:100%;background:#A5B4FC;border-radius:2px;opacity:.4"></div></div>
-                    </div>
-                </div>
-                <div style='margin-top:10px;display:flex;justify-content:center;gap:8px;flex-wrap:wrap'>{badges}</div>{veto_html}
+        f"""
+        <div class="sigl-grid sigl-grid--2">
+          <div class="sigl-card">
+            <div class="sigl-section-head">
+              <div>
+                <p class="sigl-section-title">선행 지표</p>
+                <p class="sigl-section-copy">속도와 전환 신호 중심의 해석입니다.</p>
+              </div>
             </div>
-            """
-        ).strip(),
+            <p class="sigl-metric-value" style="font-size:1.18rem;color:{_tone_color('positive' if accel >= 0 else 'negative')}">{_esc(leading)}</p>
+            <div class="sigl-chip-row">
+              {_badge(f'가속도 {accel:+.2f}', 'positive' if accel > 0 else 'negative')}
+              {_badge('UT 매수' if _safe_int(meta.get('utbot_dir', 0)) == 1 else 'UT 매도' if _safe_int(meta.get('utbot_dir', 0)) == -1 else 'UT 중립', 'accent')}
+              {_badge('HMA 상승' if meta.get('hma_rising') else 'HMA 하락', 'positive' if meta.get('hma_rising') else 'negative')}
+            </div>
+          </div>
+          <div class="sigl-card">
+            <div class="sigl-section-head">
+              <div>
+                <p class="sigl-section-title">후행 지표</p>
+                <p class="sigl-section-copy">구조와 누적 추세를 중심으로 봅니다.</p>
+              </div>
+            </div>
+            <p class="sigl-metric-value" style="font-size:1.18rem;color:{_tone_color(_tone_from_text(lagging))}">{_esc(lagging)}</p>
+            <div class="sigl-chip-row">
+              {_badge(localize_regime_label(meta.get('regime'), meta.get('regime_label')), 'accent')}
+              {_badge(f"RS { _safe_float(meta.get('rs_ratio', 1)):.3f}", 'muted')}
+            </div>
+          </div>
+        </div>
+        <div class="sigl-card" style="margin-top:12px">
+          <div class="sigl-section-head">
+            <div>
+              <p class="sigl-section-title">매수/매도 압력</p>
+              <p class="sigl-section-copy">현재 셋업 압력이 어느 쪽으로 더 기울었는지 보여줍니다.</p>
+            </div>
+          </div>
+          <div class="sigl-inline" style="justify-content:space-between">
+            <span class="sigl-summary">매수 압력 {setup_buy:.1f}</span>
+            <span class="sigl-summary">매도 압력 {setup_sell:.1f}</span>
+          </div>
+          <div class="sigl-bar-split" style="--buy:{buy_width:.2f}%;--sell:{sell_width:.2f}%">
+            <div class="sigl-bar-split__buy"></div>
+            <div class="sigl-bar-split__sell"></div>
+            <div class="sigl-bar-split__center"></div>
+          </div>
+        </div>
+        <div class="sigl-grid sigl-grid--4" style="margin-top:12px">{cards}</div>
+        """,
         unsafe_allow_html=True,
     )
 
 
-def render_committee_panel(m):
-    committee = m.get('committee', {})
-    if not committee:
-        return
-    ctx_code = m.get('context', 0)
-    ctx_name = CTX_LABELS.get(ctx_code, 'default')
-    weights = CONTEXT_WEIGHTS.get(ctx_name, CONTEXT_WEIGHTS['default'])
-    vote_map = {'BUY': '매수', 'SELL': '매도', 'NEUTRAL': '중립', 'ABSTAIN': '보류'}
-    cards = []
-    for idx, cm in enumerate(COMMITTEE_NAMES):
-        data = committee.get(cm, {})
-        score = float(data.get('score', 0))
-        conv = float(data.get('conviction', 0))
-        vote = data.get('vote', 'NEUTRAL')
-        weight = weights[idx] if idx < len(weights) else 0.2
-        color = SOFT_GREEN if score > 0 else (SOFT_RED if score < 0 else '#94A3B8')
-        vote_style = f'background:rgba(126,216,182,.14);color:{SOFT_GREEN}' if vote == 'BUY' else (f'background:rgba(243,165,165,.14);color:{SOFT_RED}' if vote == 'SELL' else ('background:rgba(71,85,105,.3);color:#64748B' if vote == 'ABSTAIN' else f'background:rgba(245,199,123,.14);color:{SOFT_AMBER}'))
-        width = min(abs(score) / 40 * 100, 100)
-        cards.append(
-            f"<div class='cm-card' style='border-left:3px solid {color}'>"
-            f"<p class='cm-name'>{localize_committee_name(cm)} · 비중 {weight:.0%}</p>"
-            f"<p class='cm-score' style='color:{color}'>{score:+.0f}</p>"
-            f"<span class='cm-vote' style='{vote_style}'>{vote_map.get(vote, vote)}</span>"
-            f"<p style='color:#64748B;font-size:.65rem;margin:4px 0 0'>확신도 {conv:.0f}%</p>"
-            f"<div class='cm-mini-bar'><div class='cm-mini-fill' style='width:{width}%;background:{color}'></div></div>"
-            "</div>"
-        )
-    st.markdown(f"<div style='display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:12px'>{''.join(cards)}</div>", unsafe_allow_html=True)
-    if m.get('veto_flags'):
-        st.warning(f"제한 조건: {m.get('veto_flags')}")
-    if abs(float(m.get('reversal_synergy', 0))) > 5:
-        st.info(f"반전 시너지: {float(m.get('reversal_synergy', 0)):+.1f}")
-
-
-def render_10layer_bars(m, html_key="analysis"):
-    layer_names = ['Trend', 'Momentum', 'Candle', 'BB', 'Volume', 'MF', 'Pattern', 'Combined', 'Leading', 'Lagging']
-    layer_labels = {'Trend': '추세', 'Momentum': '모멘텀', 'Candle': '캔들', 'BB': '볼린저', 'Volume': '거래량', 'MF': '자금 흐름', 'Pattern': '패턴', 'Combined': '콤보', 'Leading': '선행', 'Lagging': '후행'}
-    rows = []
-    for name in layer_names:
-        bv = max(float(m.get('buy_layers', {}).get(name, 0)), 0.0)
-        sv = max(float(m.get('sell_layers', {}).get(name, 0)), 0.0)
-        bpct = min((bv / 12.0) * 50.0, 50.0)
-        spct = min((sv / 12.0) * 50.0, 50.0)
-        rows.append(
-            f"<div style='display:grid;grid-template-columns:58px 1fr 58px;gap:10px;align-items:center;margin-bottom:8px;padding:2px;border-radius:10px'>"
-            f"<div style='text-align:right;color:{SOFT_GREEN};font-size:.88rem;font-weight:700'>{bv:.1f}</div>"
-            "<div style='position:relative;height:30px;border-radius:10px;border:1px solid rgba(148,163,184,.2);background:linear-gradient(90deg,rgba(126,216,182,.08),rgba(148,163,184,.04),rgba(243,165,165,.08));overflow:hidden'>"
-            f"<div style='position:absolute;left:{50.0 - bpct:.2f}%;top:4px;bottom:4px;width:{bpct:.2f}%;background:linear-gradient(90deg,#237650,#63D9A2);border-radius:6px 0 0 6px'></div>"
-            f"<div style='position:absolute;left:50%;top:4px;bottom:4px;width:{spct:.2f}%;background:linear-gradient(90deg,#FF8F96,#8A4B54);border-radius:0 6px 6px 0'></div>"
-            "<div style='position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(226,232,240,.55)'></div>"
-            f"<div style='position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:.72rem;color:#CBD5E1;font-weight:700;background:rgba(2,6,23,.78);padding:2px 8px;border-radius:999px;border:1px solid rgba(148,163,184,.25)'>{layer_labels.get(name, name)}</div>"
-            "</div>"
-            f"<div style='text-align:left;color:{SOFT_RED};font-size:.88rem;font-weight:700'>{sv:.1f}</div>"
-            "</div>"
-        )
-    panel_html = (
-        "<div style='background:rgba(15,19,32,.55);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px 14px;margin-bottom:12px'>"
-        "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px'>"
-        f"<span style='color:{SOFT_GREEN};font-weight:800;font-size:.86rem'>매수 ({int(m.get('buy_active', 0))}/10)</span>"
-        "<span style='color:#94A3B8;font-size:.76rem;font-weight:700'>10개 레이어 비교</span>"
-        f"<span style='color:{SOFT_RED};font-weight:800;font-size:.86rem'>매도 ({int(m.get('sell_active', 0))}/10)</span>"
-        "</div>"
-        "<div style='display:flex;justify-content:center;gap:10px;margin:0 0 10px'>"
-        f"<span style='color:{SOFT_GREEN};font-size:.7rem'>왼쪽 = 매수 압력</span>"
-        f"<span style='color:{SOFT_RED};font-size:.7rem'>오른쪽 = 매도 압력</span>"
-        "</div>"
-        + "".join(rows) +
-        "</div>"
-    )
-    html_doc = f"<!doctype html><html><head><meta charset='utf-8'></head><body style='margin:0;background:transparent;color:#E2E8F0;font-family:Pretendard,system-ui,sans-serif'><!-- {html_key} -->{panel_html}</body></html>"
-    components.html(html_doc, height=max(430, 120 + len(layer_names) * 44), scrolling=False)
-
-
-def render_leading_lagging(m):
-    lv = translate_chart_text(m.get('leading_verdict', ''))
-    lgv = translate_chart_text(m.get('lagging_verdict', ''))
-    ac = float(m.get('composite_accel', 0))
-    spb = float(m.get('setup_pressure_buy', 0))
-    sps = float(m.get('setup_pressure_sell', 0))
-    maxsp = max(spb, sps, 1)
-    bw = min(spb / maxsp * 50, 50)
-    sw = min(sps / maxsp * 50, 50)
-    tow_label = f"매수 압력 {spb:.1f}" if spb > sps else (f"매도 압력 {sps:.1f}" if sps > spb else "균형")
-    tow_color = SOFT_GREEN if spb > sps else (SOFT_RED if sps > spb else SOFT_AMBER)
-    flow_text = '하락 다이버전스' if m.get('smart_money_bearish_div') else ('상승 지지' if m.get('smart_money_bullish_div') else '중립')
-    flow_color = SOFT_RED if m.get('smart_money_bearish_div') else (SOFT_GREEN if m.get('smart_money_bullish_div') else '#94A3B8')
-    size_label, size_color = _risk_size_hint(float(m.get('atr_pct', 0)))
-    st.markdown(f"""<div style='display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px'>
-        <div style='background:rgba(255,255,255,.03);border:1px solid #1E293B;border-radius:12px;padding:16px'>
-            <p style='font-weight:700;color:#A5B4FC;margin:0 0 8px;font-size:.85rem'>선행 지표(Leading)</p>
-            <p style='color:{SOFT_GREEN if ac >= 0 else SOFT_RED};font-weight:800;font-size:1.15rem;margin:0 0 8px'>{lv}</p>
-            <div style='display:flex;gap:10px;flex-wrap:wrap'>
-                <span style='color:#94A3B8;font-size:.78rem'>가속도: <b style='color:{SOFT_GREEN if ac > 0 else SOFT_RED}'>{ac:+.2f}</b></span>
-                <span style='color:#94A3B8;font-size:.78rem'>UT: {'매수' if m.get('utbot_dir', 0) == 1 else ('매도' if m.get('utbot_dir', 0) == -1 else '중립')}</span>
-                <span style='color:#94A3B8;font-size:.78rem'>Hull: {'상승' if m.get('hma_rising') else '하락'}</span>
-            </div>
-        </div>
-        <div style='background:rgba(255,255,255,.03);border:1px solid #1E293B;border-radius:12px;padding:16px'>
-            <p style='font-weight:700;color:#A5B4FC;margin:0 0 8px;font-size:.85rem'>후행 지표(Lagging)</p>
-            <p style='color:{SOFT_GREEN if "상승" in lgv else (SOFT_RED if "하락" in lgv else SOFT_AMBER)};font-weight:800;font-size:1.15rem;margin:0 0 8px'>{lgv}</p>
-            <div style='display:flex;gap:14px'>
-                <span style='color:#94A3B8;font-size:.78rem'>시장 국면: <b>{localize_regime_label(m.get('regime'), m.get('regime_label'))}</b></span>
-                <span style='color:#94A3B8;font-size:.78rem'>RS: <b>{m.get('rs_ratio', 1):.3f}</b></span>
-            </div>
-        </div>
-    </div>""", unsafe_allow_html=True)
-    st.markdown(f"""<div style='background:rgba(255,255,255,.03);border:1px solid #1E293B;border-radius:12px;padding:14px;margin-bottom:12px'>
-        <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:4px'>
-            <span style='color:{SOFT_GREEN};font-size:.78rem;font-weight:700'>매수 압력 {spb:.1f}</span>
-            <span style='color:{tow_color};font-size:.78rem;font-weight:700'>{tow_label}</span>
-            <span style='color:{SOFT_RED};font-size:.78rem;font-weight:700'>매도 압력 {sps:.1f}</span>
-        </div>
-        <div class='tow-bar'><div class='tow-buy' style='width:{bw}%'></div><div class='tow-sell' style='width:{sw}%'></div><div class='tow-center'></div></div>
-    </div>""", unsafe_allow_html=True)
-    cards = "".join([
-        _mini_stat_card('BB %B', f"{float(m.get('percent_b', 0.5)) * 100:.0f}%", SOFT_GREEN if float(m.get('percent_b', 0.5)) < 0.3 else (SOFT_RED if float(m.get('percent_b', 0.5)) > 0.7 else SOFT_AMBER), '볼린저 밴드 안에서 현재 위치를 보여줍니다.'),
-        _mini_stat_card('CMF', f"{float(m.get('cmf', 0)):+.3f}", SOFT_GREEN if float(m.get('cmf', 0)) > 0.05 else (SOFT_RED if float(m.get('cmf', 0)) < -0.05 else '#94A3B8'), '0 위면 자금 유입 우위, 0 아래면 자금 이탈 우위로 봅니다.'),
-        _mini_stat_card('자금 흐름', flow_text, flow_color, '가격과 자금 흐름의 방향이 같은지, 다이버전스가 있는지 봅니다.'),
-        _mini_stat_card('OBV 기울기', f"{float(m.get('obv_slope', 0)):+.2f}", SOFT_GREEN if float(m.get('obv_slope', 0)) > 0 else (SOFT_RED if float(m.get('obv_slope', 0)) < 0 else '#94A3B8'), 'OBV 기울기로 거래량 흐름의 방향을 봅니다.'),
-        _mini_stat_card('최근 거래량', f"{float(m.get('volume_ratio_20', 1)):.1f}x", SOFT_GREEN if float(m.get('volume_ratio_20', 1)) >= 1 else (SOFT_AMBER_TEXT if float(m.get('volume_ratio_20', 1)) >= 0.7 else SOFT_RED), '최근 거래량이 20일 평균 대비 얼마나 붙는지 보여줍니다.'),
-        _mini_stat_card('매수 손익비', f"{float(m.get('vp_long_rr', 1)):.2f}", SOFT_GREEN if float(m.get('vp_long_rr', 1)) >= 1.35 else (SOFT_AMBER_TEXT if float(m.get('vp_long_rr', 1)) >= 1 else SOFT_RED), '현재가 기준 매수 관점 손익비입니다.'),
-        _mini_stat_card('매도 손익비', f"{float(m.get('vp_short_rr', 1)):.2f}", SOFT_GREEN if float(m.get('vp_short_rr', 1)) >= 1.35 else (SOFT_AMBER_TEXT if float(m.get('vp_short_rr', 1)) >= 1 else SOFT_RED), '현재가 기준 매도 관점 손익비입니다.'),
-        _mini_stat_card('ATR%', f"{float(m.get('atr_pct', 0)):.1f}%", SOFT_BLUE, '평균 변동폭이 현재가 대비 어느 정도인지 보여줍니다.'),
-        _mini_stat_card('권장 비중', size_label, size_color, '변동성이 높을수록 포지션 크기를 줄이는 편이 안전합니다.'),
-        _mini_stat_card('50일선 거리', f"{float(m.get('ma50_dist', 0)):+.1f}%", SOFT_GREEN if float(m.get('ma50_dist', 0)) > 0 else SOFT_RED, '현재가와 50일선 사이 거리입니다.'),
-        _mini_stat_card('200일선 거리', f"{float(m.get('ma200_dist', 0)):+.1f}%", SOFT_GREEN if float(m.get('ma200_dist', 0)) > 0 else SOFT_RED, '현재가와 200일선 사이 거리입니다.'),
-    ])
-    st.markdown(f"<div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px'>{cards}</div>", unsafe_allow_html=True)
-
-
-def render_combined_scans(m):
-    scans = m.get('combined_scans', [])
+def render_combined_scans(meta):
+    scans = meta.get("combined_scans", [])
     if not scans:
         st.info("현재 활성화된 콤보 스캔이 없습니다.")
         return
-    bn = sum(1 for s in scans if s['dir'] == 'buy')
-    sn_ = sum(1 for s in scans if s['dir'] == 'sell')
-    t1 = sum(1 for s in scans if s['tier'] == 1)
-    hc = '#E8C56C' if t1 > 0 else (SOFT_GREEN if bn > sn_ else (SOFT_RED if sn_ > bn else SOFT_AMBER))
-    st.markdown(f"<div style='background:rgba(255,215,0,.06);border:1px solid {hc}33;border-radius:12px;padding:12px;margin-bottom:10px'><span style='font-size:1.2rem;font-weight:800;color:{hc}'>콤보 스캔 {len(scans)}개 활성</span> <span style='color:#94A3B8;margin-left:12px'>T1:{t1} · 매수:{bn} · 매도:{sn_}</span></div>", unsafe_allow_html=True)
+    buy_count = sum(1 for item in scans if item.get("dir") == "buy")
+    sell_count = sum(1 for item in scans if item.get("dir") == "sell")
+    tier1_count = sum(1 for item in scans if item.get("tier") == 1)
+    tone = "warning" if tier1_count > 0 else ("positive" if buy_count > sell_count else "negative" if sell_count > buy_count else "accent")
     cards = []
-    for s in scans:
-        tier = {1: '핵심 T1', 2: '보강 T2', 3: '참고 T3'}.get(s['tier'], '참고')
-        is_buy = s['dir'] == 'buy'
-        is_sell = s['dir'] == 'sell'
-        color = SOFT_GREEN if is_buy else (SOFT_RED if is_sell else SOFT_AMBER)
-        bg = 'linear-gradient(160deg,rgba(5,46,22,.55),rgba(15,23,42,.6))' if is_buy else ('linear-gradient(160deg,rgba(69,10,10,.55),rgba(30,41,59,.6))' if is_sell else 'linear-gradient(160deg,rgba(120,53,15,.5),rgba(30,41,59,.6))')
-        side = '상승' if is_buy else ('하락' if is_sell else '중립')
-        date_badge = "<span style='background:#FFD700;color:#111827;padding:2px 6px;border-radius:999px;font-size:.64rem;font-weight:800'>오늘</span>" if s.get('is_today') else f"<span style='color:#94A3B8;font-size:.72rem'>{s['date']}</span>"
+    for item in scans:
+        direction = item.get("dir")
+        item_tone = "positive" if direction == "buy" else ("negative" if direction == "sell" else "warning")
+        tier_label = {1: "핵심 T1", 2: "보강 T2", 3: "참고 T3"}.get(item.get("tier"), "참고")
         cards.append(
-            f"<div style='background:{bg};border:1px solid {color}55;border-radius:14px;padding:12px 12px 10px;box-shadow:0 8px 24px rgba(0,0,0,.25)'>"
-            f"<div style='display:flex;justify-content:space-between;align-items:center;gap:8px'><span style='color:{color};font-weight:800'>{side} · {s['kor']}</span><span style='color:#E2E8F0;font-size:.68rem;background:rgba(15,23,42,.6);padding:2px 8px;border-radius:999px'>{tier}</span></div>"
-            f"<div style='margin-top:8px;display:flex;justify-content:space-between;align-items:center'><span style='color:#60A5FA;font-size:.72rem'>승률 {s['win']}</span>{date_badge}</div>"
-            "</div>"
+            f"""
+            <div class="sigl-card sigl-card--{'positive' if item_tone == 'positive' else 'negative' if item_tone == 'negative' else 'warning'}">
+              <div class="sigl-section-head">
+                <div>
+                  <p class="sigl-section-title">{_esc(item.get('kor'))}</p>
+                  <p class="sigl-section-copy">{_esc(item.get('win'))}</p>
+                </div>
+                <div class="sigl-inline">
+                  {_badge(tier_label, item_tone)}
+                  {_badge(item.get('date', '--/--') if not item.get('is_today') else '오늘', 'accent')}
+                </div>
+              </div>
+            </div>
+            """
         )
-    st.markdown(f"<div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px'>{''.join(cards)}</div>", unsafe_allow_html=True)
+    st.markdown(
+        f"""
+        <div class="sigl-card sigl-card--{'warning' if tone == 'warning' else 'positive' if tone == 'positive' else 'negative' if tone == 'negative' else 'accent'}">
+          <div class="sigl-section-head">
+            <div>
+              <p class="sigl-section-title">콤보 스캔</p>
+              <p class="sigl-section-copy">다중 조건이 함께 만족된 고신뢰 패턴만 모아서 보여줍니다.</p>
+            </div>
+            <div class="sigl-inline">
+              {_badge(f'T1 {tier1_count}', 'warning')}
+              {_badge(f'매수 {buy_count}', 'positive')}
+              {_badge(f'매도 {sell_count}', 'negative')}
+            </div>
+          </div>
+        </div>
+        <div class="sigl-grid sigl-grid--2" style="margin-top:12px">{''.join(cards)}</div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_indicator_help():
-    with st.expander("차트 읽는 법 / 지표 설명", expanded=False):
+    with st.expander("차트 보는 법 / 지표 설명", expanded=False):
         st.markdown(
-            "- `최종 판단 / 신뢰도`: 지금 시점에서 시스템이 보는 기본 방향과 신뢰도입니다.\n"
-            "- `위험 점검(Risk Check)`: 스마트 머니 다이버전스, 손익비, 저거래량, 과열 경고를 모아 보여줍니다.\n"
-            "- `WT1`: 과매수/과매도 압력을 빠르게 보는 지표입니다.\n"
-            "- `ADX`: 추세의 강도를 보여주며 방향 자체를 뜻하지는 않습니다.\n"
-            "- `CMF / OBV 기울기`: 자금 유입과 이탈 흐름을 보는 보조 지표입니다.\n"
+            "- `최종 판단 / 액션`: 현재 구간에서 시스템이 보는 방향과 우선순위입니다.\n"
+            "- `리스크 체크`: 다이버전스, 거래량, 과열 경고 같은 반론 포인트를 모아 보여줍니다.\n"
+            "- `WT1`: 과매수/과매도 성격을 빠르게 보는 지표입니다.\n"
+            "- `ADX`: 추세 강도를 보여주며 방향 자체를 뜻하지는 않습니다.\n"
+            "- `CMF / OBV`: 자금 유입과 이탈 흐름을 보는 보조 지표입니다.\n"
             "- `종합 점수(Ensemble Score)`: -100~+100 범위의 종합 방향 점수입니다.\n"
-            "- `10개 레이어`: 추세, 모멘텀, 구조, 자금 흐름 등이 매수/매도 쪽으로 얼마나 기여하는지 비교합니다."
+            "- `10개 레이어`: 추세, 모멘텀, 거래량, 자금 흐름 등이 매수/매도 쪽에 얼마나 기여하는지 비교합니다."
         )
 
 
 def render_analysis(msg, key_prefix="analysis"):
-    m, fj = msg.get('meta'), msg.get('fig_json')
-    if m:
-        render_price_header(m, key_prefix=key_prefix)
-    if m or fj:
-        t0, t1, t2, t3, t4 = st.tabs(["차트", "판단/리스크", "10개 레이어", "콤보 스캔", "기업 정보"])
-        with t0:
-            if fj:
-                fig = go.Figure(json.loads(fj))
-                st.plotly_chart(fig, use_container_width=True, theme=None, config={'displaylogo': False, 'modeBarButtonsToRemove': ['lasso2d', 'select2d']}, key=f"{key_prefix}_price_chart")
-                st.caption("*캔들 툴팁, 거래량 프로파일(VP), 자동 추세선/평행채널, 패턴 오버레이를 제공합니다. 모바일에서는 판단 카드 확인 후 차트를 열면 더 읽기 쉽습니다.")
-        with t1:
-            if m:
-                render_judgment_card(m)
-                st.markdown("#### 5위원회 종합 판단")
-                render_committee_panel(m)
-                st.markdown("---")
-                render_leading_lagging(m)
-                render_indicator_help()
-        with t2:
-            if m:
-                render_10layer_bars(m, html_key=f"{key_prefix}_10layer")
-        with t3:
-            if m:
-                render_combined_scans(m)
-        with t4:
-            if m:
-                render_company_details(m['ticker'], key_prefix=f"{key_prefix}_company")
+    meta = msg.get("meta")
+    fig_json = msg.get("fig_json")
+    if meta:
+        render_price_header(meta, key_prefix=key_prefix)
+    if not (meta or fig_json):
+        return
+
+    tab_chart, tab_judgment, tab_layers, tab_scans, tab_company = st.tabs(
+        ["차트", "판단/리스크", "10개 레이어", "콤보 스캔", "기업 정보"]
+    )
+
+    with tab_chart:
+        if fig_json:
+            fig = go.Figure(json.loads(fig_json))
+            st.plotly_chart(
+                fig,
+                use_container_width=True,
+                theme=None,
+                config={"displaylogo": False, "modeBarButtonsToRemove": ["lasso2d", "select2d"]},
+                key=f"{key_prefix}_price_chart",
+            )
+            st.caption("*차트에는 가격 흐름, 거래량 프로파일, 보조 지표와 패턴 신호가 함께 표시됩니다.")
+
+    with tab_judgment:
+        if meta:
+            render_judgment_card(meta)
+            render_committee_panel(meta)
+            st.markdown("---")
+            render_leading_lagging(meta)
+            render_indicator_help()
+
+    with tab_layers:
+        if meta:
+            render_10layer_bars(meta, html_key=f"{key_prefix}_10layer")
+
+    with tab_scans:
+        if meta:
+            render_combined_scans(meta)
+
+    with tab_company:
+        if meta:
+            render_company_details(meta["ticker"], key_prefix=f"{key_prefix}_company")
