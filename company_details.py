@@ -44,14 +44,26 @@ CFO_ALIASES = [
     'Cash Flow From Continuing Operating Activities', 'Total Cash From Operating Activities'
 ]
 FCF_ALIASES = ['Free Cash Flow', 'FreeCashFlow']
+_DISPLAY_CURRENCY_CODE = "USD"
+_DISPLAY_CURRENCY_SYMBOL = "$"
+_ZERO_DECIMAL_CURRENCIES = {"KRW", "JPY"}
+_CURRENCY_SYMBOLS = {
+    "USD": "$",
+    "KRW": "KRW ",
+    "JPY": "JPY ",
+    "EUR": "EUR ",
+    "GBP": "GBP ",
+    "CNY": "CNY ",
+    "HKD": "HK$",
+}
 
 # ═══════════════════════════════════════════════════════════════
 # 🛠️ 유틸리티 함수
 # ═══════════════════════════════════════════════════════════════
 
-def _fmt_num(num, is_currency=True):
+def _fmt_num(num, is_currency=True, currency_symbol=None):
     if pd.isna(num) or num is None: return "N/A"
-    prefix = "$" if is_currency else ""
+    prefix = (currency_symbol if currency_symbol is not None else _DISPLAY_CURRENCY_SYMBOL) if is_currency else ""
     sign = "-" if num < 0 else ""
     a = abs(num)
     if   a >= 1e12: return f"{sign}{prefix}{a/1e12:.2f}T"
@@ -133,6 +145,31 @@ def _safe(val, fallback="N/A"):
 
 def _esc(text):
     return html_module.escape(str(text)) if text else ""
+
+def _resolve_display_currency(info):
+    currency_code = str((info or {}).get('currency') or (info or {}).get('financialCurrency') or "USD").upper()
+    currency_symbol = _CURRENCY_SYMBOLS.get(currency_code, f"{currency_code} ")
+    return currency_code, currency_symbol
+
+def _currency_decimals(currency_code=None):
+    code = str(currency_code or _DISPLAY_CURRENCY_CODE or "USD").upper()
+    return 0 if code in _ZERO_DECIMAL_CURRENCIES else 2
+
+def _fmt_price(num, currency_symbol=None, currency_code=None, decimals=None):
+    if num is None or (isinstance(num, float) and np.isnan(num)):
+        return "N/A"
+    symbol = currency_symbol if currency_symbol is not None else _DISPLAY_CURRENCY_SYMBOL
+    code = str(currency_code or _DISPLAY_CURRENCY_CODE or "USD").upper()
+    precision = _currency_decimals(code) if decimals is None else decimals
+    value = abs(float(num))
+    sign = "-" if float(num) < 0 else ""
+    return f"{sign}{symbol}{value:,.{precision}f}"
+
+def _fmt_signed_price(num, currency_symbol=None, currency_code=None, decimals=None):
+    if num is None or (isinstance(num, float) and np.isnan(num)):
+        return "N/A"
+    sign = "+" if float(num) >= 0 else "-"
+    return f"{sign}{_fmt_price(abs(float(num)), currency_symbol=currency_symbol, currency_code=currency_code, decimals=decimals)}"
 
 def _find_idx(df, candidates):
     if df is None or df.empty: return None
@@ -273,16 +310,18 @@ def _get_plotly_combo_chart(rv, nv, rd):
     if not rv or not rd or len(rv) < 2: return None
     rd_rev, rv_rev, nv_rev = rd[::-1], rv[::-1], nv[::-1]
     labels = [d.strftime('%Y') if hasattr(d, 'strftime') else str(d)[:4] for d in rd_rev]
+    revenue_text = [_fmt_num(v) for v in rv_rev]
+    income_text = [_fmt_num(v) for v in nv_rev]
 
     fig = go.Figure()
     fig.add_trace(go.Bar(
         x=labels, y=rv_rev, name='매출',
         marker=dict(color='rgba(96,165,250,.78)', line=dict(color='rgba(165,180,252,.28)', width=1)),
         opacity=0.92,
-        text=[_fmt_num(v, False) for v in rv_rev],
+        text=revenue_text,
         textposition='auto',
         textfont=dict(color='#E5E7EB', size=12, family=PLOTLY_FONT_FAMILY),
-        hovertemplate="Revenue<br>%{x}: %{y:$,.0f}<extra></extra>"
+        hovertemplate="Revenue<br>%{x}: %{text}<extra></extra>"
     ))
     fig.add_trace(go.Scatter(
         x=labels, y=nv_rev, name='순이익', mode='lines+markers+text',
@@ -291,10 +330,10 @@ def _get_plotly_combo_chart(rv, nv, rd):
         fill='tozeroy',
         fillcolor='rgba(99,217,162,.12)',
         yaxis='y2',
-        text=[_fmt_num(v, False) for v in nv_rev],
+        text=income_text,
         textposition='top center',
         textfont=dict(color='#B8F1D5', size=12, family=PLOTLY_FONT_FAMILY),
-        hovertemplate="Net income<br>%{x}: %{y:$,.0f}<extra></extra>"
+        hovertemplate="Net income<br>%{x}: %{text}<extra></extra>"
     ))
     _apply_cipherx_chart_theme(fig, "연도별 재무 추이", height=320, show_legend=True)
     fig.update_layout(
@@ -378,13 +417,13 @@ def _get_plotly_target_price(curr, low, mean, median, high):
                 symbol=symbol,
                 line=dict(color='#F8FAFC', width=2 if name == '현재가' else 1.2)
             ),
-            hovertemplate=f"{name}<br>${val:,.2f}<extra></extra>",
+            hovertemplate=f"{name}<br>{_fmt_price(val)}<extra></extra>",
             showlegend=False
         ))
         annotations.append(dict(
             x=xpos,
             y=val,
-            text=f"<b>{name}</b><br>${val:,.2f}",
+            text=f"<b>{name}</b><br>{_fmt_price(val)}",
             showarrow=False,
             xanchor=anchor,
             yanchor='middle' if name != '현재가' else 'bottom',
@@ -629,11 +668,7 @@ def _build_target_corridor_html(curr, low, mean, median, high, coverage_count=0)
         )
 
     gap_text = f"{focus_gap_pct:+.1f}%" if isinstance(focus_gap_pct, (int, float)) else "N/A"
-    gap_cash = (
-        f"{'+' if focus_gap_abs >= 0 else '-'}${abs(focus_gap_abs):,.2f}"
-        if isinstance(focus_gap_abs, (int, float))
-        else "N/A"
-    )
+    gap_cash = _fmt_signed_price(focus_gap_abs) if isinstance(focus_gap_abs, (int, float)) else "N/A"
     summary_stats = (
         f"<div class='consensus-corridor__stats'>"
         f"<div class='consensus-corridor__stat'><p>목표 밴드 폭</p><strong>{_fmt_num(band_width)}</strong></div>"
@@ -1350,6 +1385,7 @@ __SIGL_COMPANY_THEME__
 # ═══════════════════════════════════════════════════════════════
 
 def render_company_details(ticker_str: str, key_prefix: str = "company"):
+    global _DISPLAY_CURRENCY_CODE, _DISPLAY_CURRENCY_SYMBOL
     st.markdown(CSS, unsafe_allow_html=True)
 
     with st.spinner(f"{ticker_str} 기업 정보를 정리하고 있습니다..."):
@@ -1368,6 +1404,9 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
         cf = bundle.get("cf")
 
         sector, industry = info.get('sector', 'N/A'), info.get('industry', 'N/A')
+        currency_code, currency_symbol = _resolve_display_currency(info)
+        _DISPLAY_CURRENCY_CODE = currency_code
+        _DISPLAY_CURRENCY_SYMBOL = currency_symbol
         price = info.get('currentPrice') or info.get('regularMarketPrice') or 0
         prev_c = info.get('previousClose') or price or 1
         day_chg = ((price - prev_c) / prev_c * 100) if prev_c else 0
@@ -1421,7 +1460,7 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
         f'<div><span style="font-size:1.8rem;font-weight:900;color:#ffffff">{_esc(info.get("shortName", ticker_str))}</span>'
         f'<span style="font-size:1.1rem;color:#adbac7;margin-left:8px;font-weight:800">({_esc(ticker_str)})</span><br>'
         f'<span style="font-size:.9rem;color:#8b949e;font-weight:700">{_esc(sector)} · {_esc(industry)}</span></div>'
-        f'<div style="text-align:right"><span style="font-size:2.2rem;font-weight:900;color:{chg_c}">${price:,.2f}</span><br>'
+        f'<div style="text-align:right"><span style="font-size:2.2rem;font-weight:900;color:{chg_c}">{_fmt_price(price, currency_symbol=currency_symbol, currency_code=currency_code)}</span><br>'
         f'<span style="font-size:1.1rem;font-weight:800;color:{chg_c}">{chg_s}{day_chg:.2f}% 오늘</span></div></div>'
     )
     st.markdown(header_html, unsafe_allow_html=True)
@@ -1500,7 +1539,7 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
         f"<div class='signal-stack'>"
         f"<div class='signal-card'><p class='signal-label'>현금 창출력</p><p class='signal-value'>{_fmt_num(fcf)}</p><p class='signal-sub'>잉여현금흐름 {'' if fcf is not None else '데이터 부족'}</p></div>"
         f"<div class='signal-card'><p class='signal-label'>영업활동 현금흐름</p><p class='signal-value'>{_fmt_num(ocf)}</p><p class='signal-sub'>본업 현금흐름</p></div>"
-        f"<div class='signal-card'><p class='signal-label'>애널리스트 커버리지</p><p class='signal-value'>{analyst_count or 0}명</p><p class='signal-sub'>평균 목표가 {f'${target_mean:,.2f}' if isinstance(target_mean, (int, float)) else 'N/A'} · 기관보유 {_fmt_pct(inst_hold) if inst_hold is not None else 'N/A'}</p></div>"
+        f"<div class='signal-card'><p class='signal-label'>애널리스트 커버리지</p><p class='signal-value'>{analyst_count or 0}명</p><p class='signal-sub'>평균 목표가 {_fmt_price(target_mean, currency_symbol=currency_symbol, currency_code=currency_code) if isinstance(target_mean, (int, float)) else 'N/A'} · 기관보유 {_fmt_pct(inst_hold) if inst_hold is not None else 'N/A'}</p></div>"
         f"</div>"
         f"</div>"
     )
@@ -1726,7 +1765,7 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
             f'<div class="s-title"><span class="s-num">02</span> 돈을 잘 버는 회사인가요? <span style="font-size:.8rem;color:#768390">SEC 데이터</span></div>'
             f'<div class="two-col"><div>'
             f'{_metric_row("시가총액", _fmt_num(mcap), "m-value m-big")}'
-            f'{_metric_row("TTM EPS (주당순이익)", f"${_safe(ttm_eps)}")}'
+            f'{_metric_row("TTM EPS (주당순이익)", _fmt_price(ttm_eps) if isinstance(ttm_eps, (int, float)) else "N/A")}'
             f'{_metric_row("최근 12개월 매출", _fmt_num(ttm_rev))}'
             f'{_metric_row("최근 12개월 순이익", _fmt_num(ttm_ni), ni_cls)}'
             f'</div><div>'
@@ -1822,7 +1861,7 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
             f'<div class="two-col"><div>'
             f'{_metric_row("분기 이익 성장률 (YoY)", _fmt_pct(eg), eg_cls)}'
             f'{_metric_row("분기 매출 성장률 (YoY)", _fmt_pct(yoy_q_rev_g), rg_cls)}'
-            f'{_metric_row("Forward EPS", f"${_safe(fwd_eps)}")}'
+            f'{_metric_row("Forward EPS", _fmt_price(fwd_eps) if isinstance(fwd_eps, (int, float)) else "N/A")}'
             f'{_metric_row("PEG 비율", peg_txt, peg_cls)}'
             f'</div><div>'
             f'{_metric_row("ROE", _fmt_pct(roe_v))}'
@@ -2046,7 +2085,7 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     all_verdicts.append(("변동성", bc))
 
     w52h, w52l, w52c = info.get('fiftyTwoWeekHigh'), info.get('fiftyTwoWeekLow'), info.get('52WeekChange')
-    pos_bar = f"<div style='margin:16px 0'><div style='display:flex;justify-content:space-between;font-size:.85rem;font-weight:700;color:#adbac7;margin-bottom:6px'><span>저 ${w52l:,.2f}</span><span style='color:#ffffff;font-size:1.1rem;font-weight:900'>현재 ${price:,.2f}</span><span>고 ${w52h:,.2f}</span></div><div style='background:rgba(0,0,0,0.4);border-radius:8px;height:16px;position:relative'><div style='background:linear-gradient(90deg,#FF8F96 0%,#F6C35E 50%,#63D9A2 100%);width:100%;height:100%;border-radius:8px;opacity:0.35'></div><div style='position:absolute;top:-4px;left:{max(0, min(100, (price - w52l) / (w52h - w52l) * 100)):.1f}%;width:24px;height:24px;background:#60A5FA;border-radius:50%;transform:translateX(-50%);border:3px solid #ffffff;box-shadow:0 0 12px rgba(96,165,250,.55)'></div></div></div>" if price and w52h and w52l and w52h != w52l else ""
+    pos_bar = f"<div style='margin:16px 0'><div style='display:flex;justify-content:space-between;font-size:.85rem;font-weight:700;color:#adbac7;margin-bottom:6px'><span>저 {_fmt_price(w52l)}</span><span style='color:#ffffff;font-size:1.1rem;font-weight:900'>현재 {_fmt_price(price)}</span><span>고 {_fmt_price(w52h)}</span></div><div style='background:rgba(0,0,0,0.4);border-radius:8px;height:16px;position:relative'><div style='background:linear-gradient(90deg,#FF8F96 0%,#F6C35E 50%,#63D9A2 100%);width:100%;height:100%;border-radius:8px;opacity:0.35'></div><div style='position:absolute;top:-4px;left:{max(0, min(100, (price - w52l) / (w52h - w52l) * 100)):.1f}%;width:24px;height:24px;background:#60A5FA;border-radius:50%;transform:translateX(-50%);border:3px solid #ffffff;box-shadow:0 0 12px rgba(96,165,250,.55)'></div></div></div>" if price and w52h and w52l and w52h != w52l else ""
 
     with st.container(border=True):
         html_s7 = (
@@ -2054,8 +2093,8 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
             f'<div class="two-col"><div>'
             f'{_metric_row("베타 (β)", f"{beta:.2f} ({bl})" if isinstance(beta, (int, float)) else "N/A")}'
             f'{_metric_row("52주 가격 변화율", _fmt_pct(w52c), "m-green" if w52c and w52c > 0 else "m-red")}'
-            f'{_metric_row("52주 최고가", f"${w52h:,.2f}" if w52h else "N/A")}'
-            f'{_metric_row("52주 최저가", f"${w52l:,.2f}" if w52l else "N/A")}'
+            f'{_metric_row("52주 최고가", _fmt_price(w52h) if w52h else "N/A")}'
+            f'{_metric_row("52주 최저가", _fmt_price(w52l) if w52l else "N/A")}'
             f'</div><div>'
             f'<div style="font-size:.95rem;color:#ffffff;margin-bottom:8px;font-weight:800">📍 52주 범위 내 위치</div>{pos_bar}'
             f'<div class="note-box">💡 베타 &lt; 1 = 시장(S&amp;P500) 대비 안정적<br>베타 &gt; 1 = 시장보다 변동성이 큽니다.</div>'
@@ -2180,7 +2219,7 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     else:
         range_state = "범위 정보 부족"
     target_gap_abs = (up_ref - price) if isinstance(up_ref, (int, float)) and isinstance(price, (int, float)) else None
-    target_gap_text = f"{'+' if target_gap_abs >= 0 else '-'}${abs(target_gap_abs):,.2f}" if isinstance(target_gap_abs, (int, float)) else "N/A"
+    target_gap_text = _fmt_signed_price(target_gap_abs) if isinstance(target_gap_abs, (int, float)) else "N/A"
 
     with st.container(border=True):
         st.markdown('<div class="s-title"><span class="s-num">09</span> 전문가들의 의견 <span style="font-size:.8rem;color:#768390">Yahoo</span></div>', unsafe_allow_html=True)
@@ -2195,10 +2234,10 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
         )
         s9_target_tiles = (
             f"<div class='target-mini-grid'>"
-            f"<div class='target-mini-card'><p class='target-mini-label'>현재가</p><p class='target-mini-value'>{f'${price:,.2f}' if isinstance(price, (int, float)) else 'N/A'}</p><p class='target-mini-sub'>{range_state}</p></div>"
-            f"<div class='target-mini-card'><p class='target-mini-label'>중앙값 목표가</p><p class='target-mini-value'>{f'${t_median:,.2f}' if isinstance(t_median, (int, float)) else 'N/A'}</p><p class='target-mini-sub'>기대여력 {up_str}</p></div>"
-            f"<div class='target-mini-card'><p class='target-mini-label'>평균 목표가</p><p class='target-mini-value'>{f'${t_mean:,.2f}' if isinstance(t_mean, (int, float)) else 'N/A'}</p><p class='target-mini-sub'>가격 간극 {target_gap_text}</p></div>"
-            f"<div class='target-mini-card'><p class='target-mini-label'>최저 / 최고</p><p class='target-mini-value'>{f'${t_low:,.2f}' if isinstance(t_low, (int, float)) else 'N/A'} · {f'${t_high:,.2f}' if isinstance(t_high, (int, float)) else 'N/A'}</p><p class='target-mini-sub'>스트리트 밴드</p></div>"
+            f"<div class='target-mini-card'><p class='target-mini-label'>현재가</p><p class='target-mini-value'>{_fmt_price(price) if isinstance(price, (int, float)) else 'N/A'}</p><p class='target-mini-sub'>{range_state}</p></div>"
+            f"<div class='target-mini-card'><p class='target-mini-label'>중앙값 목표가</p><p class='target-mini-value'>{_fmt_price(t_median) if isinstance(t_median, (int, float)) else 'N/A'}</p><p class='target-mini-sub'>기대여력 {up_str}</p></div>"
+            f"<div class='target-mini-card'><p class='target-mini-label'>평균 목표가</p><p class='target-mini-value'>{_fmt_price(t_mean) if isinstance(t_mean, (int, float)) else 'N/A'}</p><p class='target-mini-sub'>가격 간극 {target_gap_text}</p></div>"
+            f"<div class='target-mini-card'><p class='target-mini-label'>최저 / 최고</p><p class='target-mini-value'>{_fmt_price(t_low) if isinstance(t_low, (int, float)) else 'N/A'} · {_fmt_price(t_high) if isinstance(t_high, (int, float)) else 'N/A'}</p><p class='target-mini-sub'>스트리트 밴드</p></div>"
             f"</div>"
         )
         s9_scale_html = (
@@ -2289,9 +2328,9 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
         else: mp_note, mp_c = f"현재가와 유사 ({d:+.1f}%) → 가격 유지 가능성", "yellow"
     all_verdicts.append(("옵션", mp_c))
 
-    ch = "".join([f"<li>${ci['strike']:.1f} <span style='color:#8b949e;font-size:.8rem'>(Vol {int(ci['volume']):,})</span></li>" for ci in (tc or [])]) or "<li>N/A</li>"
-    ph = "".join([f"<li>${pi['strike']:.1f} <span style='color:#8b949e;font-size:.8rem'>(Vol {int(pi['volume']):,})</span></li>" for pi in (tp or [])]) or "<li>N/A</li>"
-    mp_val = f"${mp:.2f}" if mp else ""
+    ch = "".join([f"<li>{_fmt_price(ci['strike'])} <span style='color:#8b949e;font-size:.8rem'>(Vol {int(ci['volume']):,})</span></li>" for ci in (tc or [])]) or "<li>N/A</li>"
+    ph = "".join([f"<li>{_fmt_price(pi['strike'])} <span style='color:#8b949e;font-size:.8rem'>(Vol {int(pi['volume']):,})</span></li>" for pi in (tp or [])]) or "<li>N/A</li>"
+    mp_val = _fmt_price(mp) if mp else ""
     mp_html = f"<span style='font-size:1.8rem;font-weight:900;color:#ffffff'>{mp_val}</span>" if mp else "<span style='color:#768390;font-size:1.2rem;font-weight:700'>데이터 없음</span>"
     exp_html = f"<span style='font-size:.85rem;color:#adbac7;font-weight:700'>(만기: {exp})</span>" if exp else ""
     vol_warning = "<div style='color:#FFC107; font-size:.85rem; margin-top:12px; font-weight:700;'>⚠️ 미결제약정(OI) 부족으로 임시로 거래량(Volume) 가중치를 사용했습니다.</div>" if is_vol_weight else ""

@@ -4,6 +4,19 @@ import numpy as np
 import yfinance as yf
 import math, time, re
 
+_ANALYSIS_US_TICKER_PATTERN = re.compile(r"^[A-Z]{1,6}(?:[.\-][A-Z0-9]{1,4})?$")
+_ANALYSIS_KR_CODE_PATTERN = re.compile(r"^\d{6}$")
+_ANALYSIS_KR_TICKER_PATTERN = re.compile(r"^\d{6}\.(?:KS|KQ)$")
+_CURRENCY_SYMBOLS = {
+    "USD": "$",
+    "KRW": "KRW ",
+    "JPY": "JPY ",
+    "EUR": "EUR ",
+    "GBP": "GBP ",
+    "CNY": "CNY ",
+    "HKD": "HK$",
+}
+
 def _recent(s,lb=3):return s.astype(float).rolling(lb+1,min_periods=1).max().fillna(0).astype(bool)
 def _cooldown(sig,bars=5):
     v=sig.fillna(False).values.astype(bool);out=np.zeros(len(v),dtype=bool);last=-bars-1
@@ -22,7 +35,13 @@ def _cd_dir(df,bs,ss,bars=5):
     if bs in df.columns:df[bs]=pd.Series(bo,index=df.index)
     if ss in df.columns:df[ss]=pd.Series(so,index=df.index)
 def _volf(vol,r=.5,p=20):return vol>=(vol.rolling(p,min_periods=5).mean()*r)
-def _valid_fmt(t):return bool(re.match(r'^[A-Za-z]{1,5}([.\-][A-Za-z]{1,2})?$',t))
+def _valid_fmt(t):
+    text = str(t or "").strip().upper()
+    return bool(
+        _ANALYSIS_US_TICKER_PATTERN.fullmatch(text)
+        or _ANALYSIS_KR_CODE_PATTERN.fullmatch(text)
+        or _ANALYSIS_KR_TICKER_PATTERN.fullmatch(text)
+    )
 def _vs(cond):c=cond.fillna(False).astype(int);g=(c==0).cumsum();return c.groupby(g).cumsum()
 def _sp(df,sn,pts):
     if sn not in df.columns:return pd.Series(0.,index=df.index)
@@ -37,16 +56,40 @@ def _sf(val,default=0.):
     try:r=float(val);return r if r==r else default
     except:return default
 
+def _display_currency(info):
+    code = str((info or {}).get('currency') or (info or {}).get('financialCurrency') or 'USD').upper()
+    symbol = _CURRENCY_SYMBOLS.get(code, f"{code} ")
+    return code, symbol
+
+def _format_quote_value(val, currency_code='USD', currency_symbol='$'):
+    if val is None:
+        return "N/A"
+    try:
+        numeric = float(val)
+    except Exception:
+        return "N/A"
+    decimals = 0 if currency_code in {"KRW", "JPY"} else 2
+    return f"{currency_symbol}{numeric:,.{decimals}f}"
+
+def _analysis_ticker_candidates(t):
+    raw = str(t or "").strip().upper()
+    if _ANALYSIS_KR_CODE_PATTERN.fullmatch(raw):
+        return [f"{raw}.KS", f"{raw}.KQ"]
+    if _ANALYSIS_KR_TICKER_PATTERN.fullmatch(raw) or _ANALYSIS_US_TICKER_PATTERN.fullmatch(raw):
+        return [raw]
+    return []
+
 # ━━━ 캐시 ━━━
 @st.cache_data(ttl=3600,show_spinner=False)
 def fetch_fundamentals(t):
     try:
         info=yf.Ticker(t).info
+        currency_code, currency_symbol = _display_currency(info)
         def g(key,fmt=None):
             val=info.get(key)
             if val is None:return "N/A"
             try:
-                if fmt=='$':return f"${val:,.2f}"
+                if fmt=='$':return _format_quote_value(val, currency_code, currency_symbol)
                 if fmt=='n':return f"{val:,.0f}"
                 return str(val)
             except:return "N/A"
@@ -62,6 +105,23 @@ def fetch_spy(_ts=None):return yf.Ticker("SPY").history(period="2y")
 def validate_ticker(t):
     try:return not yf.Ticker(t).history(period="5d").empty
     except:return False
+@st.cache_data(ttl=3600,show_spinner=False)
+def resolve_analysis_ticker(t):
+    raw = str(t or "").strip().upper()
+    if not _valid_fmt(raw):
+        return {"input": raw, "resolved": None, "valid": False, "reason": "format", "candidates": []}
+    candidates = _analysis_ticker_candidates(raw)
+    for candidate in candidates:
+        if validate_ticker(candidate):
+            return {
+                "input": raw,
+                "resolved": candidate,
+                "valid": True,
+                "reason": "ok",
+                "candidates": candidates,
+                "auto_resolved": candidate != raw,
+            }
+    return {"input": raw, "resolved": None, "valid": False, "reason": "not_found", "candidates": candidates}
 @st.cache_data(ttl=300,max_entries=50,show_spinner=False)
 def _compute_cached(t,k):
     from engine import detect_all_signals

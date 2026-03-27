@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import yfinance as yf
 from sectors import SECTOR_GROUPS
 from config import GEMINI_API_KEY, COMBINED_SCAN_REGISTRY, CTX_KOR
-from utils import _valid_fmt, _sf, fetch_fundamentals, validate_ticker, compute_and_cache, _compute_cached
+from utils import _valid_fmt, _sf, fetch_fundamentals, resolve_analysis_ticker, compute_and_cache, _compute_cached
 from chart import build_chart, build_metadata
 from ui import render_market_home_dashboard
 from ui_localized import render_analysis
@@ -32,7 +32,7 @@ from branding import (
     build_brand_board,
 )
 from theme import build_app_theme_css
-st.set_page_config(page_title=BRAND_PAGE_TITLE, page_icon=BRAND_PAGE_ICON, layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title=BRAND_PAGE_TITLE, page_icon=BRAND_PAGE_ICON, layout="wide", initial_sidebar_state="expanded")
 
 # ━━━ CSS ━━━
 st.markdown(build_app_theme_css(), unsafe_allow_html=True)
@@ -455,6 +455,16 @@ def _render_sector_button_picker(sector_names, selected_sectors):
 def _parse_ticker_input(raw_text):
     raw = str(raw_text or "").upper()
     return list(dict.fromkeys(_SCAN_SYMBOL_PATTERN.findall(raw)))
+
+
+def _parse_analysis_ticker_input(raw_text):
+    raw = str(raw_text or "").upper()
+    tokens = []
+    for token in re.split(r"[\s,;/]+", raw):
+        cleaned = str(token or "").strip()
+        if cleaned and _valid_fmt(cleaned):
+            tokens.append(cleaned)
+    return list(dict.fromkeys(tokens))
 
 
 def _short_collection_title(values):
@@ -2115,10 +2125,10 @@ elif current_mode == MODE_MARKET_DAILY:
         tight=True,
     )
     _render_quick_analysis_grid(key_prefix="briefing_quick")
-    if ti := st.chat_input("분석할 티커를 입력하세요."):
-        parsed = _parse_ticker_input(ti)
+    if ti := st.chat_input("분석할 티커를 입력하세요. 예: AAPL, 005930"):
+        parsed = _parse_analysis_ticker_input(ti)
         if not parsed:
-            st.toast("분석할 티커를 입력해 주세요.", icon="⌨️")
+            st.toast("분석할 티커를 입력해 주세요. 예: AAPL / 005930", icon="⌨️")
         else:
             if len(parsed) > 1:
                 st.toast(f"{parsed[0]} 기준으로 먼저 분석합니다.", icon="📌")
@@ -2242,20 +2252,27 @@ else:
                 st.error(f"AI 오류: {e}")
 
     def process_ticker(tv, refresh=False):
-        tv = tv.strip().upper()
+        raw_tv = str(tv or "").strip().upper()
         st.session_state.pending_ai_ticker = None
         st.session_state.pending_ai_prompt = None
-        if not _valid_fmt(tv):
-            st.toast(f"⚠️ {tv} 형식 오류", icon="🚨")
+        resolved = resolve_analysis_ticker(raw_tv)
+        if not resolved.get("valid"):
+            sample_text = "예: AAPL / 005930"
+            if resolved.get("reason") == "format":
+                st.toast(f"⚠️ 형식 오류 · {sample_text}", icon="🚨")
+            else:
+                st.toast(f"⚠️ {raw_tv} 티커를 찾을 수 없습니다 · {sample_text}", icon="🔍")
             return
-        if not validate_ticker(tv):
-            st.toast(f"⚠️ {tv} 티커를 찾을 수 없습니다", icon="🔍")
-            return
-        st.session_state.messages.append({"role": "user", "type": "text", "content": tv})
+        tv = str(resolved.get("resolved") or raw_tv).strip().upper()
+        st.session_state.messages.append({"role": "user", "type": "text", "content": raw_tv})
         st.session_state.last_ticker = tv
         _set_scan_focus(tv)
+        if resolved.get("auto_resolved"):
+            st.toast(f"{raw_tv} → {tv} 로 해석해 분석합니다.", icon="📌")
         with st.chat_message("assistant", avatar="✨"):
             with st.status(f"READING THE TAPE · {tv}", expanded=True) as status:
+                if resolved.get("auto_resolved"):
+                    st.write(f"0. 입력값을 `{raw_tv}` → `{tv}` 로 해석했습니다.")
                 st.write("1. 입력 형식과 티커 유효성을 확인했습니다.")
                 status.update(label=f"VALIDATING TARGET · {tv}", state="running", expanded=True)
                 st.write("2. 기업 기본 정보와 부가 메타데이터를 불러오고 있습니다.")
@@ -2313,10 +2330,10 @@ else:
         st.caption("QUANT AUDIT는 보통 10~20초 정도 걸립니다. 시스템 판단 요약과 반론 포인트를 함께 정리합니다.")
         if st.button(f"🚀 {st.session_state.pending_ai_ticker.upper()} QUANT AUDIT", type="primary", use_container_width=True):
             _run_ai()
-    if ti := st.chat_input("분석할 티커를 입력하세요."):
-        parsed = _parse_ticker_input(ti)
+    if ti := st.chat_input("분석할 티커를 입력하세요. 예: AAPL, 005930"):
+        parsed = _parse_analysis_ticker_input(ti)
         if not parsed:
-            st.toast("분석할 티커를 입력해 주세요.", icon="⌨️")
+            st.toast("분석할 티커를 입력해 주세요. 예: AAPL / 005930", icon="⌨️")
         else:
             if len(parsed) > 1:
                 st.toast(f"{parsed[0]} 기준으로 먼저 분석합니다.", icon="📌")
