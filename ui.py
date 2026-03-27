@@ -31,7 +31,7 @@ SOFT_AMBER = '#F6C35E'
 SOFT_AMBER_TEXT = '#F8DE9A'
 SOFT_BLUE = '#A5B4FC'
 
-_US_MARKET_DECK_HEIGHT = 728
+_US_MARKET_DECK_HEIGHT = 692
 _US_MARKET_DEFAULT_DURATION = 7000
 _US_MARKET_TEXT_HEAVY_DURATION = 10000
 _US_MARKET_HISTORY_PERIOD = "6mo"
@@ -47,6 +47,7 @@ _US_MARKET_MACRO = [
     ("^TNX", "미 국채 10년"),
     ("DX-Y.NYB", "달러 인덱스"),
     ("KRW=X", "원/달러 환율"),
+    ("GLD", "금 ETF"),
     ("CL=F", "WTI"),
     ("BTC-USD", "비트코인"),
 ]
@@ -259,6 +260,217 @@ def _build_snapshot_metric(label, note, snapshot, inverse=False):
     return {"label": label, "value": value, "delta": delta, "note": note, "tone": tone}
 
 
+def _relative_change(lhs_snapshot, rhs_snapshot):
+    lhs_change = (lhs_snapshot or {}).get("change_pct")
+    rhs_change = (rhs_snapshot or {}).get("change_pct")
+    if lhs_change is None or rhs_change is None or pd.isna(lhs_change) or pd.isna(rhs_change):
+        return None
+    return float(lhs_change) - float(rhs_change)
+
+
+def _format_pct_point(change_pct):
+    if change_pct is None or pd.isna(change_pct):
+        return "N/A"
+    return f"{change_pct:+.2f}%p"
+
+
+def _build_relative_strength_metric(label, note, spread):
+    if spread is None or pd.isna(spread):
+        return {"label": label, "value": "N/A", "delta": "", "note": note, "tone": "neutral"}
+    tone = _tone_from_change(spread, neutral_band=0.18)
+    delta = "상대 강세" if tone == "positive" else "상대 약세" if tone == "negative" else "중립"
+    return {
+        "label": label,
+        "value": _format_pct_point(spread),
+        "delta": delta,
+        "note": note,
+        "tone": tone,
+    }
+
+
+def _build_market_regime(benchmarks, macro, sector_rows):
+    qqq_vs_spy = _relative_change(benchmarks.get("QQQ", {}), benchmarks.get("SPY", {}))
+    iwm_vs_spy = _relative_change(benchmarks.get("IWM", {}), benchmarks.get("SPY", {}))
+    vix_snapshot = benchmarks.get("VIX", {})
+    vix_level = vix_snapshot.get("price")
+    vix_change = vix_snapshot.get("change_pct")
+    tnx_snapshot = macro.get("10Y", {})
+    tnx_bps = ((tnx_snapshot.get("price") or 0) - (tnx_snapshot.get("prev_close") or 0)) * 10 if tnx_snapshot else None
+    dxy_change = macro.get("DXY", {}).get("change_pct")
+    fx_change = macro.get("USDKRW", {}).get("change_pct")
+    wti_change = macro.get("WTI", {}).get("change_pct")
+    btc_change = macro.get("BTC", {}).get("change_pct")
+    gold_change = macro.get("Gold", {}).get("change_pct")
+    sector_up = sum(1 for row in sector_rows if (row.get("change_pct") or 0) > 0)
+    sector_total = len(sector_rows) or 11
+
+    score = 0
+    breadth_ratio = sector_up / sector_total if sector_total else 0.5
+    if sector_total:
+        if breadth_ratio >= 0.64:
+            score += 2
+        elif breadth_ratio <= 0.36:
+            score -= 2
+
+    if qqq_vs_spy is not None:
+        if qqq_vs_spy >= 0.30:
+            score += 1
+        elif qqq_vs_spy <= -0.30:
+            score -= 1
+
+    if iwm_vs_spy is not None:
+        if iwm_vs_spy >= 0.30:
+            score += 2
+        elif iwm_vs_spy <= -0.30:
+            score -= 2
+
+    if vix_change is not None:
+        if vix_change <= -4:
+            score += 2
+        elif vix_change >= 5:
+            score -= 2
+
+    if vix_level is not None:
+        if vix_level <= 18:
+            score += 1
+        elif vix_level >= 25:
+            score -= 1
+
+    if dxy_change is not None:
+        if dxy_change <= -0.35:
+            score += 1
+        elif dxy_change >= 0.35:
+            score -= 1
+
+    if fx_change is not None:
+        if fx_change <= -0.35:
+            score += 1
+        elif fx_change >= 0.35:
+            score -= 1
+
+    if wti_change is not None:
+        if wti_change >= 1.5:
+            score += 1
+        elif wti_change <= -1.5:
+            score -= 1
+
+    if btc_change is not None:
+        if btc_change >= 2.0:
+            score += 1
+        elif btc_change <= -2.0:
+            score -= 1
+
+    if gold_change is not None:
+        if gold_change >= 0.8:
+            score -= 1
+        elif gold_change <= -0.8:
+            score += 1
+
+    # Falling yields can mean either risk support or a flight to safety, so we
+    # only score them once other assets show the context around that move.
+    if tnx_bps is not None:
+        safety_context = ((vix_change or 0) >= 3) or ((dxy_change or 0) >= 0.25) or ((gold_change or 0) >= 0.6)
+        reflation_context = breadth_ratio >= 0.58 or ((wti_change or 0) >= 1.2) or ((qqq_vs_spy or 0) >= 0.2)
+        if tnx_bps <= -4 and safety_context:
+            score -= 1
+        elif tnx_bps >= 4 and reflation_context:
+            score += 1
+
+    clamped = max(-10, min(10, score))
+    fear_greed_score = round((clamped + 10) / 20 * 100)
+    if clamped >= 4:
+        state = "RISK-ON"
+        state_note = "위험 선호"
+        tone = "positive"
+    elif clamped <= -4:
+        state = "RISK-OFF"
+        state_note = "위험 회피"
+        tone = "negative"
+    else:
+        state = "MIXED"
+        state_note = "혼조"
+        tone = "neutral"
+
+    if fear_greed_score >= 65:
+        fear_greed_label = "탐욕"
+        fear_greed_tone = "positive"
+    elif fear_greed_score <= 35:
+        fear_greed_label = "공포"
+        fear_greed_tone = "negative"
+    else:
+        fear_greed_label = "중립"
+        fear_greed_tone = "neutral"
+    state_display = f"{state_note} ({state})"
+
+    return {
+        "state": state,
+        "state_note": state_note,
+        "state_display": state_display,
+        "tone": tone,
+        "score": clamped,
+        "fear_greed_score": fear_greed_score,
+        "fear_greed_label": fear_greed_label,
+        "fear_greed_tone": fear_greed_tone,
+        "qqq_vs_spy": qqq_vs_spy,
+        "iwm_vs_spy": iwm_vs_spy,
+        "sector_up": sector_up,
+        "sector_total": sector_total,
+    }
+
+
+def _build_risk_state_metric(regime):
+    regime = regime or {}
+    return {
+        "label": "리스크",
+        "value": regime.get("state_note", "혼조"),
+        "delta": regime.get("state", "MIXED"),
+        "note": "위험 선호/회피",
+        "tone": regime.get("tone", "neutral"),
+    }
+
+
+def _build_fear_greed_proxy_metric(regime):
+    regime = regime or {}
+    return {
+        "label": "심리",
+        "value": f"{int(regime.get('fear_greed_score', 50))}/100",
+        "delta": regime.get("fear_greed_label", "중립"),
+        "note": "공포·탐욕 프록시",
+        "tone": regime.get("fear_greed_tone", "neutral"),
+    }
+
+
+def _describe_market_structure(benchmarks, macro, sector_rows):
+    qqq_vs_spy = _relative_change(benchmarks.get("QQQ", {}), benchmarks.get("SPY", {}))
+    iwm_vs_spy = _relative_change(benchmarks.get("IWM", {}), benchmarks.get("SPY", {}))
+    vix_change = benchmarks.get("VIX", {}).get("change_pct")
+    dxy_change = macro.get("DXY", {}).get("change_pct")
+    gold_change = macro.get("Gold", {}).get("change_pct")
+    tnx_snapshot = macro.get("10Y", {})
+    tnx_bps = ((tnx_snapshot.get("price") or 0) - (tnx_snapshot.get("prev_close") or 0)) * 10 if tnx_snapshot else None
+    sector_up = sum(1 for row in sector_rows if (row.get("change_pct") or 0) > 0)
+    sector_total = len(sector_rows) or 11
+    breadth_ratio = sector_up / sector_total if sector_total else 0.5
+    strongest_sector = max(sector_rows, key=lambda row: row.get("change_pct") if row.get("change_pct") is not None else -999) if sector_rows else None
+    weakest_sector = min(sector_rows, key=lambda row: row.get("change_pct") if row.get("change_pct") is not None else 999) if sector_rows else None
+
+    if qqq_vs_spy is not None and qqq_vs_spy >= 0.45 and breadth_ratio <= 0.4:
+        return {"label": "메가캡 쏠림", "note": "지수보다 일부 리더 종목 중심", "tone": "neutral"}
+    if iwm_vs_spy is not None and iwm_vs_spy >= 0.45 and breadth_ratio >= 0.6:
+        return {"label": "광범위 반등", "note": "소형주와 섹터 확산 동반", "tone": "positive"}
+    if gold_change is not None and gold_change >= 0.8 and (((vix_change or 0) >= 3) or ((dxy_change or 0) >= 0.25)):
+        return {"label": "방어형", "note": "안전자산 선호 우위", "tone": "negative"}
+    if tnx_bps is not None and tnx_bps >= 4 and weakest_sector and weakest_sector.get("symbol") == "XLK":
+        return {"label": "금리부담형", "note": "기술주 duration 압박", "tone": "negative"}
+    if strongest_sector and strongest_sector.get("symbol") in {"XLU", "XLP", "XLV"} and breadth_ratio <= 0.5:
+        return {"label": "방어주 주도", "note": "안정성 선호 우위", "tone": "negative"}
+    if breadth_ratio <= 0.36:
+        return {"label": "확산 약세", "note": "하락 종목 우위", "tone": "negative"}
+    if breadth_ratio >= 0.64:
+        return {"label": "광범위 매수", "note": "대부분 섹터 동반 상승", "tone": "positive"}
+    return {"label": "혼조형", "note": "섹터 간 온도 차 확대", "tone": "neutral"}
+
+
 def _build_sector_sentence(sector_rows):
     if not sector_rows:
         return "섹터 데이터가 아직 동기화 중입니다."
@@ -266,11 +478,15 @@ def _build_sector_sentence(sector_rows):
     total = len(sector_rows)
     strongest = max(sector_rows, key=lambda row: row.get("change_pct") if row.get("change_pct") is not None else -999)
     weakest = min(sector_rows, key=lambda row: row.get("change_pct") if row.get("change_pct") is not None else 999)
-    return f"{total}개 섹터 중 {positive}개가 상승했습니다. {strongest['label']}이 주도했고 {weakest['label']}이 가장 약했습니다."
+    return f"{total}개 섹터 중 {positive}개가 상승했습니다. {strongest['label']}(이)가 주도했고 {weakest['label']}(이)가 가장 약했습니다."
 
 
 def _build_driver_candidates(benchmarks, macro, sector_rows):
     drivers = []
+    def add_driver(text):
+        if text and text not in drivers:
+            drivers.append(text)
+
     spy = benchmarks.get("SPY", {})
     qqq = benchmarks.get("QQQ", {})
     iwm = benchmarks.get("IWM", {})
@@ -278,9 +494,17 @@ def _build_driver_candidates(benchmarks, macro, sector_rows):
     tnx = macro.get("10Y", {})
     dxy = macro.get("DXY", {})
     fx = macro.get("USDKRW", {})
+    gold = macro.get("Gold", {})
     wti = macro.get("WTI", {})
     btc = macro.get("BTC", {})
     sector_breadth = sum(1 for row in sector_rows if (row.get("change_pct") or 0) > 0)
+    sector_count = len(sector_rows)
+    sector_total = sector_count or 11
+    breadth_ratio = sector_breadth / sector_count if sector_count else 0.5
+    qqq_vs_spy = _relative_change(qqq, spy)
+    iwm_vs_spy = _relative_change(iwm, spy)
+    strongest_sector = max(sector_rows, key=lambda row: row.get("change_pct") if row.get("change_pct") is not None else -999) if sector_rows else None
+    weakest_sector = min(sector_rows, key=lambda row: row.get("change_pct") if row.get("change_pct") is not None else 999) if sector_rows else None
 
     spy_chg = spy.get("change_pct")
     qqq_chg = qqq.get("change_pct")
@@ -289,78 +513,135 @@ def _build_driver_candidates(benchmarks, macro, sector_rows):
     tnx_bps = ((tnx.get("price") or 0) - (tnx.get("prev_close") or 0)) * 10 if tnx else None
     dxy_chg = dxy.get("change_pct")
     fx_chg = fx.get("change_pct")
+    gold_chg = gold.get("change_pct")
     wti_chg = wti.get("change_pct")
     btc_chg = btc.get("change_pct")
 
+    if vix_chg is not None and gold_chg is not None and tnx_bps is not None:
+        if vix_chg >= 5 and gold_chg >= 0.8 and tnx_bps <= -4:
+            add_driver("VIX 급등과 금 강세, 장기금리 하락이 겹치며 전형적인 위험회피 흐름이 나타났습니다.")
+
+    if iwm_vs_spy is not None and vix_chg is not None and sector_count:
+        if iwm_vs_spy >= 0.5 and breadth_ratio >= 0.6 and vix_chg <= -4:
+            add_driver("소형주와 섹터 확산도가 함께 개선되고 VIX도 낮아지며 더 넓은 위험선호 흐름이 나타났습니다.")
+
+    if qqq_vs_spy is not None and sector_count:
+        if qqq_vs_spy >= 0.45 and breadth_ratio <= 0.4:
+            add_driver("대형 기술주만 상대적으로 강해 시장 전반보다 메가캡 쏠림 성격이 두드러졌습니다.")
+
+    if wti_chg is not None and tnx_bps is not None and qqq_vs_spy is not None:
+        if wti_chg >= 1.8 and tnx_bps >= 4 and qqq_vs_spy <= -0.2:
+            add_driver("유가와 금리가 함께 오르며 인플레이션 및 밸류에이션 부담이 성장주를 눌렀습니다.")
+
+    if dxy_chg is not None and gold_chg is not None:
+        if dxy_chg >= 0.35 and gold_chg >= 0.8:
+            add_driver("달러와 금이 함께 강세를 보이며 안전자산 선호가 뚜렷했습니다.")
+
+    if dxy_chg is not None and btc_chg is not None:
+        if dxy_chg >= 0.35 and btc_chg <= -2.5:
+            add_driver("달러 강세와 비트코인 약세가 겹치며 투기적 위험선호 심리가 빠르게 식었습니다.")
+
+    if strongest_sector:
+        if strongest_sector.get("symbol") in {"XLU", "XLP", "XLV"} and breadth_ratio <= 0.5:
+            add_driver("방어 섹터가 상단을 차지하며 투자자들이 공격적 베팅보다 안정성을 우선했습니다.")
+        elif strongest_sector.get("symbol") in {"XLI", "XLY", "XLB", "XLE"} and (iwm_vs_spy or -999) >= 0.3:
+            add_driver("경기민감 섹터와 소형주가 함께 버티며 경기 기대가 일부 살아났습니다.")
+
     if qqq_chg is not None and spy_chg is not None:
         if qqq_chg < spy_chg - 0.45:
-            drivers.append("나스닥이 대형주 전체보다 더 약해 성장주 압박이 크게 나타났습니다.")
+            add_driver("나스닥이 대형주 전체보다 더 약해 성장주 압박이 크게 나타났습니다.")
         elif qqq_chg > spy_chg + 0.45:
-            drivers.append("대형 기술주가 상대 강세를 보이며 시장 주도권을 일부 되찾았습니다.")
+            add_driver("대형 기술주가 상대 강세를 보이며 시장 주도권을 일부 되찾았습니다.")
 
     if iwm_chg is not None and spy_chg is not None:
         if iwm_chg > spy_chg + 0.5:
-            drivers.append("소형주가 선방해 위험선호가 완전히 꺾이진 않았습니다.")
+            add_driver("소형주가 선방해 위험선호가 완전히 꺾이진 않았습니다.")
         elif iwm_chg < spy_chg - 0.5:
-            drivers.append("소형주 약세가 더 깊어지며 시장 전반의 위험회피 성격이 강해졌습니다.")
+            add_driver("소형주 약세가 더 깊어지며 시장 전반의 위험회피 성격이 강해졌습니다.")
 
     if vix_chg is not None:
         if vix_chg >= 5:
-            drivers.append("VIX 급등은 헤지 수요 확대와 변동성 경계 심리 강화를 보여줬습니다.")
+            add_driver("VIX 급등은 헤지 수요 확대와 변동성 경계 심리 강화를 보여줬습니다.")
         elif vix_chg <= -4:
-            drivers.append("VIX가 빠르게 낮아지며 위험 프리미엄이 다소 완화됐습니다.")
+            add_driver("VIX가 빠르게 낮아지며 위험 프리미엄이 다소 완화됐습니다.")
 
     if tnx_bps is not None:
         if tnx_bps >= 4:
-            drivers.append("10년물 금리 상승이 밸류에이션 부담을 키워 성장주에 불리하게 작용했습니다.")
+            if weakest_sector and weakest_sector.get("symbol") == "XLK":
+                add_driver("장기금리 상승과 함께 기술주가 약세 선두에 서며 duration 부담이 부각됐습니다.")
+            else:
+                add_driver("10년물 금리 상승이 밸류에이션 부담을 키워 성장주에 불리하게 작용했습니다.")
         elif tnx_bps <= -4:
-            drivers.append("장기금리 하락이 성장주에 우호적인 배경을 만들었습니다.")
+            if ((vix_chg or 0) >= 3) or ((dxy_chg or 0) >= 0.25) or ((gold_chg or 0) >= 0.6):
+                add_driver("장기금리 하락은 안전자산 선호 강화와 함께 나타나며 위험회피 흐름을 뒷받침했습니다.")
+            else:
+                add_driver("장기금리 하락이 성장주에 우호적인 배경을 만들었습니다.")
 
     if dxy_chg is not None:
         if dxy_chg >= 0.35:
-            drivers.append("달러 강세가 위험자산 전반에 부담으로 작용했습니다.")
+            add_driver("달러 강세가 위험자산 전반에 부담으로 작용했습니다.")
         elif dxy_chg <= -0.35:
-            drivers.append("달러 압력이 완화되며 위험자산이 숨을 돌렸습니다.")
+            add_driver("달러 압력이 완화되며 위험자산이 숨을 돌렸습니다.")
 
     if fx_chg is not None:
         if fx_chg >= 0.45:
-            drivers.append("원/달러 환율 상승은 대외 불안과 달러 선호 심리를 반영했습니다.")
+            add_driver("원/달러 환율 상승은 대외 불안과 달러 선호 심리를 반영했습니다.")
         elif fx_chg <= -0.45:
-            drivers.append("원/달러 환율 안정은 위험심리 완화에 우호적으로 작용했습니다.")
+            add_driver("원/달러 환율 안정은 위험심리 완화에 우호적으로 작용했습니다.")
+
+    if gold_chg is not None:
+        if gold_chg >= 0.9:
+            add_driver("금 강세는 방어 자산 선호가 남아 있음을 보여줬습니다.")
+        elif gold_chg <= -0.9:
+            add_driver("금 약세는 방어 수요가 일부 완화됐음을 시사했습니다.")
 
     if wti_chg is not None and abs(wti_chg) >= 1.8:
         if wti_chg > 0:
-            drivers.append("유가 강세가 인플레이션 우려를 다시 자극했습니다.")
+            add_driver("유가 강세가 인플레이션 우려를 다시 자극했습니다.")
         else:
-            drivers.append("유가 약세가 물가 부담 완화 기대를 키웠습니다.")
+            add_driver("유가 약세가 물가 부담 완화 기대를 키웠습니다.")
 
     if btc_chg is not None and abs(btc_chg) >= 2.5:
         if btc_chg > 0:
-            drivers.append("비트코인 강세는 투기적 위험선호가 완전히 꺾이지 않았음을 시사했습니다.")
+            add_driver("비트코인 강세는 투기적 위험선호가 완전히 꺾이지 않았음을 시사했습니다.")
         else:
-            drivers.append("비트코인 약세는 고베타 자산 전반의 심리 둔화와 맞물렸습니다.")
+            add_driver("비트코인 약세는 고베타 자산 전반의 심리 둔화와 맞물렸습니다.")
 
     if sector_rows:
         if sector_breadth <= 3:
-            drivers.append(f"상승 섹터가 {sector_breadth}/{len(sector_rows)}개에 그쳐 시장 확산도가 약했습니다.")
+            add_driver(f"상승 섹터가 {sector_breadth}/{sector_total}개에 그쳐 시장 확산도가 약했습니다.")
         elif sector_breadth >= len(sector_rows) - 2:
-            drivers.append(f"{sector_breadth}/{len(sector_rows)}개 섹터가 동반 상승해 광범위한 매수 흐름이 나타났습니다.")
+            add_driver(f"{sector_breadth}/{sector_total}개 섹터가 동반 상승해 광범위한 매수 흐름이 나타났습니다.")
 
-    return drivers[:4]
+    return drivers[:6]
 
 
-def _fallback_market_headline(benchmarks, sector_rows):
+def _fallback_market_headline(benchmarks, macro, sector_rows):
     spy = benchmarks.get("SPY", {}).get("change_pct")
     qqq = benchmarks.get("QQQ", {}).get("change_pct")
     dia = benchmarks.get("DIA", {}).get("change_pct")
     iwm = benchmarks.get("IWM", {}).get("change_pct")
     vix = benchmarks.get("VIX", {}).get("change_pct")
+    qqq_vs_spy = _relative_change(benchmarks.get("QQQ", {}), benchmarks.get("SPY", {}))
+    iwm_vs_spy = _relative_change(benchmarks.get("IWM", {}), benchmarks.get("SPY", {}))
+    gold_chg = macro.get("Gold", {}).get("change_pct")
+    tnx_snapshot = macro.get("10Y", {})
+    tnx_bps = ((tnx_snapshot.get("price") or 0) - (tnx_snapshot.get("prev_close") or 0)) * 10 if tnx_snapshot else None
     breadth = sum(1 for row in sector_rows if (row.get("change_pct") or 0) > 0)
     total = len(sector_rows) or 11
+    weakest_sector = min(sector_rows, key=lambda row: row.get("change_pct") if row.get("change_pct") is not None else 999) if sector_rows else None
     if spy is None:
         return "미국장 데이터가 아직 로딩 중입니다."
     values = [value for value in [spy, qqq, dia, iwm] if value is not None]
     avg = sum(values) / max(1, len(values))
+    if gold_chg is not None and gold_chg >= 0.8 and (vix or 0) >= 3 and breadth <= max(3, total // 3):
+        return "안전자산 선호가 강화되며 방어 심리가 짙어진 장이었습니다."
+    if iwm_vs_spy is not None and iwm_vs_spy >= 0.45 and breadth >= max(7, int(total * 0.6)):
+        return "소형주와 섹터 확산이 동반된 건강한 반등 장이었습니다."
+    if qqq_vs_spy is not None and qqq_vs_spy >= 0.45 and breadth <= max(4, total // 3):
+        return "지수는 버텼지만 메가캡 중심 쏠림이 강한 장이었습니다."
+    if tnx_bps is not None and tnx_bps >= 4 and weakest_sector and weakest_sector.get("symbol") == "XLK":
+        return "인플레이션과 금리 부담이 기술주를 눌렀던 장이었습니다."
     if avg <= -0.8 and (vix or 0) > 3:
         return "변동성 확대와 함께 위험회피가 지배한 장이었습니다."
     if avg >= 0.8 and breadth >= max(7, total - 3):
@@ -377,28 +658,59 @@ def _fallback_market_headline(benchmarks, sector_rows):
 def _fallback_market_insight(benchmarks, macro, sector_rows):
     spy = benchmarks.get("SPY", {}).get("change_pct")
     qqq = benchmarks.get("QQQ", {}).get("change_pct")
+    iwm = benchmarks.get("IWM", {}).get("change_pct")
     vix = benchmarks.get("VIX", {}).get("change_pct")
     tnx_bps = ((macro.get("10Y", {}).get("price") or 0) - (macro.get("10Y", {}).get("prev_close") or 0)) * 10 if macro.get("10Y") else 0
+    dxy_chg = macro.get("DXY", {}).get("change_pct")
+    gold_chg = macro.get("Gold", {}).get("change_pct")
+    btc_chg = macro.get("BTC", {}).get("change_pct")
     breadth = sum(1 for row in sector_rows if (row.get("change_pct") or 0) > 0)
     total = len(sector_rows) or 11
+    qqq_vs_spy = _relative_change(benchmarks.get("QQQ", {}), benchmarks.get("SPY", {}))
+    iwm_vs_spy = _relative_change(benchmarks.get("IWM", {}), benchmarks.get("SPY", {}))
+    strongest_sector = max(sector_rows, key=lambda row: row.get("change_pct") if row.get("change_pct") is not None else -999) if sector_rows else None
     if spy is None:
         return {
             "insight": "핵심 입력값이 아직 동기화 중이라 오늘 인사이트는 데이터가 안정되면 다시 갱신됩니다.",
-            "watchlist": ["SPY와 QQQ 종가 확인", "VIX와 10년물 재확인", "섹터 확산도 업데이트 대기"],
+            "watchlist": ["QQQ와 SPY 상대강도 확인", "IWM과 SPY 상대강도 확인", "Gold/BTC 방어 심리 확인"],
         }
-    if (vix or 0) > 4 and tnx_bps > 0:
+    if tnx_bps <= -4 and (gold_chg or 0) >= 0.8 and (vix or 0) >= 3:
+        insight = "금리 하락을 바로 호재로 보기보다 안전자산 선호가 주도한 흐름인지 구분하는 대응이 중요합니다."
+    elif qqq_vs_spy is not None and qqq_vs_spy >= 0.45 and breadth <= max(4, total // 3):
+        insight = "지수 반등처럼 보여도 메가캡 쏠림일 수 있어 확산 확인 전 추격은 신중할 필요가 있습니다."
+    elif iwm_vs_spy is not None and iwm_vs_spy >= 0.35 and breadth >= max(total // 2, 6):
+        insight = "소형주와 확산도가 함께 살아날수록 메가캡 편중보다 시장 전반 회복 신호의 신뢰도가 높아집니다."
+    elif (dxy_chg or 0) >= 0.35 and (btc_chg or 0) <= -2.5:
+        insight = "달러 강세와 고베타 자산 약세가 겹칠 때는 위험자산 회복을 서두르지 않는 편이 좋습니다."
+    elif strongest_sector and strongest_sector.get("symbol") in {"XLU", "XLP", "XLV"} and breadth <= max(total // 2, 5):
+        insight = "방어 섹터 주도가 이어질수록 공격적 추격보다 포지션 방어와 선별 대응이 유효합니다."
+    elif (vix or 0) > 4 and tnx_bps > 0:
         insight = "금리와 변동성이 함께 오를 때는 반등 추격보다 확인 후 대응이 더 중요합니다."
     elif (qqq or 0) > (spy or 0) and breadth >= total // 2:
         insight = "기술주 주도력이 이어질수록 지수보다 리더 종목 추적이 더 중요합니다."
+    elif iwm is not None and spy is not None and iwm > spy and breadth >= total // 2:
+        insight = "소형주가 받쳐줄수록 메가캡 편중보다 시장 전반 회복 가능성을 더 높게 볼 수 있습니다."
+    elif gold_chg is not None and btc_chg is not None and gold_chg > 0.8 and btc_chg < 0:
+        insight = "금 강세와 비트코인 약세가 함께 나타날 때는 방어 심리가 쉽게 꺾이지 않을 수 있습니다."
     elif breadth <= 3:
         insight = "시장 약세가 넓게 퍼질수록 신규 추격보다 방어와 현금 관리가 우선입니다."
     else:
         insight = "한 방향 베팅보다 섹터 상대강도와 금리 민감도를 함께 보는 대응이 유효합니다."
-    watchlist = [
-        "QQQ가 SPY 대비 상대강도를 회복하는지 확인",
-        f"섹터 확산도({breadth}/{total})가 개선되는지 확인",
-        "VIX와 10년물이 함께 진정되는지 확인",
-    ]
+    watchlist = []
+    if qqq_vs_spy is not None and qqq_vs_spy >= 0.45 and breadth <= max(4, total // 3):
+        watchlist.append("메가캡 쏠림이 시장 전반 확산으로 번지는지 확인")
+    else:
+        watchlist.append("QQQ가 SPY 대비 상대강도를 회복하는지 확인")
+    if iwm_vs_spy is not None and iwm_vs_spy >= 0.35:
+        watchlist.append("IWM 상대강도가 하루 반짝이 아닌지 확인")
+    else:
+        watchlist.append("IWM이 SPY 대비 상대강도를 회복하는지 확인")
+    if tnx_bps <= -4 and (((gold_chg or 0) >= 0.8) or ((vix or 0) >= 3)):
+        watchlist.append("10Y·Gold·VIX 조합이 위험회피 완화로 이어지는지 확인")
+    elif (dxy_chg or 0) >= 0.35 and (btc_chg or 0) <= -2.5:
+        watchlist.append("달러 강세와 비트코인 약세가 진정되는지 확인")
+    else:
+        watchlist.append("Gold/BTC와 VIX로 방어 심리 지속 여부 확인")
     return {"insight": insight, "watchlist": watchlist}
 
 
@@ -517,7 +829,7 @@ def build_us_market_daily_payload():
         benchmark_snapshots[label] = _build_snapshot(_extract_symbol_frame(benchmark_history, symbol))
 
     macro_snapshots = {}
-    macro_labels = {"^TNX": "10Y", "DX-Y.NYB": "DXY", "KRW=X": "USDKRW", "CL=F": "WTI", "BTC-USD": "BTC"}
+    macro_labels = {"^TNX": "10Y", "DX-Y.NYB": "DXY", "KRW=X": "USDKRW", "GLD": "Gold", "CL=F": "WTI", "BTC-USD": "BTC"}
     for symbol, _ in _US_MARKET_MACRO:
         macro_snapshots[macro_labels[symbol]] = _build_snapshot(_extract_symbol_frame(benchmark_history, symbol))
 
@@ -547,6 +859,10 @@ def build_us_market_daily_payload():
 
     driver_candidates = _build_driver_candidates(benchmark_snapshots, macro_snapshots, sector_sorted)
     fallback_insight = _fallback_market_insight(benchmark_snapshots, macro_snapshots, sector_sorted)
+    market_regime = _build_market_regime(benchmark_snapshots, macro_snapshots, sector_sorted)
+    market_structure = _describe_market_structure(benchmark_snapshots, macro_snapshots, sector_sorted)
+    qqq_vs_spy = market_regime.get("qqq_vs_spy")
+    iwm_vs_spy = market_regime.get("iwm_vs_spy")
 
     summary_payload = {
         "market_date": market_date_key,
@@ -555,8 +871,13 @@ def build_us_market_daily_payload():
             "10Y_bps": ((macro_snapshots.get("10Y", {}).get("price") or 0) - (macro_snapshots.get("10Y", {}).get("prev_close") or 0)) * 10,
             "DXY_pct": macro_snapshots.get("DXY", {}).get("change_pct"),
             "USDKRW_pct": macro_snapshots.get("USDKRW", {}).get("change_pct"),
+            "Gold_pct": macro_snapshots.get("Gold", {}).get("change_pct"),
             "WTI_pct": macro_snapshots.get("WTI", {}).get("change_pct"),
             "BTC_pct": macro_snapshots.get("BTC", {}).get("change_pct"),
+        },
+        "relative_strength": {
+            "QQQ_vs_SPY": qqq_vs_spy,
+            "IWM_vs_SPY": iwm_vs_spy,
         },
         "sector_top": [f"{row['symbol']} {row['change_pct']:+.2f}%" for row in sector_sorted[:3] if row.get("change_pct") is not None],
         "sector_bottom": [f"{row['symbol']} {row['change_pct']:+.2f}%" for row in sector_sorted[-3:] if row.get("change_pct") is not None],
@@ -566,10 +887,18 @@ def build_us_market_daily_payload():
             "up": sum(1 for row in sector_sorted if (row.get("change_pct") or 0) > 0),
             "total": len(sector_sorted),
         },
+        "risk_proxy": {
+            "state": market_regime.get("state"),
+            "state_note": market_regime.get("state_note"),
+            "score": market_regime.get("score"),
+            "fear_greed_score": market_regime.get("fear_greed_score"),
+            "fear_greed_label": market_regime.get("fear_greed_label"),
+        },
+        "market_structure": market_structure.get("label"),
     }
     ai_copy = _generate_us_market_ai_copy(market_date_key, json.dumps(summary_payload, ensure_ascii=False))
 
-    headline = ai_copy.get("headline") or _fallback_market_headline(benchmark_snapshots, sector_sorted)
+    headline = ai_copy.get("headline") or _fallback_market_headline(benchmark_snapshots, macro_snapshots, sector_sorted)
     drivers = ai_copy.get("drivers") or driver_candidates or ["시장 방향성은 유지됐지만 거시 변수의 압박도 여전히 크게 작용했습니다."]
     insight = ai_copy.get("insight") or fallback_insight["insight"]
     watchlist = ai_copy.get("watchlist") or fallback_insight["watchlist"]
@@ -588,28 +917,35 @@ def build_us_market_daily_payload():
         _build_snapshot_metric("10Y", "미 국채 10년", macro_snapshots.get("10Y", {}), inverse=True),
         _build_snapshot_metric("DXY", "달러 인덱스", macro_snapshots.get("DXY", {}), inverse=True),
         _build_snapshot_metric("USD/KRW", "원/달러 환율", macro_snapshots.get("USDKRW", {}), inverse=True),
+        _build_snapshot_metric("Gold", "금 ETF", macro_snapshots.get("Gold", {}), inverse=True),
         _build_snapshot_metric("WTI", "국제유가", macro_snapshots.get("WTI", {})),
         _build_snapshot_metric("BTC", "위험선호 프록시", macro_snapshots.get("BTC", {})),
     ]
+    macro_metric_map = {metric["label"]: metric for metric in macro_metrics}
+    qqq_vs_spy_metric = _build_relative_strength_metric("QQQ-SPY", "기술주 상대강도", qqq_vs_spy)
+    iwm_vs_spy_metric = _build_relative_strength_metric("IWM-SPY", "소형주 상대강도", iwm_vs_spy)
     market_driver_metrics = [
-        macro_metrics[1],
-        macro_metrics[2],
-        macro_metrics[0],
-        macro_metrics[3],
-        macro_metrics[4],
+        macro_metric_map["DXY"],
+        macro_metric_map["USD/KRW"],
+        macro_metric_map["10Y"],
+        macro_metric_map["Gold"],
+        macro_metric_map["WTI"],
+        macro_metric_map["BTC"],
     ]
     sector_metrics = [_build_snapshot_metric(row["symbol"], row["label"], row["snapshot"]) for row in (sector_sorted[:3] + list(reversed(sector_sorted[-3:])))]
     mover_metrics = [_build_snapshot_metric(row["symbol"], _mover_reason(row["snapshot"]), row["snapshot"]) for row in gainers + losers]
     insight_metrics = [
+        _build_risk_state_metric(market_regime),
+        _build_fear_greed_proxy_metric(market_regime),
+        qqq_vs_spy_metric,
+        iwm_vs_spy_metric,
+        _build_snapshot_metric("Gold", "금 ETF", macro_snapshots.get("Gold", {}), inverse=True),
         {"label": "확산도", "value": f"{sector_breadth}/{sector_total}", "delta": "상승 섹터", "note": "섹터 전반 흐름", "tone": "positive" if sector_breadth >= sector_total / 2 else "negative"},
-        _build_snapshot_metric("VIX", "변동성", benchmark_snapshots.get("VIX", {}), inverse=True),
-        _build_snapshot_metric("10Y", "미 국채 10년", macro_snapshots.get("10Y", {}), inverse=True),
-        _build_snapshot_metric("USD/KRW", "원/달러 환율", macro_snapshots.get("USDKRW", {}), inverse=True),
     ]
     market_driver_bullets = [
         _build_market_bullet(
-            f"달러/환율 체크: DXY {macro_metrics[1]['delta'] or 'N/A'} / USD/KRW {macro_metrics[2]['delta'] or 'N/A'}",
-            _resolve_market_tone(macro_metrics[1]["tone"], macro_metrics[2]["tone"]),
+            f"달러/방어 체크: DXY {macro_metric_map['DXY']['delta'] or 'N/A'} / USD/KRW {macro_metric_map['USD/KRW']['delta'] or 'N/A'} / Gold {macro_metric_map['Gold']['delta'] or 'N/A'}",
+            _resolve_market_tone(macro_metric_map["DXY"]["tone"], macro_metric_map["USD/KRW"]["tone"], macro_metric_map["Gold"]["tone"]),
         )
     ] + [_build_market_bullet(text, _infer_market_text_tone(text)) for text in drivers[:2]]
 
@@ -621,38 +957,35 @@ def build_us_market_daily_payload():
             "metrics": main_metrics,
             "bullets": [
                 _build_market_bullet(
-                    f"거시 점검: 10Y {macro_metrics[0]['value']} ({macro_metrics[0]['delta'] or 'N/A'}) / DXY {macro_metrics[1]['delta'] or 'N/A'}",
-                    _resolve_market_tone(macro_metrics[0]["tone"], macro_metrics[1]["tone"]),
+                    f"시장 상태: {market_regime['state_display']} · 구조: {market_structure['label']} · 심리 {market_regime['fear_greed_score']}/100({market_regime['fear_greed_label']})",
+                    _resolve_market_tone(market_regime["tone"], market_structure["tone"]),
                 ),
                 _build_market_bullet(
-                    f"환율/원자재: USD/KRW {macro_metrics[2]['delta'] or 'N/A'} / WTI {macro_metrics[3]['delta'] or 'N/A'}",
-                    _resolve_market_tone(macro_metrics[2]["tone"], macro_metrics[3]["tone"]),
+                    f"리더십/확산: QQQ-SPY {_format_pct_point(qqq_vs_spy)} / IWM-SPY {_format_pct_point(iwm_vs_spy)} / 섹터 확산도 {sector_breadth}/{sector_total}",
+                    _resolve_market_tone(qqq_vs_spy_metric["tone"], iwm_vs_spy_metric["tone"], "positive" if sector_breadth >= sector_total / 2 else "negative"),
                 ),
                 _build_market_bullet(
-                    f"리스크 자산: BTC {macro_metrics[4]['delta'] or 'N/A'} / 섹터 확산도 {sector_breadth}/{sector_total}",
-                    _resolve_market_tone(
-                        macro_metrics[4]["tone"],
-                        "positive" if sector_breadth >= sector_total / 2 else "negative",
-                    ),
+                    f"방어/거시: 10Y {macro_metric_map['10Y']['value']} ({macro_metric_map['10Y']['delta'] or 'N/A'}) / DXY {macro_metric_map['DXY']['delta'] or 'N/A'} / Gold {macro_metric_map['Gold']['delta'] or 'N/A'}",
+                    _resolve_market_tone(macro_metric_map["10Y"]["tone"], macro_metric_map["DXY"]["tone"], macro_metric_map["Gold"]["tone"]),
                 ),
             ],
             "tone": _tone_from_change(benchmark_snapshots.get("SPY", {}).get("change_pct")),
-            "chart_hint": "SPY / QQQ / DIA / IWM / VIX",
+            "chart_hint": "SPY / QQQ / DIA / IWM / VIX / 리스크",
             "duration_ms": _US_MARKET_DEFAULT_DURATION,
         },
         {
             "id": "market_drivers",
             "title": "움직인 이유",
-            "subtitle": "금리, 달러, 환율, 유가, 비트코인 흐름이 시장 강약을 설명합니다.",
+            "subtitle": "금리, 달러, 환율, 금, 유가, 비트코인 흐름이 시장 강약을 설명합니다.",
             "metrics": market_driver_metrics,
             "bullets": market_driver_bullets,
             "tone": _tone_from_change(benchmark_snapshots.get("SPY", {}).get("change_pct")),
-            "chart_hint": "10Y / DXY / USD/KRW / WTI / BTC",
+            "chart_hint": "10Y / DXY / USD/KRW / Gold / WTI / BTC",
             "duration_ms": _US_MARKET_TEXT_HEAVY_DURATION,
         },
         {
             "id": "sector_pressure",
-            "title": "섹터 온도",
+            "title": "주요 섹터",
             "subtitle": _build_sector_sentence(sector_sorted),
             "metrics": sector_metrics,
             "bullets": [_build_market_bullet(f"강세 상위: {row['symbol']} {row['change_pct']:+.2f}% / {row['label']}", "positive") for row in sector_sorted[:3]] + [_build_market_bullet(f"약세 상위: {row['symbol']} {row['change_pct']:+.2f}% / {row['label']}", "negative") for row in list(reversed(sector_sorted[-3:]))],
@@ -677,7 +1010,7 @@ def build_us_market_daily_payload():
             "metrics": insight_metrics,
             "bullets": [_build_market_bullet(text, _infer_market_text_tone(text)) for text in watchlist[:3]],
             "tone": _tone_from_change(benchmark_snapshots.get("QQQ", {}).get("change_pct")),
-            "chart_hint": "다음 세션 체크리스트",
+            "chart_hint": "리스크 상태 / 공포·탐욕 / 상대강도",
             "duration_ms": _US_MARKET_TEXT_HEAVY_DURATION,
         },
     ]
@@ -760,7 +1093,7 @@ def _build_us_market_daily_doc(payload):
               --tone-bullet-fill: linear-gradient(180deg, rgba(148,163,184,.92), rgba(100,116,139,.82));
               --tone-bullet-shadow: rgba(148,163,184,.10);
             }
-            .head { display: flex; justify-content: space-between; gap: 12px; padding: 18px 14px 8px; }
+            .head { display: flex; justify-content: space-between; gap: 12px; padding: 16px 14px 8px; }
             .kicker { display: inline-flex; align-items: center; min-height: 30px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--tone-kicker-border); background: var(--tone-kicker-bg); color: var(--tone-kicker-copy); font-size: .72rem; font-weight: 900; transition: border-color .28s ease, background .28s ease, color .28s ease; }
             .date { color: var(--muted); font-size: .76rem; font-weight: 700; text-align: right; }
             .body {
@@ -837,20 +1170,50 @@ def _build_us_market_daily_doc(payload):
             .foot {
               position: relative;
               z-index: 3;
+              display: grid;
+              grid-template-columns: auto minmax(0, 1fr) auto;
+              align-items: center;
+              gap: 10px;
+              margin-top: 2px;
+              padding: 10px 14px 12px;
+              background: linear-gradient(180deg, rgba(10,15,28,0), rgba(10,15,28,.94) 34%);
+            }
+            .status {
+              min-width: 0;
+              display: grid;
+              justify-items: center;
+              align-content: center;
+              gap: 7px;
+              padding: 0 8px;
+            }
+            .btn {
+              position: relative;
+              z-index: 4;
+              min-width: 62px;
+              height: 36px;
+              padding: 0 14px;
+              border-radius: 999px;
+              border: 1px solid rgba(148,163,184,.14);
+              background: rgba(255,255,255,.04);
+              color: var(--strong);
+              font-size: .78rem;
+              font-weight: 900;
+              cursor: pointer;
+              transition: border-color .28s ease, background .28s ease;
+            }
+            .btn--prev { justify-self: start; }
+            .btn--next { justify-self: end; }
+            .dots {
               display: flex;
               align-items: center;
-              justify-content: space-between;
-              gap: 12px;
-              margin-top: 2px;
-              padding: 12px 14px 14px;
-              background: linear-gradient(180deg, rgba(10,15,28,0), rgba(10,15,28,.94) 30%);
+              justify-content: center;
+              gap: 8px;
+              flex-wrap: wrap;
+              width: 100%;
             }
-            .nav { display: inline-flex; align-items: center; gap: 8px; }
-            .btn { position: relative; z-index: 4; min-width: 44px; height: 38px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(148,163,184,.14); background: rgba(255,255,255,.04); color: var(--strong); font-size: .78rem; font-weight: 900; cursor: pointer; transition: border-color .28s ease, background .28s ease; }
-            .dots { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
             .dot { width: 11px; height: 11px; border: 0; border-radius: 999px; background: rgba(148,163,184,.32); cursor: pointer; }
             .dot.active { width: 24px; background: var(--tone-progress); }
-            .index { color: var(--muted); font-size: .76rem; font-weight: 800; }
+            .index { color: var(--muted); font-size: .76rem; font-weight: 800; text-align: center; white-space: nowrap; }
             @media (max-width: 980px) {
               .head { flex-direction: column; align-items: flex-start; }
               .date { text-align: left; }
@@ -883,13 +1246,34 @@ def _build_us_market_daily_doc(payload):
                 grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
                 flex: 0 0 auto;
               }
-              .foot { flex-direction: column; align-items: stretch; }
-              .nav { justify-content: space-between; }
+              .foot {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                grid-template-areas:
+                  "status status"
+                  "prev next";
+                align-items: stretch;
+              }
+              .status {
+                grid-area: status;
+                padding: 0;
+              }
+              .btn {
+                width: 100%;
+              }
+              .btn--prev {
+                grid-area: prev;
+              }
+              .btn--next {
+                grid-area: next;
+              }
             }
             @media (max-width: 560px) {
               .deck { padding: 8px; border-radius: 18px; }
               .head { padding: 16px 12px 8px; }
               .foot { padding: 10px 12px 12px; }
+              .dots { gap: 7px; }
+              .dot { width: 10px; height: 10px; }
+              .dot.active { width: 22px; }
               .metrics { grid-template-columns: 1fr; }
             }
           </style>
@@ -910,8 +1294,9 @@ def _build_us_market_daily_doc(payload):
               </div>
             </div>
             <div class="foot">
-              <div class="nav"><button class="btn" id="prevBtn" type="button">이전</button><div class="dots" id="deckDots"></div><button class="btn" id="nextBtn" type="button">다음</button></div>
-              <div class="index" id="deckIndex"></div>
+              <button class="btn btn--prev" id="prevBtn" type="button">이전</button>
+              <div class="status"><div class="dots" id="deckDots"></div><div class="index" id="deckIndex"></div></div>
+              <button class="btn btn--next" id="nextBtn" type="button">다음</button>
             </div>
           </div>
           <script>
@@ -1050,7 +1435,6 @@ def _render_us_market_daily_deck(payload):
         height=_US_MARKET_DECK_HEIGHT,
         scrolling=False,
     )
-
 
 def render_market_home_dashboard():
     payload = build_us_market_daily_payload()

@@ -93,6 +93,94 @@ h1,h2,h3,h4,h5,h6{{
 header{{
   background:transparent!important;
 }}
+/* Sidebar toggle / collapsed control */
+div[data-testid="collapsedControl"],
+div[data-testid="stSidebarCollapsedControl"],
+section[data-testid="stSidebar"] div[data-testid="stSidebarCollapseButton"]{{
+  z-index:999990!important;
+}}
+div[data-testid="collapsedControl"] button,
+div[data-testid="stSidebarCollapsedControl"] button,
+section[data-testid="stSidebar"] div[data-testid="stSidebarCollapseButton"] button,
+section[data-testid="stSidebar"] button[kind="header"],
+section[data-testid="stSidebar"] button[kind="headerNoPadding"],
+section[data-testid="stSidebar"] button[data-testid="baseButton-header"],
+section[data-testid="stSidebar"] button[data-testid="baseButton-headerNoPadding"],
+header button[kind="header"],
+header button[kind="headerNoPadding"],
+header button[data-testid="baseButton-header"],
+header button[data-testid="baseButton-headerNoPadding"],
+button[aria-label="Open sidebar"],
+button[aria-label="Close sidebar"],
+button[aria-label="open sidebar"],
+button[aria-label="close sidebar"]{{
+  min-width:44px!important;
+  width:44px!important;
+  height:44px!important;
+  border-radius:14px!important;
+  border:1px solid rgba(142,164,255,.34)!important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,0) 34%),
+    linear-gradient(180deg, rgba(24,33,52,.98), rgba(13,20,36,.96))!important;
+  box-shadow:
+    0 14px 28px rgba(2,6,23,.24)!important,
+    inset 0 1px 0 rgba(255,255,255,.08)!important;
+  color:var(--sigl-text-strong)!important;
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+  opacity:1!important;
+  transition:
+    transform .18s ease,
+    border-color .18s ease,
+    box-shadow .18s ease,
+    background .18s ease!important;
+}}
+div[data-testid="collapsedControl"] button:hover,
+div[data-testid="stSidebarCollapsedControl"] button:hover,
+section[data-testid="stSidebar"] div[data-testid="stSidebarCollapseButton"] button:hover,
+section[data-testid="stSidebar"] button[kind="header"]:hover,
+section[data-testid="stSidebar"] button[kind="headerNoPadding"]:hover,
+section[data-testid="stSidebar"] button[data-testid="baseButton-header"]:hover,
+section[data-testid="stSidebar"] button[data-testid="baseButton-headerNoPadding"]:hover,
+header button[kind="header"]:hover,
+header button[kind="headerNoPadding"]:hover,
+header button[data-testid="baseButton-header"]:hover,
+header button[data-testid="baseButton-headerNoPadding"]:hover,
+button[aria-label="Open sidebar"]:hover,
+button[aria-label="Close sidebar"]:hover,
+button[aria-label="open sidebar"]:hover,
+button[aria-label="close sidebar"]:hover{{
+  transform:translateY(-1px)!important;
+  border-color:rgba(166,183,255,.46)!important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,0) 34%),
+    linear-gradient(135deg, rgba(124,147,255,.30), rgba(93,123,255,.14))!important;
+  box-shadow:
+    0 18px 34px rgba(93,123,255,.22)!important,
+    inset 0 1px 0 rgba(255,255,255,.10)!important;
+}}
+div[data-testid="collapsedControl"] button svg,
+div[data-testid="stSidebarCollapsedControl"] button svg,
+section[data-testid="stSidebar"] div[data-testid="stSidebarCollapseButton"] button svg,
+section[data-testid="stSidebar"] button[kind="header"] svg,
+section[data-testid="stSidebar"] button[kind="headerNoPadding"] svg,
+section[data-testid="stSidebar"] button[data-testid="baseButton-header"] svg,
+section[data-testid="stSidebar"] button[data-testid="baseButton-headerNoPadding"] svg,
+header button[kind="header"] svg,
+header button[kind="headerNoPadding"] svg,
+header button[data-testid="baseButton-header"] svg,
+header button[data-testid="baseButton-headerNoPadding"] svg,
+button[aria-label="Open sidebar"] svg,
+button[aria-label="Close sidebar"] svg,
+button[aria-label="open sidebar"] svg,
+button[aria-label="close sidebar"] svg{{
+  width:20px!important;
+  height:20px!important;
+  fill:var(--sigl-text-strong)!important;
+  color:var(--sigl-text-strong)!important;
+  stroke:var(--sigl-text-strong)!important;
+  opacity:1!important;
+}}
 section[data-testid="stSidebar"]{{
   --sigl-sidebar-control-h:46px;
   --sigl-sidebar-control-radius:15px;
@@ -178,9 +266,13 @@ section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.sigl-si
   position:relative!important;
   min-height:var(--sigl-sidebar-control-h)!important;
   border-radius:calc(var(--sigl-sidebar-control-radius) - 1px)!important;
-  border:1px solid rgba(148,163,184,.12)!important;
-  background:linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.015))!important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.03)!important;
+  border:1px solid rgba(148,163,184,.18)!important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.015) 28%),
+    linear-gradient(180deg, rgba(22,31,48,.96), rgba(13,20,36,.94))!important;
+  box-shadow:
+    0 10px 20px rgba(2,6,23,.16)!important,
+    inset 0 1px 0 rgba(255,255,255,.04)!important;
   overflow:hidden!important;
   justify-content:center!important;
   transition:
@@ -218,23 +310,30 @@ section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.sigl-si
 section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.sigl-sidebar-choice-anchor) div.stButton>button span,
 section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.sigl-sidebar-choice-anchor) div.stButton>button p,
 section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.sigl-sidebar-choice-anchor) div.stButton>button div{{
-  color:var(--sigl-text)!important;
+  color:var(--sigl-text-strong)!important;
   font-size:.84rem!important;
   font-weight:800!important;
+  text-shadow:0 1px 0 rgba(2,6,23,.16)!important;
 }}
 section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.sigl-sidebar-choice-anchor) div.stButton>button:hover{{
   transform:translateY(-1px)!important;
-  border-color:rgba(142,164,255,.22)!important;
-  background:linear-gradient(180deg, rgba(142,164,255,.10), rgba(142,164,255,.04))!important;
-  box-shadow:0 10px 20px rgba(2,6,23,.16)!important;
+  border-color:rgba(142,164,255,.30)!important;
+  background:
+    linear-gradient(180deg, rgba(142,164,255,.16), rgba(142,164,255,.05) 34%),
+    linear-gradient(180deg, rgba(24,33,52,.98), rgba(15,23,42,.94))!important;
+  box-shadow:
+    0 14px 26px rgba(2,6,23,.22)!important,
+    inset 0 1px 0 rgba(255,255,255,.05)!important;
 }}
 section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.sigl-sidebar-choice-anchor) div.stButton>button[kind="primary"]{{
   transform:translateY(-1px)!important;
-  border-color:rgba(142,164,255,.34)!important;
-  background:linear-gradient(180deg, rgba(142,164,255,.18), rgba(93,123,255,.08))!important;
+  border-color:rgba(142,164,255,.42)!important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,0) 34%),
+    linear-gradient(135deg, rgba(124,147,255,.34), rgba(93,123,255,.14))!important;
   box-shadow:
-    0 10px 22px rgba(93,123,255,.18)!important,
-    inset 0 0 0 1px rgba(142,164,255,.14)!important;
+    0 14px 28px rgba(93,123,255,.24)!important,
+    inset 0 0 0 1px rgba(142,164,255,.18)!important;
 }}
 section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.sigl-sidebar-choice-anchor) div.stButton>button[kind="primary"]::before{{
   background:var(--sigl-success)!important;
@@ -870,6 +969,13 @@ section[data-testid="stSidebar"] div[data-testid="stDownloadButton"] button{{
   border-radius:var(--sigl-sidebar-control-radius)!important;
   padding:.78rem .95rem!important;
   justify-content:center!important;
+  border:1px solid rgba(148,163,184,.24)!important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.015) 28%),
+    linear-gradient(180deg, rgba(22,31,48,.98), rgba(13,20,36,.95))!important;
+  box-shadow:
+    0 12px 22px rgba(2,6,23,.18)!important,
+    inset 0 1px 0 rgba(255,255,255,.05)!important;
 }}
 section[data-testid="stSidebar"] div.stButton>button span,
 section[data-testid="stSidebar"] div.stButton>button p,
@@ -884,6 +990,40 @@ section[data-testid="stSidebar"] div[data-testid="stDownloadButton"] button div{
   font-weight:800!important;
   letter-spacing:-.01em!important;
   line-height:1.2!important;
+  color:var(--sigl-text-strong)!important;
+  text-shadow:0 1px 0 rgba(2,6,23,.16)!important;
+}}
+section[data-testid="stSidebar"] div.stButton>button:hover,
+section[data-testid="stSidebar"] div[data-testid="stFormSubmitButton"] button:hover,
+section[data-testid="stSidebar"] div[data-testid="stDownloadButton"] button:hover{{
+  border-color:rgba(142,164,255,.30)!important;
+  background:
+    linear-gradient(180deg, rgba(142,164,255,.15), rgba(142,164,255,.05) 34%),
+    linear-gradient(180deg, rgba(24,33,52,.98), rgba(15,23,42,.94))!important;
+  box-shadow:
+    0 16px 30px rgba(2,6,23,.24)!important,
+    inset 0 1px 0 rgba(255,255,255,.06)!important;
+}}
+section[data-testid="stSidebar"] div.stButton>button[kind="primary"],
+section[data-testid="stSidebar"] div[data-testid="stFormSubmitButton"] button[kind="primary"],
+section[data-testid="stSidebar"] div[data-testid="stDownloadButton"] button[kind="primary"]{{
+  border-color:rgba(166,183,255,.42)!important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,0) 34%),
+    linear-gradient(135deg, #7C93FF, #5D7BFF)!important;
+  box-shadow:
+    0 18px 32px rgba(93,123,255,.26)!important,
+    inset 0 1px 0 rgba(255,255,255,.10)!important;
+}}
+section[data-testid="stSidebar"] div.stButton>button[kind="secondary"],
+section[data-testid="stSidebar"] div[data-testid="stFormSubmitButton"] button[kind="secondary"],
+section[data-testid="stSidebar"] div.stButton>button:not([kind="primary"]),
+section[data-testid="stSidebar"] div[data-testid="stFormSubmitButton"] button:not([kind="primary"]),
+section[data-testid="stSidebar"] div[data-testid="stDownloadButton"] button:not([kind="primary"]){{
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.015) 28%),
+    linear-gradient(180deg, rgba(22,31,48,.98), rgba(13,20,36,.95))!important;
+  border-color:rgba(148,163,184,.24)!important;
 }}
 section[data-testid="stSidebar"] div.stButton>button:disabled,
 section[data-testid="stSidebar"] div[data-testid="stFormSubmitButton"] button:disabled,
