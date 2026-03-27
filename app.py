@@ -14,6 +14,7 @@ from sectors import SECTOR_GROUPS
 from config import GEMINI_API_KEY, COMBINED_SCAN_REGISTRY, CTX_KOR
 from utils import _valid_fmt, _sf, fetch_fundamentals, validate_ticker, compute_and_cache, _compute_cached
 from chart import build_chart, build_metadata
+from ui import render_market_home_dashboard
 from ui_localized import render_analysis
 from ai_agent import build_prompt_text, build_ai_prompt
 from localization import (
@@ -2039,26 +2040,10 @@ else:
     report_indices = [i for i, msg in enumerate(st.session_state.messages) if msg.get("type") == "report"]
     latest_analysis_idx = analysis_indices[-1] if analysis_indices else None
     latest_report_idx = report_indices[-1] if report_indices else None
+    show_market_home_dashboard = not analysis_indices
 
-    if not analysis_indices:
-        _render_page_intro(
-            "Analysis Workspace",
-            "대화형 티커 분석",
-            "티커를 입력하면 차트, 종합 판단, 10개 레이어, 콤보 스캔, 기업 정보를 한 흐름으로 정리합니다.",
-            badges=[
-                ("차트 + 판단 + 기업정보", "accent"),
-                ("리포트 생성 가능", "warning"),
-                ("대화형 입력", "muted"),
-            ],
-        )
-        _render_empty_state(
-            "아직 분석된 종목이 없습니다",
-            "아래 빠른 시작 버튼을 누르거나 하단 입력창에 티커를 넣어 첫 분석을 시작하세요.",
-            badges=[
-                ("예: NVDA, TSLA, AAPL", "accent"),
-            ],
-            tone="accent",
-        )
+    if show_market_home_dashboard:
+        render_market_home_dashboard()
     else:
         _render_section_heading(
             "Analysis Feed",
@@ -2080,7 +2065,7 @@ else:
                 ("입력창으로 다른 티커 가능", "muted"),
             ],
             eyebrow="Quick Actions",
-            tight=bool(analysis_indices),
+            tight=bool(analysis_indices) or show_market_home_dashboard,
         )
         quick_tickers = ["NVDA", "TSLA", "AAPL", "GOOGL", "AMZN", "META", "MSFT", "PLTR", "HIMS", "SNDK", "LITE", "COHR", "IREN", "ORCL", "RKLB", "ASTS"]
         for start in range(0, len(quick_tickers), 2):

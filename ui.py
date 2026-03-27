@@ -1,8 +1,13 @@
-import streamlit as st
+﻿import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
 import plotly.graph_objects as go
+import google.generativeai as genai
+import html
 import json
+import re
+import yfinance as yf
+from datetime import datetime
 from textwrap import dedent
 from config import *
 from chart import build_metadata, build_chart
@@ -15,6 +20,7 @@ from localization import (
     localize_regime_label,
     translate_chart_text,
 )
+from sectors import SECTOR_GROUPS
 from theme import FONT_IMPORT_URL, FONT_STACK
 
 SOFT_GREEN = '#63D9A2'
@@ -24,6 +30,1029 @@ SOFT_RED_TEXT = '#FFD2D7'
 SOFT_AMBER = '#F6C35E'
 SOFT_AMBER_TEXT = '#F8DE9A'
 SOFT_BLUE = '#A5B4FC'
+
+_US_MARKET_DECK_HEIGHT = 728
+_US_MARKET_DEFAULT_DURATION = 7000
+_US_MARKET_TEXT_HEAVY_DURATION = 10000
+_US_MARKET_HISTORY_PERIOD = "6mo"
+_US_MARKET_MOVER_LIMIT = 120
+_US_MARKET_BENCHMARKS = [
+    ("SPY", "S&P 500"),
+    ("QQQ", "나스닥 100"),
+    ("DIA", "다우"),
+    ("IWM", "러셀 2000"),
+    ("^VIX", "변동성"),
+]
+_US_MARKET_MACRO = [
+    ("^TNX", "미 국채 10년"),
+    ("DX-Y.NYB", "달러 인덱스"),
+    ("KRW=X", "원/달러 환율"),
+    ("CL=F", "WTI"),
+    ("BTC-USD", "비트코인"),
+]
+_MARKET_SYMBOL_NORMALIZATION_MAP = {
+    "BRK.B": "BRK-B",
+    "BF.B": "BF-B",
+}
+_MARKET_SYMBOL_FALLBACKS = {
+    "DX-Y.NYB": ("DX=F",),
+    "KRW=X": ("USDKRW=X",),
+}
+_US_SECTOR_ETFS = [
+    ("XLK", "기술"),
+    ("XLF", "금융"),
+    ("XLE", "에너지"),
+    ("XLV", "헬스케어"),
+    ("XLI", "산업재"),
+    ("XLY", "경기소비재"),
+    ("XLP", "필수소비재"),
+    ("XLU", "유틸리티"),
+    ("XLB", "소재"),
+    ("XLC", "커뮤니케이션"),
+    ("XLRE", "부동산"),
+]
+_US_MARKET_MEGA_CAPS = [
+    "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "AVGO", "TSLA",
+    "AMD", "NFLX", "JPM", "BRK-B", "XOM", "LLY", "UNH", "COST",
+]
+
+
+def _market_badge(label, tone="muted"):
+    safe_label = html.escape(str(label or "").strip())
+    if not safe_label:
+        return ""
+    return f"<span class='sigl-badge sigl-badge--{tone}'>{safe_label}</span>"
+
+
+def _ordered_unique(items):
+    seen = set()
+    ordered = []
+    for item in items:
+        key = str(item or "").strip()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        ordered.append(key)
+    return ordered
+
+
+def _normalize_market_symbol(symbol):
+    raw = str(symbol or "").strip().upper()
+    return _MARKET_SYMBOL_NORMALIZATION_MAP.get(raw, raw)
+
+
+def _market_symbol_candidates(symbol):
+    raw = _normalize_market_symbol(symbol)
+    if not raw:
+        return tuple()
+    candidates = [raw]
+    for fallback in _MARKET_SYMBOL_FALLBACKS.get(raw, ()):
+        normalized = _normalize_market_symbol(fallback)
+        if normalized and normalized not in candidates:
+            candidates.append(normalized)
+    return tuple(candidates)
+
+
+def _format_market_date(dt_value):
+    if dt_value is None:
+        return "최신 세션"
+    if hasattr(dt_value, "to_pydatetime"):
+        dt_value = dt_value.to_pydatetime()
+    return f"{dt_value:%Y.%m.%d} 미국장 마감"
+
+
+def _format_change_pct(change_pct):
+    if change_pct is None or pd.isna(change_pct):
+        return "N/A"
+    return f"{change_pct:+.2f}%"
+
+
+def _tone_from_change(change_pct, inverse=False, neutral_band=0.12):
+    if change_pct is None or pd.isna(change_pct):
+        return "neutral"
+    effective = -change_pct if inverse else change_pct
+    if effective > neutral_band:
+        return "positive"
+    if effective < -neutral_band:
+        return "negative"
+    return "neutral"
+
+
+def _resolve_market_tone(*tones):
+    normalized = [tone for tone in tones if tone in {"positive", "negative", "neutral"}]
+    if not normalized:
+        return "neutral"
+    positives = sum(1 for tone in normalized if tone == "positive")
+    negatives = sum(1 for tone in normalized if tone == "negative")
+    if positives > negatives:
+        return "positive"
+    if negatives > positives:
+        return "negative"
+    return "neutral"
+
+
+def _build_market_bullet(text, tone="neutral"):
+    safe_text = str(text or "").strip()
+    if not safe_text:
+        return {"text": "", "tone": "neutral"}
+    return {"text": safe_text, "tone": tone if tone in {"positive", "negative", "neutral"} else "neutral"}
+
+
+def _infer_market_text_tone(text):
+    sample = str(text or "").lower()
+    if not sample:
+        return "neutral"
+    positive_keywords = [
+        "강세", "완화", "우호", "반등", "회복", "상승", "선방", "주도", "지지", "개선",
+        "risk-on", "strength", "eased", "friendlier", "support", "bounce", "led",
+    ]
+    negative_keywords = [
+        "압박", "약세", "위험회피", "부담", "급등", "변동성", "우려", "둔화", "하락", "이탈",
+        "차익실현", "risk-off", "lagged", "pressure", "weakness", "hedging", "caution", "pullback",
+    ]
+    positive_hits = sum(1 for keyword in positive_keywords if keyword in sample)
+    negative_hits = sum(1 for keyword in negative_keywords if keyword in sample)
+    if positive_hits > negative_hits:
+        return "positive"
+    if negative_hits > positive_hits:
+        return "negative"
+    return "neutral"
+
+
+def _extract_symbol_frame(history, symbol):
+    if history is None or getattr(history, "empty", True):
+        return pd.DataFrame()
+    frame = None
+    candidates = _market_symbol_candidates(symbol)
+    if isinstance(history.columns, pd.MultiIndex):
+        level_zero = list(history.columns.get_level_values(0))
+        level_one = list(history.columns.get_level_values(1))
+        for candidate in candidates:
+            if candidate in level_zero:
+                frame = history[candidate].copy()
+                break
+            if candidate in level_one:
+                frame = history.xs(candidate, axis=1, level=1).copy()
+                break
+    else:
+        frame = history.copy()
+    if frame is None or frame.empty or "Close" not in frame.columns:
+        return pd.DataFrame()
+    frame = frame.dropna(how="all")
+    frame = frame.dropna(subset=["Close"])
+    return frame
+
+
+def _build_snapshot(frame):
+    if frame is None or frame.empty or "Close" not in frame.columns:
+        return {}
+    close = frame["Close"].dropna()
+    if close.empty:
+        return {}
+    price = float(close.iloc[-1])
+    prev_close = float(close.iloc[-2]) if len(close) >= 2 else price
+    change_pct = ((price - prev_close) / prev_close * 100.0) if prev_close else None
+    five_day_change = ((price - float(close.iloc[-6])) / float(close.iloc[-6]) * 100.0) if len(close) >= 6 and float(close.iloc[-6]) else None
+    month_change = ((price - float(close.iloc[-21])) / float(close.iloc[-21]) * 100.0) if len(close) >= 21 and float(close.iloc[-21]) else None
+    volume_ratio = None
+    if "Volume" in frame.columns:
+        volume = frame["Volume"].dropna()
+        if not volume.empty:
+            base_volume = float(volume.tail(20).mean())
+            if base_volume > 0:
+                volume_ratio = float(volume.iloc[-1]) / base_volume
+    return {
+        "price": price,
+        "prev_close": prev_close,
+        "change_pct": change_pct,
+        "five_day_change": five_day_change,
+        "month_change": month_change,
+        "volume_ratio": volume_ratio,
+        "date": close.index[-1],
+    }
+
+
+def _build_snapshot_metric(label, note, snapshot, inverse=False):
+    if not snapshot:
+        return {"label": label, "value": "N/A", "delta": "", "note": note, "tone": "neutral"}
+    price = snapshot.get("price")
+    prev_close = snapshot.get("prev_close")
+    change_pct = snapshot.get("change_pct")
+    tone = _tone_from_change(change_pct, inverse=inverse)
+    if label == "10Y":
+        value = f"{(price or 0) / 10:.2f}%"
+        delta = ""
+        if price is not None and prev_close is not None:
+            delta = f"{(price - prev_close) * 10:+.1f}bp"
+    elif label == "USD/KRW":
+        value = f"₩{price:,.1f}" if price is not None else "N/A"
+        delta = _format_change_pct(change_pct)
+    elif label == "BTC":
+        value = f"${price:,.0f}" if price is not None else "N/A"
+        delta = _format_change_pct(change_pct)
+    elif label in {"WTI", "DXY", "VIX"}:
+        value = f"{price:.2f}" if price is not None else "N/A"
+        delta = _format_change_pct(change_pct)
+    else:
+        value = f"{price:.2f}" if price is not None else "N/A"
+        delta = _format_change_pct(change_pct)
+    return {"label": label, "value": value, "delta": delta, "note": note, "tone": tone}
+
+
+def _build_sector_sentence(sector_rows):
+    if not sector_rows:
+        return "섹터 데이터가 아직 동기화 중입니다."
+    positive = sum(1 for row in sector_rows if (row.get("change_pct") or 0) > 0)
+    total = len(sector_rows)
+    strongest = max(sector_rows, key=lambda row: row.get("change_pct") if row.get("change_pct") is not None else -999)
+    weakest = min(sector_rows, key=lambda row: row.get("change_pct") if row.get("change_pct") is not None else 999)
+    return f"{total}개 섹터 중 {positive}개가 상승했습니다. {strongest['label']}이 주도했고 {weakest['label']}이 가장 약했습니다."
+
+
+def _build_driver_candidates(benchmarks, macro, sector_rows):
+    drivers = []
+    spy = benchmarks.get("SPY", {})
+    qqq = benchmarks.get("QQQ", {})
+    iwm = benchmarks.get("IWM", {})
+    vix = benchmarks.get("VIX", {})
+    tnx = macro.get("10Y", {})
+    dxy = macro.get("DXY", {})
+    fx = macro.get("USDKRW", {})
+    wti = macro.get("WTI", {})
+    btc = macro.get("BTC", {})
+    sector_breadth = sum(1 for row in sector_rows if (row.get("change_pct") or 0) > 0)
+
+    spy_chg = spy.get("change_pct")
+    qqq_chg = qqq.get("change_pct")
+    iwm_chg = iwm.get("change_pct")
+    vix_chg = vix.get("change_pct")
+    tnx_bps = ((tnx.get("price") or 0) - (tnx.get("prev_close") or 0)) * 10 if tnx else None
+    dxy_chg = dxy.get("change_pct")
+    fx_chg = fx.get("change_pct")
+    wti_chg = wti.get("change_pct")
+    btc_chg = btc.get("change_pct")
+
+    if qqq_chg is not None and spy_chg is not None:
+        if qqq_chg < spy_chg - 0.45:
+            drivers.append("나스닥이 대형주 전체보다 더 약해 성장주 압박이 크게 나타났습니다.")
+        elif qqq_chg > spy_chg + 0.45:
+            drivers.append("대형 기술주가 상대 강세를 보이며 시장 주도권을 일부 되찾았습니다.")
+
+    if iwm_chg is not None and spy_chg is not None:
+        if iwm_chg > spy_chg + 0.5:
+            drivers.append("소형주가 선방해 위험선호가 완전히 꺾이진 않았습니다.")
+        elif iwm_chg < spy_chg - 0.5:
+            drivers.append("소형주 약세가 더 깊어지며 시장 전반의 위험회피 성격이 강해졌습니다.")
+
+    if vix_chg is not None:
+        if vix_chg >= 5:
+            drivers.append("VIX 급등은 헤지 수요 확대와 변동성 경계 심리 강화를 보여줬습니다.")
+        elif vix_chg <= -4:
+            drivers.append("VIX가 빠르게 낮아지며 위험 프리미엄이 다소 완화됐습니다.")
+
+    if tnx_bps is not None:
+        if tnx_bps >= 4:
+            drivers.append("10년물 금리 상승이 밸류에이션 부담을 키워 성장주에 불리하게 작용했습니다.")
+        elif tnx_bps <= -4:
+            drivers.append("장기금리 하락이 성장주에 우호적인 배경을 만들었습니다.")
+
+    if dxy_chg is not None:
+        if dxy_chg >= 0.35:
+            drivers.append("달러 강세가 위험자산 전반에 부담으로 작용했습니다.")
+        elif dxy_chg <= -0.35:
+            drivers.append("달러 압력이 완화되며 위험자산이 숨을 돌렸습니다.")
+
+    if fx_chg is not None:
+        if fx_chg >= 0.45:
+            drivers.append("원/달러 환율 상승은 대외 불안과 달러 선호 심리를 반영했습니다.")
+        elif fx_chg <= -0.45:
+            drivers.append("원/달러 환율 안정은 위험심리 완화에 우호적으로 작용했습니다.")
+
+    if wti_chg is not None and abs(wti_chg) >= 1.8:
+        if wti_chg > 0:
+            drivers.append("유가 강세가 인플레이션 우려를 다시 자극했습니다.")
+        else:
+            drivers.append("유가 약세가 물가 부담 완화 기대를 키웠습니다.")
+
+    if btc_chg is not None and abs(btc_chg) >= 2.5:
+        if btc_chg > 0:
+            drivers.append("비트코인 강세는 투기적 위험선호가 완전히 꺾이지 않았음을 시사했습니다.")
+        else:
+            drivers.append("비트코인 약세는 고베타 자산 전반의 심리 둔화와 맞물렸습니다.")
+
+    if sector_rows:
+        if sector_breadth <= 3:
+            drivers.append(f"상승 섹터가 {sector_breadth}/{len(sector_rows)}개에 그쳐 시장 확산도가 약했습니다.")
+        elif sector_breadth >= len(sector_rows) - 2:
+            drivers.append(f"{sector_breadth}/{len(sector_rows)}개 섹터가 동반 상승해 광범위한 매수 흐름이 나타났습니다.")
+
+    return drivers[:4]
+
+
+def _fallback_market_headline(benchmarks, sector_rows):
+    spy = benchmarks.get("SPY", {}).get("change_pct")
+    qqq = benchmarks.get("QQQ", {}).get("change_pct")
+    dia = benchmarks.get("DIA", {}).get("change_pct")
+    iwm = benchmarks.get("IWM", {}).get("change_pct")
+    vix = benchmarks.get("VIX", {}).get("change_pct")
+    breadth = sum(1 for row in sector_rows if (row.get("change_pct") or 0) > 0)
+    total = len(sector_rows) or 11
+    if spy is None:
+        return "미국장 데이터가 아직 로딩 중입니다."
+    values = [value for value in [spy, qqq, dia, iwm] if value is not None]
+    avg = sum(values) / max(1, len(values))
+    if avg <= -0.8 and (vix or 0) > 3:
+        return "변동성 확대와 함께 위험회피가 지배한 장이었습니다."
+    if avg >= 0.8 and breadth >= max(7, total - 3):
+        return "지수와 섹터가 함께 오른 광범위한 위험선호 장이었습니다."
+    if qqq is not None and spy is not None and qqq < spy - 0.5:
+        return "기술주가 시장보다 약해 성장주 압박이 두드러졌습니다."
+    if qqq is not None and spy is not None and qqq > spy + 0.5:
+        return "대형 기술주가 반등을 주도하며 시장 리더십을 회복했습니다."
+    if breadth <= 3:
+        return "하락 우위 흐름 속에 방어적 색채가 짙었습니다."
+    return "방향성은 있었지만 섹터 간 온도 차가 큰 장이었습니다."
+
+
+def _fallback_market_insight(benchmarks, macro, sector_rows):
+    spy = benchmarks.get("SPY", {}).get("change_pct")
+    qqq = benchmarks.get("QQQ", {}).get("change_pct")
+    vix = benchmarks.get("VIX", {}).get("change_pct")
+    tnx_bps = ((macro.get("10Y", {}).get("price") or 0) - (macro.get("10Y", {}).get("prev_close") or 0)) * 10 if macro.get("10Y") else 0
+    breadth = sum(1 for row in sector_rows if (row.get("change_pct") or 0) > 0)
+    total = len(sector_rows) or 11
+    if spy is None:
+        return {
+            "insight": "핵심 입력값이 아직 동기화 중이라 오늘 인사이트는 데이터가 안정되면 다시 갱신됩니다.",
+            "watchlist": ["SPY와 QQQ 종가 확인", "VIX와 10년물 재확인", "섹터 확산도 업데이트 대기"],
+        }
+    if (vix or 0) > 4 and tnx_bps > 0:
+        insight = "금리와 변동성이 함께 오를 때는 반등 추격보다 확인 후 대응이 더 중요합니다."
+    elif (qqq or 0) > (spy or 0) and breadth >= total // 2:
+        insight = "기술주 주도력이 이어질수록 지수보다 리더 종목 추적이 더 중요합니다."
+    elif breadth <= 3:
+        insight = "시장 약세가 넓게 퍼질수록 신규 추격보다 방어와 현금 관리가 우선입니다."
+    else:
+        insight = "한 방향 베팅보다 섹터 상대강도와 금리 민감도를 함께 보는 대응이 유효합니다."
+    watchlist = [
+        "QQQ가 SPY 대비 상대강도를 회복하는지 확인",
+        f"섹터 확산도({breadth}/{total})가 개선되는지 확인",
+        "VIX와 10년물이 함께 진정되는지 확인",
+    ]
+    return {"insight": insight, "watchlist": watchlist}
+
+
+def _market_mover_universe(limit=_US_MARKET_MOVER_LIMIT):
+    raw = list(_US_MARKET_MEGA_CAPS)
+    for tickers in SECTOR_GROUPS.values():
+        if isinstance(tickers, (list, tuple, set)):
+            raw.extend(str(ticker or "").strip() for ticker in tickers)
+    filtered = []
+    for ticker in _ordered_unique(_normalize_market_symbol(ticker) for ticker in raw):
+        if not re.fullmatch(r"[A-Z0-9\-=]+", ticker):
+            continue
+        filtered.append(ticker)
+        if len(filtered) >= limit:
+            break
+    return tuple(filtered)
+
+
+def _mover_reason(snapshot):
+    change_pct = snapshot.get("change_pct")
+    volume_ratio = snapshot.get("volume_ratio")
+    five_day_change = snapshot.get("five_day_change")
+    month_change = snapshot.get("month_change")
+    if change_pct is None:
+        return "데이터 부족"
+    direction = "상승 탄력 확대" if change_pct > 0 else "급한 조정"
+    if volume_ratio is not None and volume_ratio >= 1.7:
+        return f"거래량 {volume_ratio:.1f}배와 함께 {direction}"
+    if five_day_change is not None and change_pct > 0 and five_day_change < 0:
+        return "최근 약세 이후 기술적 반등"
+    if five_day_change is not None and change_pct < 0 and five_day_change > 0:
+        return "단기 급등 뒤 차익실현"
+    if month_change is not None and month_change > 8:
+        return "월간 강세 흐름 속 추세 연장"
+    if month_change is not None and month_change < -8:
+        return "월간 약세 흐름 속 추가 하락"
+    return "단기 수급이 빠르게 이동"
+
+
+def _extract_json_object(text):
+    if not text:
+        return "{}"
+    fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.S)
+    if fenced:
+        return fenced.group(1)
+    raw = re.search(r"\{.*\}", text, re.S)
+    return raw.group(0) if raw else "{}"
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _download_market_history(tickers, period=_US_MARKET_HISTORY_PERIOD):
+    expanded = []
+    for ticker in tickers:
+        expanded.extend(_market_symbol_candidates(ticker))
+    symbols = tuple(_ordered_unique(symbol for symbol in expanded if symbol))
+    if not symbols:
+        return pd.DataFrame()
+    try:
+        history = yf.download(
+            tickers=list(symbols),
+            period=period,
+            interval="1d",
+            group_by="ticker",
+            auto_adjust=False,
+            progress=False,
+            threads=True,
+        )
+    except Exception:
+        return pd.DataFrame()
+    return history.sort_index() if isinstance(history, pd.DataFrame) else pd.DataFrame()
+
+
+@st.cache_data(ttl=21600, show_spinner=False)
+def _generate_us_market_ai_copy(market_date_key, summary_json):
+    if not GEMINI_API_KEY:
+        return {}
+    try:
+        genai.configure(api_key=GEMINI_API_KEY)
+        model = genai.GenerativeModel("gemini-flash-latest")
+        prompt = (
+            "You are a US market close editor. Use only the JSON data below and answer in concise Korean.\n"
+            "Return pure JSON only.\n"
+            'Format: {"headline":"...","drivers":["...","...","..."],"insight":"...","watchlist":["...","...","..."]}\n'
+            "Rules:\n"
+            "- headline: one short sentence.\n"
+            "- drivers: two to three short bullets.\n"
+            "- insight: one sentence with a practical next-session angle.\n"
+            "- watchlist: two to three short points.\n"
+            "- Do not mention unverified news or events.\n"
+            f"- market_date_key: {market_date_key}\n"
+            f"- data: {summary_json}\n"
+        )
+        response = model.generate_content(prompt)
+        raw_text = getattr(response, "text", "") or str(response)
+        parsed = json.loads(_extract_json_object(raw_text))
+        return {
+            "headline": str(parsed.get("headline", "")).strip(),
+            "drivers": [str(item).strip() for item in parsed.get("drivers", []) if str(item).strip()],
+            "insight": str(parsed.get("insight", "")).strip(),
+            "watchlist": [str(item).strip() for item in parsed.get("watchlist", []) if str(item).strip()],
+        }
+    except Exception:
+        return {}
+
+
+def build_us_market_daily_payload():
+    benchmark_symbols = tuple(symbol for symbol, _ in _US_MARKET_BENCHMARKS)
+    macro_symbols = tuple(symbol for symbol, _ in _US_MARKET_MACRO)
+    sector_symbols = tuple(symbol for symbol, _ in _US_SECTOR_ETFS)
+    benchmark_history = _download_market_history(benchmark_symbols + macro_symbols + sector_symbols)
+    mover_history = _download_market_history(_market_mover_universe())
+
+    benchmark_snapshots = {}
+    for symbol, _ in _US_MARKET_BENCHMARKS:
+        label = "VIX" if symbol == "^VIX" else symbol
+        benchmark_snapshots[label] = _build_snapshot(_extract_symbol_frame(benchmark_history, symbol))
+
+    macro_snapshots = {}
+    macro_labels = {"^TNX": "10Y", "DX-Y.NYB": "DXY", "KRW=X": "USDKRW", "CL=F": "WTI", "BTC-USD": "BTC"}
+    for symbol, _ in _US_MARKET_MACRO:
+        macro_snapshots[macro_labels[symbol]] = _build_snapshot(_extract_symbol_frame(benchmark_history, symbol))
+
+    sector_rows = []
+    for symbol, label in _US_SECTOR_ETFS:
+        snapshot = _build_snapshot(_extract_symbol_frame(benchmark_history, symbol))
+        sector_rows.append({"symbol": symbol, "label": label, "snapshot": snapshot, "change_pct": snapshot.get("change_pct")})
+    sector_rows = [row for row in sector_rows if row.get("snapshot")]
+    sector_sorted = sorted(sector_rows, key=lambda row: row.get("change_pct") if row.get("change_pct") is not None else -999, reverse=True)
+
+    movers = []
+    for symbol in _market_mover_universe():
+        snapshot = _build_snapshot(_extract_symbol_frame(mover_history, symbol))
+        if not snapshot or snapshot.get("change_pct") is None:
+            continue
+        movers.append({"symbol": symbol, "snapshot": snapshot, "change_pct": snapshot.get("change_pct")})
+    movers_sorted = sorted(movers, key=lambda row: row["change_pct"], reverse=True)
+    gainers = movers_sorted[:3]
+    losers = list(reversed(movers_sorted[-3:])) if movers_sorted else []
+
+    market_dt = None
+    for candidate in [benchmark_snapshots.get("SPY", {}).get("date"), benchmark_snapshots.get("QQQ", {}).get("date")]:
+        if candidate is not None:
+            market_dt = candidate
+            break
+    market_date_key = market_dt.strftime("%Y-%m-%d") if market_dt is not None else datetime.utcnow().strftime("%Y-%m-%d")
+
+    driver_candidates = _build_driver_candidates(benchmark_snapshots, macro_snapshots, sector_sorted)
+    fallback_insight = _fallback_market_insight(benchmark_snapshots, macro_snapshots, sector_sorted)
+
+    summary_payload = {
+        "market_date": market_date_key,
+        "benchmarks": {label: snapshot.get("change_pct") for label, snapshot in benchmark_snapshots.items()},
+        "macro": {
+            "10Y_bps": ((macro_snapshots.get("10Y", {}).get("price") or 0) - (macro_snapshots.get("10Y", {}).get("prev_close") or 0)) * 10,
+            "DXY_pct": macro_snapshots.get("DXY", {}).get("change_pct"),
+            "USDKRW_pct": macro_snapshots.get("USDKRW", {}).get("change_pct"),
+            "WTI_pct": macro_snapshots.get("WTI", {}).get("change_pct"),
+            "BTC_pct": macro_snapshots.get("BTC", {}).get("change_pct"),
+        },
+        "sector_top": [f"{row['symbol']} {row['change_pct']:+.2f}%" for row in sector_sorted[:3] if row.get("change_pct") is not None],
+        "sector_bottom": [f"{row['symbol']} {row['change_pct']:+.2f}%" for row in sector_sorted[-3:] if row.get("change_pct") is not None],
+        "gainers": [f"{row['symbol']} {row['change_pct']:+.2f}%" for row in gainers],
+        "losers": [f"{row['symbol']} {row['change_pct']:+.2f}%" for row in losers],
+        "breadth": {
+            "up": sum(1 for row in sector_sorted if (row.get("change_pct") or 0) > 0),
+            "total": len(sector_sorted),
+        },
+    }
+    ai_copy = _generate_us_market_ai_copy(market_date_key, json.dumps(summary_payload, ensure_ascii=False))
+
+    headline = ai_copy.get("headline") or _fallback_market_headline(benchmark_snapshots, sector_sorted)
+    drivers = ai_copy.get("drivers") or driver_candidates or ["시장 방향성은 유지됐지만 거시 변수의 압박도 여전히 크게 작용했습니다."]
+    insight = ai_copy.get("insight") or fallback_insight["insight"]
+    watchlist = ai_copy.get("watchlist") or fallback_insight["watchlist"]
+
+    sector_breadth = sum(1 for row in sector_sorted if (row.get("change_pct") or 0) > 0)
+    sector_total = len(sector_sorted) or len(_US_SECTOR_ETFS)
+
+    main_metrics = [
+        _build_snapshot_metric("SPY", "미국 대형주", benchmark_snapshots.get("SPY", {})),
+        _build_snapshot_metric("QQQ", "나스닥 100", benchmark_snapshots.get("QQQ", {})),
+        _build_snapshot_metric("DIA", "다우", benchmark_snapshots.get("DIA", {})),
+        _build_snapshot_metric("IWM", "러셀 2000", benchmark_snapshots.get("IWM", {})),
+        _build_snapshot_metric("VIX", "변동성", benchmark_snapshots.get("VIX", {}), inverse=True),
+    ]
+    macro_metrics = [
+        _build_snapshot_metric("10Y", "미 국채 10년", macro_snapshots.get("10Y", {}), inverse=True),
+        _build_snapshot_metric("DXY", "달러 인덱스", macro_snapshots.get("DXY", {}), inverse=True),
+        _build_snapshot_metric("USD/KRW", "원/달러 환율", macro_snapshots.get("USDKRW", {}), inverse=True),
+        _build_snapshot_metric("WTI", "국제유가", macro_snapshots.get("WTI", {})),
+        _build_snapshot_metric("BTC", "위험선호 프록시", macro_snapshots.get("BTC", {})),
+    ]
+    sector_metrics = [_build_snapshot_metric(row["symbol"], row["label"], row["snapshot"]) for row in (sector_sorted[:3] + list(reversed(sector_sorted[-3:])))]
+    mover_metrics = [_build_snapshot_metric(row["symbol"], _mover_reason(row["snapshot"]), row["snapshot"]) for row in gainers + losers]
+    insight_metrics = [
+        {"label": "확산도", "value": f"{sector_breadth}/{sector_total}", "delta": "상승 섹터", "note": "섹터 전반 흐름", "tone": "positive" if sector_breadth >= sector_total / 2 else "negative"},
+        _build_snapshot_metric("VIX", "변동성", benchmark_snapshots.get("VIX", {}), inverse=True),
+        _build_snapshot_metric("10Y", "미 국채 10년", macro_snapshots.get("10Y", {}), inverse=True),
+        _build_snapshot_metric("USD/KRW", "원/달러 환율", macro_snapshots.get("USDKRW", {}), inverse=True),
+    ]
+    market_driver_bullets = [
+        _build_market_bullet(
+            f"달러/환율 체크: DXY {macro_metrics[1]['delta'] or 'N/A'} / USD/KRW {macro_metrics[2]['delta'] or 'N/A'}",
+            _resolve_market_tone(macro_metrics[1]["tone"], macro_metrics[2]["tone"]),
+        )
+    ] + [_build_market_bullet(text, _infer_market_text_tone(text)) for text in drivers[:2]]
+
+    cards = [
+        {
+            "id": "main_headline",
+            "title": "오늘 시장 한줄",
+            "subtitle": headline,
+            "metrics": main_metrics,
+            "bullets": [
+                _build_market_bullet(
+                    f"거시 점검: 10Y {macro_metrics[0]['value']} ({macro_metrics[0]['delta'] or 'N/A'}) / DXY {macro_metrics[1]['delta'] or 'N/A'}",
+                    _resolve_market_tone(macro_metrics[0]["tone"], macro_metrics[1]["tone"]),
+                ),
+                _build_market_bullet(
+                    f"환율/원자재: USD/KRW {macro_metrics[2]['delta'] or 'N/A'} / WTI {macro_metrics[3]['delta'] or 'N/A'}",
+                    _resolve_market_tone(macro_metrics[2]["tone"], macro_metrics[3]["tone"]),
+                ),
+                _build_market_bullet(
+                    f"리스크 자산: BTC {macro_metrics[4]['delta'] or 'N/A'} / 섹터 확산도 {sector_breadth}/{sector_total}",
+                    _resolve_market_tone(
+                        macro_metrics[4]["tone"],
+                        "positive" if sector_breadth >= sector_total / 2 else "negative",
+                    ),
+                ),
+            ],
+            "tone": _tone_from_change(benchmark_snapshots.get("SPY", {}).get("change_pct")),
+            "chart_hint": "SPY / QQQ / DIA / IWM / VIX",
+            "duration_ms": _US_MARKET_DEFAULT_DURATION,
+        },
+        {
+            "id": "market_drivers",
+            "title": "움직인 이유",
+            "subtitle": "금리, 달러, 환율, 유가, 비트코인 흐름이 시장 강약을 설명합니다.",
+            "metrics": macro_metrics,
+            "bullets": market_driver_bullets,
+            "tone": _tone_from_change(benchmark_snapshots.get("SPY", {}).get("change_pct")),
+            "chart_hint": "10Y / DXY / USD/KRW / WTI / BTC",
+            "duration_ms": _US_MARKET_TEXT_HEAVY_DURATION,
+        },
+        {
+            "id": "sector_pressure",
+            "title": "섹터 온도",
+            "subtitle": _build_sector_sentence(sector_sorted),
+            "metrics": sector_metrics,
+            "bullets": [_build_market_bullet(f"강세 상위: {row['symbol']} {row['change_pct']:+.2f}% / {row['label']}", "positive") for row in sector_sorted[:3]] + [_build_market_bullet(f"약세 상위: {row['symbol']} {row['change_pct']:+.2f}% / {row['label']}", "negative") for row in list(reversed(sector_sorted[-3:]))],
+            "tone": "positive" if sector_breadth >= sector_total / 2 else "negative",
+            "chart_hint": f"상승 섹터 {sector_breadth}/{sector_total}",
+            "duration_ms": _US_MARKET_TEXT_HEAVY_DURATION,
+        },
+        {
+            "id": "top_movers",
+            "title": "주요 등락주",
+            "subtitle": "메가캡과 핵심 유니버스에서 수급이 몰린 종목입니다.",
+            "metrics": mover_metrics,
+            "bullets": [_build_market_bullet(f"{row['symbol']} {row['change_pct']:+.2f}% / {_mover_reason(row['snapshot'])}", "positive") for row in gainers] + [_build_market_bullet(f"{row['symbol']} {row['change_pct']:+.2f}% / {_mover_reason(row['snapshot'])}", "negative") for row in losers],
+            "tone": _tone_from_change(sum(row["change_pct"] for row in gainers + losers) / max(1, len(gainers + losers)) if gainers or losers else 0),
+            "chart_hint": f"추적 유니버스 {len(movers_sorted)}개",
+            "duration_ms": _US_MARKET_TEXT_HEAVY_DURATION,
+        },
+        {
+            "id": "daily_insight",
+            "title": "오늘 미장 인사이트",
+            "subtitle": insight,
+            "metrics": insight_metrics,
+            "bullets": [_build_market_bullet(text, _infer_market_text_tone(text)) for text in watchlist[:3]],
+            "tone": _tone_from_change(benchmark_snapshots.get("QQQ", {}).get("change_pct")),
+            "chart_hint": "다음 세션 체크리스트",
+            "duration_ms": _US_MARKET_TEXT_HEAVY_DURATION,
+        },
+    ]
+
+    return {
+        "market_date_label": _format_market_date(market_dt),
+        "headline": headline,
+        "cards": cards,
+    }
+
+
+def _build_us_market_daily_doc(payload):
+    payload_json = json.dumps(payload, ensure_ascii=False).replace("</", "<\\/")
+    template = dedent(
+        """
+        <!doctype html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <link href="__FONT_IMPORT_URL__" rel="stylesheet">
+          <style>
+            :root {
+              color-scheme: dark;
+              --border: rgba(148,163,184,.16);
+              --copy: #cbd5e1;
+              --muted: #8fa1bc;
+              --strong: #f8fafc;
+              --positive: #63d9a2;
+              --negative: #ff8f96;
+              --neutral: #f6c35e;
+            }
+            * { box-sizing: border-box; }
+            html, body {
+              margin: 0;
+              width: 100%;
+              height: 100%;
+              overflow: hidden;
+              background: transparent;
+              font-family: __FONT_STACK__;
+            }
+            body { color: var(--copy); }
+            .deck {
+              --tone-border: rgba(148,163,184,.16);
+              --tone-progress: linear-gradient(90deg, rgba(165,180,252,.96), rgba(129,140,248,.96));
+              --tone-kicker-border: rgba(165,180,252,.24);
+              --tone-kicker-bg: rgba(165,180,252,.10);
+              --tone-kicker-copy: #d6ddff;
+              --tone-hint-border: rgba(255,255,255,.08);
+              --tone-hint-bg: rgba(255,255,255,.04);
+              --tone-hint-copy: #e2e8f0;
+              --tone-bullet-fill: linear-gradient(180deg, rgba(99,217,162,.96), rgba(45,212,191,.80));
+              --tone-bullet-shadow: rgba(99,217,162,.10);
+              display: grid;
+              grid-template-rows: auto auto 1fr auto;
+              width: 100%;
+              height: 100%;
+              padding: 10px;
+              border-radius: 24px;
+              border: 1px solid var(--tone-border);
+              background:
+                radial-gradient(circle at top right, rgba(165,180,252,.14), transparent 24%),
+                radial-gradient(circle at bottom left, rgba(99,217,162,.10), transparent 28%),
+                linear-gradient(180deg, rgba(19,28,45,.90), rgba(10,15,28,.98));
+              box-shadow: 0 22px 44px rgba(2,6,23,.28), inset 0 1px 0 rgba(255,255,255,.04);
+              overflow: hidden;
+              transition: border-color .28s ease, background .28s ease, box-shadow .28s ease;
+            }
+            .progress { height: 4px; background: rgba(255,255,255,.04); margin: -10px -10px 0; }
+            .progress > div { height: 100%; width: 100%; transform-origin: left center; transform: scaleX(0); background: var(--tone-progress); transition: background .28s ease; }
+            .deck[data-tone="neutral"] {
+              --tone-border: rgba(148,163,184,.16);
+              --tone-progress: linear-gradient(90deg, rgba(165,180,252,.96), rgba(129,140,248,.96));
+              --tone-kicker-border: rgba(165,180,252,.24);
+              --tone-kicker-bg: rgba(165,180,252,.10);
+              --tone-kicker-copy: #d6ddff;
+              --tone-hint-border: rgba(255,255,255,.08);
+              --tone-hint-bg: rgba(255,255,255,.04);
+              --tone-hint-copy: #e2e8f0;
+              --tone-bullet-fill: linear-gradient(180deg, rgba(148,163,184,.92), rgba(100,116,139,.82));
+              --tone-bullet-shadow: rgba(148,163,184,.10);
+            }
+            .head { display: flex; justify-content: space-between; gap: 12px; padding: 18px 14px 8px; }
+            .kicker { display: inline-flex; align-items: center; min-height: 30px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--tone-kicker-border); background: var(--tone-kicker-bg); color: var(--tone-kicker-copy); font-size: .72rem; font-weight: 900; transition: border-color .28s ease, background .28s ease, color .28s ease; }
+            .date { color: var(--muted); font-size: .76rem; font-weight: 700; text-align: right; }
+            .body {
+              display: grid;
+              grid-template-columns: minmax(0,1.1fr) minmax(260px,.9fr);
+              gap: 16px;
+              min-height: 0;
+              padding: 0 14px 10px;
+              overflow-y: auto;
+              overflow-x: hidden;
+              overscroll-behavior: contain;
+              -webkit-overflow-scrolling: touch;
+              scrollbar-width: thin;
+              scrollbar-color: rgba(148,163,184,.38) transparent;
+              align-content: start;
+            }
+            .body::-webkit-scrollbar { width: 8px; height: 8px; }
+            .body::-webkit-scrollbar-thumb { background: rgba(148,163,184,.32); border-radius: 999px; }
+            .body::-webkit-scrollbar-track { background: transparent; }
+            .story {
+              position: relative;
+              z-index: 1;
+              display: flex;
+              flex-direction: column;
+              gap: 12px;
+              min-width: 0;
+              min-height: max-content;
+              align-self: start;
+            }
+            .title { margin: 0; color: var(--strong); font-size: 1.16rem; font-weight: 900; transition: color .28s ease; }
+            .subtitle { margin: 0; color: #eef2ff; font-size: 1rem; line-height: 1.56; font-weight: 700; transition: color .28s ease; }
+            .hint { display: inline-flex; align-items: center; width: fit-content; min-height: 30px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--tone-hint-border); background: var(--tone-hint-bg); color: var(--tone-hint-copy); font-size: .76rem; font-weight: 800; transition: border-color .28s ease, background .28s ease, color .28s ease; }
+            .bullets { display: flex; flex-direction: column; gap: 10px; }
+            .bullet { display: grid; grid-template-columns: 12px minmax(0,1fr); gap: 10px; padding: 11px 12px; border-radius: 14px; border: 1px solid rgba(148,163,184,.12); background: rgba(255,255,255,.03); transition: border-color .28s ease, background .28s ease; }
+            .bullet[data-tone="positive"] { border-color: rgba(99,217,162,.16); background: linear-gradient(180deg, rgba(99,217,162,.06), rgba(255,255,255,.02)); }
+            .bullet[data-tone="negative"] { border-color: rgba(255,143,150,.16); background: linear-gradient(180deg, rgba(255,143,150,.06), rgba(255,255,255,.02)); }
+            .bullet[data-tone="neutral"] { border-color: rgba(148,163,184,.16); background: linear-gradient(180deg, rgba(148,163,184,.05), rgba(255,255,255,.02)); }
+            .bullet i { width: 10px; height: 10px; margin-top: 5px; border-radius: 999px; background: linear-gradient(180deg, rgba(148,163,184,.92), rgba(100,116,139,.82)); box-shadow: 0 0 0 4px rgba(148,163,184,.10); transition: background .28s ease, box-shadow .28s ease; }
+            .bullet[data-tone="positive"] i { background: linear-gradient(180deg, rgba(99,217,162,.98), rgba(45,212,191,.82)); box-shadow: 0 0 0 4px rgba(99,217,162,.14); }
+            .bullet[data-tone="negative"] i { background: linear-gradient(180deg, rgba(255,143,150,.98), rgba(251,113,133,.82)); box-shadow: 0 0 0 4px rgba(255,143,150,.14); }
+            .bullet[data-tone="neutral"] i { background: linear-gradient(180deg, rgba(148,163,184,.92), rgba(100,116,139,.82)); box-shadow: 0 0 0 4px rgba(148,163,184,.10); }
+            .bullet span { font-size: .90rem; line-height: 1.56; font-weight: 700; }
+            .metrics {
+              position: relative;
+              z-index: 1;
+              display: grid;
+              grid-template-columns: repeat(2, minmax(0,1fr));
+              gap: 10px;
+              align-content: start;
+              min-height: max-content;
+              align-self: start;
+            }
+            .metric { position: relative; padding: 13px 14px; border-radius: 16px; border: 1px solid rgba(148,163,184,.12); background: rgba(255,255,255,.03); overflow: hidden; }
+            .metric:after { content: ""; position: absolute; right: 12px; top: 12px; width: 8px; height: 8px; border-radius: 999px; background: rgba(148,163,184,.6); }
+            .metric[data-tone="positive"]:after { background: var(--positive); box-shadow: 0 0 0 4px rgba(99,217,162,.12); }
+            .metric[data-tone="negative"]:after { background: var(--negative); box-shadow: 0 0 0 4px rgba(255,143,150,.10); }
+            .metric[data-tone="neutral"]:after { background: var(--neutral); box-shadow: 0 0 0 4px rgba(246,195,94,.12); }
+            .metric b { display: block; color: var(--muted); font-size: .72rem; font-weight: 800; text-transform: uppercase; }
+            .metric strong { display: block; margin-top: 8px; color: var(--strong); font-size: 1.08rem; font-weight: 900; }
+            .metric em { display: block; margin-top: 6px; font-style: normal; font-size: .82rem; font-weight: 800; }
+            .metric[data-tone="positive"] em { color: var(--positive); }
+            .metric[data-tone="negative"] em { color: var(--negative); }
+            .metric[data-tone="neutral"] em { color: var(--neutral); }
+            .metric small { display: block; margin-top: 8px; color: var(--muted); font-size: .72rem; font-weight: 700; padding-right: 18px; }
+            .foot {
+              position: relative;
+              z-index: 3;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 12px;
+              margin-top: 2px;
+              padding: 12px 14px 14px;
+              background: linear-gradient(180deg, rgba(10,15,28,0), rgba(10,15,28,.94) 30%);
+            }
+            .nav { display: inline-flex; align-items: center; gap: 8px; }
+            .btn { position: relative; z-index: 4; min-width: 44px; height: 38px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(148,163,184,.14); background: rgba(255,255,255,.04); color: var(--strong); font-size: .78rem; font-weight: 900; cursor: pointer; transition: border-color .28s ease, background .28s ease; }
+            .dots { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+            .dot { width: 11px; height: 11px; border: 0; border-radius: 999px; background: rgba(148,163,184,.32); cursor: pointer; }
+            .dot.active { width: 24px; background: var(--tone-progress); }
+            .index { color: var(--muted); font-size: .76rem; font-weight: 800; }
+            @media (max-width: 980px) {
+              .head { flex-direction: column; align-items: flex-start; }
+              .date { text-align: left; }
+              .body {
+                display: block;
+              }
+              .story {
+                display: flex;
+                width: 100%;
+                min-height: max-content;
+                padding-bottom: 2px;
+                margin: 0;
+                flex: 0 0 auto;
+              }
+              .metrics {
+                display: grid;
+                width: 100%;
+                min-height: max-content;
+                margin-top: 18px;
+                padding-top: 12px;
+                border-top: 1px solid rgba(148,163,184,.14);
+                grid-template-columns: repeat(2, minmax(0,1fr));
+                flex: 0 0 auto;
+              }
+              .foot { flex-direction: column; align-items: stretch; }
+              .nav { justify-content: space-between; }
+            }
+            @media (max-width: 560px) {
+              .metrics { grid-template-columns: 1fr; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="deck" id="deck" data-tone="neutral">
+            <div class="progress"><div id="progressBar"></div></div>
+            <div class="head"><div class="kicker">오늘 미국장</div><div class="date" id="deckDate"></div></div>
+            <div class="body">
+              <div class="story">
+                <p class="title" id="cardTitle"></p>
+                <p class="subtitle" id="cardSubtitle"></p>
+                <div class="hint" id="cardHint"></div>
+                <div class="bullets" id="cardBullets"></div>
+              </div>
+              <div class="metrics" id="cardMetrics"></div>
+            </div>
+            <div class="foot">
+              <div class="nav"><button class="btn" id="prevBtn" type="button">이전</button><div class="dots" id="deckDots"></div><button class="btn" id="nextBtn" type="button">다음</button></div>
+              <div class="index" id="deckIndex"></div>
+            </div>
+          </div>
+          <script>
+            const payload = __PAYLOAD__;
+            const cards = Array.isArray(payload.cards) ? payload.cards : [];
+            const deck = document.getElementById("deck");
+            const deckDate = document.getElementById("deckDate");
+            const cardTitle = document.getElementById("cardTitle");
+            const cardSubtitle = document.getElementById("cardSubtitle");
+            const cardHint = document.getElementById("cardHint");
+            const cardBullets = document.getElementById("cardBullets");
+            const cardMetrics = document.getElementById("cardMetrics");
+            const deckDots = document.getElementById("deckDots");
+            const deckIndex = document.getElementById("deckIndex");
+            const progressBar = document.getElementById("progressBar");
+            const prevBtn = document.getElementById("prevBtn");
+            const nextBtn = document.getElementById("nextBtn");
+            let activeIndex = 0;
+            let paused = false;
+            let rafId = null;
+            let startedAt = 0;
+            let elapsedBeforePause = 0;
+            let currentDuration = 7000;
+            function card() { return cards[activeIndex] || {}; }
+            function loopIndex(index) { return cards.length ? (index + cards.length) % cards.length : 0; }
+            function stopTicker() { if (rafId) { cancelAnimationFrame(rafId); rafId = null; } }
+            function tick(now) {
+              if (paused) return;
+              if (!startedAt) startedAt = now;
+              const elapsed = elapsedBeforePause + (now - startedAt);
+              const progress = Math.min(elapsed / currentDuration, 1);
+              progressBar.style.transform = "scaleX(" + progress + ")";
+              if (progress >= 1) {
+                elapsedBeforePause = 0;
+                startedAt = 0;
+                activeIndex = loopIndex(activeIndex + 1);
+                render();
+                return;
+              }
+              rafId = requestAnimationFrame(tick);
+            }
+            function startTicker(reset) {
+              stopTicker();
+              if (reset) { elapsedBeforePause = 0; startedAt = 0; }
+              progressBar.style.transform = "scaleX(" + (elapsedBeforePause / currentDuration) + ")";
+              if (!paused) rafId = requestAnimationFrame(tick);
+            }
+            function pauseTicker() {
+              if (paused || !cards.length) return;
+              paused = true;
+              if (startedAt) { elapsedBeforePause += performance.now() - startedAt; startedAt = 0; }
+              stopTicker();
+            }
+            function resumeTicker() {
+              if (!paused || !cards.length) return;
+              paused = false;
+              startTicker(false);
+            }
+            function renderDots() {
+              deckDots.innerHTML = "";
+              cards.forEach((item, index) => {
+                const dot = document.createElement("button");
+                dot.type = "button";
+                dot.className = "dot" + (index === activeIndex ? " active" : "");
+                dot.addEventListener("click", () => { activeIndex = index; render(); });
+                deckDots.appendChild(dot);
+              });
+            }
+            function renderMetrics(metrics) {
+              cardMetrics.innerHTML = "";
+              (metrics || []).forEach((metric) => {
+                const item = document.createElement("article");
+                item.className = "metric";
+                item.dataset.tone = metric.tone || "neutral";
+                item.innerHTML = "<b>" + (metric.label || "") + "</b><strong>" + (metric.value || "N/A") + "</strong>" + (metric.delta ? "<em>" + metric.delta + "</em>" : "") + (metric.note ? "<small>" + metric.note + "</small>" : "");
+                cardMetrics.appendChild(item);
+              });
+            }
+            function renderBullets(bullets) {
+              cardBullets.innerHTML = "";
+              (bullets || []).forEach((entry) => {
+                const bullet = typeof entry === "string" ? { text: entry, tone: "neutral" } : (entry || {});
+                const row = document.createElement("div");
+                row.className = "bullet";
+                row.dataset.tone = bullet.tone || "neutral";
+                const dot = document.createElement("i");
+                const copy = document.createElement("span");
+                copy.textContent = bullet.text || "";
+                row.appendChild(dot);
+                row.appendChild(copy);
+                cardBullets.appendChild(row);
+              });
+            }
+            function render() {
+              const current = card();
+              currentDuration = Number(current.duration_ms) || 7000;
+              deck.dataset.tone = "neutral";
+              deckDate.textContent = payload.market_date_label || "";
+              cardTitle.textContent = current.title || "";
+              cardSubtitle.textContent = current.subtitle || "";
+              cardHint.textContent = current.chart_hint || "";
+              renderMetrics(current.metrics);
+              renderBullets(current.bullets);
+              renderDots();
+              deckIndex.textContent = cards.length ? (activeIndex + 1) + " / " + cards.length + " 카드" : "";
+              startTicker(true);
+            }
+            prevBtn.addEventListener("click", () => { activeIndex = loopIndex(activeIndex - 1); render(); });
+            nextBtn.addEventListener("click", () => { activeIndex = loopIndex(activeIndex + 1); render(); });
+            deck.addEventListener("mouseenter", pauseTicker);
+            deck.addEventListener("mouseleave", resumeTicker);
+            deck.addEventListener("touchstart", pauseTicker, { passive: true });
+            deck.addEventListener("touchend", resumeTicker, { passive: true });
+            deck.addEventListener("touchcancel", resumeTicker, { passive: true });
+            if (cards.length) {
+              render();
+            } else {
+              deck.dataset.tone = "neutral";
+              deckDate.textContent = payload.market_date_label || "";
+              cardTitle.textContent = "오늘 미국장 브리핑";
+              cardSubtitle.textContent = "시장 데이터가 아직 동기화 중입니다.";
+              cardHint.textContent = "시장 데이터 동기화";
+              renderBullets(["SPY, QQQ, VIX, 10년물 입력값을 불러오는 중입니다."]);
+            }
+          </script>
+        </body>
+        </html>
+        """
+    ).strip()
+    return template.replace("__FONT_IMPORT_URL__", FONT_IMPORT_URL).replace("__FONT_STACK__", FONT_STACK).replace("__PAYLOAD__", payload_json)
+
+
+def _render_us_market_daily_deck(payload):
+    components.html(
+        _build_us_market_daily_doc(payload),
+        height=_US_MARKET_DECK_HEIGHT,
+        scrolling=False,
+    )
+
+
+def render_market_home_dashboard():
+    payload = build_us_market_daily_payload()
+    headline_copy = html.escape(
+        payload.get("headline")
+        or "무엇이 미국장을 움직였는지, 어디에 강약이 몰렸는지, 다음 세션에서 무엇을 볼지 빠르게 정리합니다."
+    )
+    badges_html = "".join(
+        [
+            _market_badge("미국 시장", "accent"),
+            _market_badge("5장 브리핑", "warning"),
+            _market_badge("Gemini" if GEMINI_API_KEY else "규칙 기반", "muted"),
+        ]
+    )
+    st.markdown(
+        dedent(
+            f"""
+            <div class="sigl-market-dashboard-anchor"></div>
+            <div class="sigl-market-dashboard__hero">
+              <div class="sigl-market-dashboard__intro">
+                <p class="sigl-page-head__eyebrow">오늘 미국장</p>
+                <p class="sigl-page-head__title">데일리 브리핑</p>
+                <p class="sigl-market-dashboard__copy">{headline_copy}</p>
+              </div>
+              <div class="sigl-market-dashboard__meta">{badges_html}</div>
+            </div>
+            """
+        ),
+        unsafe_allow_html=True,
+    )
+    _render_us_market_daily_deck(payload)
 
 def _mini_stat_card(label, value, color, tooltip):
     return (
@@ -646,10 +1675,14 @@ def render_judgment_card(m):
         f"<p style='color:#CBD5E1;font-size:.82rem;margin:0'>{translate_chart_text(detail_text)}</p>"
         f"</div>"
     ) if detail_text else ""
+    contrast_html = (
+        f"<p style='color:#CBD5E1;font-size:.8rem;margin:0 0 10px'>{translate_chart_text(contrast)}</p>"
+        if contrast else ""
+    )
     risk_html = (
         f"<div style='margin:14px 0 0;background:rgba(15,23,42,.58);border:1px solid rgba(148,163,184,.14);border-radius:12px;padding:14px 16px'>"
         f"<p style='color:#94A3B8;font-size:.72rem;font-weight:700;margin:0 0 8px'>위험 점검(Risk Check)</p>"
-        f"{f\"<p style='color:#CBD5E1;font-size:.8rem;margin:0 0 10px'>{translate_chart_text(contrast)}</p>\" if contrast else ''}"
+        f"{contrast_html}"
         f"<div style='display:flex;gap:8px;flex-wrap:wrap'>{chips}</div>"
         f"</div>"
     ) if contrast or risk_tags else ""

@@ -2848,7 +2848,83 @@ html, body, [class*="css"] {{
 .score-pillar-value {{
   color:var(--sigl-text-strong) !important;
 }}
+.sigl-market-dashboard-anchor{{
+  width:0;
+  height:0;
+  overflow:hidden;
+}}
+.sigl-market-dashboard__hero{{
+  position:relative;
+  display:grid;
+  grid-template-columns:minmax(0, 1fr) auto;
+  gap:16px;
+  align-items:end;
+  padding:22px 24px;
+  margin:0 0 12px;
+  border-radius:22px;
+  border:1px solid rgba(148,163,184,.18);
+  background:
+    radial-gradient(circle at top right, rgba(125,211,252,.12), transparent 30%),
+    linear-gradient(180deg, rgba(19,28,45,.92), rgba(11,17,32,.98));
+  box-shadow:
+    0 18px 38px rgba(2,6,23,.24),
+    inset 0 1px 0 rgba(255,255,255,.04);
+  overflow:hidden;
+}}
+.sigl-market-dashboard__hero::after{{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:linear-gradient(120deg, rgba(255,255,255,0) 14%, rgba(255,255,255,.07) 48%, rgba(255,255,255,0) 82%);
+  opacity:.45;
+  transform:translate3d(-18%, 0, 0);
+}}
+.sigl-market-dashboard__intro{{
+  position:relative;
+  z-index:1;
+  min-width:0;
+}}
+.sigl-market-dashboard__copy{{
+  margin:8px 0 0;
+  max-width:720px;
+  color:#CBD5E1;
+  font-size:.94rem;
+  line-height:1.68;
+  font-weight:600;
+}}
+.sigl-market-dashboard__meta{{
+  position:relative;
+  z-index:1;
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:8px;
+  flex-wrap:wrap;
+}}
+div[data-testid="stVerticalBlock"]:has(.sigl-market-dashboard-anchor){{
+  gap:12px!important;
+}}
+div[data-testid="stVerticalBlock"]:has(.sigl-market-dashboard-anchor) iframe{{
+  width:100%!important;
+  border:0!important;
+  border-radius:22px!important;
+  background:transparent!important;
+}}
 @media (max-width: 640px) {{
+  .sigl-market-dashboard__hero{{
+    grid-template-columns:1fr;
+    align-items:flex-start;
+    padding:18px 18px;
+    border-radius:18px;
+  }}
+  .sigl-market-dashboard__copy{{
+    font-size:.88rem;
+    line-height:1.6;
+  }}
+  .sigl-market-dashboard__meta{{
+    justify-content:flex-start;
+  }}
   [data-testid="stVerticalBlockBorderWrapper"] > div {{
     padding:18px 18px !important;
   }}
