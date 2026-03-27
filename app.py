@@ -60,6 +60,11 @@ _ETF_UNIVERSE_PRESETS = [
     {"key": "WCBR", "label": "WCBR", "symbol": "WCBR"},
 ]
 _ETF_UNIVERSE_PRESET_MAP = {item["key"]: item for item in _ETF_UNIVERSE_PRESETS}
+MODE_MARKET_DAILY = "US MARKET DAILY"
+MODE_ANALYSIS = "분석"
+MODE_SCANNER = "스캐너"
+_APP_MODE_OPTIONS = [MODE_MARKET_DAILY, MODE_ANALYSIS, MODE_SCANNER]
+_QUICK_ANALYSIS_TICKERS = ["NVDA", "TSLA", "AAPL", "GOOGL", "AMZN", "META", "MSFT", "PLTR", "HIMS", "SNDK", "LITE", "COHR", "IREN", "ORCL", "RKLB", "ASTS"]
 
 
 # ━━━ Constants ━━━
@@ -133,7 +138,7 @@ def _initial_messages():
 # ━━━ Session + Main ━━━
 def init_session():
     defs = {
-        '_mode': '분석',
+        '_mode': MODE_MARKET_DAILY,
         '_auto': None,
         'quick': None,
         'messages': _initial_messages(),
@@ -163,7 +168,7 @@ def init_session():
 
 
 def reset_session():
-    st.session_state['_mode'] = '분석'
+    st.session_state['_mode'] = MODE_MARKET_DAILY
     st.session_state['_auto'] = None
     st.session_state['quick'] = None
     st.session_state['messages'] = _initial_messages()
@@ -238,9 +243,26 @@ def _queue_scan_navigation(idx):
     ticker = ctx['results'][idx]['ticker']
     _set_scan_focus(ticker, idx)
     st.session_state['scan_nav_select_idx'] = idx
-    st.session_state['_mode'] = '분석'
+    _queue_analysis_target(ticker)
+
+
+def _queue_analysis_target(ticker):
+    ticker = str(ticker or "").strip().upper()
+    if not ticker:
+        return
+    st.session_state['_mode'] = MODE_ANALYSIS
     st.session_state['_auto'] = ticker
+    st.session_state['quick'] = None
     st.rerun()
+
+
+def _render_quick_analysis_grid(key_prefix="quick"):
+    for start in range(0, len(_QUICK_ANALYSIS_TICKERS), 2):
+        cols = st.columns(2)
+        for idx, ticker in enumerate(_QUICK_ANALYSIS_TICKERS[start:start + 2]):
+            with cols[idx]:
+                if st.button(ticker, use_container_width=True, key=f"{key_prefix}_{ticker}"):
+                    _queue_analysis_target(ticker)
 
 def _build_scan_nav_labels(results):
     return [f"{i + 1}. {r['ticker']} · {r.get('jg', 'N/A')} · ES {r.get('es', 0):+.0f}" for i, r in enumerate(results)]
@@ -287,7 +309,7 @@ def _render_analysis_sidebar_nav():
         label_visibility="collapsed",
     )
     if st.button("스캐너로 돌아가기", key="scan_nav_back_sb", use_container_width=True):
-        st.session_state['_mode'] = '스캐너'
+        st.session_state['_mode'] = MODE_SCANNER
         st.rerun()
 
 def _show_analysis_toasts(ticker, meta):
@@ -1432,13 +1454,18 @@ def _resolve_board_tone(mode_label, judgment, es_value):
     return 'neutral'
 
 def _build_brand_payload(current_mode, chart_period):
-    mode_label = 'SCANNER' if current_mode == '스캐너' else 'ANALYSIS'
+    if current_mode == MODE_SCANNER:
+        mode_label = 'SCANNER'
+    elif current_mode == MODE_MARKET_DAILY:
+        mode_label = 'US MARKET DAILY'
+    else:
+        mode_label = 'ANALYSIS'
     period_label = _short_period_label(chart_period)
     analysis_messages = _analysis_messages()
     analysis_count = len(analysis_messages)
     history_rows = _history_rows_from_messages(analysis_messages, limit=8)
 
-    if current_mode == '스캐너':
+    if current_mode == MODE_SCANNER:
         results = st.session_state.get('scan_results', [])
         focus_idx = st.session_state.get('scan_focus_idx')
         focus_row = None
@@ -1505,6 +1532,49 @@ def _build_brand_payload(current_mode, chart_period):
             'focus_recent_signals': focus_recent_signals,
             'focus_stack_summary': focus_stack_summary,
             'status_tone': _resolve_board_tone(mode_label, judgment, es_value),
+        }
+
+    if current_mode == MODE_MARKET_DAILY:
+        focus = _format_board_code(st.session_state.get('last_ticker'), fallback='US CLOSE')
+        judgment = 'BRIEFING'
+        context = 'US CLOSE'
+        system_status = 'ACTIVE'
+        feed_status = 'MARKET_SYNC'
+        recent_label = 'DAILY RECAP'
+        recent_tone = 'accent'
+        summary = "Macro, breadth, and leadership shifts are staged before the next analysis entry."
+        marquee_items = _build_board_marquee([
+            f"[ {BRAND_NAME} ] BRIEFING",
+            f"STATUS {system_status}",
+            f"FOCUS {focus}",
+            f"SIGNAL {judgment}",
+            f"CTX {context}",
+            f"SPAN {period_label}",
+            f"LOG {analysis_count:02d}",
+        ], history_rows=history_rows)
+        return {
+            'brand_code': BRAND_NAME,
+            'mode': mode_label,
+            'focus': focus,
+            'price': _format_board_price(None),
+            'change_value': _format_board_change_value(None),
+            'change_pct': _format_board_change_pct(None),
+            'change_tone': 'neutral',
+            'es': _format_board_es(None),
+            'judgment': judgment,
+            'context': context,
+            'period': period_label,
+            'recent_label': recent_label,
+            'recent_tone': recent_tone,
+            'marquee_items': marquee_items,
+            'summary': summary,
+            'system_status': system_status,
+            'feed_status': feed_status,
+            'analysis_count': analysis_count,
+            'history_rows': history_rows,
+            'focus_recent_signals': [],
+            'focus_stack_summary': {'buy_agree': 0, 'sell_agree': 0, 'combined_scans': [], 'veto_flags': ''},
+            'status_tone': 'neutral',
         }
 
     analysis_msg = _latest_analysis_message()
@@ -1647,10 +1717,10 @@ def _render_empty_state(title, copy, badges=None, tone="accent"):
 with st.sidebar:
     app_mode = _render_sidebar_choice_buttons(
         "모드",
-        ['분석', '스캐너'],
+        _APP_MODE_OPTIONS,
         "_mode",
-        columns=2,
-        default_value='분석',
+        columns=1,
+        default_value=MODE_MARKET_DAILY,
     )
     chart_period = _render_sidebar_choice_buttons(
         "기간",
@@ -1665,16 +1735,16 @@ with st.sidebar:
         reset_session()
         st.rerun()
 
-    if st.session_state.get('_mode', '분석') == '분석':
+    if st.session_state.get('_mode', MODE_MARKET_DAILY) == MODE_ANALYSIS:
         _render_analysis_sidebar_nav()
 
-current_mode = st.session_state.get('_mode', '분석')
+current_mode = st.session_state.get('_mode', MODE_MARKET_DAILY)
 main_board_payload = _build_brand_payload(current_mode, chart_period)
 
 # ══════════════════════════════════════════════════════════════
 #  스캐너 모드
 # ══════════════════════════════════════════════════════════════
-if current_mode == '스캐너':
+if current_mode == MODE_SCANNER:
     _render_brand_board(main_board_payload)
     all_universe = sorted({str(t).strip().upper() for ts in SECTOR_GROUPS.values() for t in ts if str(t).strip()})
     sector_names = list(SECTOR_GROUPS.keys())
@@ -2016,9 +2086,7 @@ if current_mode == '스캐너':
 
             if st.button(f"{r['ticker']} 분석", key=f"sc_{r['ticker']}", use_container_width=True):
                 _set_scan_focus(r['ticker'], rk - 1)
-                st.session_state['_mode'] = '분석'
-                st.session_state['_auto'] = r['ticker']
-                st.rerun()
+                _queue_analysis_target(r['ticker'])
     else:
         _render_empty_state(
             "아직 스캔 결과가 없습니다",
@@ -2031,6 +2099,32 @@ if current_mode == '스캐너':
         )
 
 # ══════════════════════════════════════════════════════════════
+#  US MARKET DAILY 모드
+# ══════════════════════════════════════════════════════════════
+elif current_mode == MODE_MARKET_DAILY:
+    _render_brand_board(main_board_payload)
+    render_market_home_dashboard()
+    _render_section_heading(
+        "브리핑에서 바로 분석",
+        "티커를 입력하거나 빠른 시작에서 선택하면 분석 모드로 전환되어 상세 분석을 이어갑니다.",
+        badges=[
+            ("US MARKET DAILY", "accent"),
+            ("즉시 분석 전환", "warning"),
+        ],
+        eyebrow="Daily To Analysis",
+        tight=True,
+    )
+    _render_quick_analysis_grid(key_prefix="briefing_quick")
+    if ti := st.chat_input("분석할 티커를 입력하세요."):
+        parsed = _parse_ticker_input(ti)
+        if not parsed:
+            st.toast("분석할 티커를 입력해 주세요.", icon="⌨️")
+        else:
+            if len(parsed) > 1:
+                st.toast(f"{parsed[0]} 기준으로 먼저 분석합니다.", icon="📌")
+            _queue_analysis_target(parsed[0])
+
+# ══════════════════════════════════════════════════════════════
 #  분석 모드
 # ══════════════════════════════════════════════════════════════
 else:
@@ -2040,17 +2134,25 @@ else:
     report_indices = [i for i, msg in enumerate(st.session_state.messages) if msg.get("type") == "report"]
     latest_analysis_idx = analysis_indices[-1] if analysis_indices else None
     latest_report_idx = report_indices[-1] if report_indices else None
-    show_market_home_dashboard = not analysis_indices
 
-    if show_market_home_dashboard:
-        render_market_home_dashboard()
-    else:
+    if analysis_indices:
         _render_section_heading(
             "Analysis Feed",
             "최신 분석과 생성된 리포트가 시간순으로 쌓이며, 가장 최근 분석이 기본으로 펼쳐집니다.",
             badges=[
                 (f"분석 {len(analysis_indices)}건", "accent"),
                 (f"리포트 {len(report_indices)}건", "warning"),
+            ],
+            eyebrow="Workspace",
+            tight=True,
+        )
+    else:
+        _render_section_heading(
+            "Analysis Workspace",
+            "티커를 입력하거나 빠른 시작을 눌러 개별 종목 분석을 시작하세요.",
+            badges=[
+                ("직접 입력", "accent"),
+                ("QUANT AUDIT 연동", "muted"),
             ],
             eyebrow="Workspace",
             tight=True,
@@ -2065,15 +2167,9 @@ else:
                 ("입력창으로 다른 티커 가능", "muted"),
             ],
             eyebrow="Quick Actions",
-            tight=bool(analysis_indices) or show_market_home_dashboard,
+            tight=bool(analysis_indices),
         )
-        quick_tickers = ["NVDA", "TSLA", "AAPL", "GOOGL", "AMZN", "META", "MSFT", "PLTR", "HIMS", "SNDK", "LITE", "COHR", "IREN", "ORCL", "RKLB", "ASTS"]
-        for start in range(0, len(quick_tickers), 2):
-            cols = st.columns(2)
-            for idx, ticker in enumerate(quick_tickers[start:start + 2]):
-                with cols[idx]:
-                    if st.button(ticker, use_container_width=True, key=f"quick_{ticker}"):
-                        st.session_state['quick'] = ticker
+        _render_quick_analysis_grid(key_prefix="analysis_quick")
 
     for i, msg in enumerate(st.session_state.messages):
         av = "✨" if msg["role"] == "assistant" else "🧑‍💻"
