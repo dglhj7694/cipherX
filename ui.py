@@ -591,6 +591,13 @@ def build_us_market_daily_payload():
         _build_snapshot_metric("WTI", "국제유가", macro_snapshots.get("WTI", {})),
         _build_snapshot_metric("BTC", "위험선호 프록시", macro_snapshots.get("BTC", {})),
     ]
+    market_driver_metrics = [
+        macro_metrics[1],
+        macro_metrics[2],
+        macro_metrics[0],
+        macro_metrics[3],
+        macro_metrics[4],
+    ]
     sector_metrics = [_build_snapshot_metric(row["symbol"], row["label"], row["snapshot"]) for row in (sector_sorted[:3] + list(reversed(sector_sorted[-3:])))]
     mover_metrics = [_build_snapshot_metric(row["symbol"], _mover_reason(row["snapshot"]), row["snapshot"]) for row in gainers + losers]
     insight_metrics = [
@@ -637,7 +644,7 @@ def build_us_market_daily_payload():
             "id": "market_drivers",
             "title": "움직인 이유",
             "subtitle": "금리, 달러, 환율, 유가, 비트코인 흐름이 시장 강약을 설명합니다.",
-            "metrics": macro_metrics,
+            "metrics": market_driver_metrics,
             "bullets": market_driver_bullets,
             "tone": _tone_from_change(benchmark_snapshots.get("SPY", {}).get("change_pct")),
             "chart_hint": "10Y / DXY / USD/KRW / WTI / BTC",
@@ -757,9 +764,7 @@ def _build_us_market_daily_doc(payload):
             .kicker { display: inline-flex; align-items: center; min-height: 30px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--tone-kicker-border); background: var(--tone-kicker-bg); color: var(--tone-kicker-copy); font-size: .72rem; font-weight: 900; transition: border-color .28s ease, background .28s ease, color .28s ease; }
             .date { color: var(--muted); font-size: .76rem; font-weight: 700; text-align: right; }
             .body {
-              display: grid;
-              grid-template-columns: minmax(0,1.1fr) minmax(260px,.9fr);
-              gap: 16px;
+              display: block;
               min-height: 0;
               padding: 0 14px 10px;
               overflow-y: auto;
@@ -768,7 +773,6 @@ def _build_us_market_daily_doc(payload):
               -webkit-overflow-scrolling: touch;
               scrollbar-width: thin;
               scrollbar-color: rgba(148,163,184,.38) transparent;
-              align-content: start;
             }
             .body::-webkit-scrollbar { width: 8px; height: 8px; }
             .body::-webkit-scrollbar-thumb { background: rgba(148,163,184,.32); border-radius: 999px; }
@@ -779,14 +783,23 @@ def _build_us_market_daily_doc(payload):
               display: flex;
               flex-direction: column;
               gap: 12px;
+              width: 100%;
               min-width: 0;
               min-height: max-content;
               align-self: start;
             }
+            .story-grid {
+              display: grid;
+              grid-template-columns: minmax(260px, 0.42fr) minmax(380px, 0.58fr);
+              gap: 18px;
+              width: 100%;
+              margin-top: 18px;
+              align-items: start;
+            }
             .title { margin: 0; color: var(--strong); font-size: 1.16rem; font-weight: 900; transition: color .28s ease; }
             .subtitle { margin: 0; color: #eef2ff; font-size: 1rem; line-height: 1.56; font-weight: 700; transition: color .28s ease; }
             .hint { display: inline-flex; align-items: center; width: fit-content; min-height: 30px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--tone-hint-border); background: var(--tone-hint-bg); color: var(--tone-hint-copy); font-size: .76rem; font-weight: 800; transition: border-color .28s ease, background .28s ease, color .28s ease; }
-            .bullets { display: flex; flex-direction: column; gap: 10px; }
+            .bullets { display: flex; flex-direction: column; gap: 10px; width: 100%; min-width: 0; }
             .bullet { display: grid; grid-template-columns: 12px minmax(0,1fr); gap: 10px; padding: 11px 12px; border-radius: 14px; border: 1px solid rgba(148,163,184,.12); background: rgba(255,255,255,.03); transition: border-color .28s ease, background .28s ease; }
             .bullet[data-tone="positive"] { border-color: rgba(99,217,162,.16); background: linear-gradient(180deg, rgba(99,217,162,.06), rgba(255,255,255,.02)); }
             .bullet[data-tone="negative"] { border-color: rgba(255,143,150,.16); background: linear-gradient(180deg, rgba(255,143,150,.06), rgba(255,255,255,.02)); }
@@ -800,13 +813,16 @@ def _build_us_market_daily_doc(payload):
               position: relative;
               z-index: 1;
               display: grid;
-              grid-template-columns: repeat(2, minmax(0,1fr));
+              width: 100%;
+              padding-left: 14px;
+              border-left: 1px solid rgba(148,163,184,.14);
+              grid-template-columns: repeat(auto-fit, minmax(min(100%, 165px), 1fr));
               gap: 10px;
               align-content: start;
               min-height: max-content;
               align-self: start;
             }
-            .metric { position: relative; padding: 13px 14px; border-radius: 16px; border: 1px solid rgba(148,163,184,.12); background: rgba(255,255,255,.03); overflow: hidden; }
+            .metric { position: relative; width: 100%; min-width: 0; padding: 13px 14px; border-radius: 16px; border: 1px solid rgba(148,163,184,.12); background: rgba(255,255,255,.03); overflow: hidden; }
             .metric:after { content: ""; position: absolute; right: 12px; top: 12px; width: 8px; height: 8px; border-radius: 999px; background: rgba(148,163,184,.6); }
             .metric[data-tone="positive"]:after { background: var(--positive); box-shadow: 0 0 0 4px rgba(99,217,162,.12); }
             .metric[data-tone="negative"]:after { background: var(--negative); box-shadow: 0 0 0 4px rgba(255,143,150,.10); }
@@ -840,6 +856,7 @@ def _build_us_market_daily_doc(payload):
               .date { text-align: left; }
               .body {
                 display: block;
+                padding: 0 12px 10px;
               }
               .story {
                 display: flex;
@@ -849,20 +866,30 @@ def _build_us_market_daily_doc(payload):
                 margin: 0;
                 flex: 0 0 auto;
               }
+              .story-grid {
+                grid-template-columns: 1fr;
+                gap: 18px;
+                margin-top: 18px;
+              }
               .metrics {
                 display: grid;
                 width: 100%;
                 min-height: max-content;
-                margin-top: 18px;
+                margin-top: 0;
+                padding-left: 0;
                 padding-top: 12px;
+                border-left: 0;
                 border-top: 1px solid rgba(148,163,184,.14);
-                grid-template-columns: repeat(2, minmax(0,1fr));
+                grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
                 flex: 0 0 auto;
               }
               .foot { flex-direction: column; align-items: stretch; }
               .nav { justify-content: space-between; }
             }
             @media (max-width: 560px) {
+              .deck { padding: 8px; border-radius: 18px; }
+              .head { padding: 16px 12px 8px; }
+              .foot { padding: 10px 12px 12px; }
               .metrics { grid-template-columns: 1fr; }
             }
           </style>
@@ -876,9 +903,11 @@ def _build_us_market_daily_doc(payload):
                 <p class="title" id="cardTitle"></p>
                 <p class="subtitle" id="cardSubtitle"></p>
                 <div class="hint" id="cardHint"></div>
-                <div class="bullets" id="cardBullets"></div>
               </div>
-              <div class="metrics" id="cardMetrics"></div>
+              <div class="story-grid">
+                <div class="bullets" id="cardBullets"></div>
+                <div class="metrics" id="cardMetrics"></div>
+              </div>
             </div>
             <div class="foot">
               <div class="nav"><button class="btn" id="prevBtn" type="button">이전</button><div class="dots" id="deckDots"></div><button class="btn" id="nextBtn" type="button">다음</button></div>
