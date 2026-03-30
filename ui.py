@@ -586,7 +586,13 @@ def _build_sector_sentence(sector_rows):
     total = len(sector_rows)
     strongest = max(sector_rows, key=lambda row: row.get("change_pct") if row.get("change_pct") is not None else -999)
     weakest = min(sector_rows, key=lambda row: row.get("change_pct") if row.get("change_pct") is not None else 999)
-    return f"{total}개 섹터 중 {positive}개가 상승했습니다. {strongest['label']}(이)가 주도했고 {weakest['label']}(이)가 가장 약했습니다."
+    strongest_change = strongest.get("change_pct")
+    weakest_change = weakest.get("change_pct")
+    breadth_note = "광범위한 상승" if positive >= max(7, total - 3) else "하락 우위" if positive <= max(3, total // 3) else "선별 장세"
+    return (
+        f"{total}개 섹터 중 {positive}개가 상승한 {breadth_note}였습니다. "
+        f"{strongest['label']} {_format_change_pct(strongest_change)}가 주도했고 {weakest['label']} {_format_change_pct(weakest_change)}가 가장 부진했습니다."
+    )
 
 
 def _build_driver_candidates(benchmarks, macro, sector_rows):
@@ -856,6 +862,41 @@ def _mover_reason(snapshot):
     if month_change is not None and month_change < -8:
         return "월간 약세 흐름 속 추가 하락"
     return "단기 수급이 빠르게 이동"
+
+
+def _average_market_change(rows):
+    values = [row.get("change_pct") for row in (rows or []) if row.get("change_pct") is not None and not pd.isna(row.get("change_pct"))]
+    if not values:
+        return None
+    return float(sum(values) / len(values))
+
+
+def _build_mover_context(snapshot):
+    snapshot = snapshot or {}
+    parts = []
+    volume_ratio = snapshot.get("volume_ratio")
+    five_day_change = snapshot.get("five_day_change")
+    month_change = snapshot.get("month_change")
+    if volume_ratio is not None and not pd.isna(volume_ratio) and volume_ratio >= 1.25:
+        parts.append(f"거래량 {volume_ratio:.1f}배")
+    if five_day_change is not None and not pd.isna(five_day_change):
+        parts.append(f"5일 {_format_change_pct(five_day_change)}")
+    if month_change is not None and not pd.isna(month_change):
+        parts.append(f"1개월 {_format_change_pct(month_change)}")
+    return " · ".join(parts[:2])
+
+
+def _build_mover_detail_bullet(row):
+    row = row or {}
+    symbol = str(row.get("symbol") or "").strip()
+    change_pct = row.get("change_pct")
+    snapshot = row.get("snapshot") or {}
+    tone = "positive" if (change_pct or 0) >= 0 else "negative"
+    base = f"{symbol} {_format_change_pct(change_pct)} / {_mover_reason(snapshot)}"
+    context = _build_mover_context(snapshot)
+    if context:
+        base += f" · {context}"
+    return _build_market_bullet(base, tone)
 
 
 def _extract_json_object(text):
@@ -2289,10 +2330,11 @@ def _generate_us_market_ai_copy(market_date_key, summary_json):
             "Return pure JSON only.\n"
             'Format: {"headline":"...","drivers":["...","...","..."],"insight":"...","watchlist":["...","...","..."]}\n'
             "Rules:\n"
-            "- headline: one short sentence.\n"
-            "- drivers: two to three short bullets.\n"
+            "- headline: one short but explanatory sentence.\n"
+            "- drivers: three to four short bullets that explain what moved the market and why it mattered.\n"
             "- insight: one sentence with a practical next-session angle.\n"
-            "- watchlist: two to three short points.\n"
+            "- watchlist: three to four specific checkpoints for the next session.\n"
+            "- Prefer explanation over slogans; mention cause and implication together.\n"
             "- Do not mention unverified news or events.\n"
             f"- market_date_key: {market_date_key}\n"
             f"- data: {summary_json}\n"
@@ -2419,6 +2461,19 @@ def build_us_market_daily_payload():
 
     sector_breadth = sum(1 for row in sector_sorted if (row.get("change_pct") or 0) > 0)
     sector_total = len(sector_sorted) or len(_US_SECTOR_ETFS)
+    strongest_sector = sector_sorted[0] if sector_sorted else None
+    weakest_sector = sector_sorted[-1] if sector_sorted else None
+    sector_spread = None
+    if strongest_sector and weakest_sector and strongest_sector.get("change_pct") is not None and weakest_sector.get("change_pct") is not None:
+        sector_spread = float(strongest_sector["change_pct"] - weakest_sector["change_pct"])
+    top_gainer = gainers[0] if gainers else None
+    top_loser = losers[0] if losers else None
+    avg_gainer_change = _average_market_change(gainers)
+    avg_loser_change = _average_market_change(losers)
+    cyclical_symbols = {"XLK", "XLY", "XLI", "XLB", "XLF", "XLE", "XLC"}
+    defensive_symbols = {"XLV", "XLP", "XLU", "XLRE"}
+    cyclical_up = sum(1 for row in sector_sorted if row.get("symbol") in cyclical_symbols and (row.get("change_pct") or 0) > 0)
+    defensive_up = sum(1 for row in sector_sorted if row.get("symbol") in defensive_symbols and (row.get("change_pct") or 0) > 0)
 
     main_metrics = [
         _build_snapshot_metric("SPY", "미국 대형주", benchmark_snapshots.get("SPY", {})),
@@ -2457,15 +2512,89 @@ def build_us_market_daily_payload():
         {"label": "확산도", "value": f"{sector_breadth}/{sector_total}", "delta": "상승 섹터", "note": "섹터 전반 흐름", "tone": "positive" if sector_breadth >= sector_total / 2 else "negative"},
     ]
     market_driver_summary = str(drivers[0]).strip() if drivers else ""
-    market_driver_details = drivers[1:3] if market_driver_summary else drivers[:2]
+    market_driver_details = drivers[1:4] if market_driver_summary else drivers[:3]
     if not market_driver_summary:
         market_driver_summary = "금리, 달러, 환율, 금, 유가, 비트코인 흐름이 시장 강약을 설명합니다."
+    main_bullets = [
+        _build_market_bullet(
+            f"시장 상태: {market_regime['state_display']} · 구조: {market_structure['label']} · 심리 {market_regime['fear_greed_score']}/100({market_regime['fear_greed_label']})",
+            _resolve_market_tone(market_regime["tone"], market_structure["tone"]),
+        ),
+        _build_market_bullet(
+            f"리더십/확산: QQQ-SPY {_format_pct_point(qqq_vs_spy)} / IWM-SPY {_format_pct_point(iwm_vs_spy)} / 섹터 확산도 {sector_breadth}/{sector_total}",
+            _resolve_market_tone(qqq_vs_spy_metric["tone"], iwm_vs_spy_metric["tone"], "positive" if sector_breadth >= sector_total / 2 else "negative"),
+        ),
+        _build_market_bullet(
+            f"섹터 지도: {strongest_sector['label']} {_format_change_pct(strongest_sector.get('change_pct'))} 주도 / {weakest_sector['label']} {_format_change_pct(weakest_sector.get('change_pct'))} 부진",
+            _resolve_market_tone(_tone_from_change(strongest_sector.get("change_pct")), _tone_from_change(weakest_sector.get("change_pct"))),
+        ) if strongest_sector and weakest_sector else _build_market_bullet("섹터 지도는 데이터 동기화 후 갱신됩니다.", "neutral"),
+        _build_market_bullet(
+            f"거시 배경: 10Y {macro_metric_map['10Y']['value']} ({macro_metric_map['10Y']['delta'] or 'N/A'}) / DXY {macro_metric_map['DXY']['delta'] or 'N/A'} / Gold {macro_metric_map['Gold']['delta'] or 'N/A'}",
+            _resolve_market_tone(macro_metric_map["10Y"]["tone"], macro_metric_map["DXY"]["tone"], macro_metric_map["Gold"]["tone"]),
+        ),
+    ]
+    if top_gainer and top_loser:
+        main_bullets.append(
+            _build_market_bullet(
+                f"주목 종목: {top_gainer['symbol']} {_format_change_pct(top_gainer.get('change_pct'))} 강세 / {top_loser['symbol']} {_format_change_pct(top_loser.get('change_pct'))} 약세",
+                _tone_from_change(((top_gainer.get("change_pct") or 0) + (top_loser.get("change_pct") or 0)) / 2, neutral_band=0.5),
+            )
+        )
     market_driver_bullets = [
         _build_market_bullet(
             f"달러/방어 체크: DXY {macro_metric_map['DXY']['delta'] or 'N/A'} / USD/KRW {macro_metric_map['USD/KRW']['delta'] or 'N/A'} / Gold {macro_metric_map['Gold']['delta'] or 'N/A'}",
             _resolve_market_tone(macro_metric_map["DXY"]["tone"], macro_metric_map["USD/KRW"]["tone"], macro_metric_map["Gold"]["tone"]),
+        ),
+        _build_market_bullet(
+            f"금리/원자재/위험선호: 10Y {macro_metric_map['10Y']['delta'] or 'N/A'} / WTI {macro_metric_map['WTI']['delta'] or 'N/A'} / BTC {macro_metric_map['BTC']['delta'] or 'N/A'}",
+            _resolve_market_tone(macro_metric_map["10Y"]["tone"], macro_metric_map["WTI"]["tone"], macro_metric_map["BTC"]["tone"]),
+        ),
+        _build_market_bullet(
+            f"시장 내부 체력: QQQ-SPY {_format_pct_point(qqq_vs_spy)} / IWM-SPY {_format_pct_point(iwm_vs_spy)} / 확산도 {sector_breadth}/{sector_total}",
+            _resolve_market_tone(qqq_vs_spy_metric["tone"], iwm_vs_spy_metric["tone"], "positive" if sector_breadth >= sector_total / 2 else "negative"),
+        ),
+    ] + [_build_market_bullet(text, _infer_market_text_tone(text)) for text in market_driver_details[:2]]
+    sector_bullets = []
+    sector_bullets.append(
+        _build_market_bullet(
+            f"섹터 확산: 상승 {sector_breadth}/{sector_total}개 · 경기민감 {cyclical_up}개 상승 / 방어 {defensive_up}개 상승",
+            "positive" if sector_breadth >= sector_total / 2 else "negative",
         )
-    ] + [_build_market_bullet(text, _infer_market_text_tone(text)) for text in market_driver_details]
+    )
+    if strongest_sector and weakest_sector and sector_spread is not None:
+        sector_bullets.append(
+            _build_market_bullet(
+                f"리더십 격차: {strongest_sector['label']} {_format_change_pct(strongest_sector.get('change_pct'))} vs {weakest_sector['label']} {_format_change_pct(weakest_sector.get('change_pct'))} · 스프레드 {sector_spread:+.2f}%p",
+                _resolve_market_tone(_tone_from_change(sector_spread, neutral_band=0.6), _tone_from_change(strongest_sector.get("change_pct"))),
+            )
+        )
+    if sector_sorted[:3]:
+        sector_bullets.append(
+            _build_market_bullet(
+                "강세 상위: " + " / ".join(f"{row['symbol']} {_format_change_pct(row.get('change_pct'))} {row['label']}" for row in sector_sorted[:3]),
+                "positive",
+            )
+        )
+    weak_sector_rows = list(reversed(sector_sorted[-3:])) if sector_sorted else []
+    if weak_sector_rows:
+        sector_bullets.append(
+            _build_market_bullet(
+                "약세 상위: " + " / ".join(f"{row['symbol']} {_format_change_pct(row.get('change_pct'))} {row['label']}" for row in weak_sector_rows),
+                "negative",
+            )
+        )
+    mover_subtitle = "메가캡과 핵심 유니버스에서 수급이 몰린 종목입니다."
+    if avg_gainer_change is not None and avg_loser_change is not None:
+        mover_subtitle = (
+            f"상승 상위 평균 {_format_change_pct(avg_gainer_change)} / 하락 상위 평균 {_format_change_pct(avg_loser_change)}. "
+            "거래량과 단기 추세가 동반된 종목 중심으로 수급이 움직였습니다."
+        )
+    insight_bullets = [
+        _build_market_bullet(
+            f"현재 해석: {market_structure['label']} · {market_structure['note']} / 리스크 상태 {market_regime['state_display']}",
+            _resolve_market_tone(market_structure["tone"], market_regime["tone"]),
+        )
+    ] + [_build_market_bullet(text, _infer_market_text_tone(text)) for text in watchlist[:4]]
     market_news_card = _build_market_news_card(
         market_date_key,
         benchmark_snapshots,
@@ -2482,23 +2611,10 @@ def build_us_market_daily_payload():
             "title": "오늘 시장 한줄",
             "subtitle": headline,
             "metrics": main_metrics,
-            "bullets": [
-                _build_market_bullet(
-                    f"시장 상태: {market_regime['state_display']} · 구조: {market_structure['label']} · 심리 {market_regime['fear_greed_score']}/100({market_regime['fear_greed_label']})",
-                    _resolve_market_tone(market_regime["tone"], market_structure["tone"]),
-                ),
-                _build_market_bullet(
-                    f"리더십/확산: QQQ-SPY {_format_pct_point(qqq_vs_spy)} / IWM-SPY {_format_pct_point(iwm_vs_spy)} / 섹터 확산도 {sector_breadth}/{sector_total}",
-                    _resolve_market_tone(qqq_vs_spy_metric["tone"], iwm_vs_spy_metric["tone"], "positive" if sector_breadth >= sector_total / 2 else "negative"),
-                ),
-                _build_market_bullet(
-                    f"방어/거시: 10Y {macro_metric_map['10Y']['value']} ({macro_metric_map['10Y']['delta'] or 'N/A'}) / DXY {macro_metric_map['DXY']['delta'] or 'N/A'} / Gold {macro_metric_map['Gold']['delta'] or 'N/A'}",
-                    _resolve_market_tone(macro_metric_map["10Y"]["tone"], macro_metric_map["DXY"]["tone"], macro_metric_map["Gold"]["tone"]),
-                ),
-            ],
+            "bullets": main_bullets,
             "tone": _tone_from_change(benchmark_snapshots.get("SPY", {}).get("change_pct")),
             "chart_hint": "SPY / QQQ / DIA / IWM / VIX / 리스크",
-            "duration_ms": _US_MARKET_DEFAULT_DURATION,
+            "duration_ms": _US_MARKET_TEXT_HEAVY_DURATION,
         },
         {
             "id": "market_drivers",
@@ -2516,7 +2632,7 @@ def build_us_market_daily_payload():
             "title": "주요 섹터",
             "subtitle": _build_sector_sentence(sector_sorted),
             "metrics": sector_metrics,
-            "bullets": [_build_market_bullet(f"강세 상위: {row['symbol']} {row['change_pct']:+.2f}% / {row['label']}", "positive") for row in sector_sorted[:3]] + [_build_market_bullet(f"약세 상위: {row['symbol']} {row['change_pct']:+.2f}% / {row['label']}", "negative") for row in list(reversed(sector_sorted[-3:]))],
+            "bullets": sector_bullets,
             "tone": "positive" if sector_breadth >= sector_total / 2 else "negative",
             "chart_hint": f"상승 섹터 {sector_breadth}/{sector_total}",
             "duration_ms": _US_MARKET_TEXT_HEAVY_DURATION,
@@ -2524,9 +2640,9 @@ def build_us_market_daily_payload():
         {
             "id": "top_movers",
             "title": "주요 등락주",
-            "subtitle": "메가캡과 핵심 유니버스에서 수급이 몰린 종목입니다.",
+            "subtitle": mover_subtitle,
             "metrics": mover_metrics,
-            "bullets": [_build_market_bullet(f"{row['symbol']} {row['change_pct']:+.2f}% / {_mover_reason(row['snapshot'])}", "positive") for row in gainers] + [_build_market_bullet(f"{row['symbol']} {row['change_pct']:+.2f}% / {_mover_reason(row['snapshot'])}", "negative") for row in losers],
+            "bullets": [_build_mover_detail_bullet(row) for row in gainers] + [_build_mover_detail_bullet(row) for row in losers],
             "tone": _tone_from_change(sum(row["change_pct"] for row in gainers + losers) / max(1, len(gainers + losers)) if gainers or losers else 0),
             "chart_hint": f"추적 유니버스 {len(movers_sorted)}개",
             "duration_ms": _US_MARKET_TEXT_HEAVY_DURATION,
@@ -2536,7 +2652,7 @@ def build_us_market_daily_payload():
             "title": "오늘 미장 인사이트",
             "subtitle": insight,
             "metrics": insight_metrics,
-            "bullets": [_build_market_bullet(text, _infer_market_text_tone(text)) for text in watchlist[:3]],
+            "bullets": insight_bullets,
             "tone": _tone_from_change(benchmark_snapshots.get("QQQ", {}).get("change_pct")),
             "chart_hint": "리스크 상태 / 공포·탐욕 / 상대강도",
             "duration_ms": _US_MARKET_TEXT_HEAVY_DURATION,
