@@ -1963,6 +1963,16 @@ if current_mode == MODE_SCANNER:
                 sa  = int(_sf(lt.get('Sell_Agree', 0)))
                 es  = _sf(lt.get('Ensemble_Score', 0))
                 cf  = _sf(lt.get('Judgment_Confidence', 0))
+                market_bias = _sf(lt.get('Market_Filter_Bias', 0))
+                downgrade_count = _sf(lt.get('Downgrade_Count', 0))
+                flip_guard_triggered = bool(lt.get('Flip_Guard_Triggered', False))
+                continuation_buy = _sf(lt.get('Continuation_Buy_Score', 0))
+                continuation_sell = _sf(lt.get('Continuation_Sell_Score', 0))
+                thin_trade_risk = bool(lt.get('Thin_Trade_Risk', False))
+                bullish_gap_reversal = bool(lt.get('Bullish_Gap_Reversal', False))
+                bearish_gap_failure = bool(lt.get('Bearish_Gap_Failure', False))
+
+                raw_jg = str(lt.get('Trade_Judgment', 'N/A'))
 
                 # ── 4. scan_score: acs 기반 tier 가중치 유지 (5일 활동도 반영) ─
                 t1b = sum(1 for s in acs if s['tier'] == 1 and s['dir'] == 'buy')
@@ -1976,7 +1986,30 @@ if current_mode == MODE_SCANNER:
                     + t1b * 4.0  - t1s * 4.0
                     + t2b * 1.6  - t2s * 1.6
                     + cf  * 0.04
+                    + market_bias * 0.55
+                    + continuation_buy * 0.9
+                    - continuation_sell * 0.9
                 )
+                scan_score -= downgrade_count * 3.5
+                if thin_trade_risk:
+                    scan_score -= 4.0
+                if bullish_gap_reversal:
+                    scan_score += 1.8
+                if bearish_gap_failure:
+                    scan_score -= 2.2
+                judgment_bias = {
+                    'STRONG_BUY': 10.0,
+                    'BUY': 5.0,
+                    'WATCH_BUY': 2.0,
+                    'WATCH_SELL': -2.0,
+                    'SELL': -5.0,
+                    'STRONG_SELL': -10.0,
+                }.get(raw_jg, 0.0)
+                scan_score += judgment_bias
+                if raw_jg in ('NEUTRAL', 'MIXED'):
+                    scan_score *= 0.7
+                if flip_guard_triggered:
+                    scan_score *= 0.82
                 strength = (
                     abs(es)
                     + (bt + stt) * 0.35
@@ -2010,7 +2043,6 @@ if current_mode == MODE_SCANNER:
                     fallback = sorted(acs, key=lambda x: (x.get('tier', 9), x.get('days_ago', 99)))[:6]
                     mhits = [{'icon': h['icon'], 'label': h['kor'], 'dir': h['dir'], 'date': h['date']} for h in fallback]
 
-                raw_jg = str(lt.get('Trade_Judgment', 'N/A'))
                 return {
                     'ticker':       t,
                     'price':        _sf(lt['Close']),

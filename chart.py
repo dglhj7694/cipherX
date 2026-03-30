@@ -750,6 +750,22 @@ def build_metadata(dc,ticker):
         'context':ctx_code,'context_label':CTX_KOR.get(ctx_code,'기본'),'committee':committee,
         'buy_agree':int(_sf(lat.get('Buy_Agree'))),'sell_agree':int(_sf(lat.get('Sell_Agree'))),'veto_flags':str(lat.get('Veto_Flags','')),'reversal_synergy':_sf(lat.get('Reversal_Synergy')),
         'judgment_reason':str(lat.get('Judgment_Reason','')),'judgment_detail':str(lat.get('Judgment_Detail','')),'action_label':str(lat.get('Action_Label','')),
+        'pre_veto_judgment':str(lat.get('PreVeto_Judgment','')),'downgrade_count':int(_sf(lat.get('Downgrade_Count'))),
+        'macro_risk_off_count':int(_sf(lat.get('Macro_Risk_Off_Count'))),'macro_risk_on_count':int(_sf(lat.get('Macro_Risk_On_Count'))),
+        'market_filter_bias':_sf(lat.get('Market_Filter_Bias')),'flip_guard_triggered':bool(lat.get('Flip_Guard_Triggered',False)),
+        'macro_pressure_score':_sf(lat.get('Macro_Pressure_Score')),'market_breadth_score':_sf(lat.get('Market_Breadth_Score')),
+        'breadth_risk_on':bool(lat.get('Breadth_Risk_On',False)),'breadth_risk_off':bool(lat.get('Breadth_Risk_Off',False)),
+        'narrow_leadership':bool(lat.get('Narrow_Leadership',False)),
+        'trend_inflection_buy_score':_sf(lat.get('Trend_Inflection_Buy_Score')),'trend_inflection_sell_score':_sf(lat.get('Trend_Inflection_Sell_Score')),
+        'trend_inflection_bull':bool(lat.get('Trend_Inflection_Bull',False)),'trend_inflection_bear':bool(lat.get('Trend_Inflection_Bear',False)),
+        'market_turn_bull_score':_sf(lat.get('Market_Turn_Bull_Score')),'market_turn_bear_score':_sf(lat.get('Market_Turn_Bear_Score')),
+        'market_turn_bull':bool(lat.get('Market_Turn_Bull',False)),'market_turn_bear':bool(lat.get('Market_Turn_Bear',False)),
+        'continuation_buy_score':_sf(lat.get('Continuation_Buy_Score')),'continuation_sell_score':_sf(lat.get('Continuation_Sell_Score')),
+        'utbot_stop_atr_gap':_sf(lat.get('UTBot_Stop_ATR_Gap')),
+        'bullish_gap_reversal':bool(lat.get('Bullish_Gap_Reversal',False)),'bearish_gap_failure':bool(lat.get('Bearish_Gap_Failure',False)),
+        'thin_trade_risk':bool(lat.get('Thin_Trade_Risk',False)),
+        'diag_support_hold':bool(lat.get('Diag_Support_Hold',False)),'diag_breakout_bull':bool(lat.get('Diag_Breakout_Bull',False)),
+        'diag_resistance_reject':bool(lat.get('Diag_Resistance_Reject',False)),'diag_breakdown_bear':bool(lat.get('Diag_Breakdown_Bear',False)),
         'ma50':_sf(lat.get('MA50')),'ma200':_sf(lat.get('MA200')),'vp_poc':_sf(lat.get('VP_POC')),'vp_vah':_sf(lat.get('VP_VAH')),'vp_val':_sf(lat.get('VP_VAL')),
         'percent_b':_sf(lat.get('Percent_B'),0.5),'rsi_mfi':_sf(lat.get('RSI_MFI')),'bb_up':_sf(lat.get('BB_Up')),'bb_low':_sf(lat.get('BB_Low')),
         'ema8':_sf(lat.get('EMA8')),'ema21':_sf(lat.get('EMA21')),'obv_trend':'rising' if _sf(lat.get('OBV'))>_sf(dc['OBV'].rolling(20).mean().iloc[-1]) else 'falling',
@@ -832,6 +848,7 @@ def build_metadata(dc,ticker):
     meta['regime_label']=localize_regime_label(meta.get('regime'), meta.get('regime_label'))
     meta['context_label']=localize_context_label(meta.get('context'))
     meta['judgment']=localize_judgment_label(meta.get('judgment'))
+    meta['pre_veto_judgment']=localize_judgment_label(meta.get('pre_veto_judgment'))
     meta['action_label']=localize_action_label(meta.get('action_label') or meta.get('judgment'))
     meta['leading_verdict']=translate_chart_text(meta.get('leading_verdict'))
     meta['lagging_verdict']=translate_chart_text(meta.get('lagging_verdict'))

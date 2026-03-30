@@ -270,6 +270,101 @@ def _combined_scan_panel_height(card_count):
     return max(260, 160 + max(int(card_count), 1) * 48)
 
 
+def _join_reason_phrases(parts):
+    cleaned = [str(part).strip() for part in parts if str(part or "").strip()]
+    if not cleaned:
+        return ""
+    if len(cleaned) == 1:
+        return cleaned[0]
+    if len(cleaned) == 2:
+        return f"{cleaned[0]}와 {cleaned[1]}"
+    return f"{', '.join(cleaned[:-1])}, {cleaned[-1]}"
+
+
+def _judgment_explainer(meta, title):
+    raw_judgment = str(meta.get("judgment", "")).strip()
+    final_label = localize_action_label(meta.get("action_label", "").strip() or raw_judgment or title or "NEUTRAL")
+    pre_veto_label = localize_judgment_label(str(meta.get("pre_veto_judgment", "")).strip())
+    downgrade_count = _safe_int(meta.get("downgrade_count", 0))
+    macro_risk_off_count = _safe_int(meta.get("macro_risk_off_count", 0))
+    macro_risk_on_count = _safe_int(meta.get("macro_risk_on_count", 0))
+    continuation_buy = _safe_float(meta.get("continuation_buy_score", 0))
+    continuation_sell = _safe_float(meta.get("continuation_sell_score", 0))
+    macro_pressure = _safe_float(meta.get("macro_pressure_score", 0))
+    ut_gap = max(_safe_float(meta.get("utbot_stop_atr_gap", 0)), 0.0)
+    breadth_score = _safe_float(meta.get("market_breadth_score", 0))
+    judgment_tone = _tone_from_text(raw_judgment or final_label)
+
+    supportive = []
+    risk = []
+
+    if continuation_buy >= 2.5:
+        supportive.append("타이트한 continuation 신호")
+    elif continuation_buy >= 1.0:
+        supportive.append("추세 지속 신호")
+    if meta.get("bullish_gap_reversal"):
+        supportive.append("갭다운 회복 패턴")
+    if meta.get("diag_support_hold"):
+        supportive.append("사선 지지 유지")
+    if meta.get("diag_breakout_bull"):
+        supportive.append("사선 돌파 구조")
+    if ut_gap and ut_gap <= 0.9 and continuation_buy >= continuation_sell:
+        supportive.append("UTBot 기준선 근처 지지")
+    if breadth_score >= 1.0 or meta.get("breadth_risk_on") or macro_risk_on_count >= 2:
+        supportive.append("시장 breadth 확산")
+
+    if continuation_sell >= 2.5:
+        risk.append("구조 약화와 매도 압력 누적")
+    elif continuation_sell >= 1.0:
+        risk.append("매도 압력 겹침")
+    if meta.get("bearish_gap_failure"):
+        risk.append("갭업 실패 패턴")
+    if meta.get("diag_resistance_reject"):
+        risk.append("사선 저항 거부")
+    if meta.get("diag_breakdown_bear"):
+        risk.append("사선 이탈 구조")
+    if ut_gap >= 2.0 and continuation_buy >= continuation_sell:
+        risk.append("UTBot 기준선과의 과도한 이격")
+    if meta.get("thin_trade_risk"):
+        risk.append("얇은 거래대금")
+    if macro_risk_off_count >= 2 or macro_pressure >= 1.5:
+        risk.append(f"거시 역풍 {max(macro_risk_off_count, 1)}개")
+    if meta.get("narrow_leadership"):
+        risk.append("메가캡 쏠림 장세")
+    if meta.get("flip_guard_triggered"):
+        risk.append("급반전 보호 구간")
+
+    support_text = _join_reason_phrases(supportive[:3])
+    risk_text = _join_reason_phrases(risk[:3])
+
+    if pre_veto_label and pre_veto_label != final_label and downgrade_count > 0:
+        cause_text = risk_text or support_text
+        if cause_text:
+            return f"초기 판단은 {pre_veto_label}였지만 {cause_text} 때문에 {downgrade_count}단계 조정돼 현재는 {final_label}로 봅니다."
+        return f"초기 판단은 {pre_veto_label}였지만 보호 규칙이 적용돼 현재는 {final_label}로 조정됐습니다."
+
+    if judgment_tone == "positive":
+        if support_text and risk_text:
+            return f"{final_label} 판단은 {support_text}에 기반합니다. 다만 {risk_text}는 함께 확인해야 할 리스크입니다."
+        if support_text:
+            return f"{final_label} 판단은 {support_text}에 기반합니다."
+        if risk_text:
+            return f"{final_label} 판단이지만 {risk_text}는 함께 경계해야 합니다."
+    elif judgment_tone == "negative":
+        if risk_text and support_text:
+            return f"{final_label} 판단은 {risk_text} 때문입니다. 다만 {support_text}는 반대 근거로 남아 있습니다."
+        if risk_text:
+            return f"{final_label} 판단은 {risk_text} 때문입니다."
+        if support_text:
+            return f"{final_label} 판단이지만 {support_text}는 반대 근거로 남아 있습니다."
+    else:
+        if support_text and risk_text:
+            return f"매수 쪽에서는 {support_text}, 매도 쪽에서는 {risk_text}가 동시에 보여 판단을 보수적으로 유지했습니다."
+        if support_text or risk_text:
+            return f"{final_label} 판단은 {_join_reason_phrases([support_text, risk_text])}에 영향을 받았습니다."
+    return ""
+
+
 def render_judgment_card(meta):
     raw_judgment = str(meta.get("judgment", "NEUTRAL"))
     action = localize_action_label(meta.get("action_label", ""))
@@ -297,6 +392,107 @@ def render_judgment_card(meta):
         risk_tags.append(_badge(f"\uC800\uAC70\uB798\uB7C9 {_safe_float(meta.get('volume_ratio_20', 1)):.1f}x", "warning"))
     if meta.get("blowoff_top_hard"):
         risk_tags.append(_badge("\uAE09\uB4F1 \uACFC\uC5F4 \uACBD\uACE0", "negative"))
+    if meta.get("thin_trade_risk"):
+        risk_tags.append(_badge("저유동성 종목", "warning"))
+    if meta.get("flip_guard_triggered"):
+        risk_tags.append(_badge("판단 급반전 보호", "warning"))
+
+    pre_veto_label = localize_judgment_label(str(meta.get("pre_veto_judgment", "")).strip())
+    downgrade_count = _safe_int(meta.get("downgrade_count", 0))
+    market_filter_bias = _safe_float(meta.get("market_filter_bias", 0))
+    macro_pressure = _safe_float(meta.get("macro_pressure_score", 0))
+    breadth_score = _safe_float(meta.get("market_breadth_score", 0))
+    continuation_buy = _safe_float(meta.get("continuation_buy_score", 0))
+    continuation_sell = _safe_float(meta.get("continuation_sell_score", 0))
+    trend_inflection_buy = _safe_float(meta.get("trend_inflection_buy_score", 0))
+    trend_inflection_sell = _safe_float(meta.get("trend_inflection_sell_score", 0))
+    market_turn_bull_score = _safe_float(meta.get("market_turn_bull_score", 0))
+    market_turn_bear_score = _safe_float(meta.get("market_turn_bear_score", 0))
+    ut_gap = max(_safe_float(meta.get("utbot_stop_atr_gap", 0)), 0.0)
+    macro_risk_off_count = _safe_int(meta.get("macro_risk_off_count", 0))
+    macro_risk_on_count = _safe_int(meta.get("macro_risk_on_count", 0))
+
+    explain_tags = []
+    if macro_risk_on_count:
+        explain_tags.append(_badge(f"거시 우호 {macro_risk_on_count}", "positive"))
+    if macro_risk_off_count:
+        explain_tags.append(_badge(f"거시 역풍 {macro_risk_off_count}", "negative"))
+    if meta.get("market_turn_bull"):
+        explain_tags.append(_badge("시장 전환 초기 강세", "positive"))
+    if meta.get("market_turn_bear"):
+        explain_tags.append(_badge("시장 전환 초기 약세", "negative"))
+    if meta.get("trend_inflection_bull"):
+        explain_tags.append(_badge("종목 추세 전환 매수", "positive"))
+    if meta.get("trend_inflection_bear"):
+        explain_tags.append(_badge("종목 추세 전환 매도", "negative"))
+    if meta.get("breadth_risk_on"):
+        explain_tags.append(_badge("시장 폭 확산", "positive"))
+    if meta.get("breadth_risk_off"):
+        explain_tags.append(_badge("시장 폭 약화", "negative"))
+    if meta.get("narrow_leadership"):
+        explain_tags.append(_badge("메가캡 쏠림", "warning"))
+    if meta.get("bullish_gap_reversal"):
+        explain_tags.append(_badge("갭다운 회복", "positive"))
+    if meta.get("bearish_gap_failure"):
+        explain_tags.append(_badge("갭업 실패", "negative"))
+    if meta.get("diag_support_hold"):
+        explain_tags.append(_badge("사선 지지 유지", "positive"))
+    if meta.get("diag_breakout_bull"):
+        explain_tags.append(_badge("사선 돌파", "positive"))
+    if meta.get("diag_resistance_reject"):
+        explain_tags.append(_badge("사선 저항 거부", "negative"))
+    if meta.get("diag_breakdown_bear"):
+        explain_tags.append(_badge("사선 이탈", "negative"))
+
+    """
+    # legacy block 1 disabled
+    flow_cards = [
+        _mini_stat_card("초기 판단", pre_veto_label or title or "-", _tone_from_text(pre_veto_label or title or "")),
+        _mini_stat_card("최종 판단", title or localize_judgment_label(raw_judgment), tone),
+        _mini_stat_card("강등 횟수", f"{downgrade_count}회", "warning" if downgrade_count else "muted"),
+        _mini_stat_card("시장 필터", f"{market_filter_bias:+.1f}", "positive" if market_filter_bias > 0.3 else "negative" if market_filter_bias < -0.3 else "warning"),
+    ]
+    driver_cards = [
+        _mini_stat_card("지속 매수", f"{continuation_buy:.1f}", "positive" if continuation_buy >= max(continuation_sell, 1.0) else "muted"),
+        _mini_stat_card("지속 매도", f"{continuation_sell:.1f}", "negative" if continuation_sell >= max(continuation_buy, 1.0) else "muted"),
+        _mini_stat_card("거시 압력", f"{macro_pressure:+.1f}", "negative" if macro_pressure > 0.5 else "positive" if macro_pressure < -0.5 else "warning"),
+        _mini_stat_card("UT 거리", f"{ut_gap:.2f} ATR", "positive" if ut_gap <= 0.9 else "negative" if ut_gap >= 2.0 else "warning"),
+        _mini_stat_card("시장 폭", f"{breadth_score:+.1f}", "positive" if breadth_score > 0.5 else "negative" if breadth_score < -0.5 else "warning"),
+    ]
+    """
+    """
+    flow_cards = [
+        _mini_stat_card("초기 판단", pre_veto_label or title or "-", _tone_from_text(pre_veto_label or title or "")),
+        _mini_stat_card("최종 판단", title or localize_judgment_label(raw_judgment), tone),
+        _mini_stat_card("강등 횟수", f"{downgrade_count}회", "warning" if downgrade_count else "muted"),
+        _mini_stat_card("시장 필터", f"{market_filter_bias:+.1f}", "positive" if market_filter_bias > 0.3 else "negative" if market_filter_bias < -0.3 else "warning"),
+    ]
+    driver_cards = [
+        _mini_stat_card("지속 매수", f"{continuation_buy:.1f}", "positive" if continuation_buy >= max(continuation_sell, 1.0) else "muted"),
+        _mini_stat_card("지속 매도", f"{continuation_sell:.1f}", "negative" if continuation_sell >= max(continuation_buy, 1.0) else "muted"),
+        _mini_stat_card("거시 압력", f"{macro_pressure:+.1f}", "negative" if macro_pressure > 0.5 else "positive" if macro_pressure < -0.5 else "warning"),
+        _mini_stat_card("UT 거리", f"{ut_gap:.2f} ATR", "positive" if ut_gap <= 0.9 else "negative" if ut_gap >= 2.0 else "warning"),
+        _mini_stat_card("시장 폭", f"{breadth_score:+.1f}", "positive" if breadth_score > 0.5 else "negative" if breadth_score < -0.5 else "warning"),
+    ]
+    """
+    flow_cards = [
+        _mini_stat_card("\uCD08\uAE30 \uD310\uB2E8", pre_veto_label or title or "-", _tone_from_text(pre_veto_label or title or "")),
+        _mini_stat_card("\uCD5C\uC885 \uD310\uB2E8", title or localize_judgment_label(raw_judgment), tone),
+        _mini_stat_card("\uAC15\uB4F1 \uD69F\uC218", f"{downgrade_count}\uD68C", "warning" if downgrade_count else "muted"),
+        _mini_stat_card("\uC2DC\uC7A5 \uD544\uD130", f"{market_filter_bias:+.1f}", "positive" if market_filter_bias > 0.3 else "negative" if market_filter_bias < -0.3 else "warning"),
+    ]
+    driver_cards = [
+        _mini_stat_card("\uC9C0\uC18D \uB9E4\uC218", f"{continuation_buy:.1f}", "positive" if continuation_buy >= max(continuation_sell, 1.0) else "muted"),
+        _mini_stat_card("\uC9C0\uC18D \uB9E4\uB3C4", f"{continuation_sell:.1f}", "negative" if continuation_sell >= max(continuation_buy, 1.0) else "muted"),
+        _mini_stat_card("\uCD94\uC138 \uC804\uD658 \uB9E4\uC218", f"{trend_inflection_buy:.1f}", "positive" if trend_inflection_buy >= max(trend_inflection_sell, 1.0) else "muted"),
+        _mini_stat_card("\uCD94\uC138 \uC804\uD658 \uB9E4\uB3C4", f"{trend_inflection_sell:.1f}", "negative" if trend_inflection_sell >= max(trend_inflection_buy, 1.0) else "muted"),
+        _mini_stat_card("\uC2DC\uC7A5 \uC804\uD658 \uAC15\uC138", f"{market_turn_bull_score:.1f}", "positive" if market_turn_bull_score >= max(market_turn_bear_score, 1.0) else "muted"),
+        _mini_stat_card("\uC2DC\uC7A5 \uC804\uD658 \uC57D\uC138", f"{market_turn_bear_score:.1f}", "negative" if market_turn_bear_score >= max(market_turn_bull_score, 1.0) else "muted"),
+        _mini_stat_card("\uAC70\uC2DC \uC555\uB825", f"{macro_pressure:+.1f}", "negative" if macro_pressure > 0.5 else "positive" if macro_pressure < -0.5 else "warning"),
+        _mini_stat_card("UT \uAC70\uB9AC", f"{ut_gap:.2f} ATR", "positive" if ut_gap <= 0.9 else "negative" if ut_gap >= 2.0 else "warning"),
+        _mini_stat_card("\uC2DC\uC7A5 \uD3ED", f"{breadth_score:+.1f}", "positive" if breadth_score > 0.5 else "negative" if breadth_score < -0.5 else "warning"),
+    ]
+    explainer_text = _judgment_explainer(meta, title)
 
     summary_html = f"""
     <div class="sigl-card sigl-card--{'positive' if tone == 'positive' else 'negative' if tone == 'negative' else 'warning'}">
@@ -313,6 +509,10 @@ def render_judgment_card(meta):
         {_progress_metric_card('합의 비율', f'{buy_agree}:{sell_agree}', localize_context_label(meta.get('context', 0)), 'accent', buy_agree / max(buy_agree + sell_agree, 1) * 100)}
       </div>
     """
+    if explainer_text:
+        summary_html += f"<div class='sigl-note'><strong>\uC65C \uC774\uB7F0 \uD310\uB2E8\uC774 \uB098\uC654\uB098</strong><br><span class='sigl-summary'>{_esc(explainer_text)}</span></div>"
+    summary_html += f"<div class='sigl-note'><strong>\uD310\uB2E8 \uACBD\uB85C</strong><div class='sigl-grid sigl-grid--4'>{''.join(flow_cards)}</div></div>"
+    summary_html += f"<div class='sigl-note'><strong>\uD575\uC2EC \uADFC\uAC70</strong><div class='sigl-grid sigl-grid--4'>{''.join(driver_cards)}</div><div class='sigl-chip-row'>{''.join(explain_tags)}</div></div>"
     if detail_text:
         summary_html += f"<div class='sigl-note'><strong>판단 요약</strong><br><span class='sigl-summary'>{_esc(translate_chart_text(detail_text))}</span></div>"
     if contrast or risk_tags:
@@ -321,7 +521,7 @@ def render_judgment_card(meta):
     summary_html += "</div>"
     _render_panel_html(
         summary_html,
-        min_height=_judgment_panel_height(detail_text, contrast, len(risk_tags)),
+        min_height=_judgment_panel_height(detail_text, contrast, len(risk_tags) + len(explain_tags)),
     )
 
 

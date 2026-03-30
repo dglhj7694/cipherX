@@ -97,10 +97,14 @@ def fetch_fundamentals(t):
     except:return "N/A"
 @st.cache_data(ttl=300,max_entries=30,show_spinner=False)
 def fetch_history(t,_ts=None):
-    try:return yf.Ticker(t).history(period="2y")
+    try:return yf.Ticker(t).history(period="2y", auto_adjust=True)
     except:return pd.DataFrame()
 @st.cache_data(ttl=3600,show_spinner=False)
-def fetch_spy(_ts=None):return yf.Ticker("SPY").history(period="2y")
+def fetch_spy(_ts=None):return yf.Ticker("SPY").history(period="2y", auto_adjust=True)
+@st.cache_data(ttl=3600,show_spinner=False)
+def fetch_market_proxy(t,_ts=None):
+    try:return yf.Ticker(t).history(period="2y", auto_adjust=True)
+    except:return pd.DataFrame()
 @st.cache_data(ttl=3600,show_spinner=False)
 def validate_ticker(t):
     try:return not yf.Ticker(t).history(period="5d").empty
