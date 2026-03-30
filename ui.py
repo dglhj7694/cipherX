@@ -43,17 +43,23 @@ SOFT_BLUE = '#A5B4FC'
 _US_MARKET_DECK_HEIGHT = 692
 _US_MARKET_DEFAULT_DURATION = 7000
 _US_MARKET_TEXT_HEAVY_DURATION = 10000
+_US_MARKET_DAILY_PAYLOAD_TTL_SEC = 900
 _US_MARKET_HISTORY_PERIOD = "6mo"
-_US_MARKET_MOVER_LIMIT = 120
+_US_MARKET_MOVER_LIMIT = 96
 _US_MARKET_TOP_MOVER_CARD_COUNT = 9
 _US_MARKET_NEWS_LOOKBACK_HOURS = 36
 _US_MARKET_NEWS_MAX_ITEMS = 5
-_US_MARKET_NEWS_SECTION_MAX_ITEMS = 5
+_US_MARKET_NEWS_SECTION_MAX_ITEMS = 3
 _US_MARKET_NEWS_PER_TICKER_LIMIT = 8
-_US_MARKET_NEWS_AI_ITEMS_PER_SECTION = 5
-_US_MARKET_NEWS_ARTICLE_FETCH_LIMIT = 25
+_US_MARKET_NEWS_AI_ITEMS_PER_SECTION = 3
+_US_MARKET_NEWS_ARTICLE_FETCH_LIMIT = 12
 _US_MARKET_NEWS_SECTION_SUMMARY_ITEMS = 5
 _US_MARKET_NEWS_EXCERPT_MAX_CHARS = 320
+_US_MARKET_NEWS_ARTICLE_FETCH_TIMEOUT_SEC = 4
+_US_MARKET_NEWS_GOOD_EXCERPT_SCORE = 140
+_US_MARKET_NEWS_MEGA_CAP_LIMIT = 8
+_US_MARKET_NEWS_GAINER_SYMBOL_LIMIT = 4
+_US_MARKET_NEWS_LOSER_SYMBOL_LIMIT = 4
 _US_MARKET_NEWS_SECTION_ORDER = [
     "시장 총평",
     "거시·연준",
@@ -175,6 +181,8 @@ _US_SECTOR_ETFS = [
     ("XLC", "커뮤니케이션"),
     ("XLRE", "부동산"),
 ]
+_US_CYCLICAL_SECTOR_SYMBOLS = {"XLK", "XLY", "XLI", "XLB", "XLF", "XLE", "XLC"}
+_US_DEFENSIVE_SECTOR_SYMBOLS = {"XLV", "XLP", "XLU", "XLRE"}
 _US_MARKET_MEGA_CAPS = [
     "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "AVGO", "TSLA",
     "AMD", "NFLX", "JPM", "BRK-B", "XOM", "LLY", "UNH", "COST",
@@ -894,6 +902,73 @@ def _build_market_divergence_notes(benchmarks, macro, sector_rows, market_regime
     return _ordered_unique(notes)[:3]
 
 
+def _classify_market_leadership_state(qqq_vs_spy, iwm_vs_spy, breadth_ratio):
+    if qqq_vs_spy is not None and qqq_vs_spy >= 0.60 and breadth_ratio <= 0.36:
+        return "mega_cap_extreme"
+    if qqq_vs_spy is not None and qqq_vs_spy >= 0.45 and breadth_ratio <= 0.45:
+        return "mega_cap_narrow"
+    if iwm_vs_spy is not None and iwm_vs_spy >= 0.45 and breadth_ratio >= 0.64:
+        return "small_cap_broad"
+    if iwm_vs_spy is not None and iwm_vs_spy >= 0.30 and breadth_ratio >= 0.55:
+        return "small_cap_rotation"
+    if breadth_ratio >= 0.64:
+        return "broad_risk_on"
+    if breadth_ratio <= 0.36:
+        return "broad_risk_off"
+    return "mixed"
+
+
+def _classify_market_rates_state(tnx_bps, qqq_vs_spy, iwm_vs_spy, gold_chg, vix_chg, breadth_ratio):
+    if tnx_bps is None:
+        return "rates_unknown"
+    if tnx_bps >= 6 and qqq_vs_spy is not None and qqq_vs_spy >= 0.20:
+        return "rates_up_tech_resilient"
+    if tnx_bps >= 6 and iwm_vs_spy is not None and iwm_vs_spy >= 0.20 and breadth_ratio >= 0.55:
+        return "rates_up_reflation"
+    if tnx_bps >= 4:
+        return "rates_up_growth_pressure"
+    if tnx_bps <= -6 and (((gold_chg or 0) >= 0.8) or ((vix_chg or 0) >= 3)):
+        return "rates_down_safety"
+    if tnx_bps <= -4 and breadth_ratio >= 0.55 and (vix_chg or 0) <= 1:
+        return "rates_down_risk_support"
+    if tnx_bps <= -4:
+        return "rates_down_mixed"
+    return "rates_stable"
+
+
+def _classify_market_overlay_state(dxy_chg, btc_chg, gold_chg, vix_chg, wti_chg, breadth_ratio):
+    if (dxy_chg or 0) >= 0.35 and (btc_chg or 0) <= -2.0 and ((((gold_chg or 0) >= 0.6)) or (((vix_chg or 0) >= 2))):
+        return "dollar_defensive"
+    if (dxy_chg or 0) <= -0.35 and (btc_chg or 0) >= 2.0 and breadth_ratio >= 0.55:
+        return "dollar_risk_on"
+    if (gold_chg or 0) >= 0.8 and (vix_chg or 0) >= 3:
+        return "safe_haven_bid"
+    if (wti_chg or 0) >= 2.0 and breadth_ratio <= 0.50:
+        return "oil_shock"
+    if (wti_chg or 0) <= -2.0 and breadth_ratio >= 0.55:
+        return "oil_relief"
+    return "overlay_none"
+
+
+def _classify_market_sector_state(sector_rows, breadth_ratio):
+    strongest_sector = max(sector_rows, key=lambda row: row.get("change_pct") if row.get("change_pct") is not None else -999) if sector_rows else None
+    if not strongest_sector:
+        return {"state": "sector_mixed", "symbol": "", "label": ""}
+    symbol = str(strongest_sector.get("symbol") or "").strip().upper()
+    label = str(strongest_sector.get("label") or symbol or "섹터").strip() or "섹터"
+    if symbol in _US_DEFENSIVE_SECTOR_SYMBOLS and breadth_ratio <= 0.50:
+        return {"state": "defensive_led", "symbol": symbol, "label": label}
+    if symbol == "XLE" and breadth_ratio <= 0.55:
+        return {"state": "energy_led", "symbol": symbol, "label": label}
+    if symbol == "XLK" and breadth_ratio <= 0.50:
+        return {"state": "tech_led_narrow", "symbol": symbol, "label": label}
+    if symbol in _US_CYCLICAL_SECTOR_SYMBOLS and breadth_ratio >= 0.55:
+        return {"state": "cyclical_led", "symbol": symbol, "label": label}
+    if symbol == "XLK":
+        return {"state": "tech_led", "symbol": symbol, "label": label}
+    return {"state": "sector_mixed", "symbol": symbol, "label": label}
+
+
 def _build_market_strategy_points(benchmarks, macro, sector_rows, market_regime, news_context=None):
     qqq_vs_spy = market_regime.get("qqq_vs_spy")
     iwm_vs_spy = market_regime.get("iwm_vs_spy")
@@ -901,42 +976,105 @@ def _build_market_strategy_points(benchmarks, macro, sector_rows, market_regime,
     tnx_bps = ((tnx_snapshot.get("price") or 0) - (tnx_snapshot.get("prev_close") or 0)) * 10 if tnx_snapshot else None
     dxy_chg = macro.get("DXY", {}).get("change_pct")
     gold_chg = macro.get("Gold", {}).get("change_pct")
+    wti_chg = macro.get("WTI", {}).get("change_pct")
     btc_chg = macro.get("BTC", {}).get("change_pct")
     vix_chg = benchmarks.get("VIX", {}).get("change_pct")
     sector_up = sum(1 for row in sector_rows if (row.get("change_pct") or 0) > 0)
     sector_total = len(sector_rows) or len(_US_SECTOR_ETFS)
     breadth_ratio = sector_up / sector_total if sector_total else 0.5
-    strongest_sector = max(sector_rows, key=lambda row: row.get("change_pct") if row.get("change_pct") is not None else -999) if sector_rows else None
-
-    points = []
-    if qqq_vs_spy is not None and qqq_vs_spy >= 0.45 and breadth_ratio <= 0.45:
-        points.append("메가캡 강세가 섹터 확산으로 번지기 전까지는 지수 추격보다 리더 종목 선별이 유리합니다.")
-    elif iwm_vs_spy is not None and iwm_vs_spy >= 0.35 and breadth_ratio >= 0.55:
-        points.append("소형주와 경기민감 섹터 확산이 이어지면 지수보다 순환매 수혜 업종을 넓게 보는 대응이 좋습니다.")
-
-    if tnx_bps is not None and tnx_bps >= 4:
-        if qqq_vs_spy is not None and qqq_vs_spy >= 0.2:
-            points.append("금리 재상승이 이어질 때도 빅테크가 버티는지 확인해야 추세 지속을 더 신뢰할 수 있습니다.")
-        else:
-            points.append("10년물 금리 반등이 이어지면 성장주와 장기 듀레이션 자산의 민감도를 먼저 점검해야 합니다.")
-    elif tnx_bps is not None and tnx_bps <= -4 and (((gold_chg or 0) >= 0.8) or ((vix_chg or 0) >= 3)):
-        points.append("금리 하락만 보고 공격적으로 보기보다 금·VIX가 함께 식는지 확인하는 편이 안전합니다.")
-
-    if (dxy_chg or 0) >= 0.35 and (btc_chg or 0) <= -2.0:
-        points.append("달러 강세가 진정되고 비트코인이 안정되는지 확인해야 위험선호 복귀를 더 믿을 수 있습니다.")
-
-    if strongest_sector and strongest_sector.get("symbol") in {"XLU", "XLP", "XLV"} and breadth_ratio <= 0.5:
-        points.append("방어주 주도가 이어지면 신규 베타 확대보다 현금 비중과 손절 기준 관리가 우선입니다.")
-
+    leadership_state = _classify_market_leadership_state(qqq_vs_spy, iwm_vs_spy, breadth_ratio)
+    rates_state = _classify_market_rates_state(tnx_bps, qqq_vs_spy, iwm_vs_spy, gold_chg, vix_chg, breadth_ratio)
+    overlay_state = _classify_market_overlay_state(dxy_chg, btc_chg, gold_chg, vix_chg, wti_chg, breadth_ratio)
+    sector_state = _classify_market_sector_state(sector_rows, breadth_ratio)
     lead_sections = set(_coerce_market_text_list((news_context or {}).get("lead_sections")))
-    if {"거시·연준", "외부 변수", "원자재·암호"} & lead_sections:
-        points.append("다음 세션은 뉴스 제목보다 10Y·DXY·WTI가 같은 방향으로 재반응하는지 확인해야 합니다.")
-    elif "실적·개별주" in lead_sections:
-        points.append("주도 종목 뉴스가 하루 재료에 그치지 않는지 거래량과 섹터 확산으로 확인할 필요가 있습니다.")
+    lead_events = set(_coerce_market_text_list((news_context or {}).get("lead_events")))
 
-    if not points:
-        points.append("한 방향 베팅보다 상대강도와 금리 반응을 함께 보며 포지션 크기를 조절하는 대응이 유효합니다.")
-    return _ordered_unique(points)[:3]
+    ranked_points = []
+
+    def add_point(text, priority):
+        safe_text = str(text or "").strip()
+        if safe_text:
+            ranked_points.append((int(priority), safe_text))
+
+    if leadership_state == "mega_cap_extreme":
+        add_point("메가캡 쏠림이 극단적인 구간이라 지수 추격보다 리더 종목과 핵심 반도체 주도주 선별이 더 유리합니다.", 100)
+    elif leadership_state == "mega_cap_narrow":
+        if rates_state == "rates_up_tech_resilient":
+            add_point("금리 재상승에도 빅테크가 버티는 장이라 지수보다 리더 종목 강도 유지 여부를 먼저 확인하는 대응이 좋습니다.", 96)
+        elif sector_state.get("state") in {"tech_led", "tech_led_narrow"}:
+            add_point("기술주 중심 쏠림이 강한 장이라 섹터 확산 전까지는 지수 추격보다 리더 종목 선별이 유리합니다.", 94)
+        else:
+            add_point("메가캡 강세가 시장 전반 확산으로 번지기 전까지는 지수 추격보다 리더 종목 선별이 유리합니다.", 92)
+    elif leadership_state == "small_cap_broad":
+        add_point("소형주와 광범위 확산이 동반된 장이라 메가캡 한정 대응보다 순환매 수혜 업종을 넓게 보는 편이 좋습니다.", 94)
+    elif leadership_state == "small_cap_rotation":
+        add_point("소형주 상대 강세가 이어지면 대형 기술주 집중보다 경기민감 업종과 중소형주 확산을 함께 보는 대응이 유효합니다.", 90)
+    elif leadership_state == "broad_risk_on":
+        add_point("섹터 확산이 넓은 장이라 지수 추격보다 강세가 이어지는 업종군을 넓게 가져가는 접근이 더 자연스럽습니다.", 82)
+    elif leadership_state == "broad_risk_off":
+        add_point("하락 확산이 넓은 구간에서는 신규 베타 확대보다 반등 강도가 확인된 업종만 선별하는 편이 안전합니다.", 82)
+
+    if rates_state == "rates_up_tech_resilient":
+        add_point("10년물 금리 상승에도 빅테크가 버티면 추세 지속 신호가 될 수 있어 나스닥 리더십 유지 여부를 먼저 확인해야 합니다.", 88)
+    elif rates_state == "rates_up_reflation":
+        add_point("금리 상승이 경기민감 강세와 동행하면 성장주 방어보다 금융·산업재·에너지 순환매 지속 여부를 먼저 보는 편이 좋습니다.", 86)
+    elif rates_state == "rates_up_growth_pressure":
+        add_point("10년물 금리 반등이 이어지면 성장주와 장기 듀레이션 자산의 민감도를 먼저 점검해야 합니다.", 84)
+    elif rates_state == "rates_down_safety":
+        add_point("금리 하락을 곧바로 호재로 보기보다 금·VIX가 함께 식는지 확인한 뒤 베타를 늘리는 편이 안전합니다.", 84)
+    elif rates_state == "rates_down_risk_support":
+        add_point("금리 하락이 섹터 확산 개선으로 이어지면 메가캡보다 경기민감·소형주 쪽 확산을 먼저 확인하는 대응이 좋습니다.", 80)
+    elif rates_state == "rates_down_mixed":
+        add_point("금리 하락이 나와도 방어자산이 함께 강하면 안전자산 선호 해석인지 먼저 구분해야 합니다.", 76)
+
+    if overlay_state == "dollar_defensive":
+        add_point("달러 강세와 고베타 약세가 겹친 만큼 위험선호 복귀를 서두르기보다 DXY와 비트코인 진정 여부를 먼저 확인해야 합니다.", 83)
+    elif overlay_state == "dollar_risk_on":
+        add_point("달러 완화와 비트코인 반등이 같이 이어지면 위험선호 확산 신호로 해석할 여지가 있어 베타 확대 여지를 열어둘 만합니다.", 74)
+    elif overlay_state == "safe_haven_bid":
+        add_point("금과 VIX가 함께 강한 구간에서는 지수 반등보다 방어자산 진정 여부를 먼저 확인하는 편이 안전합니다.", 78)
+    elif overlay_state == "oil_shock":
+        add_point("유가 급등이 이어지면 에너지 강세만 보기보다 운송·소비 업종 부담으로 번지는지 함께 체크해야 합니다.", 76)
+    elif overlay_state == "oil_relief":
+        add_point("유가 부담 완화가 이어지면 항공·운송·소비처럼 비용 민감 업종의 반응을 같이 보는 대응이 좋습니다.", 68)
+
+    if sector_state.get("state") == "defensive_led":
+        add_point("방어주 주도가 이어지면 신규 베타 확대보다 현금 비중과 손절 기준 관리가 우선입니다.", 79)
+    elif sector_state.get("state") == "cyclical_led":
+        add_point(f"{sector_state.get('label') or '경기민감 섹터'} 중심 순환매가 이어지면 지수보다 경기민감 업종을 넓게 보는 대응이 좋습니다.", 72)
+    elif sector_state.get("state") == "energy_led" and overlay_state != "oil_shock":
+        add_point("에너지 주도가 유가 뉴스 하루 반응인지, 금융·산업재로 번지는 순환매인지 구분해서 볼 필요가 있습니다.", 66)
+    elif sector_state.get("state") == "tech_led_narrow":
+        add_point("기술주가 시장보다 강해도 확산이 좁다면 반도체·플랫폼 리더십이 하루짜리인지 확인하는 대응이 필요합니다.", 70)
+
+    if {"거시·연준", "외부 변수", "원자재·암호"} & lead_sections:
+        if {"연준·금리", "경제지표"} & lead_events:
+            add_point("다음 세션은 거시 헤드라인보다 10Y와 달러가 같은 방향으로 재반응하는지 확인해야 합니다.", 81)
+        elif "지정학" in lead_events:
+            add_point("지정학 뉴스는 제목보다 유가와 달러가 같은 방향으로 재반응하는지 확인해야 실제 시장 영향도를 더 신뢰할 수 있습니다.", 80)
+        else:
+            add_point("다음 세션은 뉴스보다 10Y·DXY·WTI가 같은 방향으로 재반응하는지 확인해야 합니다.", 72)
+    elif "실적·개별주" in lead_sections:
+        if {"실적 상회", "가이던스 상향", "계약·협업"} & lead_events:
+            add_point("주도 종목 호재가 하루 재료에 그치지 않는지 거래량과 동종 업종 확산으로 확인할 필요가 있습니다.", 76)
+        elif {"실적 하회", "가이던스 하향", "규제·조사"} & lead_events:
+            add_point("악재성 개별주 뉴스는 해당 종목에만 머무는지, 섹터 전체 밸류에이션 부담으로 번지는지 함께 확인해야 합니다.", 74)
+        else:
+            add_point("주도 종목 뉴스가 하루 재료에 그치지 않는지 거래량과 섹터 확산으로 확인할 필요가 있습니다.", 70)
+
+    if not ranked_points:
+        add_point("한 방향 베팅보다 상대강도와 금리 반응을 함께 보며 포지션 크기를 조절하는 대응이 유효합니다.", 50)
+
+    ordered_points = []
+    seen = set()
+    for _, text in sorted(ranked_points, key=lambda row: row[0], reverse=True):
+        if text in seen:
+            continue
+        seen.add(text)
+        ordered_points.append(text)
+        if len(ordered_points) >= 3:
+            break
+    return ordered_points
 
 
 def _build_market_insight_watchlist(benchmarks, macro, sector_rows, market_regime, news_context=None):
@@ -1066,6 +1204,23 @@ def _market_mover_universe(limit=_US_MARKET_MOVER_LIMIT):
         if len(filtered) >= limit:
             break
     return tuple(filtered)
+
+
+def _build_market_news_universe(gainers, losers):
+    priority_movers = []
+    for row in list(gainers or [])[:_US_MARKET_NEWS_GAINER_SYMBOL_LIMIT]:
+        symbol = str(row.get("symbol") or "").strip()
+        if symbol:
+            priority_movers.append(symbol)
+    for row in list(losers or [])[:_US_MARKET_NEWS_LOSER_SYMBOL_LIMIT]:
+        symbol = str(row.get("symbol") or "").strip()
+        if symbol:
+            priority_movers.append(symbol)
+    return _ordered_unique(
+        [*_US_MARKET_SYSTEMIC_NEWS_SYMBOLS]
+        + list(_US_MARKET_MEGA_CAPS[:_US_MARKET_NEWS_MEGA_CAP_LIMIT])
+        + priority_movers
+    )
 
 
 def _mover_reason(snapshot):
@@ -1275,7 +1430,7 @@ def _fetch_market_news_article_excerpt(url):
         )
         response = scraper.get(
             str(url).strip(),
-            timeout=8,
+            timeout=_US_MARKET_NEWS_ARTICLE_FETCH_TIMEOUT_SEC,
             headers={
                 "User-Agent": "Mozilla/5.0",
                 "Accept-Language": "en-US,en;q=0.9",
@@ -2120,9 +2275,15 @@ def _collect_market_news(news_universe, snapshot_lookup, gainers, losers):
             item["source_depth"] = item.get("source_depth") or ("snippet" if item.get("body_excerpt") else "headline")
             item.update(_build_market_news_structured_fields(item))
             continue
+        current_excerpt = _clean_market_news_excerpt(item.get("body_excerpt"))
+        current_score = _market_news_excerpt_score(current_excerpt, item.get("title"))
+        if current_excerpt and current_score >= _US_MARKET_NEWS_GOOD_EXCERPT_SCORE:
+            item["body_excerpt"] = current_excerpt
+            item["source_depth"] = item.get("source_depth") or "snippet"
+            item.update(_build_market_news_structured_fields(item))
+            continue
         article_payload = _fetch_market_news_article_excerpt(item.get("link"))
         article_excerpt = _clean_market_news_excerpt(article_payload.get("excerpt"))
-        current_excerpt = _clean_market_news_excerpt(item.get("body_excerpt"))
         if _market_news_excerpt_score(article_excerpt, item.get("title")) > _market_news_excerpt_score(current_excerpt, item.get("title")):
             item["body_excerpt"] = article_excerpt
             item["source_depth"] = article_payload.get("source_depth") or "article"
@@ -2180,7 +2341,7 @@ def _fallback_market_news_summary(news_items, rate_limited=False):
     if top_events:
         event_label = "·".join(top_events)
         focus_label = "와 ".join(focus_parts) if focus_parts else ("·".join(focus_labels[:2]) if focus_labels else "시장 핵심 종목")
-        return f"{event_label} 이슈가 {focus_label} 중심으로 시장 해석을 이끌었습니다."
+        return f"{event_label} 이슈가 {focus_label} 중심으로 시장을 이끌었습니다."
     if rate_limited:
         return "오늘 시장 핵심 뉴스는 제한적으로 확인됐습니다."
     if focus_labels:
@@ -2589,6 +2750,7 @@ def _generate_us_market_ai_copy(market_date_key, summary_json):
         return {}
 
 
+@st.cache_data(ttl=_US_MARKET_DAILY_PAYLOAD_TTL_SEC, show_spinner=False)
 def build_us_market_daily_payload():
     benchmark_symbols = tuple(symbol for symbol, _ in _US_MARKET_BENCHMARKS)
     macro_symbols = tuple(symbol for symbol, _ in _US_MARKET_MACRO)
@@ -2643,11 +2805,7 @@ def build_us_market_daily_payload():
             market_dt = candidate
             break
     market_date_key = market_dt.strftime("%Y-%m-%d") if market_dt is not None else datetime.utcnow().strftime("%Y-%m-%d")
-    news_universe = _ordered_unique(
-        [*_US_MARKET_SYSTEMIC_NEWS_SYMBOLS, *_US_MARKET_MEGA_CAPS]
-        + [row["symbol"] for row in gainers if row.get("symbol")]
-        + [row["symbol"] for row in losers if row.get("symbol")]
-    )
+    news_universe = _build_market_news_universe(gainers, losers)
     market_news_bundle = _collect_market_news(news_universe, snapshot_lookup, gainers, losers)
 
     market_regime = _build_market_regime(benchmark_snapshots, macro_snapshots, sector_sorted)
@@ -2728,10 +2886,8 @@ def build_us_market_daily_payload():
     top_loser = losers[0] if losers else None
     avg_gainer_change = _average_market_change(gainers)
     avg_loser_change = _average_market_change(losers)
-    cyclical_symbols = {"XLK", "XLY", "XLI", "XLB", "XLF", "XLE", "XLC"}
-    defensive_symbols = {"XLV", "XLP", "XLU", "XLRE"}
-    cyclical_up = sum(1 for row in sector_sorted if row.get("symbol") in cyclical_symbols and (row.get("change_pct") or 0) > 0)
-    defensive_up = sum(1 for row in sector_sorted if row.get("symbol") in defensive_symbols and (row.get("change_pct") or 0) > 0)
+    cyclical_up = sum(1 for row in sector_sorted if row.get("symbol") in _US_CYCLICAL_SECTOR_SYMBOLS and (row.get("change_pct") or 0) > 0)
+    defensive_up = sum(1 for row in sector_sorted if row.get("symbol") in _US_DEFENSIVE_SECTOR_SYMBOLS and (row.get("change_pct") or 0) > 0)
 
     main_metrics = [
         _build_snapshot_metric("SPY", "미국 대형주", benchmark_snapshots.get("SPY", {})),
@@ -3016,6 +3172,30 @@ def _build_us_market_daily_doc(payload):
               --tone-hint-copy: #e2e8f0;
               --tone-bullet-fill: linear-gradient(180deg, rgba(148,163,184,.92), rgba(100,116,139,.82));
               --tone-bullet-shadow: rgba(148,163,184,.10);
+            }
+            .deck[data-tone="positive"] {
+              --tone-border: rgba(99,217,162,.24);
+              --tone-progress: linear-gradient(90deg, rgba(99,217,162,.98), rgba(45,212,191,.88));
+              --tone-kicker-border: rgba(99,217,162,.26);
+              --tone-kicker-bg: rgba(99,217,162,.10);
+              --tone-kicker-copy: #d7ffed;
+              --tone-hint-border: rgba(99,217,162,.18);
+              --tone-hint-bg: rgba(99,217,162,.08);
+              --tone-hint-copy: #d7ffed;
+              --tone-bullet-fill: linear-gradient(180deg, rgba(99,217,162,.98), rgba(45,212,191,.82));
+              --tone-bullet-shadow: rgba(99,217,162,.12);
+            }
+            .deck[data-tone="negative"] {
+              --tone-border: rgba(255,143,150,.24);
+              --tone-progress: linear-gradient(90deg, rgba(255,143,150,.98), rgba(251,113,133,.88));
+              --tone-kicker-border: rgba(255,143,150,.24);
+              --tone-kicker-bg: rgba(255,143,150,.10);
+              --tone-kicker-copy: #ffe1e5;
+              --tone-hint-border: rgba(255,143,150,.18);
+              --tone-hint-bg: rgba(255,143,150,.08);
+              --tone-hint-copy: #ffe7ea;
+              --tone-bullet-fill: linear-gradient(180deg, rgba(255,143,150,.98), rgba(251,113,133,.82));
+              --tone-bullet-shadow: rgba(255,143,150,.12);
             }
             .head { display: flex; justify-content: space-between; gap: 12px; padding: 16px 14px 8px; }
             .kicker { display: inline-flex; align-items: center; min-height: 30px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--tone-kicker-border); background: var(--tone-kicker-bg); color: var(--tone-kicker-copy); font-size: .72rem; font-weight: 900; transition: border-color .28s ease, background .28s ease, color .28s ease; }
@@ -3386,12 +3566,17 @@ def _build_us_market_daily_doc(payload):
             const nextBtn = document.getElementById("nextBtn");
             let activeIndex = 0;
             let paused = false;
+            let hoverPaused = false;
+            let expandedPaused = false;
             let rafId = null;
             let startedAt = 0;
             let elapsedBeforePause = 0;
             let currentDuration = 7000;
             function card() { return cards[activeIndex] || {}; }
             function loopIndex(index) { return cards.length ? (index + cards.length) % cards.length : 0; }
+            function resolveDeckTone(value) {
+              return value === "positive" || value === "negative" ? value : "neutral";
+            }
             function stopTicker() { if (rafId) { cancelAnimationFrame(rafId); rafId = null; } }
             function tick(now) {
               if (paused) return;
@@ -3424,6 +3609,13 @@ def _build_us_market_daily_doc(payload):
               if (!paused || !cards.length) return;
               paused = false;
               startTicker(false);
+            }
+            function syncTickerPause() {
+              if (hoverPaused || expandedPaused) {
+                pauseTicker();
+              } else {
+                resumeTicker();
+              }
             }
             function renderDots() {
               deckDots.innerHTML = "";
@@ -3580,8 +3772,9 @@ def _build_us_market_daily_doc(payload):
                     event.preventDefault();
                     event.stopPropagation();
                     expanded = !expanded;
+                    expandedPaused = expanded;
                     syncExpanded();
-                    if (expanded) pauseTicker();
+                    syncTickerPause();
                   });
 
                   syncExpanded();
@@ -3598,7 +3791,9 @@ def _build_us_market_daily_doc(payload):
             function render() {
               const current = card();
               currentDuration = Number(current.duration_ms) || 7000;
-              deck.dataset.tone = "neutral";
+              expandedPaused = false;
+              paused = hoverPaused;
+              deck.dataset.tone = resolveDeckTone(current.tone);
               deckDate.textContent = payload.market_date_label || "";
               cardTitle.textContent = current.title || "";
               cardSubtitle.textContent = current.subtitle || "";
@@ -3612,14 +3807,15 @@ def _build_us_market_daily_doc(payload):
               renderDots();
               deckIndex.textContent = cards.length ? (activeIndex + 1) + " / " + cards.length + " 카드" : "";
               startTicker(true);
+              syncTickerPause();
             }
             prevBtn.addEventListener("click", () => { activeIndex = loopIndex(activeIndex - 1); render(); });
             nextBtn.addEventListener("click", () => { activeIndex = loopIndex(activeIndex + 1); render(); });
-            deck.addEventListener("mouseenter", pauseTicker);
-            deck.addEventListener("mouseleave", resumeTicker);
-            deck.addEventListener("touchstart", pauseTicker, { passive: true });
-            deck.addEventListener("touchend", resumeTicker, { passive: true });
-            deck.addEventListener("touchcancel", resumeTicker, { passive: true });
+            deck.addEventListener("mouseenter", () => { hoverPaused = true; syncTickerPause(); });
+            deck.addEventListener("mouseleave", () => { hoverPaused = false; syncTickerPause(); });
+            deck.addEventListener("touchstart", () => { hoverPaused = true; syncTickerPause(); }, { passive: true });
+            deck.addEventListener("touchend", () => { hoverPaused = false; syncTickerPause(); }, { passive: true });
+            deck.addEventListener("touchcancel", () => { hoverPaused = false; syncTickerPause(); }, { passive: true });
             if (cards.length) {
               render();
             } else {
@@ -3651,6 +3847,7 @@ def _render_us_market_daily_deck(payload):
 def render_market_home_dashboard():
     with st.spinner("데일리 브리핑 만드는 중입니다. 시장 데이터와 핵심 뉴스를 불러오고 있습니다."):
         payload = build_us_market_daily_payload()
+    card_count = len(payload.get("cards") or [])
     headline_copy = html.escape(
         payload.get("headline")
         or "무엇이 미국장을 움직였는지, 어디에 강약이 몰렸는지, 다음 세션에서 무엇을 볼지 빠르게 정리합니다."
@@ -3658,7 +3855,7 @@ def render_market_home_dashboard():
     badges_html = "".join(
         [
             _market_badge("미국 시장", "accent"),
-            _market_badge("5장 브리핑", "warning"),
+            _market_badge(f"{card_count or 5}장 브리핑", "warning"),
             _market_badge("Gemini" if GEMINI_API_KEY else "규칙 기반", "muted"),
         ]
     )

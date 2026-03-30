@@ -60,7 +60,7 @@ _ETF_UNIVERSE_PRESETS = [
     {"key": "WCBR", "label": "WCBR", "symbol": "WCBR"},
 ]
 _ETF_UNIVERSE_PRESET_MAP = {item["key"]: item for item in _ETF_UNIVERSE_PRESETS}
-MODE_MARKET_DAILY = "US MARKET DAILY"
+MODE_MARKET_DAILY = "오늘 미국장"
 MODE_ANALYSIS = "분석"
 MODE_SCANNER = "스캐너"
 _APP_MODE_OPTIONS = [MODE_MARKET_DAILY, MODE_ANALYSIS, MODE_SCANNER]
@@ -1467,7 +1467,7 @@ def _build_brand_payload(current_mode, chart_period):
     if current_mode == MODE_SCANNER:
         mode_label = 'SCANNER'
     elif current_mode == MODE_MARKET_DAILY:
-        mode_label = 'US MARKET DAILY'
+        mode_label = '오늘 미국장'
     else:
         mode_label = 'ANALYSIS'
     period_label = _short_period_label(chart_period)
@@ -2109,7 +2109,7 @@ if current_mode == MODE_SCANNER:
         )
 
 # ══════════════════════════════════════════════════════════════
-#  US MARKET DAILY 모드
+#  오늘 미국장 모드
 # ══════════════════════════════════════════════════════════════
 elif current_mode == MODE_MARKET_DAILY:
     _render_brand_board(main_board_payload)
@@ -2118,7 +2118,7 @@ elif current_mode == MODE_MARKET_DAILY:
         "브리핑에서 바로 분석",
         "티커를 입력하거나 빠른 시작에서 선택하면 분석 모드로 전환되어 상세 분석을 이어갑니다.",
         badges=[
-            ("US MARKET DAILY", "accent"),
+            ("오늘 미국장", "accent"),
             ("즉시 분석 전환", "warning"),
         ],
         eyebrow="Daily To Analysis",
