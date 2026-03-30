@@ -1,5 +1,6 @@
 ﻿import streamlit as st
 import streamlit.components.v1 as components
+from collections import Counter
 import pandas as pd
 import plotly.graph_objects as go
 import google.generativeai as genai
@@ -7,8 +8,16 @@ import html
 import json
 import re
 import yfinance as yf
-from datetime import datetime
+from datetime import datetime, timedelta
 from textwrap import dedent
+try:
+    import cloudscraper
+except Exception:
+    cloudscraper = None
+try:
+    from bs4 import BeautifulSoup
+except Exception:
+    BeautifulSoup = None
 from config import *
 from chart import build_metadata, build_chart
 from company_details import render_company_details
@@ -36,6 +45,29 @@ _US_MARKET_DEFAULT_DURATION = 7000
 _US_MARKET_TEXT_HEAVY_DURATION = 10000
 _US_MARKET_HISTORY_PERIOD = "6mo"
 _US_MARKET_MOVER_LIMIT = 120
+_US_MARKET_TOP_MOVER_CARD_COUNT = 9
+_US_MARKET_NEWS_LOOKBACK_HOURS = 36
+_US_MARKET_NEWS_MAX_ITEMS = 5
+_US_MARKET_NEWS_SECTION_MAX_ITEMS = 5
+_US_MARKET_NEWS_PER_TICKER_LIMIT = 8
+_US_MARKET_NEWS_AI_ITEMS_PER_SECTION = 5
+_US_MARKET_NEWS_ARTICLE_FETCH_LIMIT = 25
+_US_MARKET_NEWS_SECTION_SUMMARY_ITEMS = 5
+_US_MARKET_NEWS_EXCERPT_MAX_CHARS = 320
+_US_MARKET_NEWS_SECTION_ORDER = [
+    "시장 총평",
+    "거시·연준",
+    "실적·개별주",
+    "외부 변수",
+    "원자재·암호",
+]
+_US_MARKET_NEWS_SECTION_IDS = {
+    "시장 총평": "market_snapshot",
+    "거시·연준": "macro_fed",
+    "실적·개별주": "earnings_stocks",
+    "외부 변수": "external_risks",
+    "원자재·암호": "commodities_crypto",
+}
 _US_MARKET_BENCHMARKS = [
     ("SPY", "S&P 500"),
     ("QQQ", "나스닥 100"),
@@ -51,6 +83,23 @@ _US_MARKET_MACRO = [
     ("CL=F", "WTI"),
     ("BTC-USD", "비트코인"),
 ]
+_US_MARKET_SYSTEMIC_NEWS_SYMBOLS = [
+    "SPY", "QQQ", "DIA", "IWM", "^VIX", "^TNX", "DX-Y.NYB", "KRW=X", "GLD", "CL=F", "BTC-USD", "XLE",
+]
+_MARKET_NEWS_DISPLAY_LABELS = {
+    "SPY": "S&P 500",
+    "QQQ": "나스닥 100",
+    "DIA": "다우",
+    "IWM": "러셀 2000",
+    "^VIX": "VIX",
+    "^TNX": "미 국채 10년",
+    "DX-Y.NYB": "달러 인덱스",
+    "KRW=X": "원/달러",
+    "GLD": "금",
+    "CL=F": "WTI",
+    "BTC-USD": "비트코인",
+    "XLE": "에너지",
+}
 _MARKET_SYMBOL_NORMALIZATION_MAP = {
     "BRK.B": "BRK-B",
     "BF.B": "BF-B",
@@ -59,6 +108,60 @@ _MARKET_SYMBOL_FALLBACKS = {
     "DX-Y.NYB": ("DX=F",),
     "KRW=X": ("USDKRW=X",),
 }
+_MARKET_NEWS_TITLE_TRANSLATIONS = [
+    (r"\bafter-hours\b", "시간외"),
+    (r"\bpre-market\b", "개장 전"),
+    (r"\bpremarket\b", "개장 전"),
+    (r"\bfederal reserve\b", "연준"),
+    (r"\bfed\b", "연준"),
+    (r"\bearnings\b", "실적"),
+    (r"\bguidance\b", "가이던스"),
+    (r"\boutlook\b", "전망"),
+    (r"\brevenue\b", "매출"),
+    (r"\bprofit\b", "이익"),
+    (r"\bquarterly\b", "분기"),
+    (r"\bresults\b", "결과"),
+    (r"\bforecasts?\b", "전망"),
+    (r"\bforecast\b", "전망"),
+    (r"\btariffs?\b", "관세"),
+    (r"\bsanctions?\b", "제재"),
+    (r"\blawsuit\b", "소송"),
+    (r"\bsettlement\b", "합의"),
+    (r"\bmerger\b", "합병"),
+    (r"\bacquisition\b", "인수"),
+    (r"\bpartnership\b", "파트너십"),
+    (r"\bagreement\b", "합의"),
+    (r"\bdeal\b", "계약"),
+    (r"\bbitcoin\b", "비트코인"),
+    (r"\bethereum\b", "이더리움"),
+    (r"\bcrypto(?:currency)?\b", "가상자산"),
+    (r"\bsemiconductor\b", "반도체"),
+    (r"\bchipmaker\b", "반도체 기업"),
+    (r"\bchips\b", "칩"),
+    (r"\bchip\b", "칩"),
+    (r"\boil\b", "유가"),
+    (r"\bcrude\b", "원유"),
+    (r"\bgold\b", "금"),
+    (r"\byields?\b", "금리"),
+    (r"\brate cuts?\b", "금리 인하"),
+    (r"\brate hikes?\b", "금리 인상"),
+    (r"\bbeats?\b", "상회"),
+    (r"\bmiss(?:es|ed)?\b", "하회"),
+    (r"\braises?\b", "상향"),
+    (r"\bcuts?\b", "하향"),
+    (r"\bsurges?\b", "급등"),
+    (r"\bjumps?\b", "급등"),
+    (r"\brall(?:y|ies|ied)\b", "강세"),
+    (r"\brises?\b", "상승"),
+    (r"\bgains?\b", "상승"),
+    (r"\bfalls?\b", "하락"),
+    (r"\bdrops?\b", "하락"),
+    (r"\bslips?\b", "약세"),
+    (r"\bsinks?\b", "급락"),
+    (r"\bstocks\b", "주식"),
+    (r"\bstock\b", "주가"),
+    (r"\bshares\b", "주가"),
+]
 _US_SECTOR_ETFS = [
     ("XLK", "기술"),
     ("XLF", "금융"),
@@ -100,6 +203,11 @@ def _ordered_unique(items):
 def _normalize_market_symbol(symbol):
     raw = str(symbol or "").strip().upper()
     return _MARKET_SYMBOL_NORMALIZATION_MAP.get(raw, raw)
+
+
+def _market_news_display_label(symbol):
+    normalized = _normalize_market_symbol(symbol)
+    return _MARKET_NEWS_DISPLAY_LABELS.get(normalized, normalized)
 
 
 def _market_symbol_candidates(symbol):
@@ -760,6 +868,1392 @@ def _extract_json_object(text):
     return raw.group(0) if raw else "{}"
 
 
+def _is_market_news_rate_limited(err):
+    sample = str(err or "").lower()
+    return "too many requests" in sample or "rate limit" in sample or "429" in sample
+
+
+def _normalize_market_news_title(title):
+    normalized = re.sub(r"\W+", " ", str(title or "").lower())
+    return re.sub(r"\s+", " ", normalized).strip()
+
+
+def _normalize_market_news_url(url):
+    normalized = str(url or "").strip().split("#", 1)[0].split("?", 1)[0].rstrip("/")
+    return normalized.lower()
+
+
+def _market_news_has_korean(text):
+    return bool(re.search(r"[가-힣]", str(text or "")))
+
+
+def _partially_translate_market_news_title(title):
+    translated = str(title or "").strip()
+    if not translated:
+        return ""
+    for pattern, replacement in _MARKET_NEWS_TITLE_TRANSLATIONS:
+        translated = re.sub(pattern, replacement, translated, flags=re.I)
+    translated = translated.replace(" - ", " · ")
+    translated = re.sub(r"\s+([,:;.!?])", r"\1", translated)
+    translated = re.sub(r"\s+", " ", translated).strip()
+    return translated
+
+
+def _fallback_market_news_title_ko(item):
+    raw_title = str(item.get("title") or "").strip()
+    if not raw_title:
+        return ""
+    translated = _partially_translate_market_news_title(raw_title)
+    if translated != raw_title or _market_news_has_korean(translated):
+        return translated
+    display_label = item.get("display_label") or item.get("ticker") or "시장"
+    tag = item.get("tag") or "핵심"
+    return f"{display_label} {tag} 관련: {raw_title}"
+
+
+def _should_show_market_news_raw_title(title_ko, title_raw):
+    ko = str(title_ko or "").strip()
+    raw = str(title_raw or "").strip()
+    if not ko or not raw or ko == raw:
+        return False
+    return _normalize_market_news_title(raw) not in _normalize_market_news_title(ko)
+
+
+def _clean_market_news_excerpt(text, max_chars=_US_MARKET_NEWS_EXCERPT_MAX_CHARS):
+    sample = html.unescape(str(text or "")).strip()
+    if not sample:
+        return ""
+    sample = re.sub(r"<[^>]+>", " ", sample)
+    sample = re.sub(r"\s+", " ", sample).strip(" -:\n\t")
+    if not sample:
+        return ""
+    if len(sample) <= max_chars:
+        return sample
+    truncated = sample[:max_chars].rsplit(" ", 1)[0].strip()
+    return (truncated or sample[:max_chars]).rstrip(" ,;:") + "..."
+
+
+def _market_news_parse_text(*parts):
+    joined = " ".join(str(part or "").strip() for part in parts if str(part or "").strip())
+    return re.sub(r"\s+", " ", joined).strip().lower()
+
+
+def _market_news_excerpt_score(text, title=""):
+    sample = str(text or "").strip()
+    if not sample:
+        return -1
+    title_norm = _normalize_market_news_title(title)
+    sample_norm = _normalize_market_news_title(sample)
+    score = min(len(sample), _US_MARKET_NEWS_EXCERPT_MAX_CHARS)
+    if title_norm and sample_norm and title_norm == sample_norm:
+        score -= 120
+    if len(sample.split()) >= 14:
+        score += 30
+    if re.search(r"\b(revenue|earnings|guidance|forecast|contract|probe|tariff|ceasefire|opec|yield|cpi|bitcoin)\b", sample, re.I):
+        score += 24
+    return score
+
+
+def _extract_market_news_meta_description(soup):
+    if soup is None:
+        return ""
+    selectors = [
+        ("meta", {"property": "og:description"}),
+        ("meta", {"name": "description"}),
+        ("meta", {"name": "twitter:description"}),
+    ]
+    for tag_name, attrs in selectors:
+        tag = soup.find(tag_name, attrs=attrs)
+        content = _clean_market_news_excerpt(tag.get("content") if tag else "")
+        if content:
+            return content
+    return ""
+
+
+def _extract_market_news_paragraph_excerpt(soup):
+    if soup is None:
+        return ""
+    for tag_name in ["script", "style", "noscript", "header", "footer", "nav", "svg"]:
+        for node in soup.find_all(tag_name):
+            node.decompose()
+    containers = []
+    for selector in ["article", "main"]:
+        containers.extend(soup.find_all(selector))
+    if not containers:
+        containers = soup.find_all(["section", "div"], limit=25)
+    paragraphs = []
+    seen = set()
+    for container in containers:
+        for p in container.find_all("p", limit=20):
+            text = _clean_market_news_excerpt(p.get_text(" ", strip=True), max_chars=_US_MARKET_NEWS_EXCERPT_MAX_CHARS)
+            norm = _normalize_market_news_title(text)
+            if len(text) < 80 or norm in seen:
+                continue
+            seen.add(norm)
+            paragraphs.append(text)
+            if len(paragraphs) >= 3:
+                break
+        if len(paragraphs) >= 3:
+            break
+    combined = " ".join(paragraphs[:2]).strip()
+    return _clean_market_news_excerpt(combined) if combined else ""
+
+
+@st.cache_data(ttl=7200, show_spinner=False)
+def _fetch_market_news_article_excerpt(url):
+    if not url or cloudscraper is None or BeautifulSoup is None:
+        return {"excerpt": "", "source_depth": "headline"}
+    try:
+        scraper = cloudscraper.create_scraper(
+            browser={"browser": "chrome", "platform": "windows", "mobile": False}
+        )
+        response = scraper.get(
+            str(url).strip(),
+            timeout=8,
+            headers={
+                "User-Agent": "Mozilla/5.0",
+                "Accept-Language": "en-US,en;q=0.9",
+            },
+        )
+        if not getattr(response, "ok", False):
+            return {"excerpt": "", "source_depth": "headline"}
+        soup = BeautifulSoup(getattr(response, "text", "") or "", "html.parser")
+        meta_excerpt = _extract_market_news_meta_description(soup)
+        body_excerpt = _extract_market_news_paragraph_excerpt(soup)
+        if _market_news_excerpt_score(body_excerpt) > _market_news_excerpt_score(meta_excerpt):
+            excerpt = body_excerpt
+            source_depth = "article"
+        else:
+            excerpt = meta_excerpt or body_excerpt
+            source_depth = "snippet" if meta_excerpt else ("article" if body_excerpt else "headline")
+        return {"excerpt": excerpt, "source_depth": source_depth}
+    except Exception:
+        return {"excerpt": "", "source_depth": "headline"}
+
+
+def _detect_market_news_event_type(text, tag):
+    sample = str(text or "")
+    if re.search(r"\b(beat|beats|tops|top estimates|better than expected|above estimates)\b", sample):
+        return "earnings_beat"
+    if re.search(r"\b(miss|misses|below estimates|short of estimates|falls after earnings)\b", sample):
+        return "earnings_miss"
+    if re.search(r"\b(raises outlook|raise[s]? guidance|lift[s]? forecast|upgrades? outlook|boosts? forecast)\b", sample):
+        return "guidance_up"
+    if re.search(r"\b(cuts? outlook|cut[s]? guidance|lowers? forecast|warns?|trim[s]? outlook)\b", sample):
+        return "guidance_down"
+    if re.search(r"\b(wins? contract|agreement|partnership|collaboration|joint venture|alliance|deal signed|supply deal)\b", sample):
+        return "contract_partnership"
+    if re.search(r"\b(acquire|acquisition|merger|buyout|takeover|stake in)\b", sample):
+        return "mna"
+    if re.search(r"\b(lawsuit|sues|sued|court|judge|trial|settlement|appeal)\b", sample):
+        return "lawsuit"
+    if re.search(r"\b(regulator|regulatory|probe|investigation|antitrust|ftc|doj|sec|ban|export control)\b", sample):
+        return "regulation_probe"
+    if re.search(r"\b(powell|fed|fomc|federal reserve|rate cut|rate hike|treasury yield|bond yield)\b", sample):
+        return "fed_rates"
+    if re.search(r"\b(cpi|pce|gdp|payroll|jobless|retail sales|pmi|ism|inflation report)\b", sample):
+        return "macro_data"
+    if re.search(r"\b(tariff|sanction|white house|congress|senate|budget|tax plan|administration)\b", sample):
+        return "policy_politics"
+    if re.search(r"\b(hormuz|middle east|iran|israel|ukraine|russia|war|attack|ceasefire|tanker|shipping lane)\b", sample):
+        return "geopolitics"
+    if re.search(r"\b(oil|crude|brent|wti|opec|refinery|energy price|diesel)\b", sample):
+        return "oil_commodities"
+    if re.search(r"\b(bitcoin|ethereum|crypto|cryptocurrency|stablecoin|token|spot etf)\b", sample):
+        return "crypto"
+    if re.search(r"\b(ai|artificial intelligence|openai|copilot|chatgpt|llm)\b", sample):
+        return "ai"
+    if re.search(r"\b(semiconductor|chip|chips|gpu|foundry|memory|hbm)\b", sample):
+        return "semiconductor"
+    if re.search(r"\b(demand|orders|bookings|traffic|spending|consumption)\b", sample):
+        return "demand"
+    if re.search(r"\b(production|output|capacity|factory|supply|shipments?)\b", sample):
+        return "production"
+    tag_map = {
+        "연준": "fed_rates",
+        "경제지표": "macro_data",
+        "정책/정치": "policy_politics",
+        "암호화폐": "crypto",
+        "파트너십": "contract_partnership",
+        "실적": "earnings",
+        "가이던스": "guidance",
+        "AI": "ai",
+        "반도체": "semiconductor",
+        "지정학": "geopolitics",
+        "원자재": "oil_commodities",
+        "규제": "regulation_probe",
+        "M&A": "mna",
+        "금리": "fed_rates",
+        "수요": "demand",
+        "생산": "production",
+        "소송": "lawsuit",
+    }
+    return tag_map.get(tag, "market_update")
+
+
+def _detect_market_news_event_direction(text, event_type, change_pct=None):
+    sample = str(text or "")
+    if event_type in {"earnings_beat", "guidance_up", "contract_partnership"}:
+        return "positive"
+    if event_type in {"earnings_miss", "guidance_down", "lawsuit", "regulation_probe"}:
+        return "negative"
+    if re.search(r"\b(beat|beats|raises|upgrades|wins|surges|jumps|rallies|strong demand)\b", sample):
+        return "positive"
+    if re.search(r"\b(miss|misses|cuts|warns|downgrade|slumps|falls|drops|probe|lawsuit)\b", sample):
+        return "negative"
+    if change_pct is not None and not pd.isna(change_pct):
+        if float(change_pct) >= 1:
+            return "positive"
+        if float(change_pct) <= -1:
+            return "negative"
+    return "neutral"
+
+
+def _build_market_news_fact_ko(subject, event_type, event_direction):
+    fact_map = {
+        "earnings_beat": f"{subject}가 실적 기대를 웃돌았거나 호실적 신호가 부각된 소식",
+        "earnings_miss": f"{subject}가 실적 기대를 밑돌았거나 실적 실망 우려가 부각된 소식",
+        "guidance_up": f"{subject}의 가이던스·전망 상향이 부각된 소식",
+        "guidance_down": f"{subject}의 가이던스·전망 하향이 부각된 소식",
+        "contract_partnership": f"{subject}의 협업·계약·수주 관련 소식",
+        "mna": f"{subject}의 인수·합병 또는 지분 거래 관련 소식",
+        "lawsuit": f"{subject} 관련 소송이나 법적 분쟁 소식",
+        "regulation_probe": f"{subject} 관련 규제·조사 이슈 소식",
+        "fed_rates": "연준 발언이나 금리 기대 재조정 관련 소식",
+        "macro_data": "경제지표 발표나 해석 변화 관련 소식",
+        "policy_politics": "정책·정치 변수 변화 관련 소식",
+        "geopolitics": "전쟁·분쟁·운송 차질 같은 지정학 리스크 소식",
+        "oil_commodities": f"{subject} 관련 유가·원자재 변수 변화 소식",
+        "crypto": f"{subject} 관련 가상자산 가격·제도 변화 소식",
+        "ai": f"{subject} 관련 AI 기대나 투자심리 변화 소식",
+        "semiconductor": f"{subject} 관련 반도체 수요·공급망 소식",
+        "demand": f"{subject} 수요 흐름 변화와 연결된 소식",
+        "production": f"{subject} 생산·공급 변화와 연결된 소식",
+        "guidance": f"{subject} 전망 변화와 관련된 소식",
+        "earnings": f"{subject} 실적과 관련된 소식",
+        "market_update": f"{subject} 관련 핵심 업데이트",
+    }
+    base = fact_map.get(event_type, f"{subject} 관련 핵심 소식")
+    if event_direction == "positive" and event_type not in {"earnings_beat", "guidance_up", "contract_partnership", "ai"}:
+        return f"{base}이 긍정적으로 해석된 뉴스"
+    if event_direction == "negative" and event_type not in {"earnings_miss", "guidance_down", "lawsuit", "regulation_probe"}:
+        return f"{base}이 부담으로 해석된 뉴스"
+    return base
+
+
+def _build_market_news_impact_ko(subject, event_type, tag, section_label):
+    impact_map = {
+        "earnings_beat": "실적 기대와 밸류에이션 재평가 가능성을 키울 수 있습니다.",
+        "earnings_miss": "실적 기대 하향과 단기 주가 변동성을 키울 수 있습니다.",
+        "guidance_up": "앞으로의 실적 기대를 끌어올리는 재료가 될 수 있습니다.",
+        "guidance_down": "향후 실적 기대를 낮추며 경계 심리를 키울 수 있습니다.",
+        "contract_partnership": "신규 매출 기대나 성장 스토리를 강화할 수 있습니다.",
+        "mna": "밸류에이션 기대와 업계 재편 기대를 자극할 수 있습니다.",
+        "lawsuit": "법적 불확실성과 비용 부담 우려를 키울 수 있습니다.",
+        "regulation_probe": "규제 불확실성과 멀티플 부담 요인으로 작용할 수 있습니다.",
+        "fed_rates": "금리 민감주와 달러·채권 흐름 해석에 영향을 줄 수 있습니다.",
+        "macro_data": "경기와 금리 경로 기대를 다시 조정하게 만들 수 있습니다.",
+        "policy_politics": "정책 변수에 따른 시장 변동성을 키울 수 있습니다.",
+        "geopolitics": "유가·금·달러 같은 방어 자산 흐름에 영향을 줄 수 있습니다.",
+        "oil_commodities": "인플레이션 기대와 에너지 민감 섹터 심리에 영향을 줄 수 있습니다.",
+        "crypto": "위험선호 심리와 가상자산 관련 종목 흐름에 영향을 줄 수 있습니다.",
+        "ai": "AI 투자심리와 관련 공급망 기대를 자극할 수 있습니다.",
+        "semiconductor": "반도체 업황 기대와 공급망 심리에 영향을 줄 수 있습니다.",
+        "demand": "실적 추정치와 업황 기대를 다시 보게 만드는 재료입니다.",
+        "production": "공급과 마진 전망을 다시 조정하게 만들 수 있습니다.",
+        "guidance": "향후 분기 실적 기대를 조정하게 만드는 재료입니다.",
+        "earnings": "단기 실적 해석과 주가 민감도를 높이는 재료입니다.",
+        "market_update": "해당 카테고리의 대표 심리를 설명하는 뉴스입니다.",
+    }
+    if section_label == "시장 총평":
+        return "지수와 시장 폭 해석에 참고할 만한 흐름입니다."
+    return impact_map.get(event_type, f"{subject} 관련 심리와 수급 해석에 영향을 줄 수 있습니다.")
+
+
+def _build_market_news_structured_fields(item):
+    subject = str(item.get("display_label") or item.get("ticker") or "시장").strip() or "시장"
+    title = str(item.get("title") or "").strip()
+    body_excerpt = str(item.get("body_excerpt") or "").strip()
+    tag = str(item.get("tag") or "시장").strip()
+    section_label = str(item.get("section") or "").strip()
+    combined = _market_news_parse_text(title, body_excerpt)
+    event_type = _detect_market_news_event_type(combined, tag)
+    event_direction = _detect_market_news_event_direction(combined, event_type, item.get("change_pct"))
+    key_fact_ko = _build_market_news_fact_ko(subject, event_type, event_direction)
+    market_impact_ko = _build_market_news_impact_ko(subject, event_type, tag, section_label)
+    return {
+        "event_type": event_type,
+        "event_direction": event_direction,
+        "subject": subject,
+        "key_fact_ko": key_fact_ko,
+        "market_impact_ko": market_impact_ko,
+    }
+
+
+def _build_market_news_takeaway_ko(item):
+    fields = _build_market_news_structured_fields(item)
+    event_type = str(fields.get("event_type") or "").strip()
+    event_direction = str(fields.get("event_direction") or "").strip()
+    section_label = str(item.get("section") or "").strip()
+    subject = _market_news_subject_for_takeaway(item, event_type, fields.get("subject"))
+    prefix = _market_news_takeaway_tag(item, event_type)
+    fact_phrase = _build_market_news_fact_phrase_ko(item, fields)
+    reaction_phrase = _market_news_reaction_phrase(item, event_direction)
+    impact_phrase = _market_news_impact_tail_ko(event_type, section_label, event_direction)
+    if fact_phrase and reaction_phrase:
+        core = f"{fact_phrase}에 {reaction_phrase}"
+    else:
+        core = fact_phrase or reaction_phrase or "핵심 이슈 부각"
+    if impact_phrase:
+        return f"{prefix} {subject}, {core}, {impact_phrase}"
+    return f"{prefix} {subject}, {core}"
+
+
+def _market_news_event_label_ko(event_type):
+    labels = {
+        "earnings_beat": "실적 상회",
+        "earnings_miss": "실적 하회",
+        "guidance_up": "가이던스 상향",
+        "guidance_down": "가이던스 하향",
+        "contract_partnership": "계약·협업",
+        "mna": "인수합병",
+        "lawsuit": "소송",
+        "regulation_probe": "규제·조사",
+        "fed_rates": "연준·금리",
+        "macro_data": "경제지표",
+        "policy_politics": "정책·정치",
+        "geopolitics": "지정학",
+        "oil_commodities": "원자재",
+        "crypto": "가상자산",
+        "ai": "AI",
+        "semiconductor": "반도체",
+        "demand": "수요",
+        "production": "생산",
+        "guidance": "가이던스",
+        "earnings": "실적",
+        "market_update": "시장 업데이트",
+    }
+    return labels.get(str(event_type or "").strip(), "핵심 뉴스")
+
+
+def _market_news_event_score(event_type):
+    weights = {
+        "fed_rates": 18,
+        "macro_data": 18,
+        "geopolitics": 18,
+        "policy_politics": 14,
+        "oil_commodities": 14,
+        "earnings_beat": 14,
+        "earnings_miss": 14,
+        "guidance_up": 14,
+        "guidance_down": 14,
+        "earnings": 12,
+        "guidance": 12,
+        "regulation_probe": 14,
+        "lawsuit": 12,
+        "crypto": 12,
+        "contract_partnership": 10,
+        "mna": 10,
+        "ai": 8,
+        "semiconductor": 8,
+        "demand": 6,
+        "production": 6,
+        "market_update": 2,
+    }
+    return weights.get(str(event_type or "").strip(), 0)
+
+
+def _market_news_takeaway_tag(item, event_type=""):
+    tag_map = {
+        "earnings_beat": "실적",
+        "earnings_miss": "실적",
+        "guidance_up": "가이던스",
+        "guidance_down": "가이던스",
+        "contract_partnership": "계약",
+        "mna": "M&A",
+        "lawsuit": "소송",
+        "regulation_probe": "규제",
+        "fed_rates": "금리",
+        "macro_data": "지표",
+        "policy_politics": "정책",
+        "geopolitics": "지정학",
+        "oil_commodities": "원자재",
+        "crypto": "암호화폐",
+        "ai": "AI",
+        "semiconductor": "반도체",
+        "demand": "수요",
+        "production": "생산",
+        "guidance": "가이던스",
+        "earnings": "실적",
+        "market_update": "시황",
+    }
+    tag_label = tag_map.get(str(event_type or "").strip()) or str(item.get("tag") or "핵심").strip() or "핵심"
+    if tag_label == "정책/정치":
+        tag_label = "정책"
+    return f"[{tag_label}]"
+
+
+def _extract_market_news_numeric_clues(*parts):
+    sample = " ".join(str(part or "").strip() for part in parts if str(part or "").strip())
+    if not sample:
+        return []
+    clues = []
+    patterns = [
+        r"\b\d{1,3}(?:,\d{3})*(?:\.\d+)?%",
+        r"\$\d{1,4}(?:,\d{3})*(?:\.\d+)?(?:\s*(?:billion|million|trillion|bn|mn|tn))?",
+        r"\b\d{1,4}(?:,\d{3})*(?:\.\d+)?\s*(?:bp|bps|basis points?|million|billion|trillion)\b",
+        r"\b\d{1,4}(?:,\d{3})*(?:\.\d+)?x\b",
+    ]
+    for pattern in patterns:
+        for match in re.findall(pattern, sample, re.I):
+            value = str(match or "").strip()
+            if value:
+                clues.append(value)
+    return _ordered_unique(clues)
+
+
+def _is_low_signal_market_news_item(item_or_title, body_excerpt=""):
+    if isinstance(item_or_title, dict):
+        title = str(item_or_title.get("title") or "").strip()
+        body_excerpt = str(item_or_title.get("body_excerpt") or "").strip()
+    else:
+        title = str(item_or_title or "").strip()
+        body_excerpt = str(body_excerpt or "").strip()
+    sample = _market_news_parse_text(title, body_excerpt)
+    if not sample:
+        return False
+    patterns = [
+        r"\bhow .+ compares?\b",
+        r"\bfor investors\b",
+        r"\bwhat to know\b",
+        r"\bexplainer\b",
+        r"\bopinion\b",
+        r"\banalysis\b",
+        r"\bshould you\b",
+        r"\bcomparison\b",
+        r"\bcompare(?:s|d)?\b",
+        r"\bdiversification\b",
+    ]
+    if any(re.search(pattern, sample) for pattern in patterns):
+        return True
+    if re.search(r"\bvs\.?\b", sample) and re.search(r"\b(compare|comparison|diversification|investors?)\b", sample):
+        return True
+    return False
+
+
+def _build_market_news_context_phrase_ko(item, fields):
+    title = str(item.get("title") or "").strip()
+    body_excerpt = str(item.get("body_excerpt") or "").strip()
+    sample = _market_news_parse_text(title, body_excerpt)
+    event_type = str(fields.get("event_type") or "").strip()
+    if _is_low_signal_market_news_item(item):
+        if re.search(r"\biwm\b", sample) and re.search(r"\bqqq\b", sample):
+            return "중소형주·대형성장주 비교 기사"
+        if re.search(r"\bvs\.?\b", sample):
+            return "자산 비교 해설 기사"
+        return "시장 해설 기사"
+    if re.search(r"\b(loan|borrowing|borrow|funding|financing|debt)\b", sample):
+        if re.search(r"\bopenai\b", sample) and re.search(r"\barm\b", sample):
+            return "OpenAI·Arm 투자 확대 보도"
+        return "대규모 차입·투자 확대 보도"
+    if event_type == "fed_rates":
+        if re.search(r"\b(yield|treasury)\b", sample):
+            return "국채금리 변동"
+        if re.search(r"\b(powell|fomc|federal reserve|fed)\b", sample):
+            return "연준 발언"
+        return "금리 기대 재조정"
+    if event_type == "macro_data":
+        if re.search(r"\bcpi\b", sample):
+            return "CPI 발표"
+        if re.search(r"\bpce\b", sample):
+            return "PCE 발표"
+        if re.search(r"\b(payroll|jobless|employment|labor market)\b", sample):
+            return "고용지표 발표"
+        if re.search(r"\bgdp\b", sample):
+            return "GDP 발표"
+        if re.search(r"\b(retail sales)\b", sample):
+            return "소매판매 발표"
+        if re.search(r"\b(pmi|ism)\b", sample):
+            return "PMI·ISM 발표"
+        return "경제지표 발표"
+    if event_type == "geopolitics":
+        if re.search(r"\b(hormuz|strait of hormuz)\b", sample):
+            return "호르무즈 해협 리스크"
+        if re.search(r"\b(middle east|iran|israel|gaza)\b", sample):
+            return "중동 지정학 리스크"
+        if re.search(r"\b(ukraine|russia)\b", sample):
+            return "우크라이나 지정학 리스크"
+        return "지정학 리스크"
+    if event_type == "oil_commodities":
+        if re.search(r"\b(opec)\b", sample):
+            return "OPEC·유가 변수"
+        return "유가·원자재 급등락"
+    if event_type == "crypto":
+        if re.search(r"\bspot etf\b", sample):
+            return "현물 ETF 이슈"
+        if re.search(r"\bbitcoin\b", sample):
+            return "비트코인 이슈"
+        return "가상자산 이슈"
+    context_map = {
+        "earnings_beat": "실적 예상치 상회",
+        "earnings_miss": "실적 예상치 하회",
+        "guidance_up": "가이던스 상향",
+        "guidance_down": "가이던스 하향",
+        "contract_partnership": "대형 계약·협업 보도",
+        "mna": "인수·지분 거래 보도",
+        "lawsuit": "소송·법적 분쟁",
+        "regulation_probe": "규제·조사 이슈",
+        "policy_politics": "정책 변수 부각",
+        "ai": "AI 투자·수요 기대 보도",
+        "semiconductor": "반도체 수요·공급망 보도",
+        "demand": "수요 변화 신호",
+        "production": "생산·공급 변수",
+        "guidance": "전망 변화 보도",
+        "earnings": "실적 발표 보도",
+        "market_update": "시장 흐름 점검 기사",
+    }
+    return context_map.get(event_type, "핵심 이슈 보도")
+
+
+def _market_news_comparison_phrase(text, event_type):
+    sample = str(text or "")
+    if re.search(r"\b(beat|beats|top estimates|above estimates|better than expected|tops)\b", sample):
+        return "예상치 상회"
+    if re.search(r"\b(miss|misses|below estimates|short of estimates|worse than expected)\b", sample):
+        return "예상치 하회"
+    if re.search(r"\b(raises outlook|raise[s]? guidance|lift[s]? forecast|boosts? forecast|upgrades? outlook)\b", sample):
+        return "전망 상향"
+    if re.search(r"\b(cuts? outlook|cut[s]? guidance|lowers? forecast|warns?|trim[s]? outlook)\b", sample):
+        return "전망 하향"
+    fallback_map = {
+        "earnings_beat": "호실적 신호",
+        "earnings_miss": "실적 실망 우려",
+        "guidance_up": "전망 상향",
+        "guidance_down": "전망 하향",
+        "contract_partnership": "계약·협업 보도",
+        "mna": "인수·지분 거래",
+        "lawsuit": "법적 분쟁",
+        "regulation_probe": "규제·조사",
+        "fed_rates": "금리 기대 재조정",
+        "macro_data": "경제지표 해석 변화",
+        "policy_politics": "정책 변수 부각",
+        "geopolitics": "지정학 리스크",
+        "oil_commodities": "유가·원자재 급변",
+        "crypto": "가상자산 이슈",
+        "ai": "AI 기대 부각",
+        "semiconductor": "반도체 업황 기대",
+        "demand": "수요 변화",
+        "production": "생산 변수",
+        "guidance": "전망 변화",
+        "earnings": "실적 발표",
+        "market_update": "시장 업데이트",
+    }
+    return fallback_map.get(str(event_type or "").strip(), "핵심 이슈")
+
+
+def _market_news_subject_for_takeaway(item, event_type, subject):
+    base = str(subject or item.get("display_label") or item.get("ticker") or "시장").strip() or "시장"
+    if event_type == "macro_data" and base in {"S&P 500", "나스닥 100", "다우", "러셀 2000"}:
+        return "미국 경제지표"
+    if event_type == "fed_rates" and base in {"S&P 500", "나스닥 100", "다우", "러셀 2000"}:
+        return "연준·금리"
+    return base
+
+
+def _market_news_reaction_phrase(item, event_direction):
+    change_pct = item.get("change_pct")
+    if change_pct is not None and not pd.isna(change_pct):
+        move = float(change_pct)
+        if abs(move) <= 0.35:
+            return f"{_format_change_pct(move)} 보합권"
+        if move >= 3:
+            return f"{_format_change_pct(move)} 급등"
+        if move > 0:
+            return f"{_format_change_pct(move)} 상승"
+        if move <= -3:
+            return f"{_format_change_pct(move)} 급락"
+        return f"{_format_change_pct(move)} 하락"
+    if event_direction == "positive":
+        return "강세 재료 부각"
+    if event_direction == "negative":
+        return "경계 심리 확대"
+    return "해석 엇갈림"
+
+
+def _market_news_impact_tail_ko(event_type, section_label, event_direction):
+    impact_map = {
+        "earnings_beat": "밸류 재평가 재료",
+        "earnings_miss": "추정치 하향 부담",
+        "guidance_up": "향후 실적 기대 상향 재료",
+        "guidance_down": "실적 기대 후퇴 부담",
+        "contract_partnership": "신규 매출 기대 재료",
+        "mna": "업계 재편 기대 요인",
+        "lawsuit": "불확실성 확대 부담",
+        "regulation_probe": "멀티플 할인 부담",
+        "fed_rates": "성장주 밸류 변수",
+        "macro_data": "연준 경로 재평가 요인",
+        "policy_politics": "업종별 수급 변수",
+        "geopolitics": "유가·방어자산 변동성 요인",
+        "oil_commodities": "인플레 기대 자극 요인",
+        "crypto": "위험선호 민감도 변수",
+        "ai": "공급망 심리 개선 재료",
+        "semiconductor": "업황 재평가 요인",
+        "demand": "실적 추정치 조정 요인",
+        "production": "마진 전망 변수",
+        "guidance": "실적 전망 조정 변수",
+        "earnings": "실적 민감도 요인",
+        "market_update": "지수 방향 판단 재료",
+    }
+    if section_label == "시장 총평":
+        return "시장 폭 판단 재료"
+    if event_direction == "negative" and event_type == "market_update":
+        return "지수 하방 부담"
+    return impact_map.get(str(event_type or "").strip(), "시장 해석 변수")
+
+
+def _build_market_news_fact_phrase_ko(item, fields):
+    event_type = str(fields.get("event_type") or "").strip()
+    title = str(item.get("title") or "").strip()
+    body_excerpt = str(item.get("body_excerpt") or "").strip()
+    combined = _market_news_parse_text(title, body_excerpt)
+    context_phrase = _build_market_news_context_phrase_ko(item, fields)
+    if _is_low_signal_market_news_item(item) or event_type == "market_update":
+        return context_phrase
+    comparison = _market_news_comparison_phrase(combined, event_type)
+    numeric_clues = _extract_market_news_numeric_clues(title, body_excerpt)[:1]
+    parts = []
+    if context_phrase:
+        parts.append(context_phrase)
+    if comparison and comparison not in parts:
+        parts.append(comparison)
+    if numeric_clues and event_type in {"macro_data", "fed_rates", "earnings_beat", "earnings_miss", "guidance_up", "guidance_down", "oil_commodities", "crypto"}:
+        parts.append(numeric_clues[0])
+    return " / ".join(_ordered_unique(parts)) if parts else (context_phrase or comparison)
+
+
+def _build_market_news_issue_phrase_ko(item):
+    fields = _build_market_news_structured_fields(item)
+    event_type = str(fields.get("event_type") or "").strip()
+    subject = _market_news_subject_for_takeaway(item, event_type, fields.get("subject"))
+    context_phrase = _build_market_news_context_phrase_ko(item, fields)
+    fact_phrase = context_phrase or _build_market_news_fact_phrase_ko(item, fields) or _market_news_event_label_ko(event_type)
+    if _is_low_signal_market_news_item(item):
+        return context_phrase
+    if event_type == "market_update":
+        return context_phrase
+    if subject in {"연준·금리", "미국 경제지표"}:
+        return f"{subject} {fact_phrase}"
+    return f"{subject}의 {fact_phrase}" if fact_phrase else subject
+
+
+def _build_market_news_section_issue_text(section_items, limit=2):
+    issues = []
+    for item in list(section_items or [])[:limit]:
+        phrase = _build_market_news_issue_phrase_ko(item)
+        if phrase:
+            issues.append(phrase)
+    return "와 ".join(_ordered_unique(issues)[:limit])
+
+
+def _is_generic_market_news_section_summary(text):
+    sample = str(text or "").strip()
+    if not sample:
+        return True
+    if len(re.findall(r"\d+(?:\.\d+)?%", sample)) >= 2:
+        return True
+    if "시장 업데이트" in sample or "흐름 점검 기사" in sample:
+        return True
+    generic_patterns = [
+        "관련 뉴스",
+        "해석에 참고",
+        "이슈가 중심",
+        "뉴스가 중심",
+        "흐름이 민감도",
+        "영향을 줬습니다",
+        "시장 심리에 영향을 준 하루",
+    ]
+    return any(pattern in sample for pattern in generic_patterns)
+
+
+def _classify_market_news_tag(title, ticker=""):
+    sample = f" {ticker} {title} ".lower()
+    if any(keyword in sample for keyword in [
+        "hormuz", "strait of hormuz", "middle east", "red sea", "iran", "israel", "gaza", "ukraine", "russia",
+        "missile", "drone strike", "airstrike", "attack", "conflict", "war", "ceasefire", "tanker", "shipping lane",
+    ]):
+        return "지정학"
+    if any(keyword in sample for keyword in [
+        "oil", "crude", "brent", "wti", "opec", "gas", "lng", "diesel", "refinery", "energy price",
+    ]):
+        return "원자재"
+    if any(keyword in sample for keyword in [
+        "powell", "fomc", "fed", "federal reserve", "waller", "bostic", "bowman", "kashkari", "williams",
+    ]):
+        return "연준"
+    if any(keyword in sample for keyword in [
+        "cpi", "pce", "gdp", "nonfarm payroll", "payrolls", "jobless claims", "retail sales", "ism", "pmi",
+        "inflation report", "employment report", "labor market",
+    ]):
+        return "경제지표"
+    if any(keyword in sample for keyword in [
+        "tariff", "sanction", "white house", "congress", "senate", "house bill", "budget", "tax plan", "treasury department",
+        "election", "administration", "policy proposal",
+    ]):
+        return "정책/정치"
+    if any(keyword in sample for keyword in [
+        "bitcoin", "btc", "ethereum", "eth", "crypto", "cryptocurrency", "stablecoin", "token", "spot etf",
+    ]):
+        return "암호화폐"
+    if any(keyword in sample for keyword in [
+        "partnership", "partner", "collaboration", "joint venture", "agreement", "alliance",
+    ]):
+        return "파트너십"
+    if any(keyword in sample for keyword in ["guidance", "outlook", "forecast", "raises outlook", "cuts outlook", "sees "]):
+        return "가이던스"
+    if any(keyword in sample for keyword in ["earnings", "results", "quarterly", "quarter ", " eps", "revenue", "profit", "sales beat"]):
+        return "실적"
+    if re.search(r"\bai\b", sample) or any(keyword in sample for keyword in ["artificial intelligence", "openai", "copilot", "chatgpt", "llm"]):
+        return "AI"
+    if any(keyword in sample for keyword in ["semiconductor", " chip", "chips", "gpu", "hbm", "foundry", "memory"]):
+        return "반도체"
+    if any(keyword in sample for keyword in ["regulator", "regulatory", "antitrust", "ftc", "doj", "sec ", "probe", "investigation", "tariff", "ban", "export control"]):
+        return "규제"
+    if "m&a" in sample or any(keyword in sample for keyword in ["acquire", "acquires", "acquisition", "merger", "deal", "buyout", "takeover", "stake"]):
+        return "M&A"
+    if any(keyword in sample for keyword in ["fed", "fomc", "rate cut", "rates", "yield", "yields", "treasury", "inflation", "cpi", "ppi", "payroll", "jobless"]):
+        return "금리"
+    if any(keyword in sample for keyword in ["demand", "orders", "bookings", "spending", "traffic", "consumption"]):
+        return "수요"
+    if any(keyword in sample for keyword in ["production", "output", "capacity", "factory", "supply", "shipment", "shipments"]):
+        return "생산"
+    if any(keyword in sample for keyword in ["lawsuit", "sues", "sued", "court", "judge", "trial", "settlement", "appeal"]):
+        return "소송"
+    return "시장"
+
+
+def _market_news_tag_score(tag):
+    weights = {
+        "연준": 22,
+        "경제지표": 22,
+        "정책/정치": 20,
+        "암호화폐": 18,
+        "파트너십": 14,
+        "실적": 22,
+        "가이던스": 22,
+        "AI": 16,
+        "반도체": 15,
+        "지정학": 24,
+        "원자재": 20,
+        "규제": 18,
+        "M&A": 14,
+        "금리": 18,
+        "수요": 10,
+        "생산": 10,
+        "소송": 12,
+        "시장": 6,
+    }
+    return weights.get(str(tag or "").strip(), 6)
+
+
+def _classify_market_news_section(item):
+    ticker = str(item.get("ticker") or "").strip().upper()
+    tag = str(item.get("tag") or "").strip()
+    if tag in {"연준", "경제지표", "금리"} or ticker in {"^TNX", "DX-Y.NYB", "KRW=X"}:
+        return "거시·연준"
+    if tag in {"지정학", "규제", "정책/정치", "소송"}:
+        return "외부 변수"
+    if tag in {"원자재", "암호화폐"} or ticker in {"GLD", "CL=F", "BTC-USD", "XLE"}:
+        return "원자재·암호"
+    if ticker in {"SPY", "QQQ", "DIA", "IWM", "^VIX"} and tag == "시장":
+        return "시장 총평"
+    return "실적·개별주"
+
+
+def _market_news_time_score(timestamp, reference_dt):
+    if not timestamp:
+        return 0
+    try:
+        age_hours = max(0.0, (reference_dt - datetime.fromtimestamp(timestamp)).total_seconds() / 3600)
+    except Exception:
+        return 0
+    if age_hours <= 6:
+        return 24
+    if age_hours <= 12:
+        return 18
+    if age_hours <= 24:
+        return 10
+    if age_hours <= _US_MARKET_NEWS_LOOKBACK_HOURS:
+        return 4
+    return -20
+
+
+def _score_market_news_item(item, mover_symbols, mega_cap_symbols, benchmark_symbols, systemic_symbols, reference_dt):
+    ticker = str(item.get("ticker") or "").strip().upper()
+    score = _market_news_tag_score(item.get("tag"))
+    score += _market_news_event_score(item.get("event_type"))
+    score += _market_news_time_score(item.get("timestamp"), reference_dt)
+    if _is_low_signal_market_news_item(item):
+        score -= 26
+    if ticker in mover_symbols:
+        score += 35
+    if ticker in mega_cap_symbols:
+        score += 18
+    if ticker in benchmark_symbols:
+        score += 14
+    if ticker in systemic_symbols or item.get("is_systemic"):
+        score += 24
+    if str(item.get("event_type") or "").strip() == "market_update":
+        score -= 10
+    if str(item.get("source_depth") or "").strip() == "snippet":
+        score += 3
+    if str(item.get("source_depth") or "").strip() == "article":
+        score += 5
+    change_pct = item.get("change_pct")
+    if change_pct is not None and not pd.isna(change_pct):
+        move = abs(float(change_pct))
+        if move >= 5:
+            score += 16
+        elif move >= 3:
+            score += 10
+        elif move >= 1.5:
+            score += 6
+    return score
+
+
+def _market_news_item_tone(item):
+    change_pct = item.get("change_pct")
+    if change_pct is not None and not pd.isna(change_pct):
+        ticker = str(item.get("ticker") or "").strip().upper()
+        inverse_tickers = {"^VIX", "DX-Y.NYB", "KRW=X", "GLD", "CL=F"}
+        return _tone_from_change(change_pct, inverse=ticker in inverse_tickers, neutral_band=0.35)
+    tag = str(item.get("tag") or "").strip()
+    if tag in {"규제", "소송", "지정학", "정책/정치"}:
+        return "negative"
+    if tag in {"AI", "M&A", "실적", "가이던스", "원자재", "파트너십", "암호화폐"}:
+        return "positive"
+    return "neutral"
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def _fetch_market_news_items(ticker_str):
+    try:
+        news_list = yf.Ticker(ticker_str).news
+        items = []
+        for idx, raw in enumerate((news_list or [])[:_US_MARKET_NEWS_PER_TICKER_LIMIT]):
+            title = str(raw.get("title") or raw.get("content", {}).get("title") or "").strip()
+            if not title:
+                continue
+            link = str(raw.get("link") or raw.get("content", {}).get("canonicalUrl", {}).get("url") or "").strip()
+            publisher = str(raw.get("publisher") or raw.get("content", {}).get("provider", {}).get("displayName") or "Yahoo Finance").strip()
+            timestamp = raw.get("providerPublishTime", 0) or 0
+            if not timestamp:
+                raw_date = str(raw.get("content", {}).get("pubDate") or raw.get("date") or "").strip()
+                parsed_date = pd.to_datetime(raw_date, errors="coerce")
+                if not pd.isna(parsed_date):
+                    timestamp = int(parsed_date.timestamp())
+            raw_summary = (
+                raw.get("summary")
+                or raw.get("description")
+                or raw.get("content", {}).get("summary")
+                or raw.get("content", {}).get("description")
+                or raw.get("content", {}).get("snippet")
+                or ""
+            )
+            content_summary = _clean_market_news_excerpt(raw_summary)
+            date_label = datetime.fromtimestamp(timestamp).strftime("%m-%d %H:%M") if timestamp else ""
+            items.append(
+                {
+                    "raw_key": f"{ticker_str}-{idx}-{timestamp}",
+                    "ticker": str(ticker_str or "").strip().upper(),
+                    "title": title,
+                    "publisher": publisher or "Yahoo Finance",
+                    "date": date_label,
+                    "timestamp": int(timestamp) if timestamp else 0,
+                    "link": link,
+                    "content_summary": content_summary,
+                }
+            )
+        return {"items": items, "error": None, "rate_limited": False}
+    except Exception as err:
+        return {"items": [], "error": str(err), "rate_limited": _is_market_news_rate_limited(err)}
+
+
+def _collect_market_news(news_universe, snapshot_lookup, gainers, losers):
+    reference_dt = datetime.now()
+    cutoff_dt = reference_dt - timedelta(hours=_US_MARKET_NEWS_LOOKBACK_HOURS)
+    mover_symbols = {str(row.get("symbol") or "").strip().upper() for row in gainers + losers if row.get("symbol")}
+    mega_cap_symbols = {str(symbol).strip().upper() for symbol in _US_MARKET_MEGA_CAPS}
+    benchmark_symbols = {"SPY", "QQQ"}
+    systemic_symbols = {str(symbol).strip().upper() for symbol in _US_MARKET_SYSTEMIC_NEWS_SYMBOLS}
+    deduped = {}
+    rate_limited = False
+
+    for ticker in _ordered_unique(_normalize_market_symbol(symbol) for symbol in news_universe):
+        payload = _fetch_market_news_items(ticker)
+        rate_limited = rate_limited or bool(payload.get("rate_limited"))
+        for raw_item in payload.get("items", []):
+            timestamp = int(raw_item.get("timestamp") or 0)
+            if not timestamp:
+                continue
+            try:
+                if datetime.fromtimestamp(timestamp) < cutoff_dt:
+                    continue
+            except Exception:
+                continue
+            title = str(raw_item.get("title") or "").strip()
+            if not title:
+                continue
+            dedupe_key = _normalize_market_news_url(raw_item.get("link")) or _normalize_market_news_title(title)
+            if not dedupe_key:
+                continue
+            ticker_symbol = str(raw_item.get("ticker") or ticker).strip().upper()
+            tag = _classify_market_news_tag(title, ticker_symbol)
+            snapshot = snapshot_lookup.get(ticker_symbol, {})
+            item = {
+                "key": dedupe_key,
+                "ticker": ticker_symbol,
+                "display_label": _market_news_display_label(ticker_symbol),
+                "title": title,
+                "publisher": str(raw_item.get("publisher") or "Yahoo Finance").strip() or "Yahoo Finance",
+                "date": str(raw_item.get("date") or "").strip() or datetime.fromtimestamp(timestamp).strftime("%m-%d %H:%M"),
+                "timestamp": timestamp,
+                "link": str(raw_item.get("link") or "").strip(),
+                "body_excerpt": str(raw_item.get("content_summary") or "").strip(),
+                "source_depth": "snippet" if str(raw_item.get("content_summary") or "").strip() else "headline",
+                "tag": tag,
+                "change_pct": snapshot.get("change_pct"),
+                "is_mover": ticker_symbol in mover_symbols,
+                "is_megacap": ticker_symbol in mega_cap_symbols,
+                "is_benchmark": ticker_symbol in benchmark_symbols,
+                "is_systemic": ticker_symbol in systemic_symbols,
+            }
+            item["section"] = _classify_market_news_section(item)
+            item["body_excerpt"] = _clean_market_news_excerpt(item.get("body_excerpt"))
+            item["source_depth"] = item.get("source_depth") or ("snippet" if item.get("body_excerpt") else "headline")
+            item.update(_build_market_news_structured_fields(item))
+            item["score"] = _score_market_news_item(item, mover_symbols, mega_cap_symbols, benchmark_symbols, systemic_symbols, reference_dt)
+            existing = deduped.get(dedupe_key)
+            if existing is None or item["score"] > existing["score"]:
+                deduped[dedupe_key] = item
+
+    ranked = sorted(
+        deduped.values(),
+        key=lambda item: (item.get("score", 0), item.get("timestamp", 0)),
+        reverse=True,
+    )
+    display_keys = set()
+    for section_name in _US_MARKET_NEWS_SECTION_ORDER:
+        section_items = [item for item in ranked if item.get("section") == section_name][:_US_MARKET_NEWS_SECTION_MAX_ITEMS]
+        for item in section_items:
+            display_keys.add(str(item.get("key") or "").strip())
+    fetched_articles = 0
+    for item in ranked:
+        item_key = str(item.get("key") or "").strip()
+        if item_key not in display_keys or fetched_articles >= _US_MARKET_NEWS_ARTICLE_FETCH_LIMIT:
+            item["body_excerpt"] = _clean_market_news_excerpt(item.get("body_excerpt"))
+            item["source_depth"] = item.get("source_depth") or ("snippet" if item.get("body_excerpt") else "headline")
+            item.update(_build_market_news_structured_fields(item))
+            continue
+        article_payload = _fetch_market_news_article_excerpt(item.get("link"))
+        article_excerpt = _clean_market_news_excerpt(article_payload.get("excerpt"))
+        current_excerpt = _clean_market_news_excerpt(item.get("body_excerpt"))
+        if _market_news_excerpt_score(article_excerpt, item.get("title")) > _market_news_excerpt_score(current_excerpt, item.get("title")):
+            item["body_excerpt"] = article_excerpt
+            item["source_depth"] = article_payload.get("source_depth") or "article"
+        elif current_excerpt:
+            item["body_excerpt"] = current_excerpt
+            item["source_depth"] = item.get("source_depth") or "snippet"
+        else:
+            item["source_depth"] = "headline"
+        item.update(_build_market_news_structured_fields(item))
+        fetched_articles += 1
+    selected = []
+    per_ticker = Counter()
+    for section_name in ["거시·연준", "외부 변수", "원자재·암호", "실적·개별주", "시장 총평"]:
+        picked = _pick_market_news_section_item(ranked, section_name)
+        if not picked:
+            continue
+        ticker = str(picked.get("ticker") or "").strip().upper()
+        if per_ticker[ticker] >= 2 or picked in selected:
+            continue
+        selected.append(picked)
+        per_ticker[ticker] += 1
+        if len(selected) >= _US_MARKET_NEWS_MAX_ITEMS:
+            break
+    for item in ranked:
+        ticker = str(item.get("ticker") or "").strip().upper()
+        if item in selected:
+            continue
+        if per_ticker[ticker] >= 2:
+            continue
+        selected.append(item)
+        per_ticker[ticker] += 1
+        if len(selected) >= _US_MARKET_NEWS_MAX_ITEMS:
+            break
+    return {"items": selected, "ranked_items": ranked, "rate_limited": rate_limited}
+
+
+def _fallback_market_news_takeaway(item):
+    return _build_market_news_takeaway_ko(item)
+
+
+def _fallback_market_news_summary(news_items, rate_limited=False):
+    if not news_items:
+        return "오늘 시장 핵심 뉴스는 제한적으로 확인됐습니다."
+    lead_items = news_items[:_US_MARKET_NEWS_SECTION_SUMMARY_ITEMS]
+    event_counts = Counter(item.get("event_type") or _detect_market_news_event_type(_market_news_parse_text(item.get("title"), item.get("body_excerpt")), item.get("tag")) for item in lead_items)
+    top_events = [_market_news_event_label_ko(event) for event, _ in event_counts.most_common(2) if event]
+    focus_labels = _ordered_unique(item.get("display_label") or item.get("ticker") or "시장" for item in lead_items)[:3]
+    focus_parts = []
+    if sum(1 for item in lead_items if item.get("section") in {"거시·연준", "외부 변수", "원자재·암호"}) >= max(1, len(lead_items) // 2):
+        focus_parts.append("거시 변수")
+    if sum(1 for item in lead_items if item.get("is_megacap")) >= max(1, len(lead_items) // 2):
+        focus_parts.append("메가캡")
+    if sum(1 for item in lead_items if item.get("is_mover")) >= max(1, len(lead_items) // 2):
+        focus_parts.append("주요 등락주")
+    if top_events:
+        event_label = "·".join(top_events)
+        focus_label = "와 ".join(focus_parts) if focus_parts else ("·".join(focus_labels[:2]) if focus_labels else "시장 핵심 종목")
+        return f"{event_label} 이슈가 {focus_label} 중심으로 시장 해석을 이끌었습니다."
+    if rate_limited:
+        return "오늘 시장 핵심 뉴스는 제한적으로 확인됐습니다."
+    if focus_labels:
+        return f"{'·'.join(focus_labels[:2])} 관련 뉴스가 시장 심리에 영향을 준 하루였습니다."
+    return "시장 핵심 종목과 거시 변수 뉴스가 시장 심리에 영향을 준 하루였습니다."
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _generate_market_news_ai_copy(market_date_key, news_json):
+    if not GEMINI_API_KEY:
+        return {}
+    try:
+        genai.configure(api_key=GEMINI_API_KEY)
+        model = genai.GenerativeModel("gemini-flash-latest")
+        prompt = (
+            "You are a US market news editor. Answer in concise Korean.\n"
+            "Return pure JSON only.\n"
+            'Format: {"summary":"...","sections":[{"section":"...","summary":"..."}],"items":[{"key":"...","title_ko":"...","fact_ko":"...","impact_ko":"...","takeaway":"..."}]}\n'
+            "Rules:\n"
+            "- summary: one short sentence.\n"
+            "- sections: one short sentence for each section.\n"
+            "- items: one Korean title, one fact phrase, one impact phrase, and one final one-line takeaway for each key.\n"
+            "- Each item may include a source link. If the link is accessible to you, use it to better understand the article before writing the Korean summary.\n"
+            "- If the link is not accessible, rely on the headline, body_excerpt, and metadata only.\n"
+            "- Use headline, link, body_excerpt, ticker, display_label, section, tag, publisher, time, change_pct, source_depth, event_type, event_direction, key_fact_ko, and market_impact_ko.\n"
+            "- Do not fabricate facts that are not supported by the article link or provided metadata.\n"
+            "- Prefer smooth, natural Korean over rigid label-like phrasing.\n"
+            "- Do not mechanically list isolated numbers like 1.95%·1.75% without explaining what they refer to.\n"
+            "- If a news item is only a comparison/explainer article, say its direct market impact is limited instead of overstating it.\n"
+            "- Translate headlines naturally into Korean when possible.\n"
+            "- Keep numbers, tickers, company names, and product names intact.\n"
+            "- item takeaway should be one smooth Korean line that tells what happened and why it matters.\n"
+            "- section summary should explain the actual situation in plain Korean using the top items in that section.\n"
+            "- For 시장 총평, prioritize index moves and sector breadth over generic market-update articles.\n"
+            "- Do not mention information absent from the input.\n"
+            f"- market_date_key: {market_date_key}\n"
+            f"- data: {news_json}\n"
+        )
+        response = model.generate_content(prompt)
+        raw_text = getattr(response, "text", "") or str(response)
+        parsed = json.loads(_extract_json_object(raw_text))
+        section_summaries = []
+        for row in parsed.get("sections", []):
+            if not isinstance(row, dict):
+                continue
+            section = str(row.get("section", "")).strip()
+            summary = str(row.get("summary", "")).strip()
+            if not section or not summary:
+                continue
+            section_summaries.append({"section": section, "summary": summary})
+        item_copies = []
+        raw_items = parsed.get("items", [])
+        if not raw_items and isinstance(parsed.get("takeaways"), list):
+            raw_items = [{"key": row.get("key"), "takeaway": row.get("text")} for row in parsed.get("takeaways", []) if isinstance(row, dict)]
+        for row in raw_items:
+            if not isinstance(row, dict):
+                continue
+            key = str(row.get("key", "")).strip()
+            title_ko = str(row.get("title_ko", "")).strip()
+            fact_ko = str(row.get("fact_ko", "")).strip()
+            impact_ko = str(row.get("impact_ko", "")).strip()
+            takeaway = str(row.get("takeaway", "") or row.get("text", "")).strip()
+            if not key or not takeaway:
+                continue
+            item_copies.append({"key": key, "title_ko": title_ko, "fact_ko": fact_ko, "impact_ko": impact_ko, "takeaway": takeaway})
+        return {
+            "summary": str(parsed.get("summary", "")).strip(),
+            "sections": section_summaries,
+            "items": item_copies,
+        }
+    except Exception:
+        return {}
+
+
+def _build_market_snapshot_news_summary(benchmark_snapshots, sector_rows):
+    spy = benchmark_snapshots.get("SPY", {}).get("change_pct")
+    qqq = benchmark_snapshots.get("QQQ", {}).get("change_pct")
+    dia = benchmark_snapshots.get("DIA", {}).get("change_pct")
+    breadth = sum(1 for row in sector_rows if (row.get("change_pct") or 0) > 0)
+    total = len(sector_rows) or len(_US_SECTOR_ETFS)
+    strongest = max(sector_rows, key=lambda row: row.get("change_pct") if row.get("change_pct") is not None else -999) if sector_rows else None
+    weakest = min(sector_rows, key=lambda row: row.get("change_pct") if row.get("change_pct") is not None else 999) if sector_rows else None
+    text = (
+        f"다우 {_format_change_pct(dia)} / S&P 500 {_format_change_pct(spy)} / 나스닥 {_format_change_pct(qqq)}. "
+        f"상승 섹터 {breadth}/{total}개"
+    )
+    if strongest and weakest:
+        text += f", {strongest['label']} 강세 · {weakest['label']} 약세 흐름이었습니다."
+    return text
+
+
+def _build_market_news_section_pool(ranked_items, section_name):
+    items = [item for item in ranked_items if item.get("section") == section_name]
+    return {"count": len(items), "items": items}
+
+
+def _fallback_market_news_section_summary(section_label, section_items, fallback_text):
+    if not section_items:
+        return fallback_text
+    top_items = section_items[:_US_MARKET_NEWS_SECTION_SUMMARY_ITEMS]
+    high_signal_items = [
+        item for item in top_items
+        if not _is_low_signal_market_news_item(item) and str(item.get("event_type") or "") != "market_update"
+    ]
+    issue_text = _build_market_news_section_issue_text(high_signal_items or top_items, limit=2)
+    event_counts = Counter(item.get("event_type") or _detect_market_news_event_type(_market_news_parse_text(item.get("title"), item.get("body_excerpt")), item.get("tag")) for item in top_items)
+    dominant_event = next(iter(event_counts.keys()), "")
+    dominant_label = _market_news_event_label_ko(dominant_event)
+    if section_label == "시장 총평":
+        if high_signal_items and issue_text:
+            return f"시장 총평에서는 {issue_text}가 부각됐고, 관련 헤드라인이 지수 방향과 시장 폭 판단 재료가 됐습니다."
+        return fallback_text
+    if section_label == "거시·연준":
+        if issue_text:
+            return f"거시·연준에서는 {issue_text}가 부각됐고, 금리 기대 재조정의 핵심 변수로 작용했습니다."
+        return f"거시·연준에서는 {dominant_label} 이슈가 중심이었고, 금리 기대를 다시 흔들었습니다."
+    if section_label == "실적·개별주":
+        if issue_text:
+            return f"실적·개별주에서는 {issue_text}가 부각됐고, 개별주 변동성 확대 재료가 됐습니다."
+        return f"실적·개별주에서는 {dominant_label} 뉴스가 중심이었고, 개별주 변동성을 키웠습니다."
+    if section_label == "외부 변수":
+        if issue_text:
+            return f"외부 변수에서는 {issue_text}가 부각됐고, 위험회피 심리를 자극하는 변수로 작용했습니다."
+        return f"외부 변수에서는 {dominant_label} 이슈가 이어졌고, 시장 경계 심리를 자극했습니다."
+    if section_label == "원자재·암호":
+        if issue_text:
+            return f"원자재·암호에서는 {issue_text}가 부각됐고, 관련 자산 민감도를 키우는 요인이었습니다."
+        return f"원자재·암호에서는 {dominant_label} 뉴스가 중심이었고, 관련 자산 민감도를 키웠습니다."
+    return fallback_text
+
+
+def _market_news_section_tone(items, fallback="neutral"):
+    tones = [_market_news_item_tone(item) for item in items]
+    if tones:
+        return _resolve_market_tone(*(tones + [fallback]))
+    return fallback
+
+
+def _resolve_market_news_section_summary(section_label, section_items, ai_summary, fallback_summary):
+    summary = str(ai_summary or "").strip()
+    if summary and not _is_generic_market_news_section_summary(summary):
+        return summary
+    return _fallback_market_news_section_summary(section_label, section_items, fallback_summary)
+
+
+def _build_market_news_metric(label, value, delta, note, tone="neutral"):
+    return {
+        "label": str(label or "").strip(),
+        "value": str(value or "").strip() or "0건",
+        "delta": str(delta or "").strip(),
+        "note": str(note or "").strip(),
+        "tone": tone if tone in {"positive", "negative", "neutral"} else "neutral",
+    }
+
+
+def _pick_market_news_section_item(items, section_name, used_keys=None):
+    used_keys = used_keys or set()
+    for item in items:
+        if item.get("section") != section_name:
+            continue
+        if item.get("key") in used_keys:
+            continue
+        return item
+    return None
+
+
+def _build_market_news_section_entry(section_label, section_pool, section_summary_map, item_copy_map, fallback_summary, fallback_tone="neutral"):
+    section_items = list((section_pool or {}).get("items") or [])
+    rendered_items = []
+    for item in section_items:
+        item_copy = item_copy_map.get(str(item.get("key") or "").strip(), {})
+        structured = _build_market_news_structured_fields(item)
+        title_raw = str(item.get("title") or "").strip()
+        title_ko = str(item_copy.get("title_ko") or "").strip() or _fallback_market_news_title_ko(item)
+        key_fact_ko = str(item_copy.get("fact_ko") or "").strip() or str(item.get("key_fact_ko") or structured.get("key_fact_ko") or "").strip()
+        market_impact_ko = str(item_copy.get("impact_ko") or "").strip() or str(item.get("market_impact_ko") or structured.get("market_impact_ko") or "").strip()
+        takeaway_ko = str(item_copy.get("takeaway") or "").strip() or _fallback_market_news_takeaway(item)
+        rendered_items.append(
+            {
+                "key": str(item.get("key") or "").strip(),
+                "display_label": item.get("display_label") or item.get("ticker") or "시장",
+                "tag": item.get("tag") or "시장",
+                "publisher": item.get("publisher") or "Yahoo Finance",
+                "date": item.get("date") or "시간 미상",
+                "title_ko": title_ko,
+                "title_raw": title_raw if _should_show_market_news_raw_title(title_ko, title_raw) else "",
+                "body_excerpt": item.get("body_excerpt") or "",
+                "event_type": item.get("event_type") or structured.get("event_type") or "",
+                "event_direction": item.get("event_direction") or structured.get("event_direction") or "",
+                "subject": item.get("subject") or structured.get("subject") or item.get("display_label") or item.get("ticker") or "시장",
+                "key_fact_ko": key_fact_ko,
+                "market_impact_ko": market_impact_ko,
+                "source_depth": item.get("source_depth") or "headline",
+                "takeaway_ko": takeaway_ko,
+                "link": item.get("link") or "",
+                "tone": _market_news_item_tone(item),
+            }
+        )
+    return {
+        "id": _US_MARKET_NEWS_SECTION_IDS.get(section_label, _normalize_market_news_title(section_label).replace(" ", "_") or "market_news_section"),
+        "label": section_label,
+        "summary_ko": _resolve_market_news_section_summary(section_label, section_items, section_summary_map.get(section_label), fallback_summary),
+        "count": int((section_pool or {}).get("count") or len(section_items)),
+        "tone": _market_news_section_tone(section_items, fallback_tone),
+        "expanded": False,
+        "items": rendered_items,
+    }
+
+
+def _build_market_news_card(market_date_key, benchmark_snapshots, macro_snapshots, sector_rows, gainers, losers, news_bundle):
+    news_items = list(news_bundle.get("items") or [])
+    ranked_items = list(news_bundle.get("ranked_items") or news_items)
+    rate_limited = bool(news_bundle.get("rate_limited"))
+    section_pools = {section_label: _build_market_news_section_pool(ranked_items, section_label) for section_label in _US_MARKET_NEWS_SECTION_ORDER}
+    ai_sections = []
+    for section_label in _US_MARKET_NEWS_SECTION_ORDER:
+        section_items_payload = []
+        for item in section_pools[section_label]["items"][:_US_MARKET_NEWS_AI_ITEMS_PER_SECTION]:
+            section_items_payload.append(
+                {
+                    "key": item.get("key"),
+                    "ticker": item.get("ticker"),
+                    "display_label": item.get("display_label"),
+                    "section": item.get("section"),
+                    "tag": item.get("tag"),
+                    "title": item.get("title"),
+                    "link": item.get("link"),
+                    "body_excerpt": item.get("body_excerpt"),
+                    "publisher": item.get("publisher"),
+                    "time": item.get("date"),
+                    "change_pct": item.get("change_pct"),
+                    "source_depth": item.get("source_depth"),
+                    "event_type": item.get("event_type"),
+                    "event_direction": item.get("event_direction"),
+                    "subject": item.get("subject"),
+                    "key_fact_ko": item.get("key_fact_ko"),
+                    "market_impact_ko": item.get("market_impact_ko"),
+                }
+            )
+        if section_items_payload:
+            ai_sections.append({"section": section_label, "items": section_items_payload})
+    ai_payload = {"market_date": market_date_key, "sections": ai_sections}
+    ai_copy = _generate_market_news_ai_copy(market_date_key, json.dumps(ai_payload, ensure_ascii=False)) if ai_sections else {}
+    item_copy_map = {
+        str(item.get("key", "")).strip(): item
+        for item in ai_copy.get("items", [])
+        if isinstance(item, dict) and str(item.get("key", "")).strip()
+    }
+    section_summary_map = {
+        str(item.get("section", "")).strip(): str(item.get("summary", "")).strip()
+        for item in ai_copy.get("sections", [])
+        if isinstance(item, dict) and str(item.get("section", "")).strip() and str(item.get("summary", "")).strip()
+    }
+
+    subtitle = ai_copy.get("summary") or _fallback_market_news_summary(ranked_items[: max(_US_MARKET_NEWS_SECTION_SUMMARY_ITEMS, _US_MARKET_NEWS_MAX_ITEMS)], rate_limited=rate_limited)
+
+    top_gainer = gainers[0] if gainers else None
+    top_loser = losers[0] if losers else None
+    tnx = macro_snapshots.get("10Y", {})
+    dxy = macro_snapshots.get("DXY", {})
+    wti = macro_snapshots.get("WTI", {})
+    gold = macro_snapshots.get("Gold", {})
+    btc = macro_snapshots.get("BTC", {})
+    market_fallback = _build_market_snapshot_news_summary(benchmark_snapshots, sector_rows)
+    macro_fallback = (
+        f"10Y {((tnx.get('price') or 0) / 10):.2f}% / DXY {_format_change_pct(dxy.get('change_pct'))} / "
+        f"달러 {_format_change_pct(macro_snapshots.get('USDKRW', {}).get('change_pct'))} 흐름이 핵심 변수였습니다."
+    )
+    stock_fallback = (
+        f"주요 종목 뉴스는 제한적이었지만 {top_gainer['symbol']} {_format_change_pct(top_gainer.get('change_pct'))}"
+        if top_gainer else "실적·개별주 관련 핵심 헤드라인은 제한적으로 확인됐습니다."
+    )
+    if top_gainer and top_loser:
+        stock_fallback += f" / {top_loser['symbol']} {_format_change_pct(top_loser.get('change_pct'))}가 두드러졌습니다."
+    risk_fallback = (
+        f"지정학·정책 헤드라인은 제한적이었지만 WTI {_format_change_pct(wti.get('change_pct'))} / 금 {_format_change_pct(gold.get('change_pct'))} 움직임은 체크가 필요합니다."
+    )
+    commodity_fallback = (
+        f"WTI {_format_change_pct(wti.get('change_pct'))} / 금 {_format_change_pct(gold.get('change_pct'))} / 비트코인 {_format_change_pct(btc.get('change_pct'))} 흐름이 원자재·암호 섹터를 설명합니다."
+    )
+    section_fallbacks = {
+        "시장 총평": market_fallback,
+        "거시·연준": macro_fallback,
+        "실적·개별주": stock_fallback,
+        "외부 변수": risk_fallback,
+        "원자재·암호": commodity_fallback,
+    }
+    section_fallback_tones = {
+        "시장 총평": _tone_from_change(benchmark_snapshots.get("SPY", {}).get("change_pct")),
+        "거시·연준": "neutral",
+        "실적·개별주": "neutral",
+        "외부 변수": "negative" if abs((wti.get("change_pct") or 0)) >= 1.5 else "neutral",
+        "원자재·암호": _resolve_market_tone(_tone_from_change(wti.get("change_pct"), inverse=True, neutral_band=0.35), _tone_from_change(btc.get("change_pct"), neutral_band=0.35)),
+    }
+    sections = [
+        _build_market_news_section_entry(
+            section_label,
+            section_pools.get(section_label),
+            section_summary_map,
+            item_copy_map,
+            section_fallbacks.get(section_label, "오늘 핵심 뉴스는 제한적으로 확인됐습니다."),
+            section_fallback_tones.get(section_label, "neutral"),
+        )
+        for section_label in _US_MARKET_NEWS_SECTION_ORDER
+    ]
+    bullets = []
+    if rate_limited:
+        bullets.append(_build_market_bullet("뉴스 데이터 일부는 Yahoo Finance 요청 제한의 영향을 받았습니다.", "negative"))
+
+    earnings_count = sum(1 for item in ranked_items if item.get("tag") in {"실적", "가이던스", "파트너십", "M&A", "AI"})
+    macro_count = sum(1 for item in ranked_items if item.get("tag") in {"연준", "경제지표", "금리"})
+    risk_count = sum(1 for item in ranked_items if item.get("tag") in {"규제", "정책/정치", "지정학", "소송"})
+    commodity_count = sum(1 for item in ranked_items if item.get("tag") in {"원자재", "암호화폐"})
+    breadth = sum(1 for row in sector_rows if (row.get("change_pct") or 0) > 0)
+    total = len(sector_rows) or len(_US_SECTOR_ETFS)
+    metrics = [
+        _build_market_news_metric("시장 총평", f"{breadth}/{total}", "상승 섹터", "3대 지수·시장 폭", "positive" if breadth >= total / 2 else "negative"),
+        _build_market_news_metric("거시·연준", f"{macro_count}건", "금리/지표", "Fed·경제지표", "negative" if macro_count else "neutral"),
+        _build_market_news_metric("실적·개별주", f"{earnings_count}건", "실적/계약", "빅테크·주도주", "positive" if earnings_count else "neutral"),
+        _build_market_news_metric("외부 변수", f"{risk_count}건", "정책/지정학", "전쟁·관세·규제", "negative" if risk_count else "neutral"),
+        _build_market_news_metric("원자재·암호", f"{commodity_count}건", "WTI/Gold/BTC", "유가·금·비트코인", _resolve_market_tone(_tone_from_change(wti.get("change_pct"), inverse=True, neutral_band=0.35), _tone_from_change(btc.get("change_pct"), neutral_band=0.35))),
+    ]
+    item_tones = [_market_news_item_tone(item) for item in ranked_items]
+    market_tone = _tone_from_change(benchmark_snapshots.get("SPY", {}).get("change_pct"))
+    tone = _resolve_market_tone(*(item_tones + [market_tone])) if item_tones else "neutral"
+    return {
+        "id": "market_news",
+        "title": "핵심 뉴스",
+        "subtitle": subtitle,
+        "metrics": metrics,
+        "bullets": bullets,
+        "sections": sections,
+        "notice": "뉴스 데이터 일부는 Yahoo Finance 요청 제한의 영향을 받았습니다." if rate_limited else "",
+        "tone": tone,
+        "chart_hint": "시장 총평 / 거시·연준 / 실적·개별주 / 외부 변수 / 원자재·암호",
+        "duration_ms": _US_MARKET_TEXT_HEAVY_DURATION,
+    }
+
+
 @st.cache_data(ttl=1800, show_spinner=False)
 def _download_market_history(tickers, period=_US_MARKET_HISTORY_PERIOD):
     expanded = []
@@ -832,6 +2326,14 @@ def build_us_market_daily_payload():
     macro_labels = {"^TNX": "10Y", "DX-Y.NYB": "DXY", "KRW=X": "USDKRW", "GLD": "Gold", "CL=F": "WTI", "BTC-USD": "BTC"}
     for symbol, _ in _US_MARKET_MACRO:
         macro_snapshots[macro_labels[symbol]] = _build_snapshot(_extract_symbol_frame(benchmark_history, symbol))
+    macro_snapshot_lookup = {
+        "^TNX": macro_snapshots.get("10Y", {}),
+        "DX-Y.NYB": macro_snapshots.get("DXY", {}),
+        "KRW=X": macro_snapshots.get("USDKRW", {}),
+        "GLD": macro_snapshots.get("Gold", {}),
+        "CL=F": macro_snapshots.get("WTI", {}),
+        "BTC-USD": macro_snapshots.get("BTC", {}),
+    }
 
     sector_rows = []
     for symbol, label in _US_SECTOR_ETFS:
@@ -839,6 +2341,7 @@ def build_us_market_daily_payload():
         sector_rows.append({"symbol": symbol, "label": label, "snapshot": snapshot, "change_pct": snapshot.get("change_pct")})
     sector_rows = [row for row in sector_rows if row.get("snapshot")]
     sector_sorted = sorted(sector_rows, key=lambda row: row.get("change_pct") if row.get("change_pct") is not None else -999, reverse=True)
+    sector_snapshot_lookup = {row["symbol"]: row["snapshot"] for row in sector_rows}
 
     movers = []
     for symbol in _market_mover_universe():
@@ -847,8 +2350,13 @@ def build_us_market_daily_payload():
             continue
         movers.append({"symbol": symbol, "snapshot": snapshot, "change_pct": snapshot.get("change_pct")})
     movers_sorted = sorted(movers, key=lambda row: row["change_pct"], reverse=True)
-    gainers = movers_sorted[:3]
-    losers = list(reversed(movers_sorted[-3:])) if movers_sorted else []
+    gainers = movers_sorted[:_US_MARKET_TOP_MOVER_CARD_COUNT]
+    losers = list(reversed(movers_sorted[-_US_MARKET_TOP_MOVER_CARD_COUNT:])) if movers_sorted else []
+    snapshot_lookup = dict(benchmark_snapshots)
+    snapshot_lookup["^VIX"] = benchmark_snapshots.get("VIX", {})
+    snapshot_lookup.update(macro_snapshot_lookup)
+    snapshot_lookup.update(sector_snapshot_lookup)
+    snapshot_lookup.update({row["symbol"]: row["snapshot"] for row in movers})
 
     market_dt = None
     for candidate in [benchmark_snapshots.get("SPY", {}).get("date"), benchmark_snapshots.get("QQQ", {}).get("date")]:
@@ -856,6 +2364,12 @@ def build_us_market_daily_payload():
             market_dt = candidate
             break
     market_date_key = market_dt.strftime("%Y-%m-%d") if market_dt is not None else datetime.utcnow().strftime("%Y-%m-%d")
+    news_universe = _ordered_unique(
+        [*_US_MARKET_SYSTEMIC_NEWS_SYMBOLS, *_US_MARKET_MEGA_CAPS]
+        + [row["symbol"] for row in gainers if row.get("symbol")]
+        + [row["symbol"] for row in losers if row.get("symbol")]
+    )
+    market_news_bundle = _collect_market_news(news_universe, snapshot_lookup, gainers, losers)
 
     driver_candidates = _build_driver_candidates(benchmark_snapshots, macro_snapshots, sector_sorted)
     fallback_insight = _fallback_market_insight(benchmark_snapshots, macro_snapshots, sector_sorted)
@@ -942,12 +2456,25 @@ def build_us_market_daily_payload():
         _build_snapshot_metric("Gold", "금 ETF", macro_snapshots.get("Gold", {}), inverse=True),
         {"label": "확산도", "value": f"{sector_breadth}/{sector_total}", "delta": "상승 섹터", "note": "섹터 전반 흐름", "tone": "positive" if sector_breadth >= sector_total / 2 else "negative"},
     ]
+    market_driver_summary = str(drivers[0]).strip() if drivers else ""
+    market_driver_details = drivers[1:3] if market_driver_summary else drivers[:2]
+    if not market_driver_summary:
+        market_driver_summary = "금리, 달러, 환율, 금, 유가, 비트코인 흐름이 시장 강약을 설명합니다."
     market_driver_bullets = [
         _build_market_bullet(
             f"달러/방어 체크: DXY {macro_metric_map['DXY']['delta'] or 'N/A'} / USD/KRW {macro_metric_map['USD/KRW']['delta'] or 'N/A'} / Gold {macro_metric_map['Gold']['delta'] or 'N/A'}",
             _resolve_market_tone(macro_metric_map["DXY"]["tone"], macro_metric_map["USD/KRW"]["tone"], macro_metric_map["Gold"]["tone"]),
         )
-    ] + [_build_market_bullet(text, _infer_market_text_tone(text)) for text in drivers[:2]]
+    ] + [_build_market_bullet(text, _infer_market_text_tone(text)) for text in market_driver_details]
+    market_news_card = _build_market_news_card(
+        market_date_key,
+        benchmark_snapshots,
+        macro_snapshots,
+        sector_sorted,
+        gainers,
+        losers,
+        market_news_bundle,
+    )
 
     cards = [
         {
@@ -976,13 +2503,14 @@ def build_us_market_daily_payload():
         {
             "id": "market_drivers",
             "title": "움직인 이유",
-            "subtitle": "금리, 달러, 환율, 금, 유가, 비트코인 흐름이 시장 강약을 설명합니다.",
+            "subtitle": market_driver_summary,
             "metrics": market_driver_metrics,
             "bullets": market_driver_bullets,
             "tone": _tone_from_change(benchmark_snapshots.get("SPY", {}).get("change_pct")),
             "chart_hint": "10Y / DXY / USD/KRW / Gold / WTI / BTC",
             "duration_ms": _US_MARKET_TEXT_HEAVY_DURATION,
         },
+        market_news_card,
         {
             "id": "sector_pressure",
             "title": "주요 섹터",
@@ -1133,6 +2661,7 @@ def _build_us_market_daily_doc(payload):
             .subtitle { margin: 0; color: #eef2ff; font-size: 1rem; line-height: 1.56; font-weight: 700; transition: color .28s ease; }
             .hint { display: inline-flex; align-items: center; width: fit-content; min-height: 30px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--tone-hint-border); background: var(--tone-hint-bg); color: var(--tone-hint-copy); font-size: .76rem; font-weight: 800; transition: border-color .28s ease, background .28s ease, color .28s ease; }
             .bullets { display: flex; flex-direction: column; gap: 10px; width: 100%; min-width: 0; }
+            .bullets--news { gap: 12px; }
             .bullet { display: grid; grid-template-columns: 12px minmax(0,1fr); gap: 10px; padding: 11px 12px; border-radius: 14px; border: 1px solid rgba(148,163,184,.12); background: rgba(255,255,255,.03); transition: border-color .28s ease, background .28s ease; }
             .bullet[data-tone="positive"] { border-color: rgba(99,217,162,.16); background: linear-gradient(180deg, rgba(99,217,162,.06), rgba(255,255,255,.02)); }
             .bullet[data-tone="negative"] { border-color: rgba(255,143,150,.16); background: linear-gradient(180deg, rgba(255,143,150,.06), rgba(255,255,255,.02)); }
@@ -1142,6 +2671,145 @@ def _build_us_market_daily_doc(payload):
             .bullet[data-tone="negative"] i { background: linear-gradient(180deg, rgba(255,143,150,.98), rgba(251,113,133,.82)); box-shadow: 0 0 0 4px rgba(255,143,150,.14); }
             .bullet[data-tone="neutral"] i { background: linear-gradient(180deg, rgba(148,163,184,.92), rgba(100,116,139,.82)); box-shadow: 0 0 0 4px rgba(148,163,184,.10); }
             .bullet span { font-size: .90rem; line-height: 1.56; font-weight: 700; }
+            .news-notice {
+              padding: 11px 12px;
+              border-radius: 14px;
+              border: 1px solid rgba(255,143,150,.16);
+              background: linear-gradient(180deg, rgba(255,143,150,.08), rgba(255,255,255,.02));
+              color: #ffe2e5;
+              font-size: .84rem;
+              line-height: 1.5;
+              font-weight: 700;
+            }
+            .news-section {
+              border-radius: 16px;
+              border: 1px solid rgba(148,163,184,.16);
+              background: linear-gradient(180deg, rgba(148,163,184,.05), rgba(255,255,255,.02));
+              overflow: hidden;
+              transition: border-color .28s ease, background .28s ease;
+            }
+            .news-section[data-tone="positive"] {
+              border-color: rgba(99,217,162,.16);
+              background: linear-gradient(180deg, rgba(99,217,162,.06), rgba(255,255,255,.02));
+            }
+            .news-section[data-tone="negative"] {
+              border-color: rgba(255,143,150,.16);
+              background: linear-gradient(180deg, rgba(255,143,150,.06), rgba(255,255,255,.02));
+            }
+            .news-section__head {
+              display: grid;
+              grid-template-columns: minmax(0, 1fr) auto;
+              gap: 12px;
+              align-items: start;
+              padding: 13px 14px;
+            }
+            .news-section__copy {
+              min-width: 0;
+              display: flex;
+              flex-direction: column;
+              gap: 6px;
+            }
+            .news-section__topline {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 8px;
+              align-items: center;
+            }
+            .news-section__label {
+              color: var(--strong);
+              font-size: .9rem;
+              font-weight: 900;
+            }
+            .news-section__count {
+              display: inline-flex;
+              align-items: center;
+              min-height: 24px;
+              padding: 0 8px;
+              border-radius: 999px;
+              border: 1px solid rgba(148,163,184,.16);
+              background: rgba(255,255,255,.04);
+              color: var(--muted);
+              font-size: .72rem;
+              font-weight: 800;
+            }
+            .news-section__summary {
+              margin: 0;
+              color: #edf2ff;
+              font-size: .9rem;
+              line-height: 1.56;
+              font-weight: 700;
+            }
+            .news-section__toggle {
+              min-width: 72px;
+              height: 34px;
+              padding: 0 12px;
+              border-radius: 999px;
+              border: 1px solid rgba(148,163,184,.16);
+              background: rgba(255,255,255,.05);
+              color: var(--strong);
+              font-size: .76rem;
+              font-weight: 900;
+              cursor: pointer;
+              position: relative;
+              z-index: 2;
+              transition: border-color .28s ease, background .28s ease;
+            }
+            .news-section__toggle:hover {
+              border-color: rgba(165,180,252,.28);
+              background: rgba(255,255,255,.08);
+            }
+            .news-section__body {
+              display: grid;
+              gap: 10px;
+              padding: 0 14px 14px;
+            }
+            .news-item {
+              padding: 12px;
+              border-radius: 14px;
+              border: 1px solid rgba(148,163,184,.12);
+              background: rgba(8,12,23,.30);
+            }
+            .news-item[data-tone="positive"] { border-color: rgba(99,217,162,.16); }
+            .news-item[data-tone="negative"] { border-color: rgba(255,143,150,.16); }
+            .news-item__meta {
+              margin: 0 0 6px;
+              color: var(--muted);
+              font-size: .73rem;
+              line-height: 1.4;
+              font-weight: 800;
+            }
+            .news-item__title,
+            .news-item__title:visited {
+              display: block;
+              margin: 0;
+              color: #f8fbff;
+              font-size: .9rem;
+              line-height: 1.5;
+              font-weight: 900;
+              text-decoration: none;
+            }
+            .news-item__title:hover {
+              color: #dbe6ff;
+              text-decoration: underline;
+            }
+            .news-item__title--plain:hover {
+              color: #f8fbff;
+              text-decoration: none;
+            }
+            .news-item__raw {
+              margin: 6px 0 0;
+              color: #b7c3d8;
+              font-size: .76rem;
+              line-height: 1.45;
+              font-weight: 700;
+            }
+            .news-item__takeaway {
+              margin: 8px 0 0;
+              color: #edf2ff;
+              font-size: .84rem;
+              line-height: 1.55;
+              font-weight: 700;
+            }
             .metrics {
               position: relative;
               z-index: 1;
@@ -1233,6 +2901,12 @@ def _build_us_market_daily_doc(payload):
                 grid-template-columns: 1fr;
                 gap: 18px;
                 margin-top: 18px;
+              }
+              .news-section__head {
+                grid-template-columns: 1fr;
+              }
+              .news-section__toggle {
+                width: 100%;
               }
               .metrics {
                 display: grid;
@@ -1375,7 +3049,11 @@ def _build_us_market_daily_doc(payload):
                 cardMetrics.appendChild(item);
               });
             }
+            function setBulletMode(isNews) {
+              cardBullets.className = isNews ? "bullets bullets--news" : "bullets";
+            }
             function renderBullets(bullets) {
+              setBulletMode(false);
               cardBullets.innerHTML = "";
               (bullets || []).forEach((entry) => {
                 const bullet = typeof entry === "string" ? { text: entry, tone: "neutral" } : (entry || {});
@@ -1390,6 +3068,137 @@ def _build_us_market_daily_doc(payload):
                 cardBullets.appendChild(row);
               });
             }
+            function renderNewsSections(current) {
+              const sections = Array.isArray(current.sections) ? current.sections : [];
+              if (!sections.length) {
+                renderBullets(current.bullets);
+                return;
+              }
+              setBulletMode(true);
+              cardBullets.innerHTML = "";
+              if (current.notice) {
+                const notice = document.createElement("div");
+                notice.className = "news-notice";
+                notice.textContent = current.notice;
+                cardBullets.appendChild(notice);
+              }
+              sections.forEach((section) => {
+                const itemCount = Number(section.count) || ((Array.isArray(section.items) ? section.items.length : 0));
+                const visibleCount = Array.isArray(section.items) ? section.items.length : 0;
+                const hasItems = Array.isArray(section.items) && section.items.length > 0;
+                const box = document.createElement("section");
+                box.className = "news-section";
+                box.dataset.tone = section.tone || "neutral";
+
+                const head = document.createElement("div");
+                head.className = "news-section__head";
+
+                const copy = document.createElement("div");
+                copy.className = "news-section__copy";
+
+                const topline = document.createElement("div");
+                topline.className = "news-section__topline";
+
+                const label = document.createElement("span");
+                label.className = "news-section__label";
+                label.textContent = section.label || "";
+                topline.appendChild(label);
+
+                if (itemCount > 0) {
+                  const count = document.createElement("span");
+                  count.className = "news-section__count";
+                  count.textContent = itemCount > visibleCount && visibleCount > 0
+                    ? "상위 " + visibleCount + " / " + itemCount + "건"
+                    : itemCount + "건";
+                  topline.appendChild(count);
+                }
+
+                const summary = document.createElement("p");
+                summary.className = "news-section__summary";
+                summary.textContent = section.summary_ko || "";
+
+                copy.appendChild(topline);
+                copy.appendChild(summary);
+                head.appendChild(copy);
+
+                if (hasItems) {
+                  const toggle = document.createElement("button");
+                  toggle.type = "button";
+                  toggle.className = "news-section__toggle";
+
+                  const body = document.createElement("div");
+                  body.className = "news-section__body";
+
+                  let expanded = Boolean(section.expanded);
+                  const syncExpanded = () => {
+                    box.dataset.expanded = expanded ? "true" : "false";
+                    body.style.display = expanded ? "grid" : "none";
+                    toggle.textContent = expanded ? "접기" : "더보기";
+                    toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+                  };
+
+                  (section.items || []).forEach((entry) => {
+                    const item = entry || {};
+                    const row = document.createElement("article");
+                    row.className = "news-item";
+                    row.dataset.tone = item.tone || "neutral";
+
+                    const meta = document.createElement("p");
+                    meta.className = "news-item__meta";
+                    meta.textContent = [item.display_label, item.tag, item.publisher, item.date].filter(Boolean).join(" · ");
+                    row.appendChild(meta);
+
+                    if (item.link) {
+                      const title = document.createElement("a");
+                      title.className = "news-item__title";
+                      title.href = item.link;
+                      title.target = "_blank";
+                      title.rel = "noopener noreferrer";
+                      title.textContent = item.title_ko || item.title_raw || "";
+                      row.appendChild(title);
+                    } else {
+                      const title = document.createElement("p");
+                      title.className = "news-item__title news-item__title--plain";
+                      title.textContent = item.title_ko || item.title_raw || "";
+                      row.appendChild(title);
+                    }
+
+                    if (item.title_raw) {
+                      const raw = document.createElement("p");
+                      raw.className = "news-item__raw";
+                      raw.textContent = item.title_raw;
+                      row.appendChild(raw);
+                    }
+
+                    if (item.takeaway_ko) {
+                      const takeaway = document.createElement("p");
+                      takeaway.className = "news-item__takeaway";
+                      takeaway.textContent = "한줄 요약: " + item.takeaway_ko;
+                      row.appendChild(takeaway);
+                    }
+
+                    body.appendChild(row);
+                  });
+
+                  toggle.addEventListener("click", (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    expanded = !expanded;
+                    syncExpanded();
+                    if (expanded) pauseTicker();
+                  });
+
+                  syncExpanded();
+                  head.appendChild(toggle);
+                  box.appendChild(head);
+                  box.appendChild(body);
+                } else {
+                  box.appendChild(head);
+                }
+
+                cardBullets.appendChild(box);
+              });
+            }
             function render() {
               const current = card();
               currentDuration = Number(current.duration_ms) || 7000;
@@ -1399,7 +3208,11 @@ def _build_us_market_daily_doc(payload):
               cardSubtitle.textContent = current.subtitle || "";
               cardHint.textContent = current.chart_hint || "";
               renderMetrics(current.metrics);
-              renderBullets(current.bullets);
+              if (Array.isArray(current.sections) && current.sections.length) {
+                renderNewsSections(current);
+              } else {
+                renderBullets(current.bullets);
+              }
               renderDots();
               deckIndex.textContent = cards.length ? (activeIndex + 1) + " / " + cards.length + " 카드" : "";
               startTicker(true);
@@ -1416,10 +3229,13 @@ def _build_us_market_daily_doc(payload):
             } else {
               deck.dataset.tone = "neutral";
               deckDate.textContent = payload.market_date_label || "";
-              cardTitle.textContent = "오늘 미국장 브리핑";
-              cardSubtitle.textContent = "시장 데이터가 아직 동기화 중입니다.";
-              cardHint.textContent = "시장 데이터 동기화";
-              renderBullets(["SPY, QQQ, VIX, 10년물 입력값을 불러오는 중입니다."]);
+              cardTitle.textContent = "데일리 브리핑 불러오는 중";
+              cardSubtitle.textContent = "오늘 미국장 데일리 브리핑을 만드는 중입니다. 잠시만 기다려주세요.";
+              cardHint.textContent = "데일리 브리핑 로딩 중";
+              renderBullets([
+                "시장 지수, 거시 지표, 주요 뉴스와 등락주를 정리하고 있습니다.",
+                "로딩이 끝나면 오늘 미국장 흐름과 핵심 뉴스를 카드 형태로 보여드립니다.",
+              ]);
             }
           </script>
         </body>
@@ -1437,7 +3253,8 @@ def _render_us_market_daily_deck(payload):
     )
 
 def render_market_home_dashboard():
-    payload = build_us_market_daily_payload()
+    with st.spinner("데일리 브리핑 만드는 중입니다. 시장 데이터와 핵심 뉴스를 불러오고 있습니다."):
+        payload = build_us_market_daily_payload()
     headline_copy = html.escape(
         payload.get("headline")
         or "무엇이 미국장을 움직였는지, 어디에 강약이 몰렸는지, 다음 세션에서 무엇을 볼지 빠르게 정리합니다."
