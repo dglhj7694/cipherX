@@ -769,7 +769,217 @@ def _fallback_market_headline(benchmarks, macro, sector_rows):
     return "방향성은 있었지만 섹터 간 온도 차가 큰 장이었습니다."
 
 
-def _fallback_market_insight(benchmarks, macro, sector_rows):
+def _coerce_market_text_list(value, max_items=None):
+    if isinstance(value, (list, tuple, set)):
+        items = [str(item or "").strip() for item in value if str(item or "").strip()]
+    else:
+        text = str(value or "").strip()
+        items = [text] if text else []
+    items = _ordered_unique(items)
+    return items[:max_items] if max_items is not None else items
+
+
+def _join_market_phrases(parts):
+    values = [str(part or "").strip() for part in parts if str(part or "").strip()]
+    if not values:
+        return ""
+    if len(values) == 1:
+        return values[0]
+    if len(values) == 2:
+        return f"{values[0]}와 {values[1]}"
+    return ", ".join(values[:-1]) + f"와 {values[-1]}"
+
+
+def _build_market_insight_news_context(news_bundle):
+    ranked_items = list((news_bundle or {}).get("ranked_items") or (news_bundle or {}).get("items") or [])
+    high_signal_items = [
+        item for item in ranked_items
+        if not _is_low_signal_market_news_item(item) and str(item.get("event_type") or "").strip() != "market_update"
+    ]
+    lead_items = list((high_signal_items or ranked_items)[:_US_MARKET_NEWS_SECTION_SUMMARY_ITEMS])
+    if not lead_items:
+        return {
+            "focus": "",
+            "lead_sections": [],
+            "lead_events": [],
+            "lead_issues": [],
+            "section_notes": {},
+            "high_signal_count": 0,
+        }
+
+    section_counts = Counter(str(item.get("section") or "").strip() for item in lead_items if str(item.get("section") or "").strip())
+    event_counts = Counter(str(item.get("event_type") or "").strip() for item in lead_items if str(item.get("event_type") or "").strip())
+    lead_sections = [section for section, _ in section_counts.most_common(2) if section]
+    lead_events = [
+        _market_news_event_label_ko(event_type)
+        for event_type, _ in event_counts.most_common(3)
+        if event_type
+    ]
+    lead_issues = _ordered_unique(
+        _build_market_news_issue_phrase_ko(item)
+        for item in lead_items
+        if _build_market_news_issue_phrase_ko(item)
+    )[:3]
+
+    macro_weight = sum(section_counts.get(section, 0) for section in {"거시·연준", "외부 변수", "원자재·암호"})
+    stock_weight = section_counts.get("실적·개별주", 0)
+    event_text = _join_market_phrases(lead_events[:2])
+    if macro_weight >= max(2, stock_weight + 1):
+        focus = f"시장은 개별 종목보다 {event_text or '거시·외부 변수'}에 더 예민했습니다."
+    elif stock_weight >= max(2, macro_weight + 1):
+        focus = f"시장은 거시보다 {event_text or '실적과 리더 종목 재료'}에 더 민감하게 반응했습니다."
+    elif section_counts.get("시장 총평", 0) >= max(2, macro_weight, stock_weight):
+        focus = "시장은 지수 방향 자체보다 내부 확산과 리더십 변화에 더 주목했습니다."
+    else:
+        focus = f"시장은 한 가지 뉴스보다 {event_text or '복합 재료'} 조합을 함께 해석하는 흐름이었습니다."
+
+    section_notes = {}
+    for section_label in _US_MARKET_NEWS_SECTION_ORDER:
+        section_items = [item for item in lead_items if item.get("section") == section_label][:3]
+        if not section_items:
+            continue
+        issue_text = _build_market_news_section_issue_text(section_items, limit=2)
+        if issue_text:
+            section_notes[section_label] = issue_text
+
+    return {
+        "focus": focus,
+        "lead_sections": lead_sections,
+        "lead_events": lead_events[:3],
+        "lead_issues": lead_issues,
+        "section_notes": section_notes,
+        "high_signal_count": len(high_signal_items),
+    }
+
+
+def _build_market_divergence_notes(benchmarks, macro, sector_rows, market_regime, market_structure):
+    spy = benchmarks.get("SPY", {}).get("change_pct")
+    qqq_vs_spy = market_regime.get("qqq_vs_spy")
+    iwm_vs_spy = market_regime.get("iwm_vs_spy")
+    vix_chg = benchmarks.get("VIX", {}).get("change_pct")
+    tnx_snapshot = macro.get("10Y", {})
+    tnx_bps = ((tnx_snapshot.get("price") or 0) - (tnx_snapshot.get("prev_close") or 0)) * 10 if tnx_snapshot else None
+    dxy_chg = macro.get("DXY", {}).get("change_pct")
+    gold_chg = macro.get("Gold", {}).get("change_pct")
+    btc_chg = macro.get("BTC", {}).get("change_pct")
+    sector_up = sum(1 for row in sector_rows if (row.get("change_pct") or 0) > 0)
+    sector_total = len(sector_rows) or len(_US_SECTOR_ETFS)
+    breadth_ratio = sector_up / sector_total if sector_total else 0.5
+    strongest_sector = max(sector_rows, key=lambda row: row.get("change_pct") if row.get("change_pct") is not None else -999) if sector_rows else None
+
+    notes = []
+    if spy is not None and spy > 0 and breadth_ratio <= 0.45:
+        notes.append(f"지수는 {_format_change_pct(spy)} 올랐지만 상승 섹터가 {sector_up}/{sector_total}에 그쳐 체감 강도는 표면 수익률보다 약했습니다.")
+    elif spy is not None and spy < 0 and breadth_ratio >= 0.55:
+        notes.append(f"S&P 500은 {_format_change_pct(spy)} 밀렸지만 상승 섹터가 {sector_up}/{sector_total}로 버텨 지수보다 내부 체력은 덜 훼손됐습니다.")
+
+    if qqq_vs_spy is not None and qqq_vs_spy >= 0.45 and breadth_ratio <= 0.45:
+        notes.append(f"QQQ가 SPY를 {_format_pct_point(qqq_vs_spy)} 앞섰지만 확산은 좁아 메가캡 의존 성격이 강했습니다.")
+    elif iwm_vs_spy is not None and iwm_vs_spy >= 0.35 and breadth_ratio >= 0.55:
+        notes.append(f"IWM이 SPY를 {_format_pct_point(iwm_vs_spy)} 앞서며 반등이 메가캡 밖으로 번지는지 확인할 만한 장이었습니다.")
+
+    if tnx_bps is not None and tnx_bps >= 4 and qqq_vs_spy is not None and qqq_vs_spy >= 0.2:
+        notes.append(f"10년물 금리가 {tnx_bps:+.1f}bp 오른 날에도 나스닥이 상대 강세를 보여 금리보다 빅테크 선호가 우세했습니다.")
+    elif tnx_bps is not None and tnx_bps <= -4 and (((gold_chg or 0) >= 0.8) or ((vix_chg or 0) >= 3)):
+        notes.append("금리 하락이 곧바로 위험선호로 이어지기보다 금·VIX 흐름을 동반한 방어적 해석에 가까웠습니다.")
+
+    if (dxy_chg or 0) >= 0.35 and (btc_chg or 0) <= -2.0:
+        notes.append("달러 강세와 비트코인 약세가 함께 나타나며 위험자산 심리 회복은 제한적이었습니다.")
+
+    if strongest_sector and strongest_sector.get("symbol") in {"XLU", "XLP", "XLV"} and breadth_ratio <= 0.5:
+        notes.append(f"{strongest_sector['label']}가 가장 강했고 상승 섹터도 제한돼 표면 지수보다 방어주 선호가 숨어 있었습니다.")
+
+    if not notes:
+        notes.append(f"시장은 {market_structure.get('label', '혼조형')} 흐름이었고 리스크 상태는 {market_regime.get('state_display', '혼조')} 수준이었습니다.")
+    return _ordered_unique(notes)[:3]
+
+
+def _build_market_strategy_points(benchmarks, macro, sector_rows, market_regime, news_context=None):
+    qqq_vs_spy = market_regime.get("qqq_vs_spy")
+    iwm_vs_spy = market_regime.get("iwm_vs_spy")
+    tnx_snapshot = macro.get("10Y", {})
+    tnx_bps = ((tnx_snapshot.get("price") or 0) - (tnx_snapshot.get("prev_close") or 0)) * 10 if tnx_snapshot else None
+    dxy_chg = macro.get("DXY", {}).get("change_pct")
+    gold_chg = macro.get("Gold", {}).get("change_pct")
+    btc_chg = macro.get("BTC", {}).get("change_pct")
+    vix_chg = benchmarks.get("VIX", {}).get("change_pct")
+    sector_up = sum(1 for row in sector_rows if (row.get("change_pct") or 0) > 0)
+    sector_total = len(sector_rows) or len(_US_SECTOR_ETFS)
+    breadth_ratio = sector_up / sector_total if sector_total else 0.5
+    strongest_sector = max(sector_rows, key=lambda row: row.get("change_pct") if row.get("change_pct") is not None else -999) if sector_rows else None
+
+    points = []
+    if qqq_vs_spy is not None and qqq_vs_spy >= 0.45 and breadth_ratio <= 0.45:
+        points.append("메가캡 강세가 섹터 확산으로 번지기 전까지는 지수 추격보다 리더 종목 선별이 유리합니다.")
+    elif iwm_vs_spy is not None and iwm_vs_spy >= 0.35 and breadth_ratio >= 0.55:
+        points.append("소형주와 경기민감 섹터 확산이 이어지면 지수보다 순환매 수혜 업종을 넓게 보는 대응이 좋습니다.")
+
+    if tnx_bps is not None and tnx_bps >= 4:
+        if qqq_vs_spy is not None and qqq_vs_spy >= 0.2:
+            points.append("금리 재상승이 이어질 때도 빅테크가 버티는지 확인해야 추세 지속을 더 신뢰할 수 있습니다.")
+        else:
+            points.append("10년물 금리 반등이 이어지면 성장주와 장기 듀레이션 자산의 민감도를 먼저 점검해야 합니다.")
+    elif tnx_bps is not None and tnx_bps <= -4 and (((gold_chg or 0) >= 0.8) or ((vix_chg or 0) >= 3)):
+        points.append("금리 하락만 보고 공격적으로 보기보다 금·VIX가 함께 식는지 확인하는 편이 안전합니다.")
+
+    if (dxy_chg or 0) >= 0.35 and (btc_chg or 0) <= -2.0:
+        points.append("달러 강세가 진정되고 비트코인이 안정되는지 확인해야 위험선호 복귀를 더 믿을 수 있습니다.")
+
+    if strongest_sector and strongest_sector.get("symbol") in {"XLU", "XLP", "XLV"} and breadth_ratio <= 0.5:
+        points.append("방어주 주도가 이어지면 신규 베타 확대보다 현금 비중과 손절 기준 관리가 우선입니다.")
+
+    lead_sections = set(_coerce_market_text_list((news_context or {}).get("lead_sections")))
+    if {"거시·연준", "외부 변수", "원자재·암호"} & lead_sections:
+        points.append("다음 세션은 뉴스 제목보다 10Y·DXY·WTI가 같은 방향으로 재반응하는지 확인해야 합니다.")
+    elif "실적·개별주" in lead_sections:
+        points.append("주도 종목 뉴스가 하루 재료에 그치지 않는지 거래량과 섹터 확산으로 확인할 필요가 있습니다.")
+
+    if not points:
+        points.append("한 방향 베팅보다 상대강도와 금리 반응을 함께 보며 포지션 크기를 조절하는 대응이 유효합니다.")
+    return _ordered_unique(points)[:3]
+
+
+def _build_market_insight_watchlist(benchmarks, macro, sector_rows, market_regime, news_context=None):
+    qqq_vs_spy = market_regime.get("qqq_vs_spy")
+    iwm_vs_spy = market_regime.get("iwm_vs_spy")
+    tnx_snapshot = macro.get("10Y", {})
+    tnx_bps = ((tnx_snapshot.get("price") or 0) - (tnx_snapshot.get("prev_close") or 0)) * 10 if tnx_snapshot else None
+    dxy_chg = macro.get("DXY", {}).get("change_pct")
+    gold_chg = macro.get("Gold", {}).get("change_pct")
+    btc_chg = macro.get("BTC", {}).get("change_pct")
+    vix_chg = benchmarks.get("VIX", {}).get("change_pct")
+    sector_up = sum(1 for row in sector_rows if (row.get("change_pct") or 0) > 0)
+    sector_total = len(sector_rows) or len(_US_SECTOR_ETFS)
+    breadth_ratio = sector_up / sector_total if sector_total else 0.5
+
+    watchlist = []
+    lead_sections = set(_coerce_market_text_list((news_context or {}).get("lead_sections")))
+    if {"거시·연준", "외부 변수", "원자재·암호"} & lead_sections:
+        watchlist.append("10Y·DXY·WTI가 장 초반에도 같은 방향으로 움직이는지 확인")
+    elif "실적·개별주" in lead_sections:
+        watchlist.append("주도 종목 강세가 동종 업종과 섹터 전반으로 확산되는지 확인")
+
+    if qqq_vs_spy is not None and qqq_vs_spy >= 0.45 and breadth_ratio <= 0.45:
+        watchlist.append("메가캡 쏠림이 시장 전반 확산으로 번지는지 확인")
+    else:
+        watchlist.append("QQQ가 SPY 대비 상대강도를 회복하는지 확인")
+
+    if iwm_vs_spy is not None and iwm_vs_spy >= 0.35:
+        watchlist.append("IWM 상대강도가 하루 반짝이 아닌지 확인")
+    else:
+        watchlist.append("IWM이 SPY 대비 상대강도를 회복하는지 확인")
+
+    if tnx_bps is not None and tnx_bps <= -4 and (((gold_chg or 0) >= 0.8) or ((vix_chg or 0) >= 3)):
+        watchlist.append("10Y·Gold·VIX 조합이 위험회피 완화로 이어지는지 확인")
+    elif (dxy_chg or 0) >= 0.35 and (btc_chg or 0) <= -2.5:
+        watchlist.append("달러 강세와 비트코인 약세가 진정되는지 확인")
+    else:
+        watchlist.append("Gold/BTC와 VIX로 방어 심리 지속 여부 확인")
+
+    return _ordered_unique(watchlist)[:4]
+
+
+def _fallback_market_insight(benchmarks, macro, sector_rows, news_context=None, market_regime=None, market_structure=None):
     spy = benchmarks.get("SPY", {}).get("change_pct")
     qqq = benchmarks.get("QQQ", {}).get("change_pct")
     iwm = benchmarks.get("IWM", {}).get("change_pct")
@@ -783,49 +993,64 @@ def _fallback_market_insight(benchmarks, macro, sector_rows):
     qqq_vs_spy = _relative_change(benchmarks.get("QQQ", {}), benchmarks.get("SPY", {}))
     iwm_vs_spy = _relative_change(benchmarks.get("IWM", {}), benchmarks.get("SPY", {}))
     strongest_sector = max(sector_rows, key=lambda row: row.get("change_pct") if row.get("change_pct") is not None else -999) if sector_rows else None
+    market_regime = market_regime or _build_market_regime(benchmarks, macro, sector_rows)
+    market_structure = market_structure or _describe_market_structure(benchmarks, macro, sector_rows)
+    news_context = news_context or {}
+    divergence_notes = _build_market_divergence_notes(benchmarks, macro, sector_rows, market_regime, market_structure)
+    strategy_points = _build_market_strategy_points(benchmarks, macro, sector_rows, market_regime, news_context=news_context)
+    watchlist = _build_market_insight_watchlist(benchmarks, macro, sector_rows, market_regime, news_context=news_context)
     if spy is None:
         return {
+            "short_view": "핵심 입력값이 아직 동기화 중이라 오늘 인사이트는 데이터가 안정되면 다시 갱신됩니다.",
+            "deep_dive": [
+                "지수와 거시 입력값이 아직 완전히 들어오지 않아 시장 맥락을 확정하기 이릅니다.",
+                "데이터가 안정되면 시장이 무엇에 더 민감했는지 다시 정리합니다.",
+            ],
+            "strategy": ["QQQ와 SPY, IWM과 SPY 상대강도가 먼저 안정되는지 확인해야 합니다."],
             "insight": "핵심 입력값이 아직 동기화 중이라 오늘 인사이트는 데이터가 안정되면 다시 갱신됩니다.",
             "watchlist": ["QQQ와 SPY 상대강도 확인", "IWM과 SPY 상대강도 확인", "Gold/BTC 방어 심리 확인"],
         }
+
     if tnx_bps <= -4 and (gold_chg or 0) >= 0.8 and (vix or 0) >= 3:
-        insight = "금리 하락을 바로 호재로 보기보다 안전자산 선호가 주도한 흐름인지 구분하는 대응이 중요합니다."
+        short_view = "금리 하락보다 안전자산 선호 해석이 더 중요했던 장이었습니다."
     elif qqq_vs_spy is not None and qqq_vs_spy >= 0.45 and breadth <= max(4, total // 3):
-        insight = "지수 반등처럼 보여도 메가캡 쏠림일 수 있어 확산 확인 전 추격은 신중할 필요가 있습니다."
+        short_view = "지수 반등보다 메가캡 쏠림 여부를 먼저 따져봐야 했던 장이었습니다."
     elif iwm_vs_spy is not None and iwm_vs_spy >= 0.35 and breadth >= max(total // 2, 6):
-        insight = "소형주와 확산도가 함께 살아날수록 메가캡 편중보다 시장 전반 회복 신호의 신뢰도가 높아집니다."
+        short_view = "메가캡 편중 완화와 시장 확산 여부가 핵심이었던 장이었습니다."
     elif (dxy_chg or 0) >= 0.35 and (btc_chg or 0) <= -2.5:
-        insight = "달러 강세와 고베타 자산 약세가 겹칠 때는 위험자산 회복을 서두르지 않는 편이 좋습니다."
+        short_view = "달러 강세가 위험선호 회복을 눌렀는지가 핵심이었던 장이었습니다."
     elif strongest_sector and strongest_sector.get("symbol") in {"XLU", "XLP", "XLV"} and breadth <= max(total // 2, 5):
-        insight = "방어 섹터 주도가 이어질수록 공격적 추격보다 포지션 방어와 선별 대응이 유효합니다."
+        short_view = "표면 지수보다 방어주 주도가 말해준 경계 심리가 더 중요했던 장이었습니다."
     elif (vix or 0) > 4 and tnx_bps > 0:
-        insight = "금리와 변동성이 함께 오를 때는 반등 추격보다 확인 후 대응이 더 중요합니다."
+        short_view = "금리와 변동성이 함께 올라 추세보다 리스크 관리가 중요했던 장이었습니다."
     elif (qqq or 0) > (spy or 0) and breadth >= total // 2:
-        insight = "기술주 주도력이 이어질수록 지수보다 리더 종목 추적이 더 중요합니다."
+        short_view = "빅테크 리더십은 유지됐지만 확산 여부를 함께 봐야 했던 장이었습니다."
     elif iwm is not None and spy is not None and iwm > spy and breadth >= total // 2:
-        insight = "소형주가 받쳐줄수록 메가캡 편중보다 시장 전반 회복 가능성을 더 높게 볼 수 있습니다."
+        short_view = "소형주가 받쳐주며 시장 전반 회복 신호의 신뢰도가 높아진 장이었습니다."
     elif gold_chg is not None and btc_chg is not None and gold_chg > 0.8 and btc_chg < 0:
-        insight = "금 강세와 비트코인 약세가 함께 나타날 때는 방어 심리가 쉽게 꺾이지 않을 수 있습니다."
+        short_view = "금 강세와 비트코인 약세가 함께 나오며 방어 심리가 더 중요한 장이었습니다."
     elif breadth <= 3:
-        insight = "시장 약세가 넓게 퍼질수록 신규 추격보다 방어와 현금 관리가 우선입니다."
+        short_view = "하락이 넓게 퍼진 만큼 방향성보다 방어와 체력 관리가 중요했던 장이었습니다."
     else:
-        insight = "한 방향 베팅보다 섹터 상대강도와 금리 민감도를 함께 보는 대응이 유효합니다."
-    watchlist = []
-    if qqq_vs_spy is not None and qqq_vs_spy >= 0.45 and breadth <= max(4, total // 3):
-        watchlist.append("메가캡 쏠림이 시장 전반 확산으로 번지는지 확인")
-    else:
-        watchlist.append("QQQ가 SPY 대비 상대강도를 회복하는지 확인")
-    if iwm_vs_spy is not None and iwm_vs_spy >= 0.35:
-        watchlist.append("IWM 상대강도가 하루 반짝이 아닌지 확인")
-    else:
-        watchlist.append("IWM이 SPY 대비 상대강도를 회복하는지 확인")
-    if tnx_bps <= -4 and (((gold_chg or 0) >= 0.8) or ((vix or 0) >= 3)):
-        watchlist.append("10Y·Gold·VIX 조합이 위험회피 완화로 이어지는지 확인")
-    elif (dxy_chg or 0) >= 0.35 and (btc_chg or 0) <= -2.5:
-        watchlist.append("달러 강세와 비트코인 약세가 진정되는지 확인")
-    else:
-        watchlist.append("Gold/BTC와 VIX로 방어 심리 지속 여부 확인")
-    return {"insight": insight, "watchlist": watchlist}
+        short_view = "지수 방향보다 상대강도와 거시 변수 해석이 더 중요했던 장이었습니다."
+
+    deep_dive = []
+    if str(news_context.get("focus") or "").strip():
+        deep_dive.append(str(news_context.get("focus") or "").strip())
+    lead_issues = _coerce_market_text_list(news_context.get("lead_issues"), max_items=2)
+    if lead_issues:
+        deep_dive.append(f"뉴스 흐름에서는 {_join_market_phrases(lead_issues)}가 함께 부각됐습니다.")
+    deep_dive.extend(divergence_notes)
+    if not deep_dive:
+        deep_dive.append(f"시장 내부 체력은 {market_structure['label']} 흐름이었고, 리스크 상태는 {market_regime['state_display']}로 해석됩니다.")
+
+    return {
+        "short_view": short_view,
+        "deep_dive": _ordered_unique(deep_dive)[:3],
+        "strategy": _coerce_market_text_list(strategy_points, max_items=3),
+        "insight": short_view,
+        "watchlist": _coerce_market_text_list(watchlist, max_items=4),
+    }
 
 
 def _market_mover_universe(limit=_US_MARKET_MOVER_LIMIT):
@@ -2328,13 +2553,17 @@ def _generate_us_market_ai_copy(market_date_key, summary_json):
         prompt = (
             "You are a US market close editor. Use only the JSON data below and answer in concise Korean.\n"
             "Return pure JSON only.\n"
-            'Format: {"headline":"...","drivers":["...","...","..."],"insight":"...","watchlist":["...","...","..."]}\n'
+            'Format: {"headline":"...","drivers":["...","...","..."],"insight_short_view":"...","insight_deep_dive":["...","..."],"insight_strategy":["...","..."],"watchlist":["...","...","..."]}\n'
             "Rules:\n"
             "- headline: one short but explanatory sentence.\n"
             "- drivers: three to four short bullets that explain what moved the market and why it mattered.\n"
-            "- insight: one sentence with a practical next-session angle.\n"
+            "- insight_short_view: one sharp line that explains what the market cared about most today.\n"
+            "- insight_deep_dive: two to three short lines that explain the narrative, divergence, or hidden context behind the move.\n"
+            "- insight_strategy: two to three short lines that explain how to frame the next session.\n"
             "- watchlist: three to four specific checkpoints for the next session.\n"
             "- Prefer explanation over slogans; mention cause and implication together.\n"
+            "- If the JSON includes news_context or divergence notes, use them to explain what mattered beneath the index move.\n"
+            "- Do not invent historical statistics that are not present in the data.\n"
             "- Do not mention unverified news or events.\n"
             f"- market_date_key: {market_date_key}\n"
             f"- data: {summary_json}\n"
@@ -2342,11 +2571,19 @@ def _generate_us_market_ai_copy(market_date_key, summary_json):
         response = model.generate_content(prompt)
         raw_text = getattr(response, "text", "") or str(response)
         parsed = json.loads(_extract_json_object(raw_text))
+        insight_short_view = str(parsed.get("insight_short_view", "")).strip()
+        if not insight_short_view:
+            insight_short_view = str(parsed.get("insight", "")).strip()
+        drivers = _coerce_market_text_list(parsed.get("drivers"), max_items=4)
+        watchlist = _coerce_market_text_list(parsed.get("watchlist"), max_items=4)
         return {
             "headline": str(parsed.get("headline", "")).strip(),
-            "drivers": [str(item).strip() for item in parsed.get("drivers", []) if str(item).strip()],
-            "insight": str(parsed.get("insight", "")).strip(),
-            "watchlist": [str(item).strip() for item in parsed.get("watchlist", []) if str(item).strip()],
+            "drivers": drivers,
+            "insight": insight_short_view,
+            "insight_short_view": insight_short_view,
+            "insight_deep_dive": _coerce_market_text_list(parsed.get("insight_deep_dive"), max_items=3),
+            "insight_strategy": _coerce_market_text_list(parsed.get("insight_strategy"), max_items=3),
+            "watchlist": watchlist,
         }
     except Exception:
         return {}
@@ -2413,12 +2650,22 @@ def build_us_market_daily_payload():
     )
     market_news_bundle = _collect_market_news(news_universe, snapshot_lookup, gainers, losers)
 
-    driver_candidates = _build_driver_candidates(benchmark_snapshots, macro_snapshots, sector_sorted)
-    fallback_insight = _fallback_market_insight(benchmark_snapshots, macro_snapshots, sector_sorted)
     market_regime = _build_market_regime(benchmark_snapshots, macro_snapshots, sector_sorted)
     market_structure = _describe_market_structure(benchmark_snapshots, macro_snapshots, sector_sorted)
     qqq_vs_spy = market_regime.get("qqq_vs_spy")
     iwm_vs_spy = market_regime.get("iwm_vs_spy")
+    driver_candidates = _build_driver_candidates(benchmark_snapshots, macro_snapshots, sector_sorted)
+    insight_news_context = _build_market_insight_news_context(market_news_bundle)
+    divergence_notes = _build_market_divergence_notes(benchmark_snapshots, macro_snapshots, sector_sorted, market_regime, market_structure)
+    strategy_points = _build_market_strategy_points(benchmark_snapshots, macro_snapshots, sector_sorted, market_regime, news_context=insight_news_context)
+    fallback_insight = _fallback_market_insight(
+        benchmark_snapshots,
+        macro_snapshots,
+        sector_sorted,
+        news_context=insight_news_context,
+        market_regime=market_regime,
+        market_structure=market_structure,
+    )
 
     summary_payload = {
         "market_date": market_date_key,
@@ -2451,12 +2698,23 @@ def build_us_market_daily_payload():
             "fear_greed_label": market_regime.get("fear_greed_label"),
         },
         "market_structure": market_structure.get("label"),
+        "market_structure_note": market_structure.get("note"),
+        "news_context": {
+            "focus": insight_news_context.get("focus"),
+            "lead_sections": insight_news_context.get("lead_sections"),
+            "lead_events": insight_news_context.get("lead_events"),
+            "lead_issues": insight_news_context.get("lead_issues"),
+        },
+        "divergence_notes": divergence_notes[:3],
+        "strategy_bias": strategy_points[:3],
     }
     ai_copy = _generate_us_market_ai_copy(market_date_key, json.dumps(summary_payload, ensure_ascii=False))
 
     headline = ai_copy.get("headline") or _fallback_market_headline(benchmark_snapshots, macro_snapshots, sector_sorted)
     drivers = ai_copy.get("drivers") or driver_candidates or ["시장 방향성은 유지됐지만 거시 변수의 압박도 여전히 크게 작용했습니다."]
-    insight = ai_copy.get("insight") or fallback_insight["insight"]
+    insight_short_view = ai_copy.get("insight_short_view") or ai_copy.get("insight") or fallback_insight["short_view"]
+    insight_deep_dive = ai_copy.get("insight_deep_dive") or fallback_insight["deep_dive"]
+    insight_strategy = ai_copy.get("insight_strategy") or fallback_insight["strategy"]
     watchlist = ai_copy.get("watchlist") or fallback_insight["watchlist"]
 
     sector_breadth = sum(1 for row in sector_sorted if (row.get("change_pct") or 0) > 0)
@@ -2501,7 +2759,7 @@ def build_us_market_daily_payload():
         macro_metric_map["WTI"],
         macro_metric_map["BTC"],
     ]
-    sector_metrics = [_build_snapshot_metric(row["symbol"], row["label"], row["snapshot"]) for row in (sector_sorted[:3] + list(reversed(sector_sorted[-3:])))]
+    sector_metrics = [_build_snapshot_metric(row["symbol"], row["label"], row["snapshot"]) for row in sector_sorted]
     mover_metrics = [_build_snapshot_metric(row["symbol"], _mover_reason(row["snapshot"]), row["snapshot"]) for row in gainers + losers]
     insight_metrics = [
         _build_risk_state_metric(market_regime),
@@ -2591,10 +2849,32 @@ def build_us_market_daily_payload():
         )
     insight_bullets = [
         _build_market_bullet(
-            f"현재 해석: {market_structure['label']} · {market_structure['note']} / 리스크 상태 {market_regime['state_display']}",
-            _resolve_market_tone(market_structure["tone"], market_regime["tone"]),
+            f"맥락: {text}",
+            _infer_market_text_tone(text),
         )
-    ] + [_build_market_bullet(text, _infer_market_text_tone(text)) for text in watchlist[:4]]
+        for text in _coerce_market_text_list(insight_deep_dive, max_items=3)
+    ]
+    insight_bullets += [
+        _build_market_bullet(
+            f"대응: {text}",
+            _infer_market_text_tone(text),
+        )
+        for text in _coerce_market_text_list(insight_strategy, max_items=3)
+    ]
+    insight_bullets += [
+        _build_market_bullet(
+            f"체크: {text}",
+            _infer_market_text_tone(text),
+        )
+        for text in _coerce_market_text_list(watchlist, max_items=3)
+    ]
+    if not insight_bullets:
+        insight_bullets = [
+            _build_market_bullet(
+                f"맥락: {market_structure['label']} · {market_structure['note']} / 리스크 상태 {market_regime['state_display']}",
+                _resolve_market_tone(market_structure["tone"], market_regime["tone"]),
+            )
+        ]
     market_news_card = _build_market_news_card(
         market_date_key,
         benchmark_snapshots,
@@ -2650,7 +2930,7 @@ def build_us_market_daily_payload():
         {
             "id": "daily_insight",
             "title": "오늘 미장 인사이트",
-            "subtitle": insight,
+            "subtitle": insight_short_view,
             "metrics": insight_metrics,
             "bullets": insight_bullets,
             "tone": _tone_from_change(benchmark_snapshots.get("QQQ", {}).get("change_pct")),
