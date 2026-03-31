@@ -6,6 +6,7 @@ from scipy.signal import find_peaks
 from config import *
 from utils import _sf
 from localization import (
+    explain_signal_meaning,
     localize_action_label,
     localize_combo,
     localize_context_label,
@@ -169,6 +170,38 @@ def _add_volume_profile_overlay(fig,dc,default_visible='legendonly'):
                 fig.add_trace(go.Scatter(x=[dc.index[0],x_right],y=[val,val],mode='lines',line=dict(color=clr,width=1.5,dash=sty),name=label,legendgroup=f'vp_{label.lower()}',hoverinfo='skip',showlegend=True,visible=default_visible),row=1,col=1)
     fig.add_trace(go.Scatter(x=[x_right],y=[dc['Close'].iloc[-1]],mode='markers',marker=dict(size=.1,color='rgba(0,0,0,0)'),hoverinfo='skip',showlegend=False),row=1,col=1)
     fig.add_trace(go.Scatter(x=[x_right],y=[high],mode='text',text=['VP'],textfont=dict(size=9,color='#94A3B8'),name='VP Label',legendgroup='vp_profile',hoverinfo='skip',showlegend=False,visible=default_visible),row=1,col=1)
+
+def _add_fibonacci_overlay(fig,dc,default_visible='legendonly'):
+    if dc.empty:
+        return
+    x_left=dc.index[0]
+    x_right=dc.index[-1]+pd.Timedelta(days=3)
+    fib_specs=[
+        ('Fib_382','#60A5FA','dash','Fib 38.2%'),
+        ('Fib_50','#A78BFA','dot','Fib 50%'),
+        ('Fib_618','#F59E0B','solid','Fib 61.8%'),
+        ('Fib_Ext_1618_Up','#F97316','dash','Fib 161.8% Up'),
+        ('Fib_Ext_1618_Down','#14B8A6','dash','Fib 161.8% Down'),
+    ]
+    first=True
+    for col,color,dash,label in fib_specs:
+        if col not in dc.columns:
+            continue
+        val=float(dc[col].iloc[-1])
+        if not np.isfinite(val) or val <= 0:
+            continue
+        fig.add_trace(go.Scatter(
+            x=[x_left,x_right],
+            y=[val,val],
+            mode='lines',
+            line=dict(color=color,width=1.3,dash=dash),
+            name=label,
+            legendgroup='fib_overlay',
+            hovertemplate=f"{label}: %{{y:.2f}}<extra></extra>",
+            showlegend=first,
+            visible=default_visible,
+        ),row=1,col=1)
+        first=False
 
 def _sig_marker(fig,dc,sn,row,y,clr,sym,sz,lbl,legendgroup=None,showlegend=False,visible=True,legend_name=None):
     reg=SIGNAL_REGISTRY.get(sn) or COMBINED_SCAN_REGISTRY.get(sn,{})
@@ -636,6 +669,7 @@ def build_chart(dc,ticker):
     _add_trendline_overlays(fig,dc,max_per_side=2,default_visible=True)
     _add_pattern_overlay(fig,dc,_detect_active_pattern(dc),default_visible=True)
     _add_volume_profile_overlay(fig,dc,default_visible='legendonly')
+    _add_fibonacci_overlay(fig,dc,default_visible='legendonly')
     if sb.any():
         sr=dc[sb];yv=sr['Low']-sr['ATR']*2;ht=[]
         for bi in sr.index:
@@ -727,12 +761,37 @@ def build_metadata(dc,ticker):
         ds=ir.strftime('%m/%d')
         for col,cfg in SIGNAL_REGISTRY.items():
             if col in dc.columns and row.get(col,False):
-                signal_kor,_=localize_signal(col,cfg.get('kor'),cfg.get('desc'))
-                recent.append((cfg['icon'],signal_kor,ds,cfg['dir'],False))
+                signal_kor,signal_desc=localize_signal(col,cfg.get('kor'),cfg.get('desc'))
+                recent.append({
+                    'key': col,
+                    'icon': cfg['icon'],
+                    'label': signal_kor,
+                    'date': ds,
+                    'dir': cfg['dir'],
+                    'is_combined': False,
+                    'desc': signal_desc,
+                    'meaning': explain_signal_meaning(col, signal_desc, is_combo=False),
+                })
         for col,cfg in COMBINED_SCAN_REGISTRY.items():
             if col in dc.columns and row.get(col,False):
-                combo_kor,_=localize_combo(col,cfg.get('kor'),cfg.get('desc'))
-                recent.append((cfg['icon'],combo_kor,ds,cfg['dir'],True))
+                combo_kor,combo_desc=localize_combo(col,cfg.get('kor'),cfg.get('desc'))
+                recent.append({
+                    'key': col,
+                    'icon': cfg['icon'],
+                    'label': combo_kor,
+                    'date': ds,
+                    'dir': cfg['dir'],
+                    'is_combined': True,
+                    'desc': combo_desc,
+                    'meaning': explain_signal_meaning(col, combo_desc, is_combo=True),
+                })
+    derived_signal_events=[];derived_reason_states=[];latest_signal_date=dc.index[-1].strftime('%m/%d')
+    for key,cfg in DERIVED_SIGNAL_REGISTRY.items():
+        if bool(lat.get(key,False)):
+            desc_text = str(cfg.get('desc') or '')
+            payload={'key':key,'icon':'','label':str(cfg.get('kor') or key),'date':latest_signal_date,'dir':str(cfg.get('dir') or 'neutral'),'is_combined':False,'desc':desc_text,'meaning':explain_signal_meaning(key, desc_text, is_combo=False)}
+            if str(cfg.get('surface') or 'reason')=='badge':derived_signal_events.append(payload)
+            else:derived_reason_states.append(payload)
     rg=int(lat.get('Regime',0));rl={2:'STRONG BULL 🟢🟢',1:'BULL 🟢',0:'NEUTRAL ⚪',-1:'BEAR 🔴',-2:'STRONG BEAR 🔴🔴'}.get(rg,'N/A')
     committee={}
     for cm in COMMITTEE_NAMES:vv=int(_sf(lat.get(f'CM_{cm}_Vote',0)));committee[cm]={'score':_sf(lat.get(f'CM_{cm}_EffScore',0)),'conviction':_sf(lat.get(f'CM_{cm}_EffConv',0)),'vote':'BUY' if vv==1 else('SELL' if vv==-1 else('ABSTAIN' if vv==-99 else 'NEUTRAL')),'vote_int':vv}
@@ -755,7 +814,12 @@ def build_metadata(dc,ticker):
         'market_filter_bias':_sf(lat.get('Market_Filter_Bias')),'flip_guard_triggered':bool(lat.get('Flip_Guard_Triggered',False)),
         'macro_pressure_score':_sf(lat.get('Macro_Pressure_Score')),'market_breadth_score':_sf(lat.get('Market_Breadth_Score')),
         'breadth_risk_on':bool(lat.get('Breadth_Risk_On',False)),'breadth_risk_off':bool(lat.get('Breadth_Risk_Off',False)),
-        'narrow_leadership':bool(lat.get('Narrow_Leadership',False)),
+        'spy_risk_on':bool(lat.get('SPY_Risk_On',False)),'spy_risk_off':bool(lat.get('SPY_Risk_Off',False)),
+        'vix_risk_on':bool(lat.get('VIX_Risk_On',False)),'vix_risk_off':bool(lat.get('VIX_Risk_Off',False)),
+        'tnx_tailwind':bool(lat.get('TNX_Tailwind',False)),'tnx_headwind':bool(lat.get('TNX_Headwind',False)),
+        'dxy_tailwind':bool(lat.get('DXY_Tailwind',False)),'dxy_headwind':bool(lat.get('DXY_Headwind',False)),
+        'vix_pressure_score':_sf(lat.get('VIX_Pressure_Score')),'tnx_pressure_score':_sf(lat.get('TNX_Pressure_Score')),'dxy_pressure_score':_sf(lat.get('DXY_Pressure_Score')),
+        'narrow_leadership':bool(lat.get('Narrow_Leadership',False)),'leader_stock_mode':bool(lat.get('Leader_Stock_Mode',False)),'leader_stock_score':_sf(lat.get('Leader_Stock_Score')),
         'trend_inflection_buy_score':_sf(lat.get('Trend_Inflection_Buy_Score')),'trend_inflection_sell_score':_sf(lat.get('Trend_Inflection_Sell_Score')),
         'trend_inflection_bull':bool(lat.get('Trend_Inflection_Bull',False)),'trend_inflection_bear':bool(lat.get('Trend_Inflection_Bear',False)),
         'market_turn_bull_score':_sf(lat.get('Market_Turn_Bull_Score')),'market_turn_bear_score':_sf(lat.get('Market_Turn_Bear_Score')),
@@ -766,15 +830,29 @@ def build_metadata(dc,ticker):
         'thin_trade_risk':bool(lat.get('Thin_Trade_Risk',False)),
         'diag_support_hold':bool(lat.get('Diag_Support_Hold',False)),'diag_breakout_bull':bool(lat.get('Diag_Breakout_Bull',False)),
         'diag_resistance_reject':bool(lat.get('Diag_Resistance_Reject',False)),'diag_breakdown_bear':bool(lat.get('Diag_Breakdown_Bear',False)),
-        'ma50':_sf(lat.get('MA50')),'ma200':_sf(lat.get('MA200')),'vp_poc':_sf(lat.get('VP_POC')),'vp_vah':_sf(lat.get('VP_VAH')),'vp_val':_sf(lat.get('VP_VAL')),
+        'box_support_hold':bool(lat.get('Box_Support_Hold',False)),'box_resistance_reject':bool(lat.get('Box_Resistance_Reject',False)),
+        'box_breakout_bull':bool(lat.get('Box_Breakout_Bull',False)),'box_breakdown_bear':bool(lat.get('Box_Breakdown_Bear',False)),
+        'channel_support_hold':bool(lat.get('Channel_Support_Hold',False)),'channel_resistance_reject':bool(lat.get('Channel_Resistance_Reject',False)),
+        'channel_breakout_bull':bool(lat.get('Channel_Breakout_Bull',False)),'channel_breakdown_bear':bool(lat.get('Channel_Breakdown_Bear',False)),
+        'asc_triangle':bool(lat.get('Asc_Triangle',False)),'desc_triangle':bool(lat.get('Desc_Triangle',False)),'sym_triangle':bool(lat.get('Sym_Triangle',False)),
+        'triangle_breakout_bull':bool(lat.get('Triangle_Breakout_Bull',False)),'triangle_breakdown_bear':bool(lat.get('Triangle_Breakdown_Bear',False)),
+        'ma20':_sf(lat.get('MA20')),'ma50':_sf(lat.get('MA50')),'ma200':_sf(lat.get('MA200')),'vp_poc':_sf(lat.get('VP_POC')),'vp_vah':_sf(lat.get('VP_VAH')),'vp_val':_sf(lat.get('VP_VAL')),
+        'fib_382':_sf(lat.get('Fib_382')),'fib_50':_sf(lat.get('Fib_50')),'fib_618':_sf(lat.get('Fib_618')),
+        'fib_ext_1618_up':_sf(lat.get('Fib_Ext_1618_Up')),'fib_ext_1618_down':_sf(lat.get('Fib_Ext_1618_Down')),
+        'fib_382_support':bool(lat.get('Fib_382_Support',False)),'fib_50_support':bool(lat.get('Fib_50_Support',False)),'fib_618_support':bool(lat.get('Fib_618_Support',False)),
+        'fib_382_resistance':bool(lat.get('Fib_382_Resistance',False)),'fib_50_resistance':bool(lat.get('Fib_50_Resistance',False)),'fib_618_resistance':bool(lat.get('Fib_618_Resistance',False)),
+        'fib_618_breakdown':bool(lat.get('Fib_618_Breakdown',False)),'fib_618_reclaim':bool(lat.get('Fib_618_Reclaim',False)),
+        'fib_confluence_buy':bool(lat.get('Fib_Confluence_Buy',False)),'fib_confluence_sell':bool(lat.get('Fib_Confluence_Sell',False)),
+        'fib_ext_1618_up_hit':bool(lat.get('Fib_Ext_1618_Up_Hit',False)),'fib_ext_1618_down_hit':bool(lat.get('Fib_Ext_1618_Down_Hit',False)),
         'percent_b':_sf(lat.get('Percent_B'),0.5),'rsi_mfi':_sf(lat.get('RSI_MFI')),'bb_up':_sf(lat.get('BB_Up')),'bb_low':_sf(lat.get('BB_Low')),
         'ema8':_sf(lat.get('EMA8')),'ema21':_sf(lat.get('EMA21')),'obv_trend':'rising' if _sf(lat.get('OBV'))>_sf(dc['OBV'].rolling(20).mean().iloc[-1]) else 'falling',
         'obv_slope':_sf(lat.get('OBV_Slope')),'price_slope_5':_sf(lat.get('Price_Slope_5')),'volume_ratio_20':_sf(lat.get('Volume_Ratio_20'),1),
         'vp_long_rr':_sf(lat.get('VP_Long_RR'),1),'vp_short_rr':_sf(lat.get('VP_Short_RR'),1),'contrast_notes':str(lat.get('Contrast_Notes','')),
         'smart_money_bearish_div':bool(lat.get('Smart_Money_Bearish_Div',False)),'smart_money_bullish_div':bool(lat.get('Smart_Money_Bullish_Div',False)),
         'blowoff_top_hard':bool(lat.get('Blowoff_Top_Hard',False)),
-        'combined_scans':acs,'recent_signals':recent,
+        'combined_scans':acs,'recent_signals':recent,'derived_signal_events':derived_signal_events,'derived_reason_states':derived_reason_states,
         'high_52w':float(dc['High'].max()),'low_52w':float(dc['Low'].min()),
+        'ma20_dist':round((_sf(lat['Close'])-_sf(lat.get('MA20',_sf(lat['Close']))))/_sf(lat['Close'])*100,2) if _sf(lat.get('MA20')) else 0,
         'ma50_dist':round((_sf(lat['Close'])-_sf(lat.get('MA50',_sf(lat['Close']))))/_sf(lat['Close'])*100,2) if _sf(lat.get('MA50')) else 0,
         'ma200_dist':round((_sf(lat['Close'])-_sf(lat.get('MA200',_sf(lat['Close']))))/_sf(lat['Close'])*100,2) if _sf(lat.get('MA200')) else 0}
 
@@ -863,6 +941,37 @@ def build_metadata(dc,ticker):
         item['desc']=desc
         localized_scans.append(item)
     meta['combined_scans']=localized_scans
+    localized_recent=[]
+    for item in meta.get('recent_signals',[]):
+        if isinstance(item,dict):
+            payload=dict(item)
+            payload['label']=translate_chart_text(payload.get('label'))
+            payload['desc']=translate_chart_text(payload.get('desc'))
+            payload['meaning']=translate_chart_text(payload.get('meaning'))
+            localized_recent.append(payload)
+            continue
+        if isinstance(item,(list,tuple)) and len(item) >= 5:
+            icon,label,date_text,direction,is_combo=item[:5]
+            localized_recent.append((icon,translate_chart_text(label),date_text,direction,is_combo))
+        else:
+            localized_recent.append(item)
+    meta['recent_signals']=localized_recent
+    localized_derived_events=[]
+    for item in meta.get('derived_signal_events',[]):
+        payload=dict(item)
+        payload['label']=translate_chart_text(payload.get('label'))
+        payload['desc']=translate_chart_text(payload.get('desc'))
+        payload['meaning']=translate_chart_text(payload.get('meaning'))
+        localized_derived_events.append(payload)
+    meta['derived_signal_events']=localized_derived_events
+    localized_derived_states=[]
+    for item in meta.get('derived_reason_states',[]):
+        payload=dict(item)
+        payload['label']=translate_chart_text(payload.get('label'))
+        payload['desc']=translate_chart_text(payload.get('desc'))
+        payload['meaning']=translate_chart_text(payload.get('meaning'))
+        localized_derived_states.append(payload)
+    meta['derived_reason_states']=localized_derived_states
     return meta
 
 # ━━━ UI ━━━

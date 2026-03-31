@@ -336,6 +336,120 @@ def localize_signal(key: str, kor: Any = None, desc: Any = None) -> tuple[str, s
     return label, detail
 
 
+SIGNAL_MEANING_MAP = {
+    "Down_3_Days": "3거래일 연속 약세가 이어져 단기 매도 압력이 누적됐다는 뜻입니다.",
+    "Down_4_Days": "4거래일 연속 하락이 이어져 단기 추세가 눈에 띄게 약해졌다는 뜻입니다.",
+    "Down_5_Days": "5거래일 연속 하락이 이어져 매도 우위가 강하게 누적됐다는 뜻입니다.",
+    "Up_3_Days": "3거래일 연속 상승이 이어져 단기 매수 우위가 유지되고 있다는 뜻입니다.",
+    "Up_4_Days": "4거래일 연속 상승이 이어져 단기 추세가 강하게 이어지고 있다는 뜻입니다.",
+    "Up_5_Days": "5거래일 연속 상승이 이어져 과열 여부까지 함께 점검해야 하는 구간이라는 뜻입니다.",
+    "Stoch_Oversold": "스토캐스틱이 과매도권에 들어와 단기 반등 가능성을 열어두는 신호입니다.",
+    "Stoch_Reached_OS": "스토캐스틱이 과매도권에 근접해 단기 반등 시도를 볼 수 있는 구간이라는 뜻입니다.",
+    "Stoch_Overbought": "스토캐스틱이 과매수권이라 단기 과열 부담을 함께 봐야 한다는 뜻입니다.",
+    "Stoch_Reached_OB": "스토캐스틱이 과매수권에 근접해 단기 숨고르기 가능성을 살펴야 한다는 뜻입니다.",
+    "MACD_Cross_Buy": "MACD가 시그널선을 상향 돌파해 모멘텀이 개선될 수 있다는 뜻입니다.",
+    "MACD_Cross_Sell": "MACD가 시그널선을 하향 이탈해 단기 모멘텀이 약해졌다는 뜻입니다.",
+    "MACD_Zero_Cross_Buy": "MACD가 기준선 위로 올라와 중기 흐름이 강세 쪽으로 기울 수 있다는 뜻입니다.",
+    "MACD_Zero_Cross_Sell": "MACD가 기준선 아래로 내려가며 중기 모멘텀이 약해졌다는 뜻입니다.",
+    "MF_Cross_Bull": "자금 흐름 지표가 매수 쪽으로 기울어 수급 개선 가능성을 보여주는 신호입니다.",
+    "MF_Cross_Bear": "자금 흐름 지표가 매도 쪽으로 기울어 수급이 약해졌다는 뜻입니다.",
+    "DMI_Cross_Bull": "방향성 지표에서 상승 쪽 힘이 하락 쪽 힘을 앞서기 시작했다는 뜻입니다.",
+    "DMI_Cross_Bear": "방향성 지표에서 하락 쪽 힘이 상승 쪽 힘을 앞서기 시작했다는 뜻입니다.",
+    "ADX_New_Uptrend": "추세 강도와 방향이 함께 개선돼 새로운 상승 추세 가능성을 보여주는 신호입니다.",
+    "ADX_New_Downtrend": "추세 강도와 방향이 함께 약세 쪽으로 기울어 하락 추세 가능성을 보여주는 신호입니다.",
+    "BB_Lower_Walk": "주가가 볼린저 하단을 따라 내려가며 약세 압력이 이어지고 있다는 뜻입니다.",
+    "BB_Upper_Walk": "주가가 볼린저 상단을 따라 올라가며 강한 상승 압력이 이어지고 있다는 뜻입니다.",
+    "BB_Lower_Break": "볼린저 하단을 이탈해 단기 변동성 확대와 약세 압력을 경계해야 한다는 뜻입니다.",
+    "BB_Upper_Break": "볼린저 상단을 돌파해 단기 추세 가속 가능성을 보여주는 신호입니다.",
+    "BB_Lower_Bounce": "볼린저 하단에서 반등이 나와 단기 지지 확인 신호로 볼 수 있다는 뜻입니다.",
+    "Fell_Below_20MA": "주가가 20일선을 밑돌아 단기 추세가 약해졌다는 뜻입니다.",
+    "Fell_Below_50MA": "주가가 50일선을 밑돌아 중기 추세 훼손 가능성이 커졌다는 뜻입니다.",
+    "Fell_Below_200MA": "주가가 200일선을 밑돌아 장기 추세가 약세로 기울 수 있다는 뜻입니다.",
+    "Cross_Above_20MA": "주가가 20일선을 회복해 단기 추세가 개선될 가능성을 보여주는 신호입니다.",
+    "Cross_Above_50MA": "주가가 50일선을 회복해 중기 흐름 개선 가능성을 보여주는 신호입니다.",
+    "Cross_Above_200MA": "주가가 200일선을 회복해 장기 추세가 다시 강세 쪽으로 기울 수 있다는 뜻입니다.",
+    "MA20_Support": "20일선 부근에서 지지가 확인돼 단기 추세가 버티는지 보는 신호입니다.",
+    "MA20_Resistance": "20일선이 저항으로 작용해 단기 반등이 막히는지 보는 신호입니다.",
+    "MA50_Support": "50일선 지지가 확인돼 중기 추세가 유지되는지 보는 신호입니다.",
+    "MA50_Resistance": "50일선이 저항으로 작용해 중기 약세가 이어지는지 보는 신호입니다.",
+    "MA200_Support": "200일선 지지가 확인돼 장기 추세가 살아 있는지 보는 신호입니다.",
+    "MA200_Resistance": "200일선이 저항으로 작용해 장기 회복이 막히는지 보는 신호입니다.",
+    "Expansion_BD": "변동성 확장과 함께 하방 이탈이 나와 약세 압력이 커졌다는 뜻입니다.",
+    "Expansion_BO": "변동성 확장과 함께 상방 돌파가 나와 추세 가속 가능성을 보여주는 신호입니다.",
+    "Expansion_Pivot_Sell": "확장 국면에서 매도 쪽 피벗이 형성돼 단기 하락 압력을 경계해야 한다는 뜻입니다.",
+    "Expansion_Pivot_Buy": "확장 국면에서 매수 쪽 피벗이 형성돼 단기 반등이나 추세 재개를 볼 수 있다는 뜻입니다.",
+    "Gap_Up_Closed": "갭 상승분을 지키지 못해 추격 매수가 약해졌다는 뜻입니다.",
+    "Gap_Down_Closed": "갭 하락분을 빠르게 메워 단기 회복 탄력이 붙을 수 있다는 뜻입니다.",
+    "Pocket_Pivot": "거래량을 동반한 선도성 매수 신호로 해석할 수 있습니다.",
+    "Shooting_Star": "윗꼬리 매물이 나오며 단기 저항 가능성을 보여주는 캔들 신호입니다.",
+    "New_52W_Closing_High": "장기 추세가 여전히 강하다는 뜻이지만, 과열 여부도 함께 확인해야 합니다.",
+    "Three_Weeks_Tight": "가격이 좁은 범위에 응축돼 있어 추세 재가속 준비 구간으로 볼 수 있다는 뜻입니다.",
+    "Volume_Surge": "거래량이 평소보다 크게 늘어 해당 방향 움직임의 신뢰도를 높여주는 신호입니다.",
+}
+
+
+SIGNAL_MEANING_MAP.update({
+    "Fib_382_Support": "최근 상승 파동의 38.2% 되돌림 구간에서 지지가 확인돼 얕은 조정 뒤 재상승 가능성을 보여주는 신호입니다.",
+    "Fib_50_Support": "최근 상승 파동의 절반 되돌림 구간에서 지지가 확인돼 눌림목 매수 구간으로 해석할 수 있는 신호입니다.",
+    "Fib_618_Support": "61.8% 되돌림 구간을 지켜 황금비 지지선에서 추세가 살아 있는지 보는 신호입니다.",
+    "Fib_382_Resistance": "38.2% 되돌림 구간에서 저항이 확인돼 반등이 아직 저항에 막히는지 보는 신호입니다.",
+    "Fib_50_Resistance": "절반 되돌림 구간에서 저항이 확인돼 반등이 중간 되돌림 수준에서 꺾이는지 보는 신호입니다.",
+    "Fib_618_Resistance": "61.8% 되돌림 구간에서 저항이 확인돼 약세 추세가 쉽게 끝나지 않을 수 있음을 보여주는 신호입니다.",
+    "Fib_618_Breakdown": "61.8% 되돌림이 무너지며 단순 조정보다 추세 훼손 가능성이 커졌음을 보여주는 신호입니다.",
+    "Fib_618_Reclaim": "61.8% 되돌림을 다시 회복해 하락 압력 완화와 반등 시도 강화를 보여주는 신호입니다.",
+    "Fib_Confluence_Buy": "피보나치 지지와 이동평균선·볼륨 프로파일 지지가 겹쳐 신뢰도가 높아진 매수 구간입니다.",
+    "Fib_Confluence_Sell": "피보나치 저항과 이동평균선·볼륨 프로파일 저항이 겹쳐 신뢰도가 높아진 매도 구간입니다.",
+})
+
+COMBO_MEANING_MAP = {
+    "CS_Breakout_Confirm_Buy": "돌파 뒤 눌림을 버티며 상방 추세가 확인되는 조합 신호입니다.",
+    "CS_Breakout_Confirm_Sell": "하방 이탈 뒤 반등 실패가 겹쳐 약세 추세가 확인되는 조합 신호입니다.",
+    "CS_Trend_Continuation_Buy": "상승 추세 속 눌림 이후 재출발 가능성을 보여주는 조합 신호입니다.",
+    "CS_Trend_Continuation_Sell": "하락 추세 속 반등 이후 재차 약세가 이어질 가능성을 보여주는 조합 신호입니다.",
+    "CS_Squeeze_Breakout_Buy": "압축 구간 이후 상방 돌파가 확인돼 추세 확장 가능성을 보여주는 조합 신호입니다.",
+    "CS_Squeeze_Breakdown_Sell": "압축 구간 이후 하방 이탈이 확인돼 약세 확장 가능성을 보여주는 조합 신호입니다.",
+}
+
+
+def _generic_signal_meaning(signal_key: str, is_combo: bool = False) -> str:
+    key = str(signal_key or "").lower()
+    if "buy" in key or "bull" in key:
+        return "매수 쪽 힘이 붙을 수 있는 구간으로 해석하는 기술 신호입니다."
+    if "sell" in key or "bear" in key:
+        return "매도 쪽 압력이 강해질 수 있는 구간으로 해석하는 기술 신호입니다."
+    if "support" in key:
+        return "지지 여부를 확인하는 기술 신호입니다."
+    if "resistance" in key:
+        return "저항 여부를 확인하는 기술 신호입니다."
+    if "breakout" in key:
+        return "저항 돌파 여부를 확인하는 기술 신호입니다."
+    if "breakdown" in key:
+        return "지지 이탈 여부를 확인하는 기술 신호입니다."
+    if "oversold" in key:
+        return "과매도 구간 여부를 확인하는 기술 신호입니다."
+    if "overbought" in key:
+        return "과매수 구간 여부를 확인하는 기술 신호입니다."
+    if is_combo:
+        return "여러 기술 신호가 한쪽 방향으로 겹친 조합 신호입니다."
+    return "단기 방향성을 판단하는 데 참고하는 기술 신호입니다."
+
+
+def explain_signal_meaning(
+    key: str,
+    desc: Any = None,
+    *,
+    is_combo: bool = False,
+) -> str:
+    mapping = COMBO_MEANING_MAP if is_combo else SIGNAL_MEANING_MAP
+    meaning = str(mapping.get(key, "") or "").strip()
+    if meaning:
+        return meaning
+    raw_desc = str(desc or "").strip()
+    if raw_desc and not is_broken_text(raw_desc):
+        return raw_desc
+    return _generic_signal_meaning(key, is_combo=is_combo)
+
+
 def localize_regime_label(regime: Any, fallback: Any = None) -> str:
     if isinstance(regime, (int, float)):
         code = int(regime)

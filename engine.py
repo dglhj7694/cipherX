@@ -156,6 +156,16 @@ def detect_all_signals(df):
     df['Diag_Resistance_Reject']=df.get('Diag_Resistance_Reject',pd.Series(False,index=idx)).fillna(False)&vok
     df['Diag_Breakout_Bull']=df.get('Diag_Breakout_Bull',pd.Series(False,index=idx)).fillna(False)&(vol_ratio>=1.0)
     df['Diag_Breakdown_Bear']=df.get('Diag_Breakdown_Bear',pd.Series(False,index=idx)).fillna(False)&(vol_ratio>=1.0)
+    df['Box_Support_Hold']=df.get('Box_Support_Hold',pd.Series(False,index=idx)).fillna(False)&vok
+    df['Box_Resistance_Reject']=df.get('Box_Resistance_Reject',pd.Series(False,index=idx)).fillna(False)&vok
+    df['Box_Breakout_Bull']=df.get('Box_Breakout_Bull',pd.Series(False,index=idx)).fillna(False)&(vol_ratio>=1.0)
+    df['Box_Breakdown_Bear']=df.get('Box_Breakdown_Bear',pd.Series(False,index=idx)).fillna(False)&(vol_ratio>=1.0)
+    df['Channel_Support_Hold']=df.get('Channel_Support_Hold',pd.Series(False,index=idx)).fillna(False)&vok
+    df['Channel_Resistance_Reject']=df.get('Channel_Resistance_Reject',pd.Series(False,index=idx)).fillna(False)&vok
+    df['Channel_Breakout_Bull']=df.get('Channel_Breakout_Bull',pd.Series(False,index=idx)).fillna(False)&(vol_ratio>=1.0)
+    df['Channel_Breakdown_Bear']=df.get('Channel_Breakdown_Bear',pd.Series(False,index=idx)).fillna(False)&(vol_ratio>=1.0)
+    df['Triangle_Breakout_Bull']=df.get('Triangle_Breakout_Bull',pd.Series(False,index=idx)).fillna(False)&(vol_ratio>=1.0)
+    df['Triangle_Breakdown_Bear']=df.get('Triangle_Breakdown_Bear',pd.Series(False,index=idx)).fillna(False)&(vol_ratio>=1.0)
     # BB+캔들
     for k,v_ in det_bb(C,O,H,L,df['BB_Up'],df['BB_Low'],df['BB_Width'],df['KC_Upper'],df['KC_Lower']).items():df[k]=v_
     for k,v_ in det_candles(C,O,H,L,wt1,atr,V).items():df[k]=v_
@@ -219,7 +229,13 @@ def detect_all_signals(df):
     tup=(C.shift(1)>C.shift(2))&(C.shift(2)>C.shift(3));df['Three_Bar_Reversal_Sell']=tup&(C<O)&(br_>atr*0.8)&(vol_ratio>=1.5)&(wt1>20)
 
     # ═══ 쿨다운 ═══
-    PAIRED={('MACD_Cross_Buy','MACD_Cross_Sell'):12,('Bullish_Engulfing','Bearish_Engulfing'):5,('Hammer','Shooting_Star'):5,('Morning_Star','Evening_Star'):7,('DMI_Cross_Bull','DMI_Cross_Bear'):10,('Pullback_123_Bull','Pullback_123_Bear'):7,('Expansion_BO','Expansion_BD'):10,('Gilligans_Buy','Gilligans_Sell'):10,('Slingshot_Bull','Slingshot_Bear'):7,('MF_Cross_Bull','MF_Cross_Bear'):10,('Kumo_Breakout_Bull','Kumo_Breakout_Bear'):10,('StochRSI_Cross_Buy','StochRSI_Cross_Sell'):7,('ADX_Momentum_Buy','ADX_Momentum_Sell'):10,('EMA_Pullback_Buy','EMA_Pullback_Sell'):7,('SuperTrend_Buy','SuperTrend_Sell'):10,('Boomer_Buy','Boomer_Sell'):10,('Setup_180_Bull','Setup_180_Bear'):7,('VWAP_Bounce_Buy','VWAP_Reject_Sell'):7,('Momentum_Ignition_Buy','Momentum_Ignition_Sell'):10,('Volume_Dry_Breakout_Buy','Volume_Dry_Breakout_Sell'):7,('Doji_Breakout_Buy','Doji_Breakout_Sell'):5,('Three_Bar_Reversal_Buy','Three_Bar_Reversal_Sell'):5}
+    PAIRED={('MACD_Cross_Buy','MACD_Cross_Sell'):12,('Bullish_Engulfing','Bearish_Engulfing'):5,('Hammer','Shooting_Star'):5,('Morning_Star','Evening_Star'):7,('DMI_Cross_Bull','DMI_Cross_Bear'):10,('Pullback_123_Bull','Pullback_123_Bear'):7,('Expansion_BO','Expansion_BD'):10,('Gilligans_Buy','Gilligans_Sell'):10,('Slingshot_Bull','Slingshot_Bear'):7,('MF_Cross_Bull','MF_Cross_Bear'):10,('Kumo_Breakout_Bull','Kumo_Breakout_Bear'):10,('StochRSI_Cross_Buy','StochRSI_Cross_Sell'):7,('ADX_Momentum_Buy','ADX_Momentum_Sell'):10,('EMA_Pullback_Buy','EMA_Pullback_Sell'):7,('SuperTrend_Buy','SuperTrend_Sell'):10,('Boomer_Buy','Boomer_Sell'):10,('Setup_180_Bull','Setup_180_Bear'):7,('VWAP_Bounce_Buy','VWAP_Reject_Sell'):7,('Momentum_Ignition_Buy','Momentum_Ignition_Sell'):10,('Volume_Dry_Breakout_Buy','Volume_Dry_Breakout_Sell'):7,('Doji_Breakout_Buy','Doji_Breakout_Sell'):5,('Three_Bar_Reversal_Buy','Three_Bar_Reversal_Sell'):5,('Box_Support_Hold','Box_Resistance_Reject'):5,('Box_Breakout_Bull','Box_Breakdown_Bear'):7,('Channel_Support_Hold','Channel_Resistance_Reject'):5,('Channel_Breakout_Bull','Channel_Breakdown_Bear'):7,('Triangle_Breakout_Bull','Triangle_Breakdown_Bear'):7}
+    PAIRED.update({
+        ('Fib_382_Support','Fib_382_Resistance'):5,
+        ('Fib_50_Support','Fib_50_Resistance'):5,
+        ('Fib_618_Support','Fib_618_Resistance'):7,
+        ('Fib_618_Reclaim','Fib_618_Breakdown'):7,
+    })
     ph__=set()
     for (bs,ss),cd in PAIRED.items():_cd_dir(df,bs,ss,cd);ph__.add(bs);ph__.add(ss)
     for s,cd in COOLDOWN_MAP.items():
@@ -291,12 +307,24 @@ def detect_combined_scans(df,vol_ratio,hma_rising):
     df['CS_Overbought_Fade_Sell']=sob_&sc__&(n50|n_bu)&(wf_|mf_|mfs_)&trend_favor_sell
 
     # New practical combo families
-    df['CS_Trend_Continuation_Buy']=up_&(C>N('MA20'))&(F('EMA_Pullback_Buy')|F('MA20_Support')|F('MA50_Support')|F('Diag_Support_Hold')|F('Diag_Breakout_Bull'))&(wr_|mr_)&(vr>=1.0)&(N('ADX')>=18)
-    df['CS_Trend_Continuation_Sell']=dn_&(C<N('MA20'))&(F('EMA_Pullback_Sell')|F('MA20_Resistance')|F('MA50_Resistance')|F('Diag_Resistance_Reject')|F('Diag_Breakdown_Bear'))&(wf_|mf_)&(vr>=1.0)&(N('ADX')>=18)
+    df['CS_Trend_Continuation_Buy']=up_&(C>N('MA20'))&(F('EMA_Pullback_Buy')|F('MA20_Support')|F('MA50_Support')|F('Diag_Support_Hold')|F('Diag_Breakout_Bull')|F('Box_Support_Hold')|F('Channel_Support_Hold')|F('Box_Breakout_Bull')|F('Channel_Breakout_Bull')|F('Triangle_Breakout_Bull'))&(wr_|mr_)&(vr>=1.0)&(N('ADX')>=18)
+    df['CS_Trend_Continuation_Sell']=dn_&(C<N('MA20'))&(F('EMA_Pullback_Sell')|F('MA20_Resistance')|F('MA50_Resistance')|F('Diag_Resistance_Reject')|F('Diag_Breakdown_Bear')|F('Box_Resistance_Reject')|F('Channel_Resistance_Reject')|F('Box_Breakdown_Bear')|F('Channel_Breakdown_Bear')|F('Triangle_Breakdown_Bear'))&(wf_|mf_)&(vr>=1.0)&(N('ADX')>=18)
+    df['CS_Trend_Continuation_Buy']=df['CS_Trend_Continuation_Buy']|(
+        up_&(wr_|mr_)&(vr>=0.9)&(N('ADX')>=16)&(F('Fib_50_Support')|F('Fib_618_Support')|F('Fib_618_Reclaim')|F('Fib_Confluence_Buy'))
+    )
+    df['CS_Trend_Continuation_Sell']=df['CS_Trend_Continuation_Sell']|(
+        dn_&(wf_|mf_)&(vr>=0.9)&(N('ADX')>=16)&(F('Fib_50_Resistance')|F('Fib_618_Resistance')|F('Fib_618_Breakdown')|F('Fib_Confluence_Sell'))
+    )
     df['CS_Reversal_Cluster_Buy']=(dbc_>=2)&os_ctx&(bc_|llw_|F('Parabolic_Bottom_Buy')|F('Volume_Climax_Buy'))&(wr_|F('UTBot_Buy')|F('Hull_Turn_Bull'))&vok_
     df['CS_Reversal_Cluster_Sell']=(dsc_>=2)&ob_ctx&(sc__|luw_|F('Parabolic_Top_Sell')|F('Volume_Climax_Sell'))&(wf_|F('UTBot_Sell')|F('Hull_Turn_Bear'))&vok_
-    df['CS_Breakout_Confirm_Buy']=(F('Expansion_BO')|F('Kumo_Breakout_Bull')|F('BB_Upper_Break')|F('New_52W_High'))&(vr>=1.4)&(N('ADX')>=20)&(N('MACD_Hist')>N('MACD_Hist').shift(1))
-    df['CS_Breakout_Confirm_Sell']=(F('Expansion_BD')|F('Kumo_Breakout_Bear')|F('BB_Lower_Break')|F('New_52W_Low'))&(vr>=1.4)&(N('ADX')>=20)&(N('MACD_Hist')<N('MACD_Hist').shift(1))
+    df['CS_Breakout_Confirm_Buy']=(F('Expansion_BO')|F('Kumo_Breakout_Bull')|F('BB_Upper_Break')|F('New_52W_High')|F('Box_Breakout_Bull')|F('Channel_Breakout_Bull')|F('Triangle_Breakout_Bull'))&(vr>=1.4)&(N('ADX')>=20)&(N('MACD_Hist')>N('MACD_Hist').shift(1))
+    df['CS_Breakout_Confirm_Sell']=(F('Expansion_BD')|F('Kumo_Breakout_Bear')|F('BB_Lower_Break')|F('New_52W_Low')|F('Box_Breakdown_Bear')|F('Channel_Breakdown_Bear')|F('Triangle_Breakdown_Bear'))&(vr>=1.4)&(N('ADX')>=20)&(N('MACD_Hist')<N('MACD_Hist').shift(1))
+    df['CS_Breakout_Confirm_Buy']=df['CS_Breakout_Confirm_Buy']|(
+        (F('Fib_618_Reclaim')|F('Fib_Confluence_Buy'))&(vr>=1.0)&(N('ADX')>=18)&(N('MACD_Hist')>=N('MACD_Hist').shift(1))
+    )
+    df['CS_Breakout_Confirm_Sell']=df['CS_Breakout_Confirm_Sell']|(
+        (F('Fib_618_Breakdown')|F('Fib_Confluence_Sell'))&(vr>=1.0)&(N('ADX')>=18)&(N('MACD_Hist')<=N('MACD_Hist').shift(1))
+    )
 
     df['CS_Momentum_Accel_Buy']=(N('Composite_Accel',0)>JT.ACCEL_STRONG)&vok_&(C>N('MA50'))
     df['CS_Structure_Support_Buy']=n_vp&n_bl&(C>O)
@@ -356,8 +384,8 @@ def compute_10layer_scores(df, vol_ratio, hma_r_v):
     F=lambda c:df.get(c,pd.Series(False,index=idx)).fillna(False)
     os_base=((wt1<-60)|(rsi<32)|(stochk<20))&(wr_|(wt1>wt1.shift(1)))
     ob_base=((wt1>60)|(rsi>68)|(stochk>80))&(wf_|(wt1<wt1.shift(1)))
-    os_turn=F('UTBot_Buy').rolling(3,min_periods=1).max().astype(bool)|F('MACD_Cross_Buy')|F('StochRSI_Cross_Buy')|F('WT_Up')
-    ob_turn=F('UTBot_Sell').rolling(3,min_periods=1).max().astype(bool)|F('MACD_Cross_Sell')|F('StochRSI_Cross_Sell')|F('WT_Down')
+    os_turn=F('UTBot_Buy').rolling(3,min_periods=1).max().astype(bool)|F('Hull_Turn_Bull').rolling(3,min_periods=1).max().astype(bool)|F('MACD_Cross_Buy')|F('StochRSI_Cross_Buy')|F('WT_Up')
+    ob_turn=F('UTBot_Sell').rolling(3,min_periods=1).max().astype(bool)|F('Hull_Turn_Bear').rolling(3,min_periods=1).max().astype(bool)|F('MACD_Cross_Sell')|F('StochRSI_Cross_Sell')|F('WT_Down')
     os_rev=os_base&(os_turn|F('Bull_Divergence')|F('RSI_Bull_Divergence')|F('CS_Bottom_Fishing_Buy'))
     ob_rev=ob_base&(ob_turn|F('Bear_Divergence')|F('RSI_Bear_Divergence')|F('CS_Top_Fishing_Sell'))
     # BUY
@@ -367,7 +395,7 @@ def compute_10layer_scores(df, vol_ratio, hma_r_v):
     for s,p in [('MACD_Cross_Buy',2.5),('MACD_Zero_Cross_Buy',2),('StochRSI_Cross_Buy',2),('ADX_Momentum_Buy',2),('VWAP_Bounce_Buy',1.5)]:bm+=_sp(df,s,p)
     bm=bm.clip(upper=6);bm+=np.select([(N('MACD_Hist')>0)&mhr,(N('MACD_Hist')>0)&mhf,(N('MACD_Hist')<0)&mhr],[2,.5,1.5],default=0.);
     bm+=np.clip((40-N('RSI'))*0.15,0,3)+rr_.astype(float)+np.clip((25-N('StochK'))*0.15,0,2.5)+np.clip((-10-N('WT1'))*0.05,0,3)+wr_.astype(float)
-    bm+=_sp(df,'UTBot_Buy',2.5)+_sp(df,'StochSlow_Cross_Buy',1.5)+_sp(df,'Squeeze_Mom_Cross_Up',1.5)+np.where(hma_r_v&wr_.values,1,0);bm+=np.where(os_rev,1.5,0)-np.where(ob_rev,1.0,0);df['BL_Momentum']=bm.clip(-2,JT.MOMENTUM_CAP)
+    bm+=_sp(df,'UTBot_Buy',2.5)+_sp(df,'Hull_Turn_Bull',1.6)+_sp(df,'StochSlow_Cross_Buy',1.5)+_sp(df,'Squeeze_Mom_Cross_Up',1.5)+np.where(hma_r_v&wr_.values,1.2,0);bm+=np.where(os_rev,1.5,0)-np.where(ob_rev,1.0,0);df['BL_Momentum']=bm.clip(-2,JT.MOMENTUM_CAP)
     bcc=pd.Series(0.,index=idx)
     for s,p in [('Morning_Star',3.5),('Bullish_Engulfing',3),('Hammer',2.5),('Outside_Bullish',2.5),('Doji_Bullish',1),('Three_Bar_Reversal_Buy',2.5)]:bcc=np.maximum(bcc,_sp(df,s,p))
     df['BL_Candle']=pd.Series(bcc,index=idx).clip(upper=JT.CANDLE_CAP)
@@ -378,8 +406,12 @@ def compute_10layer_scores(df, vol_ratio, hma_r_v):
     bmf=pd.Series(0.,index=idx);bmf+=np.clip(-rmfi*0.2,-0.5,2)+_sp(df,'MF_Cross_Bull',2)+_sp(df,'MF_Bull_Div',2)+_sp(df,'MF_Accel_Up',1)+_sp(df,'CMF_Bull',1.5);
     bmf+=np.clip(cmf*8,-1,2);df['BL_MF']=bmf.clip(-1,JT.MF_CAP)
     bp=pd.Series(0.,index=idx);bp+=_spd(df,'Gold_Dot',4);bp+=np.where(bp==0,_spd(df,'Green_Dot_T1',2.5),0)
-    for s,p in [('Bull_Divergence',2),('Pullback_123_Bull',2.5),('Setup_180_Bull',2),('Boomer_Buy',2),('Expansion_BO',3),('Gilligans_Buy',2.5),('Lizard_Bull',2),('NonADX_123_Bull',1.5),('EMA_Pullback_Buy',2),('Momentum_Ignition_Buy',3),('SuperTrend_Buy',2),('Parabolic_Bottom_Buy',3),('Kumo_Breakout_Bull',2.5),('Reversal_New_Highs',2.5),('Slingshot_Bull',2),('Jack_In_Box_Bull',2),('Relative_Strength_Buy',2.5),('VP_VAL_Support',1.5),('VuManChu_Bull',3),('Hull_Turn_Bull',2),('Doji_Breakout_Buy',1.5),('Three_Bar_Reversal_Buy',2),('CS_Bottom_Fishing_Buy',3),('CS_Oversold_Bounce_Buy',1.5)]:bp+=_sp(df,s,p)
+    for s,p in [('Bull_Divergence',2),('Pullback_123_Bull',2.5),('Setup_180_Bull',2),('Boomer_Buy',2),('Expansion_BO',3),('Gilligans_Buy',2.5),('Lizard_Bull',2),('NonADX_123_Bull',1.5),('EMA_Pullback_Buy',2),('Momentum_Ignition_Buy',3),('SuperTrend_Buy',2),('Parabolic_Bottom_Buy',3),('Kumo_Breakout_Bull',2.5),('Reversal_New_Highs',2.5),('Slingshot_Bull',2),('Jack_In_Box_Bull',2),('Relative_Strength_Buy',2.5),('VP_VAL_Support',1.5),('VuManChu_Bull',3),('Hull_Turn_Bull',JT.TURN_SIGNAL_PATTERN_BUY),('Doji_Breakout_Buy',1.5),('Three_Bar_Reversal_Buy',2),('CS_Bottom_Fishing_Buy',3),('CS_Oversold_Bounce_Buy',1.5)]:bp+=_sp(df,s,p)
     bp+=_sp(df,'Diag_Support_Hold',1.8)+_sp(df,'Diag_Breakout_Bull',2.2)
+    bp+=_sp(df,'Box_Support_Hold',1.8)+_sp(df,'Channel_Support_Hold',2.0)
+    bp+=_sp(df,'Box_Breakout_Bull',2.4)+_sp(df,'Channel_Breakout_Bull',2.5)+_sp(df,'Triangle_Breakout_Bull',2.8)
+    bp+=_sp(df,'Fib_382_Support',1.2)+_sp(df,'Fib_50_Support',1.5)+_sp(df,'Fib_618_Support',2.0)
+    bp+=_sp(df,'Fib_618_Reclaim',2.2)+_sp(df,'Fib_Confluence_Buy',2.5)
     df['BL_Pattern']=bp.clip(upper=JT.PATTERN_CAP)
     bcs=pd.Series(0.,index=idx)
     for cn,cfg in COMBINED_SCAN_REGISTRY.items():
@@ -399,7 +431,7 @@ def compute_10layer_scores(df, vol_ratio, hma_r_v):
     for s,p in [('MACD_Cross_Sell',2.5),('MACD_Zero_Cross_Sell',2),('StochRSI_Cross_Sell',2),('ADX_Momentum_Sell',2),('VWAP_Reject_Sell',1.5)]:sm_+=_sp(df,s,p)
     sm_=sm_.clip(upper=6);sm_+=np.select([(N('MACD_Hist')<0)&mhf,(N('MACD_Hist')<0)&mhr,(N('MACD_Hist')>0)&mhf],[2,.5,1.5],default=0.);
     sm_+=np.clip((N('RSI')-60)*0.15,0,3)+rf_.astype(float)+np.clip((N('StochK')-75)*0.15,0,2.5)+np.clip((N('WT1')-10)*0.05,0,3)+wf_.astype(float)
-    sm_+=_sp(df,'UTBot_Sell',2.5)+_sp(df,'StochSlow_Cross_Sell',1.5)+_sp(df,'Squeeze_Mom_Cross_Down',1.5)+np.where(~hma_r_v&wf_.values,1,0);sm_+=np.where(ob_rev,1.5,0)-np.where(os_rev,1.0,0);df['SL_Momentum']=sm_.clip(-2,JT.MOMENTUM_CAP)
+    sm_+=_sp(df,'UTBot_Sell',2.1)+_sp(df,'Hull_Turn_Bear',0.9)+_sp(df,'StochSlow_Cross_Sell',1.5)+_sp(df,'Squeeze_Mom_Cross_Down',1.5)+np.where(~hma_r_v&wf_.values,0.8,0);sm_+=np.where(ob_rev,1.5,0)-np.where(os_rev,1.0,0);df['SL_Momentum']=sm_.clip(-2,JT.MOMENTUM_CAP)
     scc_=pd.Series(0.,index=idx)
     for s,p in [('Evening_Star',3.5),('Bearish_Engulfing',3),('Shooting_Star',2.5),('Outside_Bearish',2.5),('Doji_Bearish',1),('Three_Bar_Reversal_Sell',2.5)]:scc_=np.maximum(scc_,_sp(df,s,p))
     df['SL_Candle']=pd.Series(scc_,index=idx).clip(upper=JT.CANDLE_CAP)
@@ -410,8 +442,12 @@ def compute_10layer_scores(df, vol_ratio, hma_r_v):
     smf_=pd.Series(0.,index=idx);smf_+=np.clip(rmfi*0.2,-0.5,2)+_sp(df,'MF_Cross_Bear',2)+_sp(df,'MF_Bear_Div',2)+_sp(df,'MF_Accel_Dn',1)+_sp(df,'CMF_Bear',1.5);
     smf_+=np.clip(-cmf*8,-1,2);df['SL_MF']=smf_.clip(-1,JT.MF_CAP)
     spp_=pd.Series(0.,index=idx);spp_+=_spd(df,'Blood_Diamond',4);spp_+=np.where(spp_==0,_spd(df,'Red_Dot_T1',2.5),0)
-    for s,p in [('Bear_Divergence',2),('Pullback_123_Bear',2.5),('Setup_180_Bear',2),('Boomer_Sell',2),('Expansion_BD',3),('Gilligans_Sell',2.5),('Lizard_Bear',2),('NonADX_123_Bear',1.5),('EMA_Pullback_Sell',2),('Momentum_Ignition_Sell',3),('SuperTrend_Sell',2),('Parabolic_Top_Sell',3),('Kumo_Breakout_Bear',2.5),('Reversal_New_Lows',2.5),('Slingshot_Bear',2),('Jack_In_Box_Bear',2),('Relative_Strength_Sell',2),('VP_VAH_Resistance',1.5),('VuManChu_Bear',3),('Hull_Turn_Bear',2),('Doji_Breakout_Sell',1.5),('Three_Bar_Reversal_Sell',2),('CS_Top_Fishing_Sell',3),('CS_Overbought_Fade_Sell',1.5)]:spp_+=_sp(df,s,p)
+    for s,p in [('Bear_Divergence',2),('Pullback_123_Bear',2.5),('Setup_180_Bear',2),('Boomer_Sell',2),('Expansion_BD',3),('Gilligans_Sell',2.5),('Lizard_Bear',2),('NonADX_123_Bear',1.5),('EMA_Pullback_Sell',2),('Momentum_Ignition_Sell',3),('SuperTrend_Sell',2),('Parabolic_Top_Sell',3),('Kumo_Breakout_Bear',2.5),('Reversal_New_Lows',2.5),('Slingshot_Bear',2),('Jack_In_Box_Bear',2),('Relative_Strength_Sell',2),('VP_VAH_Resistance',1.5),('VuManChu_Bear',3),('Hull_Turn_Bear',JT.TURN_SIGNAL_PATTERN_SELL),('Doji_Breakout_Sell',1.5),('Three_Bar_Reversal_Sell',2),('CS_Top_Fishing_Sell',3),('CS_Overbought_Fade_Sell',1.5)]:spp_+=_sp(df,s,p)
     spp_+=_sp(df,'Diag_Resistance_Reject',1.8)+_sp(df,'Diag_Breakdown_Bear',2.2)
+    spp_+=_sp(df,'Box_Resistance_Reject',1.8)+_sp(df,'Channel_Resistance_Reject',2.0)
+    spp_+=_sp(df,'Box_Breakdown_Bear',2.4)+_sp(df,'Channel_Breakdown_Bear',2.5)+_sp(df,'Triangle_Breakdown_Bear',2.8)
+    spp_+=_sp(df,'Fib_382_Resistance',1.2)+_sp(df,'Fib_50_Resistance',1.5)+_sp(df,'Fib_618_Resistance',2.0)
+    spp_+=_sp(df,'Fib_618_Breakdown',2.2)+_sp(df,'Fib_Confluence_Sell',2.5)
     df['SL_Pattern']=spp_.clip(upper=JT.PATTERN_CAP)
     scs_=pd.Series(0.,index=idx)
     for cn,cfg in COMBINED_SCAN_REGISTRY.items():
@@ -613,8 +649,8 @@ def _committee_trend(df,N):
     score += np.where((wt1<-60)&(wt1>wt1.shift(1)),10,0)+np.where((wt1>60)&(wt1<wt1.shift(1)),-10,0)
     score += np.where((rsi<35)&(rsi>rsi.shift(1)),6,0)+np.where((rsi>65)&(rsi<rsi.shift(1)),-6,0)
     ma50a=ma50s-ma50s.shift(5);score+=np.where((ma50s<0)&(ma50a>0.5),8,0)+np.where((ma50s>0)&(ma50a<-0.5),-8,0)
-    score+=np.clip((N('Trend_Inflection_Buy_Score',0)-N('Trend_Inflection_Sell_Score',0))*5,-22,22)
-    score+=np.clip((N('Market_Turn_Bull_Score',0)-N('Market_Turn_Bear_Score',0))*3,-12,12)
+    score+=np.clip((N('Trend_Inflection_Buy_Score',0)*JT.TREND_INFLECTION_COMMITTEE_BUY_W)-(N('Trend_Inflection_Sell_Score',0)*JT.BEAR_TURN_SCORE_SCALE*JT.TREND_INFLECTION_COMMITTEE_SELL_W),-24,24)
+    score+=np.clip((N('Market_Turn_Bull_Score',0)*3)-(N('Market_Turn_Bear_Score',0)*JT.MARKET_TURN_BEAR_SCALE*3),-12,12)
     ns=(score/JT.TREND_NORM*100).clip(-100,100);conv=np.clip(adx_val.values*2,5,95)
     wt1=wt1.values;rsi=rsi.values;eos=np.clip((-50-wt1)/30,0,1)*.7+np.clip((30-rsi)/20,0,1)*.3;eob=np.clip((wt1-50)/30,0,1)*.7+np.clip((rsi-70)/20,0,1)*.3
     conv=conv*(1-np.maximum(eos,eob)*0.8);conv=np.clip(conv,5,95)
@@ -670,11 +706,17 @@ def _committee_structure(df,N):
     score+=F('Multiple_Ten_Bull').astype(float)*5-F('Multiple_Ten_Bear').astype(float)*5
     score+=np.where(F('Three_Weeks_Tight')&(C>O)&(pb>.55),8,0)-np.where(F('Parabolic_Rise')&(C<O),10,0)
     score+=_sp(df,'Diag_Support_Hold',7)+_sp(df,'Diag_Breakout_Bull',9)-_sp(df,'Diag_Resistance_Reject',7)-_sp(df,'Diag_Breakdown_Bear',9)
+    score+=_sp(df,'Box_Support_Hold',7)+_sp(df,'Channel_Support_Hold',8)+_sp(df,'Box_Breakout_Bull',9)+_sp(df,'Channel_Breakout_Bull',10)+_sp(df,'Triangle_Breakout_Bull',11)
+    score-=_sp(df,'Box_Resistance_Reject',7)+_sp(df,'Channel_Resistance_Reject',8)+_sp(df,'Box_Breakdown_Bear',9)+_sp(df,'Channel_Breakdown_Bear',10)+_sp(df,'Triangle_Breakdown_Bear',11)
+    score+=_sp(df,'Fib_382_Support',4)+_sp(df,'Fib_50_Support',5)+_sp(df,'Fib_618_Support',7)+_sp(df,'Fib_618_Reclaim',8)+_sp(df,'Fib_Confluence_Buy',9)
+    score-=_sp(df,'Fib_382_Resistance',4)+_sp(df,'Fib_50_Resistance',5)+_sp(df,'Fib_618_Resistance',7)+_sp(df,'Fib_618_Breakdown',8)+_sp(df,'Fib_Confluence_Sell',9)
+    score+=np.where(F('Asc_Triangle')&(C>O),5,0)-np.where(F('Desc_Triangle')&(C<O),5,0)
+    score+=np.where(F('Sym_Triangle')&(C>O),2.5,np.where(F('Sym_Triangle')&(C<O),-2.5,0))
     score+=N('Upside_Space_Score')
     score+=np.clip((N('VP_Long_RR')-JT.VP_RR_FLOOR)*12,-18,10)
     score-=np.clip((N('VP_Short_RR')-JT.VP_RR_FLOOR)*12,0,12)
     ns=(score/JT.STRUCTURE_NORM*100).clip(-100,100)
-    ne=(pb<.2).astype(float)+(pb>.8).astype(float)+(cb>0).astype(float)+(cs>0).astype(float)+(((C-val_).abs()/(C+1e-10)<.03)|((vah-C).abs()/(C+1e-10)<.03)).astype(float)+F('BB_Squeeze_End_Bull').astype(float)+F('BB_Squeeze_End_Bear').astype(float)+(N('VP_Long_RR')>JT.VP_RR_STRONG).astype(float)+(N('VP_Short_RR')>JT.VP_RR_STRONG).astype(float)+F('Gap_Down_Closed').astype(float)+F('Gap_Up_Closed').astype(float)+F('Three_Weeks_Tight').astype(float)
+    ne=(pb<.2).astype(float)+(pb>.8).astype(float)+(cb>0).astype(float)+(cs>0).astype(float)+(((C-val_).abs()/(C+1e-10)<.03)|((vah-C).abs()/(C+1e-10)<.03)).astype(float)+F('BB_Squeeze_End_Bull').astype(float)+F('BB_Squeeze_End_Bear').astype(float)+(N('VP_Long_RR')>JT.VP_RR_STRONG).astype(float)+(N('VP_Short_RR')>JT.VP_RR_STRONG).astype(float)+F('Gap_Down_Closed').astype(float)+F('Gap_Up_Closed').astype(float)+F('Three_Weeks_Tight').astype(float)+F('Box_Breakout_Bull').astype(float)+F('Box_Breakdown_Bear').astype(float)+F('Channel_Breakout_Bull').astype(float)+F('Channel_Breakdown_Bear').astype(float)+F('Triangle_Breakout_Bull').astype(float)+F('Triangle_Breakdown_Bear').astype(float)+F('Fib_618_Support').astype(float)+F('Fib_618_Breakdown').astype(float)+F('Fib_Confluence_Buy').astype(float)+F('Fib_Confluence_Sell').astype(float)
     conv=np.clip(ne.values*20+15,10,90)
     return ns,pd.Series(conv,index=idx)
 
@@ -698,11 +740,20 @@ def _committee_leading(df,N):
     score+=np.where(F('Pocket_Pivot'),10,0)+np.where(F('Pocket_Pivot')&F('Three_Weeks_Tight'),8,0)
     score+=np.where(F('Gap_Down_Closed')&(F('Pocket_Pivot')|sq_pos),10,0)-np.where(F('Gap_Up_Closed')&(F('Parabolic_Rise')|F('Volume_Surge')),12,0)
     score+=F('Multiple_Ten_Bull').astype(float)*4-F('Multiple_Ten_Bear').astype(float)*4
+    score+=np.where(F('Fib_50_Support'),5,0)+np.where(F('Fib_618_Support'),7,0)+np.where(F('Fib_618_Reclaim'),8,0)
+    score-=np.where(F('Fib_50_Resistance'),5,0)+np.where(F('Fib_618_Resistance'),7,0)+np.where(F('Fib_618_Breakdown'),8,0)
+    score+=np.where(F('Fib_Confluence_Buy'),8,0)-np.where(F('Fib_Confluence_Sell'),8,0)
+    score+=np.where(F('Box_Support_Hold'),6,0)-np.where(F('Box_Resistance_Reject'),6,0)
+    score+=np.where(F('Channel_Support_Hold'),7,0)-np.where(F('Channel_Resistance_Reject'),7,0)
+    score+=np.where(F('Box_Breakout_Bull'),8,0)-np.where(F('Box_Breakdown_Bear'),8,0)
+    score+=np.where(F('Channel_Breakout_Bull'),9,0)-np.where(F('Channel_Breakdown_Bear'),9,0)
+    score+=np.where(F('Triangle_Breakout_Bull'),10,0)-np.where(F('Triangle_Breakdown_Bear'),10,0)
+    score+=np.where(F('Triangle_Breakout_Bull')&(F('Pocket_Pivot')|sq_pos),6,0)-np.where(F('Triangle_Breakdown_Bear')&(F('Parabolic_Rise')|F('Volume_Surge')),6,0)
     score+=np.where(ut_support_buy,8,0)-np.where(ut_support_sell,8,0)
     score-=np.where(ut_overheat_buy,10,0)
     score+=np.where(ut_overheat_sell,10,0)
-    score+=np.clip((N('Trend_Inflection_Buy_Score',0)-N('Trend_Inflection_Sell_Score',0))*6,-26,26)
-    score+=np.clip((N('Market_Turn_Bull_Score',0)-N('Market_Turn_Bear_Score',0))*3.5,-14,14)
+    score+=np.clip((N('Trend_Inflection_Buy_Score',0)*JT.TREND_INFLECTION_COMMITTEE_BUY_W*1.05)-(N('Trend_Inflection_Sell_Score',0)*JT.BEAR_TURN_SCORE_SCALE*JT.TREND_INFLECTION_COMMITTEE_SELL_W),-28,28)
+    score+=np.clip((N('Market_Turn_Bull_Score',0)*3.5)-(N('Market_Turn_Bear_Score',0)*JT.MARKET_TURN_BEAR_SCALE*3.5),-14,14)
     ma_gap=N('MA20_ATR_Gap');score-=np.clip((ma_gap-1.5)*8,0,20);score+=np.clip((-ma_gap-1.5)*8,0,20)
     for cn,cfg in COMBINED_SCAN_REGISTRY.items():
         if cn not in df.columns:continue
@@ -712,8 +763,8 @@ def _committee_leading(df,N):
     score+=np.where(F('VuManChu_Bull'),20,0)-np.where(F('VuManChu_Bear'),20,0)
     score+=np.where(F('Washout_Bottom_Hard'),35,0)-np.where(F('Blowoff_Top_Hard'),45,0)
     ns=(score/JT.LEADING_NORM*100).clip(-100,100)
-    ag=(ut==1).astype(float)+hma.astype(float)+(sq>0).astype(float)+(ca>0).astype(float)+ut_support_buy.astype(float)+F('Pocket_Pivot').astype(float)+F('Gap_Down_Closed').astype(float)
-    dg=(ut==-1).astype(float)+(~hma).astype(float)+(sq<0).astype(float)+(ca<0).astype(float)+ut_support_sell.astype(float)+F('Gap_Up_Closed').astype(float)+F('Parabolic_Rise').astype(float)
+    ag=(ut==1).astype(float)+hma.astype(float)+(sq>0).astype(float)+(ca>0).astype(float)+ut_support_buy.astype(float)+F('Pocket_Pivot').astype(float)+F('Gap_Down_Closed').astype(float)+F('Box_Support_Hold').astype(float)+F('Channel_Support_Hold').astype(float)+F('Triangle_Breakout_Bull').astype(float)+F('Fib_618_Support').astype(float)+F('Fib_618_Reclaim').astype(float)+F('Fib_Confluence_Buy').astype(float)
+    dg=(ut==-1).astype(float)+(~hma).astype(float)+(sq<0).astype(float)+(ca<0).astype(float)+ut_support_sell.astype(float)+F('Gap_Up_Closed').astype(float)+F('Parabolic_Rise').astype(float)+F('Box_Resistance_Reject').astype(float)+F('Channel_Resistance_Reject').astype(float)+F('Triangle_Breakdown_Bear').astype(float)+F('Fib_618_Resistance').astype(float)+F('Fib_618_Breakdown').astype(float)+F('Fib_Confluence_Sell').astype(float)
     conv=np.clip(np.maximum(ag.values,dg.values)*20+10+np.where(F('Blowoff_Top_Hard')|F('Washout_Bottom_Hard'),12,0),10,90)
     conv=np.clip(conv+np.maximum(N('Trend_Inflection_Buy_Score',0).values,N('Trend_Inflection_Sell_Score',0).values)*4+np.maximum(N('Market_Turn_Bull_Score',0).values,N('Market_Turn_Bear_Score',0).values)*2,10,95)
     return ns,pd.Series(conv,index=idx)
@@ -778,6 +829,7 @@ def _market_filter_adjustments(
     dxy_tailwind=False,
     dxy_headwind=False,
     dxy_pressure_score=0.,
+    leader_stock_mode=False,
 ):
     buy_adj=0.;sell_adj=0.
     bias=np.clip(spy_trend_score*JT.MARKET_ENSEMBLE_SCALE,-6.,6.)
@@ -824,6 +876,12 @@ def _market_filter_adjustments(
         buy_adj+=1.25;sell_adj+=1.;bias-=1.1
     elif dxy_tailwind:
         buy_adj-=1.;bias+=0.8
+    if leader_stock_mode:
+        buy_adj-=JT.LEADER_BUY_SUPPORT
+        sell_adj-=JT.LEADER_SELL_RELIEF
+        if narrow_leadership or breadth_risk_on:
+            sell_adj-=1.0
+            bias+=0.8
     return np.clip(buy_adj,-12.,12.),np.clip(sell_adj,-12.,12.),np.clip(bias,-12.,12.)
 
 
@@ -851,6 +909,7 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
     tnx_tailwind_v=F('TNX_Tailwind').values;tnx_headwind_v=F('TNX_Headwind').values;tnx_pressure_v=N('TNX_Pressure_Score',0.).values
     dxy_tailwind_v=F('DXY_Tailwind').values;dxy_headwind_v=F('DXY_Headwind').values;dxy_pressure_v=N('DXY_Pressure_Score',0.).values
     macro_pressure_v=N('Macro_Pressure_Score',0.).values;thin_trade_v=F('Thin_Trade_Risk').values
+    rs_ratio_v=N('RS_Ratio',1.).values;qqq_rs20_v=N('QQQ_RS_20',0.).values;leader_stock_base_v=F('Leader_Stock_Mode').values;leader_stock_score_v=N('Leader_Stock_Score',0.).values
     trend_inflect_buy_score_v=N('Trend_Inflection_Buy_Score',0.).values;trend_inflect_sell_score_v=N('Trend_Inflection_Sell_Score',0.).values
     trend_inflect_bull_v=F('Trend_Inflection_Bull').values;trend_inflect_bear_v=F('Trend_Inflection_Bear').values
     market_turn_bull_score_v=N('Market_Turn_Bull_Score',0.).values;market_turn_bear_score_v=N('Market_Turn_Bear_Score',0.).values
@@ -862,34 +921,92 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
     squeeze_positive_v=F('Squeeze_Mom_Positive').values;vwap_osc_v=N('VWAP_Osc').values
     diag_support_v=F('Diag_Support_Hold').values;diag_breakout_v=F('Diag_Breakout_Bull').values
     diag_reject_v=F('Diag_Resistance_Reject').values;diag_breakdown_v=F('Diag_Breakdown_Bear').values
+    box_support_v=F('Box_Support_Hold').values;box_breakout_v=F('Box_Breakout_Bull').values
+    box_reject_v=F('Box_Resistance_Reject').values;box_breakdown_v=F('Box_Breakdown_Bear').values
+    channel_support_v=F('Channel_Support_Hold').values;channel_breakout_v=F('Channel_Breakout_Bull').values
+    channel_reject_v=F('Channel_Resistance_Reject').values;channel_breakdown_v=F('Channel_Breakdown_Bear').values
+    triangle_breakout_v=F('Triangle_Breakout_Bull').values;triangle_breakdown_v=F('Triangle_Breakdown_Bear').values
+    asc_triangle_v=F('Asc_Triangle').values;desc_triangle_v=F('Desc_Triangle').values;sym_triangle_v=F('Sym_Triangle').values
+    fib_382_support_v=F('Fib_382_Support').values;fib_50_support_v=F('Fib_50_Support').values;fib_618_support_v=F('Fib_618_Support').values
+    fib_382_resistance_v=F('Fib_382_Resistance').values;fib_50_resistance_v=F('Fib_50_Resistance').values;fib_618_resistance_v=F('Fib_618_Resistance').values
+    fib_618_breakdown_v=F('Fib_618_Breakdown').values;fib_618_reclaim_v=F('Fib_618_Reclaim').values
+    fib_confluence_buy_v=F('Fib_Confluence_Buy').values;fib_confluence_sell_v=F('Fib_Confluence_Sell').values
+    fib_ext_up_hit_v=F('Fib_Ext_1618_Up_Hit').values;fib_ext_down_hit_v=F('Fib_Ext_1618_Down_Hit').values
     ut_v=N('UTBot_Dir').values;ut_stop_gap_v=((C-N('UTBot_Stop',np.nan).values)/(N('ATR').values+1e-10))
     ut_stop_gap_v=np.where(np.isfinite(ut_stop_gap_v),ut_stop_gap_v,np.nan)
     ut_support_buy_v=np.isfinite(ut_stop_gap_v)&(ut_stop_gap_v>=0)&(ut_stop_gap_v<=JT.UTBOT_SUPPORT_MAX_ATR)&(ut_v==1)
     ut_support_sell_v=np.isfinite(ut_stop_gap_v)&(ut_stop_gap_v<=0)&((-ut_stop_gap_v)<=JT.UTBOT_SUPPORT_MAX_ATR)&(ut_v==-1)
     ut_overheat_buy_v=np.isfinite(ut_stop_gap_v)&(ut_stop_gap_v>=JT.UTBOT_OVERHEAT_ATR)
     ut_overheat_sell_v=np.isfinite(ut_stop_gap_v)&((-ut_stop_gap_v)>=JT.UTBOT_OVERHEAT_ATR)
+    hull_turn_bull_v=F('Hull_Turn_Bull').values
+    hull_turn_bear_v=F('Hull_Turn_Bear').values
+    ut_buy_v=F('UTBot_Buy').values
+    ut_sell_v=F('UTBot_Sell').values
     continuation_buy_score_v=(
         pocket_pivot_v.astype(int)
         +(three_weeks_tight_v&squeeze_positive_v).astype(int)
         +(multiple_ten_bull_v&(vwap_osc_v>0)).astype(int)
         +(gap_down_closed_v&(pocket_pivot_v|squeeze_positive_v)).astype(int)
         +(diag_support_v|diag_breakout_v).astype(int)
+        +(box_support_v|channel_support_v).astype(int)
+        +(box_breakout_v|channel_breakout_v|triangle_breakout_v).astype(int)
+        +(fib_382_support_v|fib_50_support_v).astype(int)
+        +(fib_618_support_v|fib_618_reclaim_v|fib_confluence_buy_v).astype(int)
         +ut_support_buy_v.astype(int)
     )
     continuation_sell_score_v=(
         ((gap_up_closed_v&(volume_surge_v|parabolic_rise_v))|(multiple_ten_bear_v&(vwap_osc_v<0))).astype(int)
         +(gap_up_closed_v&(vwap_osc_v<0)).astype(int)
         +(diag_reject_v|diag_breakdown_v).astype(int)
+        +(box_reject_v|channel_reject_v).astype(int)
+        +(box_breakdown_v|channel_breakdown_v|triangle_breakdown_v).astype(int)
+        +(fib_382_resistance_v|fib_50_resistance_v).astype(int)
+        +(fib_618_resistance_v|fib_618_breakdown_v|fib_confluence_sell_v).astype(int)
         +ut_support_sell_v.astype(int)
         +ut_overheat_buy_v.astype(int)
     )
-    bullish_gap_reversal_v=gap_down_closed_v&((pocket_pivot_v|three_weeks_tight_v)&(squeeze_positive_v|(vwap_osc_v>0)))
-    bearish_gap_failure_v=gap_up_closed_v&((volume_surge_v&parabolic_rise_v)|(vwap_osc_v<0)|multiple_ten_bear_v)
+    bullish_gap_reversal_v=gap_down_closed_v&((pocket_pivot_v|three_weeks_tight_v|box_support_v|channel_support_v)&(squeeze_positive_v|(vwap_osc_v>0)|triangle_breakout_v))
+    bearish_gap_failure_v=gap_up_closed_v&((volume_surge_v&parabolic_rise_v)|(vwap_osc_v<0)|multiple_ten_bear_v|box_breakdown_v|channel_breakdown_v|triangle_breakdown_v)
+    turn_alignment_buy_v=(
+        (hull_turn_bull_v&ut_buy_v)
+        | (trend_inflect_bull_v&(hull_turn_bull_v|ut_buy_v))
+        | (market_turn_bull_v&hull_turn_bull_v&(continuation_buy_score_v>=2))
+    )
+    turn_alignment_sell_v=(
+        ((hull_turn_bear_v&ut_sell_v) | (trend_inflect_bear_v&(hull_turn_bear_v|ut_sell_v)))
+        & ((continuation_sell_score_v>=2)|market_turn_bear_v)
+    )
+    leader_stock_mode_v=(
+        leader_stock_base_v
+        | (
+            (rs_ratio_v>=JT.LEADER_RS_RATIO)
+            & (qqq_rs20_v>=JT.LEADER_QQQ_RS_MIN)
+            & ((continuation_buy_score_v>=2)|pocket_pivot_v|three_weeks_tight_v|bullish_gap_reversal_v)
+            & (~thin_trade_v)
+            & ((breadth_score_v>=-0.5)|breadth_risk_on_v|narrow_leadership_v)
+        )
+    )
+    leader_stock_score_v=np.maximum(
+        leader_stock_score_v,
+        (
+            (rs_ratio_v>=JT.LEADER_RS_RATIO).astype(int)
+            +(qqq_rs20_v>=JT.LEADER_QQQ_RS_MIN).astype(int)
+            +(continuation_buy_score_v>=2).astype(int)
+            +(bullish_gap_reversal_v|pocket_pivot_v|three_weeks_tight_v).astype(int)
+            +((breadth_score_v>=0)|breadth_risk_on_v|narrow_leadership_v).astype(int)
+        )
+    )
     df['UTBot_Stop_ATR_Gap']=ut_stop_gap_v
     df['Continuation_Buy_Score']=continuation_buy_score_v
     df['Continuation_Sell_Score']=continuation_sell_score_v
     df['Bullish_Gap_Reversal']=bullish_gap_reversal_v
     df['Bearish_Gap_Failure']=bearish_gap_failure_v
+    df['Leader_Stock_Mode']=leader_stock_mode_v
+    df['Leader_Stock_Score']=leader_stock_score_v
+    df['Fib_Ext_1618_Up_Hit']=fib_ext_up_hit_v
+    df['Fib_Ext_1618_Down_Hit']=fib_ext_down_hit_v
+    df['Turn_Alignment_Buy']=turn_alignment_buy_v
+    df['Turn_Alignment_Sell']=turn_alignment_sell_v
     wt_hook_up=(wt1>np.roll(wt1,1));wt_hook_dn=(wt1<np.roll(wt1,1))
     flat=((pd.Series(C).rolling(20).max()-pd.Series(C).rolling(20).min())/(pd.Series(C).rolling(20).min()+1e-10)<.08).values
     veto_masks={
@@ -961,15 +1078,19 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
     ens=np.where(veto_masks['RRShort']&(ens<0),ens*0.82,ens)
     ens=np.where(veto_masks['HardBlowoff']&(ens>0),ens-22,ens)
     ens+=np.where(trend_inflect_buy_score_v>=JT.TREND_INFLECTION_STRONG,np.clip((trend_inflect_buy_score_v-(JT.TREND_INFLECTION_STRONG-1))*JT.TREND_INFLECTION_SIGNAL_BONUS,0,12),0)
-    ens-=np.where(trend_inflect_sell_score_v>=JT.TREND_INFLECTION_STRONG,np.clip((trend_inflect_sell_score_v-(JT.TREND_INFLECTION_STRONG-1))*JT.TREND_INFLECTION_SIGNAL_BONUS,0,12),0)
+    ens-=np.where(trend_inflect_sell_score_v>=JT.TREND_INFLECTION_STRONG,np.clip((trend_inflect_sell_score_v-(JT.TREND_INFLECTION_STRONG-1))*JT.TREND_INFLECTION_SIGNAL_BONUS*JT.BEAR_TURN_SCORE_SCALE,0,9),0)
     ens+=np.where(market_turn_bull_v,np.clip(market_turn_bull_score_v*JT.MARKET_TURN_SIGNAL_BONUS,0,10),0)
-    ens-=np.where(market_turn_bear_v,np.clip(market_turn_bear_score_v*JT.MARKET_TURN_SIGNAL_BONUS,0,10),0)
+    ens-=np.where(market_turn_bear_v,np.clip(market_turn_bear_score_v*JT.MARKET_TURN_SIGNAL_BONUS*JT.MARKET_TURN_BEAR_SCALE,0,8),0)
+    ens+=np.where(turn_alignment_buy_v,JT.TURN_ALIGNMENT_BONUS_BUY,0)
+    ens-=np.where(turn_alignment_sell_v,JT.TURN_ALIGNMENT_BONUS_SELL,0)
     ens+=np.where(continuation_buy_score_v>=2,np.clip((continuation_buy_score_v-1)*JT.CONTINUATION_SIGNAL_BONUS,0,12),0)
     ens-=np.where(continuation_sell_score_v>=2,np.clip((continuation_sell_score_v-1)*JT.CONTINUATION_SIGNAL_BONUS,0,12),0)
     ens=np.where(bearish_gap_failure_v&(ens>0),ens-JT.TRAP_SIGNAL_PENALTY,ens)
     ens=np.where(bullish_gap_reversal_v&(ens<0),ens+JT.TRAP_SIGNAL_PENALTY*0.85,ens)
     ens=np.where(ut_overheat_buy_v&(ens>0),ens-4.5,ens)
     ens=np.where(ut_overheat_sell_v&(ens<0),ens+4.5,ens)
+    ens=np.where(fib_ext_up_hit_v&(ens>0),ens-2.5,ens)
+    ens=np.where(fib_ext_down_hit_v&(ens<0),ens+2.0,ens)
     market_buy_adj=np.zeros(n);market_sell_adj=np.zeros(n);market_bias=np.zeros(n)
     for i in range(n):
         market_buy_adj[i],market_sell_adj[i],market_bias[i]=_market_filter_adjustments(
@@ -989,6 +1110,7 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
             bool(dxy_tailwind_v[i]),
             bool(dxy_headwind_v[i]),
             float(dxy_pressure_v[i]),
+            bool(leader_stock_mode_v[i]),
         )
     df['Market_Filter_Bias']=market_bias
     for ci,cm in enumerate(COMMITTEE_NAMES):
@@ -1013,18 +1135,176 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
     for i in range(n):
         e=ens[i];ba=bag[i];sl=sag[i];sy=syn[i];sr=1 if abs(sy)>=15 else 0
         asc = atr_scale[i]
+        above_ma50=bool(C[i]>ma50_v[i]) if not np.isnan(ma50_v[i]) else False
+        above_ma200=bool(C[i]>ma200_v[i]) if not np.isnan(ma200_v[i]) else False
+        leader_mode=bool(leader_stock_mode_v[i])
+        macro_risk_off_count=int(bool(spy_risk_off_v[i]))+int(bool(breadth_risk_off_v[i]))+int(bool(vix_risk_off_v[i]))+int(bool(tnx_headwind_v[i]))+int(bool(dxy_headwind_v[i]))
+        macro_risk_on_count=int(bool(spy_risk_on_v[i]))+int(bool(breadth_risk_on_v[i]))+int(bool(vix_risk_on_v[i]))+int(bool(tnx_tailwind_v[i]))+int(bool(dxy_tailwind_v[i]))
         buy_adj,sell_adj=_context_threshold_adjustments(int(ctx_v[i]))
         buy_adj+=market_buy_adj[i];sell_adj+=market_sell_adj[i]
         early_bull_turn=((trend_inflect_buy_score_v[i]>=JT.TREND_INFLECTION_STRONG) and (market_turn_bull_v[i] or continuation_buy_score_v[i]>=2 or ctx_v[i] in (CTX_BOTTOMING,CTX_EXTREME_OS)))
-        early_bear_turn=((trend_inflect_sell_score_v[i]>=JT.TREND_INFLECTION_STRONG) and (market_turn_bear_v[i] or continuation_sell_score_v[i]>=2 or ctx_v[i] in (CTX_TOPPING,CTX_EXTREME_OB)))
+        early_bear_turn=((trend_inflect_sell_score_v[i]>=JT.TREND_INFLECTION_STRONG+1) and ((market_turn_bear_v[i] and continuation_sell_score_v[i]>=2) or ctx_v[i] in (CTX_TOPPING,CTX_EXTREME_OB)))
         if early_bull_turn:
-            buy_adj-=3.5
+            buy_adj-=3.2
             sell_adj-=1.0
         if early_bear_turn:
-            buy_adj+=1.0
-            sell_adj+=3.5
+            sell_adj+=0.9
+        if leader_mode:
+            buy_adj-=0.6
+            sell_adj-=5.5
         sbt=(JT.STRONG_BUY_TH * asc)+buy_adj;bt=(JT.BUY_TH * asc)+buy_adj;wbt=(JT.WATCH_BUY_TH * asc)+buy_adj*.5
         sst=(JT.STRONG_SELL_TH * asc)+sell_adj;st=(JT.SELL_TH * asc)+sell_adj;wst=(JT.WATCH_SELL_TH * asc)+sell_adj*.5
+        if continuation_buy_score_v[i]>=2 and not ut_overheat_buy_v[i]:
+            bt-=0.8
+            wbt-=2.4
+        if ut_overheat_buy_v[i] or bearish_gap_failure_v[i]:
+            sbt+=4.0
+        buy_supportive_stack=(
+            (continuation_buy_score_v[i]>=3)
+            or bullish_gap_reversal_v[i]
+            or diag_support_v[i]
+            or diag_breakout_v[i]
+            or box_breakout_v[i]
+            or channel_breakout_v[i]
+            or triangle_breakout_v[i]
+        )
+        buy_supportive_stack_light=(
+            (continuation_buy_score_v[i]>=2)
+            or bullish_gap_reversal_v[i]
+            or diag_support_v[i]
+            or box_support_v[i]
+            or channel_support_v[i]
+            or leader_mode
+        )
+        sell_supportive_stack=(
+            (continuation_sell_score_v[i]>=3)
+            or bearish_gap_failure_v[i]
+            or diag_reject_v[i]
+            or diag_breakdown_v[i]
+            or box_breakdown_v[i]
+            or channel_breakdown_v[i]
+            or triangle_breakdown_v[i]
+            or hard_blowoff_v[i]
+        )
+        buy_confirm_count=(
+            int(continuation_buy_score_v[i]>=2)
+            +int(bullish_gap_reversal_v[i])
+            +int(diag_support_v[i] or diag_breakout_v[i] or box_support_v[i] or channel_support_v[i] or box_breakout_v[i] or channel_breakout_v[i] or triangle_breakout_v[i])
+            +int(market_turn_bull_v[i])
+            +int(trend_inflect_buy_score_v[i]>=JT.TREND_INFLECTION_STRONG)
+            +int(vr_v[i]>=JT.STRONG_BUY_MIN_VOL_RATIO)
+            +int(above_ma50)
+            +int(above_ma200)
+        )
+        sell_confirm_count=(
+            int(continuation_sell_score_v[i]>=2)
+            +int(bearish_gap_failure_v[i])
+            +int(diag_reject_v[i] or diag_breakdown_v[i] or box_reject_v[i] or channel_reject_v[i] or box_breakdown_v[i] or channel_breakdown_v[i] or triangle_breakdown_v[i])
+            +int(market_turn_bear_v[i])
+            +int(trend_inflect_sell_score_v[i]>=JT.TREND_INFLECTION_STRONG+1)
+            +int(macro_risk_off_count>=3)
+            +int(breadth_risk_off_v[i])
+            +int(not above_ma50)
+            +int(not above_ma200)
+        )
+        strong_buy_ready=(
+            (continuation_buy_score_v[i]>=JT.STRONG_BUY_CONTINUATION_MIN)
+            and (buy_confirm_count>=5)
+            and (bullish_gap_reversal_v[i] or diag_breakout_v[i] or box_breakout_v[i] or channel_breakout_v[i] or triangle_breakout_v[i] or pocket_pivot_v[i] or three_weeks_tight_v[i] or fib_confluence_buy_v[i])
+            and (not ut_overheat_buy_v[i])
+            and (not bearish_gap_failure_v[i])
+            and (not thin_trade_v[i])
+            and (vr_v[i]>=JT.STRONG_BUY_MIN_VOL_RATIO)
+            and (long_rr_v[i]>=0.95)
+            and above_ma50
+            and (above_ma200 or leader_mode or bullish_gap_reversal_v[i])
+            and (macro_risk_off_count<4)
+        )
+        buy_ready=(
+            (buy_confirm_count>=3)
+            and (
+                (continuation_buy_score_v[i]>=2)
+                or buy_supportive_stack_light
+                or bullish_gap_reversal_v[i]
+                or market_turn_bull_v[i]
+                or trend_inflect_buy_score_v[i]>=JT.TREND_INFLECTION_STRONG
+            )
+        )
+        watch_buy_ready=(
+            (continuation_buy_score_v[i]>=2)
+            or bullish_gap_reversal_v[i]
+            or buy_supportive_stack_light
+            or early_bull_turn
+            or ut_support_buy_v[i]
+        )
+        sell_breakdown_stack=(
+            bearish_gap_failure_v[i]
+            or diag_breakdown_v[i]
+            or box_breakdown_v[i]
+            or channel_breakdown_v[i]
+            or triangle_breakdown_v[i]
+            or fib_618_breakdown_v[i]
+            or fib_confluence_sell_v[i]
+        )
+        strong_sell_ready=(
+            (sell_confirm_count>=JT.STRONG_SELL_CONFIRM_MIN)
+            and (
+                hard_blowoff_v[i]
+                or (
+                    sell_supportive_stack
+                    and (continuation_sell_score_v[i]>=4)
+                    and sell_breakdown_stack
+                    and ((macro_risk_off_count>=3) or breadth_risk_off_v[i] or ctx_v[i] in (CTX_STRONG_DN,CTX_DISTRIBUTION,CTX_TOPPING,CTX_EXTREME_OB))
+                    and (not above_ma50)
+                    and (not above_ma200)
+                )
+            )
+        )
+        sell_ready=(
+            (sell_confirm_count>=JT.SELL_CONFIRM_MIN)
+            and (
+                hard_blowoff_v[i]
+                or (
+                    (continuation_sell_score_v[i]>=3)
+                    and (sell_breakdown_stack or diag_reject_v[i] or box_reject_v[i] or channel_reject_v[i])
+                    and ((macro_risk_off_count>=2) or breadth_risk_off_v[i] or (not above_ma50) or (not above_ma200))
+                )
+            )
+        )
+        watch_sell_ready=(
+            hard_blowoff_v[i]
+            or (
+                (sell_confirm_count>=JT.WATCH_SELL_CONFIRM_MIN)
+                and (
+                    continuation_sell_score_v[i]>=2
+                    or bearish_gap_failure_v[i]
+                    or diag_reject_v[i]
+                    or box_reject_v[i]
+                    or channel_reject_v[i]
+                    or market_turn_bear_v[i]
+                )
+            )
+        )
+        if leader_mode:
+            strong_sell_ready=strong_sell_ready and (
+                hard_blowoff_v[i]
+                or (
+                    ((macro_risk_off_count>=3) or breadth_risk_off_v[i])
+                    and bearish_gap_failure_v[i]
+                    and (diag_breakdown_v[i] or box_breakdown_v[i] or channel_breakdown_v[i] or triangle_breakdown_v[i] or continuation_sell_score_v[i]>=4)
+                    and (not above_ma50)
+                    and (not above_ma200)
+                )
+            )
+            sell_ready=sell_ready and (
+                hard_blowoff_v[i]
+                or (
+                    ((macro_risk_off_count>=3) or breadth_risk_off_v[i])
+                    and (bearish_gap_failure_v[i] or diag_breakdown_v[i] or box_breakdown_v[i] or channel_breakdown_v[i] or triangle_breakdown_v[i] or continuation_sell_score_v[i]>=4)
+                )
+            )
+            if not (macro_risk_off_count>=2 or breadth_risk_off_v[i] or hard_blowoff_v[i] or bearish_gap_failure_v[i]):
+                watch_sell_ready=False
         high_conflict=(
             (buy_total_arr[i]>=JT.HIGH_CONFLICT_TOTAL)
             and (sell_total_arr[i]>=JT.HIGH_CONFLICT_TOTAL)
@@ -1035,30 +1315,41 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
         )
         if high_conflict:
             j[i]='MIXED'
-        elif e>=sbt and ba>=(JT.STRONG_MIN_AGREE-sr):j[i]='STRONG_BUY'
-        elif e>=bt and ba>=(JT.BUY_MIN_AGREE-sr):j[i]='BUY'
-        elif e>=wbt and ba>=max(JT.WATCH_MIN_AGREE-sr,1):j[i]='WATCH_BUY'
-        elif e<=sst and sl>=(JT.STRONG_MIN_AGREE-sr):j[i]='STRONG_SELL'
-        elif e<=st and sl>=(JT.BUY_MIN_AGREE-sr):j[i]='SELL'
-        elif e<=wst and sl>=max(JT.WATCH_MIN_AGREE-sr,1):j[i]='WATCH_SELL'
-        elif (ctx_v[i] in (CTX_EXTREME_OS,CTX_BOTTOMING)) and ba>=2 and (sy>6 or pred[i]>5) and e>=(wbt-6):j[i]='BUY'
-        elif (ctx_v[i] in (CTX_EXTREME_OB,CTX_TOPPING)) and sl>=2 and (sy<-6 or pred[i]<-5) and e<=(wst+6):j[i]='SELL'
+        elif e>=sbt and ba>=(JT.STRONG_MIN_AGREE-sr) and strong_buy_ready:j[i]='STRONG_BUY'
+        elif e>=bt and ba>=(JT.BUY_MIN_AGREE-sr):
+            j[i]='BUY' if buy_ready else ('WATCH_BUY' if watch_buy_ready else 'NEUTRAL')
+        elif e>=wbt and ba>=max(JT.WATCH_MIN_AGREE-sr,1) and watch_buy_ready:j[i]='WATCH_BUY'
+        elif e<=sst and sl>=(JT.STRONG_MIN_AGREE-sr) and strong_sell_ready:j[i]='STRONG_SELL'
+        elif e<=st and sl>=(JT.BUY_MIN_AGREE-sr):
+            j[i]='SELL' if sell_ready else ('WATCH_SELL' if watch_sell_ready else 'NEUTRAL')
+        elif e<=wst and sl>=max(JT.WATCH_MIN_AGREE-sr,1) and watch_sell_ready:j[i]='WATCH_SELL'
+        elif (ctx_v[i] in (CTX_EXTREME_OS,CTX_BOTTOMING)) and ba>=2 and (sy>6 or pred[i]>5) and e>=(wbt-6):
+            j[i]='BUY' if buy_ready else 'WATCH_BUY'
+        elif (ctx_v[i] in (CTX_EXTREME_OB,CTX_TOPPING)) and sl>=2 and (sy<-6 or pred[i]<-5) and e<=(wst+6) and watch_sell_ready:
+            j[i]='WATCH_SELL'
         elif ba>=3 and sl>=3:j[i]='MIXED'
         pre_veto_j[i]=j[i]
         notes=[];signal_notes=[]
         if high_conflict:notes.append("buy/sell pressure conflict stayed elevated")
-        macro_risk_off_count=int(bool(spy_risk_off_v[i]))+int(bool(breadth_risk_off_v[i]))+int(bool(vix_risk_off_v[i]))+int(bool(tnx_headwind_v[i]))+int(bool(dxy_headwind_v[i]))
-        macro_risk_on_count=int(bool(spy_risk_on_v[i]))+int(bool(breadth_risk_on_v[i]))+int(bool(vix_risk_on_v[i]))+int(bool(tnx_tailwind_v[i]))+int(bool(dxy_tailwind_v[i]))
         macro_risk_off_count_arr[i]=macro_risk_off_count;macro_risk_on_count_arr[i]=macro_risk_on_count
         if macro_risk_off_count>=3:notes.append("macro backdrop stayed risk-off")
         elif macro_risk_on_count>=2 and j[i] in sell_labels:notes.append("macro backdrop stayed risk-on")
         if macro_pressure_v[i]>=3.2:notes.append("macro pressure magnitude stayed elevated")
         elif macro_pressure_v[i]<=-2.5 and j[i] in sell_labels:notes.append("macro pressure eased materially")
         if market_turn_bull_v[i]:signal_notes.append("market turn stack improved early")
-        if market_turn_bear_v[i]:notes.append("market turn stack turned defensive early")
+        if market_turn_bear_v[i]:
+            if sell_supportive_stack or macro_risk_off_count>=3:
+                notes.append("market turn stack turned defensive early")
+            else:
+                signal_notes.append("market turn stack turned cautious")
         if trend_inflect_bull_v[i]:signal_notes.append("early trend-turn stack fired")
-        if trend_inflect_bear_v[i]:notes.append("early trend-turn stack rolled over")
+        if trend_inflect_bear_v[i]:
+            if sell_supportive_stack or macro_risk_off_count>=3:
+                notes.append("early trend-turn stack rolled over")
+            else:
+                signal_notes.append("early trend-turn stack softened")
         if narrow_leadership_v[i]:notes.append("index leadership stayed narrow")
+        if leader_mode:signal_notes.append("leader / theme-stock mode stayed active")
         if pv_bear_v[i]:notes.append("price up but OBV/CMF/volume diverged")
         elif pv_bull_v[i]:notes.append("price down but money flow improved")
         if low_vol_v[i] and price_slope_v[i]>0:notes.append("volume below 0.7x average")
@@ -1070,11 +1361,24 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
         if continuation_sell_score_v[i]>=2:notes.append("exhaustion / failure stack stayed aligned")
         if bullish_gap_reversal_v[i]:signal_notes.append("gap-down reversal recovered quickly")
         if bearish_gap_failure_v[i]:notes.append("gap-up failed to hold and looked trap-prone")
+        if box_breakout_v[i]:signal_notes.append("box breakout confirmed with follow-through")
+        elif box_support_v[i]:signal_notes.append("box support held on pullback")
+        if channel_breakout_v[i]:signal_notes.append("rising channel pushed to a fresh breakout")
+        elif channel_support_v[i]:signal_notes.append("channel support held and trend stayed intact")
+        if triangle_breakout_v[i]:signal_notes.append("triangle compression resolved to the upside")
+        if box_breakdown_v[i] or channel_breakdown_v[i] or triangle_breakdown_v[i]:
+            notes.append("structure breakdown confirmed under support")
+        elif box_reject_v[i] or channel_reject_v[i]:
+            notes.append("overhead structure rejected the bounce")
+        if asc_triangle_v[i] and not triangle_breakout_v[i]:
+            signal_notes.append("ascending triangle stayed constructive")
+        elif desc_triangle_v[i] and not triangle_breakdown_v[i]:
+            notes.append("descending triangle kept pressure overhead")
+        elif sym_triangle_v[i] and not triangle_breakout_v[i] and not triangle_breakdown_v[i]:
+            notes.append("symmetrical triangle still needed resolution")
         if ut_overheat_buy_v[i] and j[i] in buy_labels:notes.append("price stretched far above UT stop")
         severe_buy=(money_eff[i]<=JT.MONEY_VETO_NEUTRAL) or (cmf[i]<0 and obv_slope_v[i]<0 and long_rr_v[i]<0.9)
         severe_sell=(money_eff[i]>=abs(JT.MONEY_VETO_NEUTRAL)) or (cmf[i]>0 and obv_slope_v[i]>0 and short_rr_v[i]<0.9)
-        above_ma50=bool(C[i]>ma50_v[i]) if not np.isnan(ma50_v[i]) else False
-        above_ma200=bool(C[i]>ma200_v[i]) if not np.isnan(ma200_v[i]) else False
         countertrend_buy_risk=(
             ctx_v[i] in (CTX_STRONG_DN,CTX_DISTRIBUTION)
             and (not above_ma50)
@@ -1090,100 +1394,94 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
             and (money_eff[i]>0 or short_rr_v[i]<1.15)
             and not hard_blowoff_v[i]
         )
-        market_sell_headwind=(macro_risk_on_count>=2) and not hard_blowoff_v[i] and ((money_eff[i]>-5) or (short_rr_v[i]<1.35))
-        buy_supportive_stack=(
-            (continuation_buy_score_v[i]>=3)
-            or bullish_gap_reversal_v[i]
-            or diag_support_v[i]
-            or diag_breakout_v[i]
+        market_sell_headwind=((macro_risk_on_count>=2) or leader_mode) and not hard_blowoff_v[i] and ((money_eff[i]>-5) or (short_rr_v[i]<1.45) or (continuation_buy_score_v[i]>=2))
+        market_buy_headwind=(
+            (
+                (macro_risk_off_count>=5)
+                or ((macro_risk_off_count>=4) and (macro_pressure_v[i]>=4.4))
+                or ((macro_risk_off_count>=3) and breadth_risk_off_v[i] and market_turn_bear_v[i] and (continuation_sell_score_v[i]>=3))
+            )
+            and not washout_bottom_v[i]
+            and (not leader_mode)
+            and ((money_eff[i]<0) or (long_rr_v[i]<0.95))
         )
-        buy_supportive_stack_light=(
-            (continuation_buy_score_v[i]>=2)
-            or bullish_gap_reversal_v[i]
-            or diag_support_v[i]
-        )
-        sell_supportive_stack=(
-            (continuation_sell_score_v[i]>=3)
-            or bearish_gap_failure_v[i]
-            or diag_reject_v[i]
-            or diag_breakdown_v[i]
-            or hard_blowoff_v[i]
-        )
-        market_buy_headwind=((macro_risk_off_count>=4) or ((macro_risk_off_count>=3) and (macro_pressure_v[i]>=3.0))) and not washout_bottom_v[i] and ((money_eff[i]<3) or (long_rr_v[i]<1.2))
         if hard_blowoff_v[i]:
             if j[i] in buy_labels or j[i] in ('NEUTRAL','MIXED'):
                 new_label='STRONG_SELL' if (sl>=max(JT.WATCH_MIN_AGREE-sr,1) and e<=st) else 'SELL'
                 if new_label!=j[i]:downgrade_count[i]+=1
                 j[i]=new_label
         elif j[i] in buy_labels:
-            if bearish_gap_failure_v[i]:
+            if bearish_gap_failure_v[i] and (
+                (j[i]=='STRONG_BUY')
+                or ((j[i]=='BUY') and (not leader_mode) and (macro_risk_off_count>=3) and not buy_supportive_stack)
+            ):
                 prev_label=j[i]
-                j[i]=_downgrade_buy(j[i],severe=bool(parabolic_rise_v[i] and volume_surge_v[i]))
+                j[i]=_downgrade_buy(j[i],severe=bool((parabolic_rise_v[i] and volume_surge_v[i]) and not leader_mode))
                 downgrade_count[i]+=int(j[i]!=prev_label)
-            if j[i] in buy_labels and thin_trade_v[i] and not buy_supportive_stack_light:
+            if j[i]=='STRONG_BUY' and thin_trade_v[i] and (not buy_supportive_stack_light) and (long_rr_v[i]<1.0):
                 prev_label=j[i]
                 j[i]=_downgrade_buy(j[i],severe=False)
                 downgrade_count[i]+=int(j[i]!=prev_label)
-            if j[i] in buy_labels and ut_overheat_buy_v[i] and (continuation_buy_score_v[i]<2) and not bullish_gap_reversal_v[i]:
+            if j[i]=='STRONG_BUY' and ut_overheat_buy_v[i] and (continuation_buy_score_v[i]<JT.STRONG_BUY_CONTINUATION_MIN) and not bullish_gap_reversal_v[i]:
                 prev_label=j[i]
                 j[i]=_downgrade_buy(j[i],severe=False)
                 downgrade_count[i]+=int(j[i]!=prev_label)
             if countertrend_buy_risk and not buy_supportive_stack:
-                prev_label=j[i]
-                j[i]=_downgrade_buy(j[i],severe=False)
-                downgrade_count[i]+=int(j[i]!=prev_label)
-                if j[i] in buy_labels and (severe_buy or long_rr_v[i]<JT.VP_RR_FLOOR) and not buy_supportive_stack_light:
+                if j[i]=='STRONG_BUY':
                     prev_label=j[i]
-                    j[i]=_downgrade_buy(j[i],severe=True)
+                    j[i]=_downgrade_buy(j[i],severe=False)
                     downgrade_count[i]+=int(j[i]!=prev_label)
+                if j[i] in buy_labels and (macro_risk_off_count>=4) and (severe_buy or long_rr_v[i]<0.85) and not buy_supportive_stack_light:
+                    if not leader_mode:
+                        prev_label=j[i]
+                        j[i]=_downgrade_buy(j[i],severe=True)
+                        downgrade_count[i]+=int(j[i]!=prev_label)
             if j[i] in buy_labels and market_buy_headwind and not buy_supportive_stack:
+                if j[i]=='STRONG_BUY':
+                    prev_label=j[i]
+                    j[i]=_downgrade_buy(j[i],severe=(spy_trend_score_v[i]<=JT.MARKET_SCORE_TREND_OFF-1 and long_rr_v[i]<JT.VP_RR_FLOOR))
+                    downgrade_count[i]+=int(j[i]!=prev_label)
+            if pv_bear_v[i] and (j[i]=='STRONG_BUY' or (severe_buy and j[i]=='BUY' and not leader_mode and not buy_supportive_stack_light and macro_risk_off_count>=3)):
                 prev_label=j[i]
-                j[i]=_downgrade_buy(j[i],severe=(spy_trend_score_v[i]<=JT.MARKET_SCORE_TREND_OFF-1 and long_rr_v[i]<JT.VP_RR_FLOOR))
-                downgrade_count[i]+=int(j[i]!=prev_label)
-            if pv_bear_v[i]:
-                prev_label=j[i]
-                j[i]=_downgrade_buy(j[i],severe=(j[i]=='STRONG_BUY' and severe_buy))
+                j[i]=_downgrade_buy(j[i],severe=(j[i]=='STRONG_BUY' and severe_buy and not leader_mode))
                 downgrade_count[i]+=int(j[i]!=prev_label)
             if long_rr_v[i]<JT.VP_RR_FLOOR:
-                prev_label=j[i]
-                j[i]=_downgrade_buy(j[i],severe=(long_rr_v[i]<0.75 and money_eff[i]<0))
-                downgrade_count[i]+=int(j[i]!=prev_label)
-            if low_vol_v[i] and price_slope_v[i]>0 and not buy_supportive_stack_light:
-                prev_label=j[i]
-                j[i]=_downgrade_buy(j[i],severe=False)
-                downgrade_count[i]+=int(j[i]!=prev_label)
+                if (j[i]=='STRONG_BUY') or ((long_rr_v[i]<0.70) and not buy_supportive_stack_light and not leader_mode and macro_risk_off_count>=3):
+                    prev_label=j[i]
+                    j[i]=_downgrade_buy(j[i],severe=(long_rr_v[i]<0.75 and money_eff[i]<0 and not leader_mode))
+                    downgrade_count[i]+=int(j[i]!=prev_label)
         elif j[i] in sell_labels:
             if bullish_gap_reversal_v[i]:
                 prev_label=j[i]
-                j[i]=_downgrade_sell(j[i],severe=bool(continuation_buy_score_v[i]>=2 and (diag_support_v[i] or macro_risk_on_count>=2)))
+                j[i]=_downgrade_sell(j[i],severe=bool((continuation_buy_score_v[i]>=2 and (diag_support_v[i] or macro_risk_on_count>=2)) or leader_mode))
                 downgrade_count[i]+=int(j[i]!=prev_label)
-            if j[i] in sell_labels and thin_trade_v[i] and not sell_supportive_stack:
+            if j[i]=='STRONG_SELL' and thin_trade_v[i] and not sell_supportive_stack:
                 prev_label=j[i]
                 j[i]=_downgrade_sell(j[i],severe=False)
                 downgrade_count[i]+=int(j[i]!=prev_label)
             if j[i] in sell_labels and continuation_buy_score_v[i]>=2 and (macro_risk_on_count>=1 or breadth_risk_on_v[i] or diag_support_v[i]) and not bearish_gap_failure_v[i]:
                 prev_label=j[i]
-                j[i]=_downgrade_sell(j[i],severe=False)
+                j[i]=_downgrade_sell(j[i],severe=bool(leader_mode or continuation_buy_score_v[i]>=3))
                 downgrade_count[i]+=int(j[i]!=prev_label)
             if countertrend_sell_risk and not sell_supportive_stack:
                 prev_label=j[i]
-                j[i]=_downgrade_sell(j[i],severe=False)
+                j[i]=_downgrade_sell(j[i],severe=bool(leader_mode or macro_risk_on_count>=3))
                 downgrade_count[i]+=int(j[i]!=prev_label)
                 if j[i] in sell_labels and (severe_sell or short_rr_v[i]<JT.VP_RR_FLOOR) and not sell_supportive_stack:
                     prev_label=j[i]
-                    j[i]=_downgrade_sell(j[i],severe=False)
+                    j[i]=_downgrade_sell(j[i],severe=bool(leader_mode or continuation_buy_score_v[i]>=2))
                     downgrade_count[i]+=int(j[i]!=prev_label)
             if j[i] in sell_labels and market_sell_headwind and not sell_supportive_stack:
                 prev_label=j[i]
-                j[i]=_downgrade_sell(j[i],severe=(spy_trend_score_v[i]>=JT.MARKET_SCORE_TREND_ON+1 and short_rr_v[i]<JT.VP_RR_FLOOR))
+                j[i]=_downgrade_sell(j[i],severe=(leader_mode or (spy_trend_score_v[i]>=JT.MARKET_SCORE_TREND_ON+1 and short_rr_v[i]<JT.VP_RR_FLOOR)))
                 downgrade_count[i]+=int(j[i]!=prev_label)
             if pv_bull_v[i]:
                 prev_label=j[i]
-                j[i]=_downgrade_sell(j[i],severe=(j[i]=='STRONG_SELL' and severe_sell))
+                j[i]=_downgrade_sell(j[i],severe=(leader_mode or (j[i]=='STRONG_SELL' and severe_sell)))
                 downgrade_count[i]+=int(j[i]!=prev_label)
             if short_rr_v[i]<JT.VP_RR_FLOOR:
                 prev_label=j[i]
-                j[i]=_downgrade_sell(j[i],severe=(short_rr_v[i]<0.75 and money_eff[i]>0))
+                j[i]=_downgrade_sell(j[i],severe=(leader_mode or (short_rr_v[i]<0.75 and money_eff[i]>0)))
                 downgrade_count[i]+=int(j[i]!=prev_label)
         if i>0:
             prev_final=j[i-1];prev_buy=prev_final in buy_labels;prev_sell=prev_final in sell_labels;cur_buy=j[i] in buy_labels;cur_sell=j[i] in sell_labels
@@ -1193,12 +1491,14 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
                     or (sl>=JT.STRONG_MIN_AGREE)
                     or (ctx_v[i] in (CTX_STRONG_DN,CTX_DISTRIBUTION,CTX_EXTREME_OB,CTX_TOPPING))
                     or (macro_risk_off_count>=JT.FLIP_GUARD_MACRO_CONFIRM)
-                    or market_turn_bear_v[i]
-                    or (trend_inflect_sell_score_v[i]>=JT.TREND_INFLECTION_STRONG)
+                    or (market_turn_bear_v[i] and sell_supportive_stack)
+                    or ((trend_inflect_sell_score_v[i]>=JT.TREND_INFLECTION_STRONG+1) and sell_supportive_stack)
                     or hard_blowoff_v[i]
                     or (sy<=-JT.FLIP_GUARD_SYNERGY)
                     or (pred[i]<=-JT.FLIP_GUARD_PREDICTION)
                 )
+                if leader_mode and not hard_blowoff_v[i] and not bearish_gap_failure_v[i] and continuation_sell_score_v[i]<3:
+                    strong_sell_flip=False
                 if not strong_sell_flip:
                     prev_label=j[i]
                     j[i]='MIXED'
@@ -1254,6 +1554,14 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
         ma200a=bool(C[i]>ma200_v[i]) if not np.isnan(ma200_v[i]) else False
         mhu=bool(mhv[i]>mhpv[i]) if i>0 else False
         r,d,a=_gen_reason(j[i],e,int(ctx_v[i]),vstr,sy,pred[i],ba,sl,wt1_v[i],rsi_v[i],mfi_v[i],cmf[i],obr,adx_v[i],vol_ratio.values[i],ma50a,ma200a,mhu,stoch_v[i],bool(hma_r_v[i]) if i<len(hma_r_v) else False,int(ut_v[i]),bool(sq_v[i]),cms)
+        if j[i]=='WATCH_BUY' and continuation_buy_score_v[i]>=2:
+            a="CONTINUATION WATCH / pullback-entry candidate"
+        elif j[i]=='WATCH_SELL':
+            a="RISK WARNING / trim or tighten stops"
+            if leader_mode and not hard_blowoff_v[i]:
+                r="Leader stock looked extended, but breakdown confirmation was incomplete"
+        elif j[i]=='SELL' and leader_mode and not hard_blowoff_v[i]:
+            a="REDUCE / wait for deeper breakdown confirmation"
         note_txt=contrast_notes[-1]
         if hard_blowoff_v[i]:
             r="Blow-off top detected - take profit / sell bias"

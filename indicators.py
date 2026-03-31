@@ -99,6 +99,117 @@ def compute_trendline_features(c,h,l,atr,window=20):
         'breakdown_bear':breakdown_bear.fillna(False),
     }
 
+def _rolling_line_fit(s,window,min_periods=None):
+    idx=s.index
+    x=pd.Series(np.arange(len(s),dtype=float),index=idx)
+    min_periods=min_periods or max(10,window//2)
+    x_mean=x.rolling(window,min_periods=min_periods).mean()
+    y_mean=s.rolling(window,min_periods=min_periods).mean()
+    cov=(x*s).rolling(window,min_periods=min_periods).mean()-(x_mean*y_mean)
+    var=(x*x).rolling(window,min_periods=min_periods).mean()-(x_mean*x_mean)
+    slope=cov/(var+1e-10)
+    fit=(y_mean-(slope*x_mean))+(slope*x)
+    return slope,fit
+
+def compute_structure_pattern_features(c,h,l,atr,window=24):
+    min_periods=max(12,window//2)
+    hs,hfit=_rolling_line_fit(h,window,min_periods)
+    ls,lfit=_rolling_line_fit(l,window,min_periods)
+    hs_pct=(hs*window/(c.abs()+1e-10))*100
+    ls_pct=(ls*window/(c.abs()+1e-10))*100
+    width=(hfit-lfit).clip(lower=0)
+    width_ratio=width/(c.abs()+1e-10)
+    width_mean=width.rolling(max(6,window//3),min_periods=3).mean()
+    width_contract=(width<=width_mean*JT.TRIANGLE_COMPRESSION_RATIO)|(width<=width.shift(max(4,window//4))*JT.TRIANGLE_COMPRESSION_RATIO)
+    valid=hfit.notna()&lfit.notna()&atr.notna()&(width>0)
+
+    flat_hi=hs_pct.abs()<=JT.TRIANGLE_FLAT_SLOPE_PCT
+    flat_lo=ls_pct.abs()<=JT.TRIANGLE_FLAT_SLOPE_PCT
+    parallel=(hs_pct-ls_pct).abs()<=JT.CHANNEL_PARALLEL_TOL_PCT
+
+    box_base=valid&flat_hi&flat_lo&(width_ratio<=JT.BOX_MAX_RANGE_PCT)
+    channel_up=valid&(hs_pct>=JT.CHANNEL_MIN_SLOPE_PCT)&(ls_pct>=JT.CHANNEL_MIN_SLOPE_PCT)&parallel
+    channel_down=valid&(hs_pct<=-JT.CHANNEL_MIN_SLOPE_PCT)&(ls_pct<=-JT.CHANNEL_MIN_SLOPE_PCT)&parallel
+    asc_triangle=valid&flat_hi&(ls_pct>=JT.TRIANGLE_MIN_SLOPE_PCT)&width_contract
+    desc_triangle=valid&flat_lo&(hs_pct<=-JT.TRIANGLE_MIN_SLOPE_PCT)&width_contract
+    sym_triangle=valid&(hs_pct<=-JT.TRIANGLE_MIN_SLOPE_PCT)&(ls_pct>=JT.TRIANGLE_MIN_SLOPE_PCT)&width_contract
+
+    box_support_hold=box_base&(l<=lfit+(atr*JT.BOX_TOUCH_ATR))&(c>=lfit)&(c>=c.shift(1))
+    box_resistance_reject=box_base&(h>=hfit-(atr*JT.BOX_TOUCH_ATR))&(c<=hfit)&(c<=c.shift(1))
+    box_breakout_bull=box_base.shift(1).fillna(False)&(c>hfit.shift(1)+(atr*JT.BOX_BREAK_ATR))&(c.shift(1)<=hfit.shift(1)+(atr*0.15))
+    box_breakdown_bear=box_base.shift(1).fillna(False)&(c<lfit.shift(1)-(atr*JT.BOX_BREAK_ATR))&(c.shift(1)>=lfit.shift(1)-(atr*0.15))
+
+    channel_support_hold=channel_up&(l<=lfit+(atr*JT.CHANNEL_TOUCH_ATR))&(c>=lfit)&(c>=c.shift(1))
+    channel_resistance_reject=channel_down&(h>=hfit-(atr*JT.CHANNEL_TOUCH_ATR))&(c<=hfit)&(c<=c.shift(1))
+    channel_breakout_bull=(channel_up|box_base).shift(1).fillna(False)&(c>hfit.shift(1)+(atr*JT.CHANNEL_BREAK_ATR))&(c.shift(1)<=hfit.shift(1)+(atr*0.20))
+    channel_breakdown_bear=(channel_down|box_base).shift(1).fillna(False)&(c<lfit.shift(1)-(atr*JT.CHANNEL_BREAK_ATR))&(c.shift(1)>=lfit.shift(1)-(atr*0.20))
+
+    triangle_breakout_bull=(asc_triangle|sym_triangle).shift(1).fillna(False)&(c>hfit.shift(1)+(atr*JT.TRIANGLE_BREAK_ATR))&(c.shift(1)<=hfit.shift(1)+(atr*0.20))
+    triangle_breakdown_bear=(desc_triangle|sym_triangle).shift(1).fillna(False)&(c<lfit.shift(1)-(atr*JT.TRIANGLE_BREAK_ATR))&(c.shift(1)>=lfit.shift(1)-(atr*0.20))
+
+    return {
+        'box_base':box_base.fillna(False),
+        'box_support_hold':box_support_hold.fillna(False),
+        'box_resistance_reject':box_resistance_reject.fillna(False),
+        'box_breakout_bull':box_breakout_bull.fillna(False),
+        'box_breakdown_bear':box_breakdown_bear.fillna(False),
+        'channel_up':channel_up.fillna(False),
+        'channel_down':channel_down.fillna(False),
+        'channel_support_hold':channel_support_hold.fillna(False),
+        'channel_resistance_reject':channel_resistance_reject.fillna(False),
+        'channel_breakout_bull':channel_breakout_bull.fillna(False),
+        'channel_breakdown_bear':channel_breakdown_bear.fillna(False),
+        'asc_triangle':asc_triangle.fillna(False),
+        'desc_triangle':desc_triangle.fillna(False),
+        'sym_triangle':sym_triangle.fillna(False),
+        'triangle_breakout_bull':triangle_breakout_bull.fillna(False),
+        'triangle_breakdown_bear':triangle_breakdown_bear.fillna(False),
+    }
+
+def compute_fibonacci_features(c,h,l,atr,window=55):
+    min_periods=max(20,window//2)
+    swing_high=h.rolling(window,min_periods=min_periods).max()
+    swing_low=l.rolling(window,min_periods=min_periods).min()
+    swing_range=(swing_high-swing_low).replace(0,np.nan)
+    valid=swing_high.notna()&swing_low.notna()&atr.notna()&(swing_range>0)
+
+    fib_382=swing_high-(swing_range*0.382)
+    fib_50=swing_high-(swing_range*0.5)
+    fib_618=swing_high-(swing_range*0.618)
+    fib_ext_up_1618=swing_high+(swing_range*0.618)
+    fib_ext_down_1618=swing_low-(swing_range*0.618)
+
+    fib_382_support=valid&(l<=fib_382+(atr*JT.FIB_TOUCH_ATR))&(c>=fib_382)
+    fib_50_support=valid&(l<=fib_50+(atr*JT.FIB_TOUCH_ATR))&(c>=fib_50)
+    fib_618_support=valid&(l<=fib_618+(atr*JT.FIB_TOUCH_ATR))&(c>=fib_618)
+    fib_382_resistance=valid&(h>=fib_382-(atr*JT.FIB_TOUCH_ATR))&(c<=fib_382)
+    fib_50_resistance=valid&(h>=fib_50-(atr*JT.FIB_TOUCH_ATR))&(c<=fib_50)
+    fib_618_resistance=valid&(h>=fib_618-(atr*JT.FIB_TOUCH_ATR))&(c<=fib_618)
+    fib_618_breakdown=valid&(c<fib_618-(atr*JT.FIB_BREAK_ATR))&(c.shift(1)>=fib_618.shift(1)-(atr.shift(1)*0.15))
+    fib_618_reclaim=valid&(c>fib_618+(atr*JT.FIB_BREAK_ATR))&(c.shift(1)<=fib_618.shift(1)+(atr.shift(1)*0.15))
+    fib_ext_up_hit=valid&(h>=fib_ext_up_1618-(atr*JT.FIB_EXT_ATR))
+    fib_ext_down_hit=valid&(l<=fib_ext_down_1618+(atr*JT.FIB_EXT_ATR))
+
+    return {
+        'swing_high':swing_high,
+        'swing_low':swing_low,
+        'fib_382':fib_382,
+        'fib_50':fib_50,
+        'fib_618':fib_618,
+        'fib_ext_up_1618':fib_ext_up_1618,
+        'fib_ext_down_1618':fib_ext_down_1618,
+        'fib_382_support':fib_382_support.fillna(False),
+        'fib_50_support':fib_50_support.fillna(False),
+        'fib_618_support':fib_618_support.fillna(False),
+        'fib_382_resistance':fib_382_resistance.fillna(False),
+        'fib_50_resistance':fib_50_resistance.fillna(False),
+        'fib_618_resistance':fib_618_resistance.fillna(False),
+        'fib_618_breakdown':fib_618_breakdown.fillna(False),
+        'fib_618_reclaim':fib_618_reclaim.fillna(False),
+        'fib_ext_up_hit':fib_ext_up_hit.fillna(False),
+        'fib_ext_down_hit':fib_ext_down_hit.fillna(False),
+    }
+
 def compute_indicators(df):
     o,c,h,l,v=df['Open'],df['Close'],df['High'],df['Low'],df['Volume']
     df['History_Bars']=pd.Series(np.arange(1,len(df)+1),index=df.index,dtype=float)
@@ -133,6 +244,22 @@ def compute_indicators(df):
     df['Trendline_Slope_Pct']=tl['slope_pct'];df['Trendline_Fit']=tl['fit'];df['Trendline_Dist_ATR']=tl['dist_atr']
     df['Diag_Support_Hold']=tl['support_hold'];df['Diag_Resistance_Reject']=tl['resistance_reject']
     df['Diag_Breakout_Bull']=tl['breakout_bull'];df['Diag_Breakdown_Bear']=tl['breakdown_bear']
+    sp=compute_structure_pattern_features(c,h,l,df['ATR'],JT.STRUCTURE_PATTERN_WINDOW)
+    df['Box_Base']=sp['box_base'];df['Box_Support_Hold']=sp['box_support_hold'];df['Box_Resistance_Reject']=sp['box_resistance_reject']
+    df['Box_Breakout_Bull']=sp['box_breakout_bull'];df['Box_Breakdown_Bear']=sp['box_breakdown_bear']
+    df['Channel_Up']=sp['channel_up'];df['Channel_Down']=sp['channel_down']
+    df['Channel_Support_Hold']=sp['channel_support_hold'];df['Channel_Resistance_Reject']=sp['channel_resistance_reject']
+    df['Channel_Breakout_Bull']=sp['channel_breakout_bull'];df['Channel_Breakdown_Bear']=sp['channel_breakdown_bear']
+    df['Asc_Triangle']=sp['asc_triangle'];df['Desc_Triangle']=sp['desc_triangle'];df['Sym_Triangle']=sp['sym_triangle']
+    df['Triangle_Breakout_Bull']=sp['triangle_breakout_bull'];df['Triangle_Breakdown_Bear']=sp['triangle_breakdown_bear']
+    fib=compute_fibonacci_features(c,h,l,df['ATR'],JT.FIB_WINDOW)
+    df['Fib_Swing_High']=fib['swing_high'];df['Fib_Swing_Low']=fib['swing_low']
+    df['Fib_382']=fib['fib_382'];df['Fib_50']=fib['fib_50'];df['Fib_618']=fib['fib_618']
+    df['Fib_Ext_1618_Up']=fib['fib_ext_up_1618'];df['Fib_Ext_1618_Down']=fib['fib_ext_down_1618']
+    df['Fib_382_Support']=fib['fib_382_support'];df['Fib_50_Support']=fib['fib_50_support'];df['Fib_618_Support']=fib['fib_618_support']
+    df['Fib_382_Resistance']=fib['fib_382_resistance'];df['Fib_50_Resistance']=fib['fib_50_resistance'];df['Fib_618_Resistance']=fib['fib_618_resistance']
+    df['Fib_618_Breakdown']=fib['fib_618_breakdown'];df['Fib_618_Reclaim']=fib['fib_618_reclaim']
+    df['Fib_Ext_1618_Up_Hit']=fib['fib_ext_up_hit'];df['Fib_Ext_1618_Down_Hit']=fib['fib_ext_down_hit']
     rv=df['RSI']-df['RSI'].shift(3);df['RSI_Accel']=rv-rv.shift(3);wv=df['WT1']-df['WT1'].shift(3);df['WT_Accel']=wv-wv.shift(3);df['MACD_Accel']=df['MACD_Hist']-df['MACD_Hist'].shift(3)
     rn=df['RSI_Accel']/(df['RSI_Accel'].rolling(50,min_periods=10).std()+1e-10);wn=df['WT_Accel']/(df['WT_Accel'].rolling(50,min_periods=10).std()+1e-10);mn=df['MACD_Accel']/(df['MACD_Accel'].rolling(50,min_periods=10).std()+1e-10)
     df['Composite_Accel']=(rn+wn+mn)/3;wg=df['WT1']-df['WT2'];df['WT_Gap']=wg;df['WT_Gap_Abs']=wg.abs();df['WT_Conv_Speed']=df['WT_Gap_Abs'].shift(3)-df['WT_Gap_Abs']
@@ -150,8 +277,28 @@ def compute_indicators(df):
     short_reward=(c-short_support).clip(lower=0);short_risk=(short_resist-c).where((short_resist-c)>risk_floor,risk_floor)
     df['VP_Long_RR']=long_reward/(long_risk+1e-10);df['VP_Short_RR']=short_reward/(short_risk+1e-10)
     df['Upside_Space_Score']=np.clip((df['VP_Long_RR']-1.0)*20,-20,12)
+    fib_buy_confluence=(
+        (df['Fib_50_Support']|df['Fib_618_Support']|df['Fib_618_Reclaim'])
+        & (
+            ((df['MA20']-df['Fib_50']).abs()/(c.abs()+1e-10)<=JT.FIB_CONFLUENCE_PCT)
+            | ((df['MA50']-df['Fib_618']).abs()/(c.abs()+1e-10)<=JT.FIB_CONFLUENCE_PCT)
+            | ((df['VP_VAL']-df['Fib_618']).abs()/(c.abs()+1e-10)<=JT.FIB_CONFLUENCE_PCT)
+            | ((df['VP_POC']-df['Fib_50']).abs()/(c.abs()+1e-10)<=JT.FIB_CONFLUENCE_PCT)
+        )
+    )
+    fib_sell_confluence=(
+        (df['Fib_50_Resistance']|df['Fib_618_Resistance']|df['Fib_618_Breakdown'])
+        & (
+            ((df['MA20']-df['Fib_50']).abs()/(c.abs()+1e-10)<=JT.FIB_CONFLUENCE_PCT)
+            | ((df['MA50']-df['Fib_618']).abs()/(c.abs()+1e-10)<=JT.FIB_CONFLUENCE_PCT)
+            | ((df['VP_VAH']-df['Fib_50']).abs()/(c.abs()+1e-10)<=JT.FIB_CONFLUENCE_PCT)
+            | ((df['VP_POC']-df['Fib_618']).abs()/(c.abs()+1e-10)<=JT.FIB_CONFLUENCE_PCT)
+        )
+    )
+    df['Fib_Confluence_Buy']=fib_buy_confluence.fillna(False)
+    df['Fib_Confluence_Sell']=fib_sell_confluence.fillna(False)
     df['RS_Ratio']=1.;df['SPY_Return']=0.;df['Stock_Return']=0.;df['SPY_Trend_Score']=0.;df['SPY_Drawdown_20']=0.;df['SPY_Risk_On']=False;df['SPY_Risk_Off']=False
-    df['SPY_MA20']=0.;df['SPY_MA50']=0.;df['SPY_MA200']=0.;df['SPY_Close']=0.
+    df['SPY_MA20']=0.;df['SPY_MA50']=0.;df['SPY_MA200']=0.;df['SPY_Close']=np.nan;df['QQQ_Close']=np.nan
     df['QQQ_RS_20']=0.;df['IWM_RS_20']=0.;df['RSP_RS_20']=0.;df['Market_Breadth_Score']=0.
     df['Breadth_Risk_On']=False;df['Breadth_Risk_Off']=False;df['Narrow_Leadership']=False
     df['VIX_Trend_10']=0.;df['VIX_Risk_On']=False;df['VIX_Risk_Off']=False
@@ -162,6 +309,7 @@ def compute_indicators(df):
     df['Trend_Inflection_Bull']=False;df['Trend_Inflection_Bear']=False
     df['Market_Turn_Bull_Score']=0.;df['Market_Turn_Bear_Score']=0.
     df['Market_Turn_Bull']=False;df['Market_Turn_Bear']=False
+    df['Leader_Stock_Score']=0.;df['Leader_Stock_Mode']=False
     try:
         spy=fetch_spy()
         if not spy.empty:
@@ -185,6 +333,7 @@ def compute_indicators(df):
             breadth_score=pd.Series(0.,index=sc_.index)
             if not qqq.empty:
                 qqqc=qqq['Close'].reindex(sc_.index,method='ffill');qqq_ret20=qqqc.pct_change(20).fillna(0);qqq_rs20=qqq_ret20-spr
+                df['QQQ_Close']=qqqc
                 df['QQQ_RS_20']=qqq_rs20
                 breadth_score+=np.where(qqq_rs20>=JT.BREADTH_RS_POS,0.5,np.where(qqq_rs20<=JT.BREADTH_RS_NEG,-0.5,0))
             if not iwm.empty:
@@ -257,24 +406,24 @@ def compute_indicators(df):
     money_turn_up=(df['MFI']>df['MFI'].shift(1))&(df['CMF']>=df['CMF'].shift(1))
     money_turn_down=(df['MFI']<df['MFI'].shift(1))&(df['CMF']<=df['CMF'].shift(1))
     bull_inflect_score=(
-        reclaim_ma20.astype(int)
-        +macd_inflect_bull.astype(int)
-        +wt_inflect_bull.astype(int)
-        +df['Hull_Turn_Bull_Raw'].fillna(False).astype(int)
-        +df['UTBot_Buy_Raw'].fillna(False).astype(int)
-        +ma20_turn_up.astype(int)
-        +(df['Diag_Support_Hold']|df['Diag_Breakout_Bull']).astype(int)
-        +money_turn_up.astype(int)
+        reclaim_ma20.astype(float)
+        +macd_inflect_bull.astype(float)
+        +wt_inflect_bull.astype(float)
+        +(df['Hull_Turn_Bull_Raw'].fillna(False).astype(float)*JT.TREND_INFLECTION_HULL_BUY_W)
+        +(df['UTBot_Buy_Raw'].fillna(False).astype(float)*JT.TREND_INFLECTION_UT_BUY_W)
+        +ma20_turn_up.astype(float)
+        +(df['Diag_Support_Hold']|df['Diag_Breakout_Bull']).astype(float)
+        +money_turn_up.astype(float)
     )
     bear_inflect_score=(
-        lose_ma20.astype(int)
-        +macd_inflect_bear.astype(int)
-        +wt_inflect_bear.astype(int)
-        +df['Hull_Turn_Bear_Raw'].fillna(False).astype(int)
-        +df['UTBot_Sell_Raw'].fillna(False).astype(int)
-        +ma20_turn_down.astype(int)
-        +(df['Diag_Resistance_Reject']|df['Diag_Breakdown_Bear']).astype(int)
-        +money_turn_down.astype(int)
+        lose_ma20.astype(float)
+        +macd_inflect_bear.astype(float)
+        +wt_inflect_bear.astype(float)
+        +(df['Hull_Turn_Bear_Raw'].fillna(False).astype(float)*JT.TREND_INFLECTION_HULL_SELL_W)
+        +(df['UTBot_Sell_Raw'].fillna(False).astype(float)*JT.TREND_INFLECTION_UT_SELL_W)
+        +ma20_turn_down.astype(float)
+        +(df['Diag_Resistance_Reject']|df['Diag_Breakdown_Bear']).astype(float)
+        +money_turn_down.astype(float)
     )
     df['Trend_Inflection_Buy_Score']=bull_inflect_score
     df['Trend_Inflection_Sell_Score']=bear_inflect_score
@@ -311,4 +460,17 @@ def compute_indicators(df):
     df['Market_Turn_Bear_Score']=bear_market_turn_score
     df['Market_Turn_Bull']=((bull_market_turn_score>=JT.MARKET_TURN_STRONG)&(bull_market_turn_score>bear_market_turn_score)).fillna(False)
     df['Market_Turn_Bear']=((bear_market_turn_score>=JT.MARKET_TURN_STRONG)&(bear_market_turn_score>bull_market_turn_score)).fillna(False)
+    leader_score=(
+        (df['RS_Ratio']>=JT.LEADER_RS_RATIO).astype(int)
+        +((df['QQQ_RS_20']>=JT.LEADER_QQQ_RS_MIN).astype(int))
+        +(df['Has_MA50_History']&(c>df['MA50'])).astype(int)
+        +(df['Has_MA200_History']&(c>df['MA200'])).astype(int)
+        +(df['Breadth_Risk_On']|df['Narrow_Leadership']).astype(int)
+        +((df['Market_Breadth_Score']>=0).astype(int))
+    )
+    df['Leader_Stock_Score']=leader_score
+    df['Leader_Stock_Mode']=(
+        (leader_score>=JT.LEADER_STOCK_SCORE_MIN)
+        &(df['Thin_Trade_Risk']==False)
+    ).fillna(False)
     return df

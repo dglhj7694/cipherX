@@ -10,8 +10,8 @@ class JT:
     PATTERN_CAP=12;COMBINED_CAP=15;LEADING_CAP=10;LAGGING_CAP=10;REVERSAL_CAP=12
     COMBO_T1=5.;COMBO_T2=3.;COMBO_T3=1.5;ACCEL_STRONG=3.;ACCEL_MOD=1.5;DECAY_DAYS=3;DECAY_RATE=.5
     TREND_NORM=18.;MOMENTUM_NORM=10.;MONEY_NORM=12.;STRUCTURE_NORM=10.;LEADING_NORM=25.
-    STRONG_BUY_TH=40;BUY_TH=20;WATCH_BUY_TH=8
-    STRONG_SELL_TH=-40;SELL_TH=-20;WATCH_SELL_TH=-8
+    STRONG_BUY_TH=52;BUY_TH=20;WATCH_BUY_TH=4
+    STRONG_SELL_TH=-68;SELL_TH=-40;WATCH_SELL_TH=-18
     STRONG_MIN_AGREE=4;BUY_MIN_AGREE=3;WATCH_MIN_AGREE=2
     VETO_EXTREME_WT=65;VETO_EXTREME_RSI_LO=25;VETO_EXTREME_RSI_HI=75
     VETO_MONEY_CMF=0.12;VETO_MONEY_OBV_BARS=10
@@ -44,6 +44,16 @@ class JT:
     MARKET_TURN_STRONG=3
     TREND_INFLECTION_SIGNAL_BONUS=3.8
     MARKET_TURN_SIGNAL_BONUS=2.8
+    TURN_SIGNAL_PATTERN_BUY=2.8
+    TURN_SIGNAL_PATTERN_SELL=1.8
+    TREND_INFLECTION_HULL_BUY_W=1.6
+    TREND_INFLECTION_HULL_SELL_W=1.0
+    TREND_INFLECTION_UT_BUY_W=1.6
+    TREND_INFLECTION_UT_SELL_W=1.0
+    TREND_INFLECTION_COMMITTEE_BUY_W=6.0
+    TREND_INFLECTION_COMMITTEE_SELL_W=4.5
+    TURN_ALIGNMENT_BONUS_BUY=4.0
+    TURN_ALIGNMENT_BONUS_SELL=2.2
     UTBOT_SUPPORT_MAX_ATR=1.25
     UTBOT_OVERHEAT_ATR=3.75
     MIN_DOLLAR_VOLUME_20=5000000.
@@ -51,6 +61,39 @@ class JT:
     TRENDLINE_MIN_SLOPE_PCT=0.6
     TRENDLINE_TOUCH_ATR=0.6
     TRENDLINE_BREAK_ATR=0.8
+    STRUCTURE_PATTERN_WINDOW=24
+    BOX_MAX_RANGE_PCT=0.12
+    BOX_TOUCH_ATR=0.45
+    BOX_BREAK_ATR=0.45
+    CHANNEL_MIN_SLOPE_PCT=0.45
+    CHANNEL_PARALLEL_TOL_PCT=0.45
+    CHANNEL_TOUCH_ATR=0.65
+    CHANNEL_BREAK_ATR=0.55
+    TRIANGLE_FLAT_SLOPE_PCT=0.35
+    TRIANGLE_MIN_SLOPE_PCT=0.45
+    TRIANGLE_COMPRESSION_RATIO=0.92
+    TRIANGLE_BREAK_ATR=0.50
+    FIB_WINDOW=55
+    FIB_TOUCH_ATR=0.45
+    FIB_BREAK_ATR=0.55
+    FIB_EXT_ATR=0.65
+    FIB_CONFLUENCE_PCT=0.012
+    STRONG_BUY_CONTINUATION_MIN=4
+    STRONG_BUY_MIN_VOL_RATIO=1.0
+    SELL_CONFIRM_MIN=4
+    STRONG_SELL_CONFIRM_MIN=7
+    WATCH_SELL_CONFIRM_MIN=3
+    LEADER_RS_RATIO=1.03
+    LEADER_QQQ_RS_MIN=0.0
+    LEADER_STOCK_SCORE_MIN=3
+    LEADER_SELL_RELIEF=6.5
+    LEADER_BUY_SUPPORT=1.8
+    BEAR_TURN_SCORE_SCALE=0.42
+    MARKET_TURN_BEAR_SCALE=0.48
+    WATCH_SELL_SCAN_BIAS=-0.15
+    SELL_SCAN_BIAS=-2.2
+    STRONG_SELL_SCAN_BIAS=-5.2
+    WATCH_BUY_SCAN_BIAS=4.0
 
 # ── Context (11종) ──
 CTX_DEFAULT=0;CTX_EXTREME_OS=1;CTX_EXTREME_OB=2;CTX_STRONG_UP=3;CTX_STRONG_DN=4
@@ -271,6 +314,19 @@ SIGNAL_REGISTRY={
     'System_Turn_Bear':_sig(3.5,_S,'','Sys▼','star-diamond',16,'#FF0000','High',4,'전면매도전환','엔진종합판단매도전환'),
 }
 
+SIGNAL_REGISTRY.update({
+    'Fib_382_Support':_sig(1.1,_B,'','Fib38','triangle-up',9,'#93C5FD','Low',-0.8,'피보 38.2 지지','최근 상승 파동의 38.2% 되돌림에서 지지'),
+    'Fib_50_Support':_sig(1.2,_B,'','Fib50','triangle-up',10,'#A7F3D0','Low',-0.9,'피보 50 지지','최근 상승 파동의 절반 되돌림 구간에서 지지'),
+    'Fib_618_Support':_sig(1.5,_B,'','Fib61','triangle-up',11,'#FCD34D','Low',-1.0,'피보 61.8 지지','61.8% 되돌림 구간을 지켜 상승 추세 유지 기대'),
+    'Fib_382_Resistance':_sig(1.1,_S,'','Fib38','triangle-down',9,'#FCA5A5','High',0.8,'피보 38.2 저항','38.2% 되돌림 구간에서 저항 확인'),
+    'Fib_50_Resistance':_sig(1.2,_S,'','Fib50','triangle-down',10,'#F9A8D4','High',0.9,'피보 50 저항','절반 되돌림 구간에서 저항 확인'),
+    'Fib_618_Resistance':_sig(1.5,_S,'','Fib61','triangle-down',11,'#FB7185','High',1.0,'피보 61.8 저항','61.8% 되돌림 구간에서 상단 저항 확인'),
+    'Fib_618_Breakdown':_sig(1.8,_S,'','Fib61↓','diamond',11,'#EF4444','High',1.1,'피보 61.8 이탈','61.8% 되돌림이 무너지며 추세 훼손 경계'),
+    'Fib_618_Reclaim':_sig(1.8,_B,'','Fib61↑','diamond',11,'#10B981','Low',-1.1,'피보 61.8 회복','61.8% 되돌림을 다시 회복해 반등 신호 강화'),
+    'Fib_Confluence_Buy':_sig(2.0,_B,'','FibConf','star-diamond',12,'#22C55E','Low',-1.2,'피보 중첩 매수','피보 구간과 이평·VP 지지가 겹친 매수 구간'),
+    'Fib_Confluence_Sell':_sig(2.0,_S,'','FibConf','star-diamond',12,'#F43F5E','High',1.2,'피보 중첩 매도','피보 구간과 이평·VP 저항이 겹친 매도 구간'),
+})
+
 COMBINED_SCAN_REGISTRY={
     'CS_Ultimate_Buy':{'name':'🏆 ULTIMATE BUY','kor':'궁극의매수','dir':'buy','tier':1,'icon':'','color':'#FFD700','desc':'6중확인','win':'75-85%'},
     'CS_Triple_Oversold_Reversal':{'name':'🔥 Triple OS','kor':'삼중과매도반전','dir':'buy','tier':1,'icon':'','color':'#00E676','desc':'WT+RSI+Stoch+반전','win':'70-80%'},
@@ -306,6 +362,35 @@ COMBINED_SCAN_REGISTRY={
     'CS_Structure_Support_Buy':{'name':'🏗️ Support','kor':'구조적지지','dir':'buy','tier':3,'icon':'','color':'#4FC3F7','desc':'VP+BB지지','win':'55-65%'},
     'CS_Overbought_Fade_Sell':{'name':'📉 OBFade','kor':'과매수페이드','dir':'sell','tier':3,'icon':'','color':'#FF5252','desc':'Stoch과매수+캔들','win':'55-65%'},
     'CS_Volatility_Explosion':{'name':'💣 VolExpl','kor':'변동성폭발셋업','dir':'neutral','tier':2,'icon':'','color':'#FFC107','desc':'NR7+BB스퀴즈','win':'방향70%+'},
+}
+
+DERIVED_SIGNAL_REGISTRY = {
+    'Trend_Inflection_Bull': {'kor': '초기 상승 전환', 'dir': 'buy', 'surface': 'badge', 'desc': '하락·횡보 이후 상승 전환 초입을 포착한 신호입니다.'},
+    'Trend_Inflection_Bear': {'kor': '초기 약세 전환', 'dir': 'sell', 'surface': 'badge', 'desc': '상승 흐름이 약해지며 하락 전환 초입을 포착한 신호입니다.'},
+    'Market_Turn_Bull': {'kor': '시장 강세 전환', 'dir': 'buy', 'surface': 'badge', 'desc': '시장 전반이 위험선호 쪽으로 기울기 시작한 상태입니다.'},
+    'Market_Turn_Bear': {'kor': '시장 약세 전환', 'dir': 'sell', 'surface': 'badge', 'desc': '시장 전반이 방어적으로 기울기 시작한 상태입니다.'},
+    'Bullish_Gap_Reversal': {'kor': '갭다운 회복', 'dir': 'buy', 'surface': 'badge', 'desc': '갭 하락 이후 빠르게 회복해 하방 흡수 가능성을 보여주는 신호입니다.'},
+    'Bearish_Gap_Failure': {'kor': '갭업 실패', 'dir': 'sell', 'surface': 'badge', 'desc': '갭 상승분을 지키지 못해 상단 추격 수요가 약해졌다는 신호입니다.'},
+    'Diag_Support_Hold': {'kor': '사선 지지 유지', 'dir': 'buy', 'surface': 'badge', 'desc': '상승 추세선 부근 지지가 유지되고 있다는 구조 신호입니다.'},
+    'Diag_Resistance_Reject': {'kor': '사선 저항 확인', 'dir': 'sell', 'surface': 'badge', 'desc': '하락 추세선 부근에서 저항을 확인한 구조 신호입니다.'},
+    'Diag_Breakout_Bull': {'kor': '사선 상방 돌파', 'dir': 'buy', 'surface': 'badge', 'desc': '하락 추세선을 상향 돌파해 흐름 전환 가능성을 보여주는 신호입니다.'},
+    'Diag_Breakdown_Bear': {'kor': '사선 하방 이탈', 'dir': 'sell', 'surface': 'badge', 'desc': '상승 추세선을 하향 이탈해 구조 약화를 보여주는 신호입니다.'},
+    'Box_Support_Hold': {'kor': '박스 지지 유지', 'dir': 'buy', 'surface': 'badge', 'desc': '박스권 하단이 지지로 작용하고 있다는 신호입니다.'},
+    'Box_Resistance_Reject': {'kor': '박스 저항 확인', 'dir': 'sell', 'surface': 'badge', 'desc': '박스권 상단에서 저항을 확인한 신호입니다.'},
+    'Box_Breakout_Bull': {'kor': '박스 상방 돌파', 'dir': 'buy', 'surface': 'badge', 'desc': '박스권 상단 돌파가 나와 추세 재개 가능성을 보여주는 신호입니다.'},
+    'Box_Breakdown_Bear': {'kor': '박스 하방 이탈', 'dir': 'sell', 'surface': 'badge', 'desc': '박스권 하단 이탈이 나와 약세 확대 가능성을 보여주는 신호입니다.'},
+    'Channel_Support_Hold': {'kor': '채널 지지 유지', 'dir': 'buy', 'surface': 'badge', 'desc': '상승 채널 하단 지지가 유지되고 있다는 신호입니다.'},
+    'Channel_Resistance_Reject': {'kor': '채널 저항 확인', 'dir': 'sell', 'surface': 'badge', 'desc': '하락 채널 상단에서 저항을 확인한 신호입니다.'},
+    'Channel_Breakout_Bull': {'kor': '채널 상방 돌파', 'dir': 'buy', 'surface': 'badge', 'desc': '채널 상단을 돌파해 상승 가속 가능성을 보여주는 신호입니다.'},
+    'Channel_Breakdown_Bear': {'kor': '채널 하방 이탈', 'dir': 'sell', 'surface': 'badge', 'desc': '채널 하단을 이탈해 하락 가속 가능성을 보여주는 신호입니다.'},
+    'Triangle_Breakout_Bull': {'kor': '삼각 상방 돌파', 'dir': 'buy', 'surface': 'badge', 'desc': '삼각 수렴 상단 돌파가 확인돼 추세 확장 가능성을 보여주는 신호입니다.'},
+    'Triangle_Breakdown_Bear': {'kor': '삼각 하방 이탈', 'dir': 'sell', 'surface': 'badge', 'desc': '삼각 수렴 하단 이탈이 확인돼 약세 확장 가능성을 보여주는 신호입니다.'},
+    'Breadth_Risk_On': {'kor': '시장 breadth 확산', 'dir': 'buy', 'surface': 'reason', 'desc': '시장 breadth가 확산돼 종목보다 시장 전반이 받쳐주는 흐름입니다.'},
+    'Breadth_Risk_Off': {'kor': '시장 breadth 약세', 'dir': 'sell', 'surface': 'reason', 'desc': '시장 breadth가 약해져 종목 선별이 중요해진 흐름입니다.'},
+    'Narrow_Leadership': {'kor': '소수 리더주 장세', 'dir': 'neutral', 'surface': 'reason', 'desc': '소수 리더주 중심 장세라 약한 종목은 따라가기 어려운 환경입니다.'},
+    'Leader_Stock_Mode': {'kor': '리더주·테마주 모드', 'dir': 'buy', 'surface': 'reason', 'desc': '리더주·테마주 강세 흐름이 유지돼 일반 약세 신호보다 추세 지속 가능성을 더 봐야 하는 상태입니다.'},
+    'Thin_Trade_Risk': {'kor': '얇은 거래대금', 'dir': 'neutral', 'surface': 'reason', 'desc': '거래대금이 얇아 신호 신뢰도를 보수적으로 봐야 하는 상태입니다.'},
+    'Blowoff_Top_Hard': {'kor': '급등 과열 경고', 'dir': 'sell', 'surface': 'reason', 'desc': '급등 과열 신호가 강해 추격 매수보다 과열 해소 여부를 먼저 봐야 하는 상태입니다.'},
 }
 
 STRONG_BUY_SIGS={'System_Turn_Bull','Gold_Dot','Green_Dot_T1','Parabolic_Bottom_Buy','Volume_Climax_Buy','Momentum_Ignition_Buy','Expansion_BO','Morning_Star','Reversal_New_Highs','CS_Ultimate_Buy','CS_Triple_Oversold_Reversal','CS_Breakout_Momentum_Buy','CS_Capitulation_Bottom','CS_Triple_Confirm_Buy','CS_VuManChu_Squeeze_Buy','VuManChu_Bull'}

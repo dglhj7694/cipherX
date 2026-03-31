@@ -11,12 +11,13 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import yfinance as yf
 from sectors import SECTOR_GROUPS
-from config import GEMINI_API_KEY, COMBINED_SCAN_REGISTRY, CTX_KOR
+from config import GEMINI_API_KEY, COMBINED_SCAN_REGISTRY, CTX_KOR, JT
 from utils import _valid_fmt, _sf, fetch_fundamentals, resolve_analysis_ticker, compute_and_cache, _compute_cached
 from chart import build_chart, build_metadata
 from ui import render_market_home_dashboard
 from ui_localized import render_analysis
 from ai_agent import build_prompt_text, build_ai_prompt
+from audit import build_audit_payload
 from localization import (
     localize_action_label,
     localize_combo,
@@ -120,16 +121,17 @@ def analyze(ticker, chart_days=252, refresh=False):
         ts = int(time.time()) if refresh else None
         df = compute_and_cache(ticker, ts)
         if df is None or df.empty or len(df) < 50:
-            return None, "데이터 부족", None
+            return None, "데이터 부족", None, None
         dc = df.dropna(subset=['WT1', 'WT2']).tail(chart_days).copy()
         if dc.empty:
-            return None, "차트 데이터 부족", None
+            return None, "차트 데이터 부족", None, None
         meta = build_metadata(dc, ticker)
-        return build_chart(dc, ticker).to_json(), build_prompt_text(dc, meta), meta
+        audit = build_audit_payload(df, ticker=ticker, lookback_bars=max(chart_days, 252))
+        return build_chart(dc, ticker).to_json(), build_prompt_text(dc, meta), meta, audit
     except Exception as e:
         import traceback
         print(f"[ERR]{ticker}:\n{traceback.format_exc()}")
-        return None, f"분석 실패: {e}", None
+        return None, f"분석 실패: {e}", None, None
 
 
 def _initial_messages():
@@ -1242,9 +1244,12 @@ def _terminal_signal_label(meta=None, fallback="IDLE"):
 
 def _latest_recent_signal_label(meta=None, fallback="STANDBY"):
     meta = meta or {}
-    recent = list(meta.get('recent_signals') or [])
+    recent = list(meta.get('recent_signals') or []) + list(meta.get('derived_signal_events') or [])
     if recent:
-        return _format_board_text(recent[-1][1], fallback)
+        last_item = recent[-1]
+        if isinstance(last_item, dict):
+            return _format_board_text(last_item.get('label'), fallback)
+        return _format_board_text(last_item[1], fallback)
     scans = list(meta.get('combined_scans') or [])
     if scans:
         return _format_board_text(scans[0].get('kor') or scans[0].get('name'), fallback)
@@ -1257,9 +1262,12 @@ def _primary_recent_signal_label(signal_items, fallback="STANDBY"):
 
 def _latest_recent_signal_tone(meta=None, fallback="neutral"):
     meta = meta or {}
-    recent = list(meta.get('recent_signals') or [])
+    recent = list(meta.get('recent_signals') or []) + list(meta.get('derived_signal_events') or [])
     if recent:
-        return _format_board_text(recent[-1][3], fallback).lower()
+        last_item = recent[-1]
+        if isinstance(last_item, dict):
+            return _format_board_text(last_item.get('dir'), fallback).lower()
+        return _format_board_text(last_item[3], fallback).lower()
     scans = list(meta.get('combined_scans') or [])
     if scans:
         return _format_board_text(scans[0].get('dir'), fallback).lower()
@@ -1275,7 +1283,14 @@ def _history_signal_stack(meta=None, limit=3):
     items = []
     seen = set()
 
-    for icon, label, _date, direction, _is_combined in reversed(list(meta.get('recent_signals') or [])[-limit:]):
+    merged_recent = list(meta.get('recent_signals') or []) + list(meta.get('derived_signal_events') or [])
+    for raw in reversed(merged_recent[-limit:]):
+        if isinstance(raw, dict):
+            icon = raw.get('icon')
+            label = raw.get('label')
+            direction = raw.get('dir')
+        else:
+            icon, label, _date, direction, _is_combined = raw
         clean_label = _format_board_text(label, '')
         if not clean_label or clean_label in seen:
             continue
@@ -1337,8 +1352,16 @@ def _history_rows_from_messages(messages, limit=8):
 
 def _focus_recent_signals_from_analysis(meta, limit=5):
     items = []
-    recent = list((meta or {}).get('recent_signals') or [])
-    for icon, label, date, direction, is_combined in reversed(recent[-limit:]):
+    recent = list((meta or {}).get('recent_signals') or []) + list((meta or {}).get('derived_signal_events') or [])
+    for raw in reversed(recent[-limit:]):
+        if isinstance(raw, dict):
+            icon = raw.get('icon')
+            label = raw.get('label')
+            date = raw.get('date')
+            direction = raw.get('dir')
+            is_combined = raw.get('is_combined')
+        else:
+            icon, label, date, direction, is_combined = raw
         items.append({
             'icon': _format_board_text(icon, '•'),
             'label': _format_board_text(label, 'NO SIGNAL'),
@@ -1990,7 +2013,7 @@ if current_mode == MODE_SCANNER:
                     + continuation_buy * 0.9
                     - continuation_sell * 0.9
                 )
-                scan_score -= downgrade_count * 3.5
+                scan_score -= downgrade_count * 2.2
                 if thin_trade_risk:
                     scan_score -= 4.0
                 if bullish_gap_reversal:
@@ -2000,10 +2023,10 @@ if current_mode == MODE_SCANNER:
                 judgment_bias = {
                     'STRONG_BUY': 10.0,
                     'BUY': 5.0,
-                    'WATCH_BUY': 2.0,
-                    'WATCH_SELL': -2.0,
-                    'SELL': -5.0,
-                    'STRONG_SELL': -10.0,
+                    'WATCH_BUY': JT.WATCH_BUY_SCAN_BIAS,
+                    'WATCH_SELL': JT.WATCH_SELL_SCAN_BIAS,
+                    'SELL': JT.SELL_SCAN_BIAS,
+                    'STRONG_SELL': JT.STRONG_SELL_SCAN_BIAS,
                 }.get(raw_jg, 0.0)
                 scan_score += judgment_bias
                 if raw_jg in ('NEUTRAL', 'MIXED'):
@@ -2311,7 +2334,7 @@ else:
                 fund = fetch_fundamentals(tv)
                 status.update(label=f"DATA FEED ESTABLISHED · {tv}", state="running", expanded=True)
                 st.write("3. 가격 데이터, 기술 지표, 위원회 점수, 차트 메타데이터를 계산합니다.")
-                fj, phist, meta = analyze(tv, chart_days, refresh)
+                fj, phist, meta, audit = analyze(tv, chart_days, refresh)
                 if fj and meta:
                     act = meta.get('action_label', '')
                     es  = meta.get('ensemble_score', 0)
@@ -2342,7 +2365,7 @@ else:
                     "role": "assistant", "type": "analysis",
                     "ticker": tv, "content": content,
                     "analyzed_at": datetime.now().isoformat(timespec="seconds"),
-                    "fig_json": fj, "meta": meta, "prompt": prompt,
+                    "fig_json": fj, "meta": meta, "prompt": prompt, "audit": audit,
                 })
                 st.session_state.pending_ai_ticker = tv
                 st.session_state.pending_ai_prompt = prompt
