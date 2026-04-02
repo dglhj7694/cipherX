@@ -1,153 +1,264 @@
-import google.generativeai as genai
-import streamlit as st
-from config import *
-from utils import _cs_str
+import json
+import re
+
 from branding import BRAND_NAME
+from config import COMBINED_SCAN_REGISTRY, SIGNAL_REGISTRY
+
+
+_AI_LABELS = {
+    "STRONG_BUY",
+    "BUY",
+    "WATCH_BUY",
+    "NEUTRAL",
+    "WATCH_SELL",
+    "SELL",
+    "STRONG_SELL",
+}
+_AI_DISAGREEMENT_TYPES = {"NONE", "TIMING", "RISK", "TREND", "MIXED"}
+
+
+def _clamp_int(value, default=0, lo=0, hi=100):
+    try:
+        return max(lo, min(hi, int(round(float(value)))))
+    except (TypeError, ValueError):
+        return default
+
+
+def _normalize_text_list(value, limit=4):
+    if isinstance(value, str):
+        items = [value]
+    elif isinstance(value, (list, tuple)):
+        items = list(value)
+    else:
+        items = []
+    out = []
+    seen = set()
+    for item in items:
+        text = str(item or "").strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        out.append(text)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _judgment_side(label):
+    text = str(label or "").upper()
+    if "BUY" in text:
+        return "BUY"
+    if "SELL" in text:
+        return "SELL"
+    return "NEUTRAL"
+
+
+def _compare_ai_vs_engine(ai_label, engine_label):
+    ai_side = _judgment_side(ai_label)
+    engine_side = _judgment_side(engine_label)
+    if ai_label == engine_label:
+        return "EXACT", "NONE"
+    if ai_side == engine_side:
+        return "ALIGNED", "TIMING"
+    if "NEUTRAL" in {ai_side, engine_side}:
+        return "MIXED", "RISK"
+    return "DISAGREE", "TREND"
+
+
+def _extract_json_blob(raw_text):
+    raw = str(raw_text or "").strip()
+    if not raw:
+        return ""
+    code_match = re.search(r"```json\s*(\{.*?\})\s*```", raw, re.DOTALL | re.IGNORECASE)
+    if code_match:
+        return code_match.group(1).strip()
+    brace_match = re.search(r"(\{.*\})", raw, re.DOTALL)
+    if brace_match:
+        return brace_match.group(1).strip()
+    return ""
 
 
 def build_prompt_text(dc, meta):
-    m = meta
-    recent = dc.tail(60)
-    prices = ", ".join([f"'{d.strftime('%m/%d')}:{r['Close']:.2f}'" for d, r in recent.iterrows()])
-    vr = m['volume'] / max(m['avg_volume'], 1)
+    latest_row = dc.iloc[-1] if len(dc) else {}
+    recent_ohlcv = []
+    for idx, row in dc.tail(20).iterrows():
+        recent_ohlcv.append(
+            f"{idx.strftime('%m/%d')} O={row.get('Open', 0):.2f} H={row.get('High', 0):.2f} "
+            f"L={row.get('Low', 0):.2f} C={row.get('Close', 0):.2f} V={row.get('Volume', 0):,.0f}"
+        )
 
-    price_block = (
-        f"[A. Price]\n{prices}\n\n"
-        f"Last=${m['price']:.2f} ({m['price_change_pct']:+.2f}%)\n"
-        f"Volume={m['volume']:,.0f} ({vr:.1f}x)\n"
-        f"ATR=${m['atr']:.2f} ({m['atr_pct']:.1f}%)\n"
-    )
-
-    ma_line = f"MA50=${m['ma50']:.2f}, MA200=${m['ma200']:.2f}" if m['ma50'] > 0 else "MA=N/A"
-    vp_line = f"POC=${m['vp_poc']:.2f}, VAH=${m['vp_vah']:.2f}, VAL=${m['vp_val']:.2f}" if m['vp_poc'] > 0 else "VP=N/A"
-    bb_line = f"BB_Up=${m.get('bb_up', 0):.2f}, BB_Low=${m.get('bb_low', 0):.2f}" if m.get('bb_up', 0) > 0 else ""
-    smart_money_line = (
-        f"SmartMoney: CMF={m['cmf']:.3f}, OBV={m.get('obv_trend', 'N/A')}, "
-        f"OBV_Slope={m.get('obv_slope', 0):+.2f}, PriceSlope5={m.get('price_slope_5', 0):+.2%}, "
-        f"Vol20={m.get('volume_ratio_20', 1):.2f}x, "
-        f"BearDiv={'Y' if m.get('smart_money_bearish_div') else 'N'}, "
-        f"BullDiv={'Y' if m.get('smart_money_bullish_div') else 'N'}"
-    )
-    structure_line = (
-        f"Structure: BB%B={m.get('percent_b', .5):.2f}, {bb_line}\n"
-        f"  {vp_line}\n"
-        f"  LongRR={m.get('vp_long_rr', 1):.2f}, ShortRR={m.get('vp_short_rr', 1):.2f}\n"
-        f"  {ma_line}"
-    )
-    indicator_block = (
-        f"[B. Indicators]\n"
-        f"Momentum: RSI={m['rsi']:.1f}, MFI={m['mfi']:.1f}, WT={m['wt1']:.1f}, "
-        f"StK={m['stochk']:.1f}, SlK={m.get('slowk', 50):.1f}\n"
-        f"Trend: ADX={m['adx']:.1f}, MACD_H={m['macd_hist']:.4f}, "
-        f"UTBot={m.get('utbot_dir', 0)}, Hull={'up' if m.get('hma_rising') else 'down'}, "
-        f"SqMom={m.get('squeeze_mom', 0):.3f}\n"
-        f"{smart_money_line}\n"
-        f"{structure_line}\n"
-        f"RelativeStrength: RS={m['rs_ratio']:.3f}\n"
-    )
+    indicator_tape = []
+    for idx, row in dc.tail(10).iterrows():
+        indicator_tape.append(
+            f"{idx.strftime('%m/%d')} C={row.get('Close', 0):.2f} HMA={row.get('HMA', 0):.2f} "
+            f"RSI={row.get('RSI', 0):.1f} MFI={row.get('MFI', 0):.1f} WT1={row.get('WT1', 0):.1f} "
+            f"MACD_Hist={row.get('MACD_Hist', 0):+.4f} ADX={row.get('ADX', 0):.1f} "
+            f"StochK={row.get('StochK', 0):.1f} StochD={row.get('StochD', 0):.1f} "
+            f"ATR={row.get('ATR', 0):.2f} Percent_B={row.get('Percent_B', 0):.2f} "
+            f"WR={row.get('Williams_R', 0):.1f} CCI={row.get('CCI', 0):.1f} "
+            f"ROC={row.get('ROC', 0):+.2f} RMI={row.get('RMI', 0):.1f} TRIX={row.get('TRIX', 0):+.3f}"
+        )
 
     signal_lines = []
-    for ir, row in dc.tail(20).iterrows():
-        date_label = ir.strftime('%m/%d')
+    combo_lines = []
+    for idx, row in dc.tail(20).iterrows():
         day_signals = []
         for key, cfg in SIGNAL_REGISTRY.items():
             if row.get(key, False):
                 day_signals.append(f"{cfg['dir']}:{cfg['kor']}")
+        if day_signals:
+            signal_lines.append(f"{idx.strftime('%m/%d')}: {', '.join(day_signals)}")
+
+        day_combos = []
         for key, cfg in COMBINED_SCAN_REGISTRY.items():
             if row.get(key, False):
-                day_signals.append(f"{cfg['dir']}:{cfg['kor']}[T{cfg['tier']}]")
-        if day_signals:
-            signal_lines.append(f"  {date_label}: {', '.join(day_signals)}")
-    signal_block = "[C. Signals]\n" + ("\n".join(signal_lines[-15:]) if signal_lines else "  (none)")
+                day_combos.append(f"{cfg['dir']}:{cfg['kor']}[T{cfg['tier']}]")
+        if day_combos:
+            combo_lines.append(f"{idx.strftime('%m/%d')}: {', '.join(day_combos)}")
 
-    committee = m.get('committee', {})
-    committee_lines = []
-    for name in COMMITTEE_NAMES:
-        data = committee.get(name, {})
-        icon = COMMITTEE_ICONS.get(name, '')
-        committee_lines.append(
-            f"    {icon}{name}: vote={data.get('vote', '?')} "
-            f"score={data.get('score', 0):+.0f} conviction={data.get('conviction', 0):.0f}%"
-        )
-    buy_layers = ', '.join(f"{k}:{v:.1f}" for k, v in m['buy_layers'].items() if v > 0)
-    sell_layers = ', '.join(f"{k}:{v:.1f}" for k, v in m['sell_layers'].items() if v > 0)
-    contrast = m.get('contrast_notes', '') or 'None'
-    review_block = (
-        f"[D. Engine Review]\n"
-        f"  Context={m.get('context_label', 'default')}\n"
-        f"  Committees:\n" + "\n".join(committee_lines) + "\n"
-        f"  ES={m.get('ensemble_score', 0):+.1f} (B{m.get('buy_agree', 0)}:S{m.get('sell_agree', 0)})\n"
-        f"  Synergy={m.get('reversal_synergy', 0):+.1f} | Prediction={m.get('prediction_boost', 0):+.1f}\n"
-        f"  Veto={m.get('veto_flags', 'none') or 'none'}\n"
-        f"  Judgment={m['judgment']} ({m['confidence']:.0f}%)\n"
-        f"  Reason={m.get('judgment_reason', '')}\n"
-        f"  Detail={m.get('judgment_detail', '')}\n"
-        f"  Action={m.get('action_label', '')}\n"
-        f"  Contrast={contrast}\n"
-        f"  BlowoffTop={'Y' if m.get('blowoff_top_hard') else 'N'}\n"
-        f"  [10L] BUY={m['buy_total']:.1f} ({m['buy_active']}/10) [{buy_layers}] "
-        f"SELL={m['sell_total']:.1f} ({m['sell_active']}/10) [{sell_layers}]\n"
-        f"  Leading={m['leading_verdict']} | Lagging={m['lagging_verdict']}\n"
+    latest = meta
+    latest_snapshot = (
+        f"Last={latest.get('price', 0):.2f}, HMA={latest_row.get('HMA', 0):.2f}, "
+        f"RSI={latest.get('rsi', 0):.1f}, MFI={latest.get('mfi', 0):.1f}, WT1={latest.get('wt1', 0):.1f}, "
+        f"MACD_Hist={latest.get('macd_hist', 0):+.4f}, ADX={latest.get('adx', 0):.1f}, "
+        f"StochK={latest.get('stochk', 0):.1f}, StochD={latest_row.get('StochD', latest.get('slowk', 0)):.1f}, "
+        f"ATR={latest.get('atr', 0):.2f}, Percent_B={latest.get('percent_b', 0):.2f}, "
+        f"Williams_R={latest.get('williams_r', 0):.1f}, CCI={latest.get('cci', 0):.1f}, "
+        f"ROC={latest.get('roc', 0):+.2f}, RMI={latest.get('rmi', 0):.1f}, "
+        f"TRIX={latest.get('trix', 0):+.3f}, Price_Osc={latest.get('price_oscillator', 0):+.3f}"
     )
-    if m['combined_scans']:
-        review_block += f"  CS={_cs_str(m['combined_scans'])}\n"
+    structure_snapshot = (
+        f"VP_POC={latest.get('vp_poc', 0):.2f}, VP_VAH={latest.get('vp_vah', 0):.2f}, "
+        f"VP_VAL={latest.get('vp_val', 0):.2f}, VP_Long_RR={latest.get('vp_long_rr', 0):.2f}, "
+        f"VP_Short_RR={latest.get('vp_short_rr', 0):.2f}, VWAP={latest.get('vwap', 0):.2f}, "
+        f"Fixed_VWAP={latest.get('fixed_vwap', 0):.2f}, Envelope%={latest.get('envelope_percent', 0):.2f}, "
+        f"Vol_Osc={latest.get('volume_oscillator', 0):+.2f}, Mass_Index={latest.get('mass_index', 0):.2f}"
+    )
 
-    return f"{price_block}\n{indicator_block}\n{signal_block}\n{review_block}"
+    return (
+        "[A. Recent OHLCV]\n"
+        + "\n".join(recent_ohlcv)
+        + "\n\n[B. Latest Indicator Snapshot]\n"
+        + latest_snapshot
+        + "\n"
+        + structure_snapshot
+        + "\n\n[C. Recent Indicator Tape]\n"
+        + ("\n".join(indicator_tape) if indicator_tape else "(none)")
+        + "\n\n[D. Signal Detection List]\n"
+        + ("\n".join(signal_lines[-15:]) if signal_lines else "(none)")
+        + "\n\n[E. Combo Signal Detection List]\n"
+        + ("\n".join(combo_lines[-10:]) if combo_lines else "(none)")
+    )
 
 
-def build_ai_prompt(ticker, phist, fund):
+def build_ai_prompt(ticker, prompt_tape):
     return f"""
-You are a veteran Wall Street analyst reviewing {BRAND_NAME}.
-Write the entire report in Korean.
+You are the independent AI second-opinion model inside {BRAND_NAME}.
+Write every natural-language field in Korean.
 
-System context:
-- {BRAND_NAME} uses 5 committees: Trend, Momentum, Money, Structure, Leading
-- It also uses context-aware weighting, veto logic, reversal synergy, prediction boost, and auto-generated reasons
-- The input already contains smart-money divergence, RR (VAH/POC/VAL), and blow-off-top warnings
+Hard rules:
+1. Use only the supplied OHLCV, indicators, signal detection list, and combo signal detection list.
+2. Do not mention committee, ensemble, veto, action label, confidence from another system, or any engine audit wording.
+3. Do not assume you know the existing engine judgment.
+4. Make an independent call from the objective data only.
+5. Use exactly one label from: STRONG_BUY, BUY, WATCH_BUY, NEUTRAL, WATCH_SELL, SELL, STRONG_SELL.
+6. Return only valid JSON. No markdown, no prose before or after the JSON.
 
-Non-negotiable rules:
-1. Verify the system instead of echoing it.
-2. If the system is bullish, actively search for bearish counter-evidence.
-3. If the system is bearish, actively search for bullish counter-evidence.
-4. You must include smart money interpretation using OBV, CMF, and volume.
-5. You must include structure / risk-reward interpretation using VP levels (POC/VAH/VAL) and RR.
-6. If low-volume breakout, money divergence, poor RR, or blow-off-top risk exists, mention it explicitly.
-7. Add a section titled exactly `Contrast Analysis`.
-8. In `Contrast Analysis`, provide exactly 2 devil's-advocate points.
-9. At least one of the 2 points must reference either smart money divergence or RR / structure compression.
-10. Do not restate the same bullish thesis inside `Contrast Analysis`.
+Required JSON schema:
+{{
+  "AI_Judgment": "one of the allowed labels",
+  "AI_Confidence": 0,
+  "AI_Bullish_Score": 0,
+  "AI_Bearish_Score": 0,
+  "AI_Risk_Flags": ["short Korean phrase"],
+  "AI_Key_Drivers": ["short Korean phrase"],
+  "AI_Reason": "2-4 Korean sentences explaining the call from the supplied data"
+}}
 
-Input data:
-[{ticker}]
-{phist}
-[Fundamentals]
-{fund}
+Field rules:
+- AI_Confidence: integer 0-100
+- AI_Bullish_Score: integer 0-100
+- AI_Bearish_Score: integer 0-100
+- AI_Risk_Flags: 0-4 items
+- AI_Key_Drivers: 2-4 items when possible
 
-Required output format:
+Ticker:
+{ticker}
 
-### 1. Market Summary
-- Summarize the latest tape, price behavior, and flow in 3-4 sentences.
+Input:
+{prompt_tape}
+""".strip()
 
-### 2. Committee Audit
-- Audit the committee votes, veto logic, ensemble score, and judgment quality.
 
-### 3. Smart Money And Flow
-- Explain OBV, CMF, volume quality, divergence, and whether money is confirming or fading price.
+def parse_ai_signal_assisted_response(raw_text, engine_judgment=""):
+    raw = str(raw_text or "").strip()
+    if not raw:
+        return {
+            "available": False,
+            "AI_Judgment": "NEUTRAL",
+            "AI_Confidence": 0,
+            "AI_Bullish_Score": 0,
+            "AI_Bearish_Score": 0,
+            "AI_Risk_Flags": [],
+            "AI_Key_Drivers": [],
+            "AI_Reason": "AI 응답이 비어 있습니다.",
+            "AI_Agreement": "UNAVAILABLE",
+            "AI_Disagreement_Type": "MIXED",
+            "raw_text": raw,
+        }
 
-### 4. Structure And Risk/Reward
-- Explain support/resistance, VP levels, upside/downside space, and whether RR is attractive.
+    blob = _extract_json_blob(raw)
+    if not blob:
+        return {
+            "available": False,
+            "AI_Judgment": "NEUTRAL",
+            "AI_Confidence": 0,
+            "AI_Bullish_Score": 0,
+            "AI_Bearish_Score": 0,
+            "AI_Risk_Flags": [],
+            "AI_Key_Drivers": [],
+            "AI_Reason": "AI 응답을 구조화된 JSON으로 읽지 못했습니다.",
+            "AI_Agreement": "UNAVAILABLE",
+            "AI_Disagreement_Type": "MIXED",
+            "raw_text": raw,
+        }
 
-### 5. Contrast Analysis
-- Point 1
-- Point 2
+    try:
+        data = json.loads(blob)
+    except json.JSONDecodeError:
+        return {
+            "available": False,
+            "AI_Judgment": "NEUTRAL",
+            "AI_Confidence": 0,
+            "AI_Bullish_Score": 0,
+            "AI_Bearish_Score": 0,
+            "AI_Risk_Flags": [],
+            "AI_Key_Drivers": [],
+            "AI_Reason": "AI JSON 파싱에 실패했습니다.",
+            "AI_Agreement": "UNAVAILABLE",
+            "AI_Disagreement_Type": "MIXED",
+            "raw_text": raw,
+        }
 
-### 6. Scenario Plan
-- Bullish scenario with trigger and target
-- Base scenario
-- Bearish scenario with invalidation and target
-- Entry / stop / risk note
+    label = str(data.get("AI_Judgment", "NEUTRAL")).strip().upper()
+    if label not in _AI_LABELS:
+        label = "NEUTRAL"
 
-### Conclusion
-- Final judgment in 2 sentences
-- Include a simple grade (A-F)
-"""
+    agreement, disagreement_type = _compare_ai_vs_engine(label, engine_judgment)
+    result = {
+        "available": True,
+        "AI_Judgment": label,
+        "AI_Confidence": _clamp_int(data.get("AI_Confidence"), default=0),
+        "AI_Bullish_Score": _clamp_int(data.get("AI_Bullish_Score"), default=0),
+        "AI_Bearish_Score": _clamp_int(data.get("AI_Bearish_Score"), default=0),
+        "AI_Risk_Flags": _normalize_text_list(data.get("AI_Risk_Flags"), limit=4),
+        "AI_Key_Drivers": _normalize_text_list(data.get("AI_Key_Drivers"), limit=4),
+        "AI_Reason": str(data.get("AI_Reason", "") or "").strip(),
+        "AI_Agreement": agreement,
+        "AI_Disagreement_Type": disagreement_type if disagreement_type in _AI_DISAGREEMENT_TYPES else "MIXED",
+        "raw_text": raw,
+    }
+
+    if not result["AI_Reason"]:
+        result["AI_Reason"] = "AI가 구조화된 판단은 줬지만 사유 설명은 비어 있습니다."
+    return result

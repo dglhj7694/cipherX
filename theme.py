@@ -2312,6 +2312,39 @@ html,body{{
   width:100%;
   min-height:84px;
 }}
+.sigl-brand-clock{{
+  position:absolute;
+  right:0;
+  top:0;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:4px;
+  padding:8px 10px;
+  border-radius:14px;
+  background:linear-gradient(180deg, rgba(18,27,44,.82), rgba(11,17,32,.70));
+  border:1px solid rgba(148,163,184,.14);
+  box-shadow:
+    0 10px 24px rgba(2,6,23,.18),
+    inset 0 1px 0 rgba(255,255,255,.04);
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+}}
+.sigl-brand-clock__label{{
+  color:rgba(148,163,184,.92);
+  font-size:.56rem;
+  font-weight:800;
+  letter-spacing:.18em;
+  line-height:1;
+}}
+.sigl-brand-clock__value{{
+  color:#E2E8F0;
+  font-size:.78rem;
+  font-weight:800;
+  letter-spacing:.04em;
+  line-height:1.1;
+  white-space:nowrap;
+}}
 .sigl-brand-lockup{{
   position:relative;
   z-index:1;
@@ -2497,6 +2530,16 @@ html,body{{
 }}
 .sigl-brand-shell--compact .sigl-brand-bar{{
   min-height:70px;
+}}
+.sigl-brand-shell--compact .sigl-brand-clock{{
+  padding:6px 8px;
+  border-radius:12px;
+}}
+.sigl-brand-shell--compact .sigl-brand-clock__label{{
+  font-size:.5rem;
+}}
+.sigl-brand-shell--compact .sigl-brand-clock__value{{
+  font-size:.7rem;
 }}
 .sigl-brand-shell--compact .sigl-brand-lockup{{
   width:min(100%, 460px);
@@ -2728,6 +2771,7 @@ html,body{{
   .sigl-brand-bar{{min-height:78px}}
   .sigl-brand-lockup{{width:min(100%, 470px)}}
   .sigl-brand-title{{font-size:clamp(1.95rem, 5.6vw, 3rem)}}
+  .sigl-brand-clock{{right:4px;top:2px}}
 }}
 @media (max-width: 640px){{
   .sigl-brand-shell{{min-height:100px;padding:14px 16px;border-radius:18px}}
@@ -2737,6 +2781,15 @@ html,body{{
   .sigl-brand-title{{font-size:clamp(1.72rem, 10vw, 2.22rem);letter-spacing:.09em}}
   .sigl-brand-subtitle{{font-size:.64rem;letter-spacing:.14em;padding-right:10px}}
   .sigl-brand-subtitle::after{{width:5px;height:5px}}
+  .sigl-brand-clock{{
+    right:0;
+    top:-2px;
+    padding:5px 7px;
+    gap:3px;
+    border-radius:10px;
+  }}
+  .sigl-brand-clock__label{{font-size:.46rem;letter-spacing:.14em}}
+  .sigl-brand-clock__value{{font-size:.62rem}}
 }}
 @media (prefers-reduced-motion: reduce){{
   .sigl-brand-shell::before,

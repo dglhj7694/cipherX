@@ -1,3 +1,5 @@
+import os
+
 import pandas as pd
 import numpy as np
 import streamlit as st
@@ -118,9 +120,12 @@ COMMITTEE_NAMES=['Trend','Momentum','Money','Structure','Leading']
 COMMITTEE_ICONS = {}
 
 try:
-    GEMINI_API_KEY=st.secrets.get("GEMINI_API_KEY", "")
+    _SECRET_GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "") or st.secrets.get("GOOGLE_API_KEY", "")
 except Exception:
-    GEMINI_API_KEY=""
+    _SECRET_GEMINI_API_KEY = ""
+
+GEMINI_API_KEY_FROM_SECRETS = bool(str(_SECRET_GEMINI_API_KEY or "").strip())
+GEMINI_API_KEY = _SECRET_GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY", "") or os.environ.get("GOOGLE_API_KEY", "")
 
 
 _B,_S,_N='buy','sell','neutral'

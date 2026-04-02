@@ -250,7 +250,7 @@ def detect_all_signals(df):
     df['VuManChu_Bull']=((wt1<-30)&(hrb|hma_r)&(df['Bull_Divergence'].fillna(False)|df['RSI_Bull_Divergence'].fillna(False)|df['Bullish_Engulfing'].fillna(False)|df['Hammer'].fillna(False)|df['Morning_Star'].fillna(False)))&vok
     df['VuManChu_Bear']=((wt1>30)&(hrbe|~hma_r)&(df['Bear_Divergence'].fillna(False)|df['RSI_Bear_Divergence'].fillna(False)|df['Bearish_Engulfing'].fillna(False)|df['Shooting_Star'].fillna(False)|df['Evening_Star'].fillna(False)))&vok
     for (bs,ss),cd in {('UTBot_Buy','UTBot_Sell'):10,('Hull_Turn_Bull','Hull_Turn_Bear'):7,('StochSlow_Cross_Buy','StochSlow_Cross_Sell'):7,('Squeeze_Mom_Cross_Up','Squeeze_Mom_Cross_Down'):5,('VuManChu_Bull','VuManChu_Bear'):10}.items():_cd_dir(df,bs,ss,cd)
-    df=detect_combined_scans(df,vol_ratio,hma_r);df=compute_10layer_scores(df,vol_ratio,hma_r_v);df=compute_committee_ensemble(df,vol_ratio,hma_r_v)
+    df=detect_combined_scans(df,vol_ratio,hma_r);df=compute_10layer_scores(df,vol_ratio,hma_r_v);df=compute_committee_ensemble(df,vol_ratio,hma_r_v);df=_compute_objective_judgment(df,vol_ratio)
     return df
 
 # ━━━ Combined Scan (동일) ━━━
@@ -1590,4 +1590,507 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
     df['System_Turn_Bull'] = (is_buy & ~is_buy.shift(1).fillna(False)).values
     df['System_Turn_Bear'] = (is_sell & ~is_sell.shift(1).fillna(False)).values
     
+    return df
+
+
+_OBJECTIVE_BUY_LABELS={'STRONG_BUY','BUY','WATCH_BUY'}
+_OBJECTIVE_SELL_LABELS={'STRONG_SELL','SELL','WATCH_SELL'}
+_OBJECTIVE_SIGNAL_EXCLUDE={'System_Turn_Bull','System_Turn_Bear'}
+
+
+def _objective_event_name(name):
+    return str(name).replace('_',' ')
+
+
+def _objective_recent_registry_score(i,specs,bool_arrays,lookback,decay):
+    score=0.;strong_hits=0;hits=[]
+    for name,base,is_strong in specs:
+        arr=bool_arrays.get(name)
+        if arr is None:
+            continue
+        best=0.;best_age=None
+        max_age=min(i,lookback-1)
+        for age in range(max_age+1):
+            if arr[i-age]:
+                cur=base*(decay**age)
+                if cur>best:
+                    best=cur;best_age=age
+        if best>0:
+            score+=best;hits.append((best,name,best_age))
+            if is_strong:
+                strong_hits+=1
+    hits.sort(key=lambda x:x[0],reverse=True)
+    return score,strong_hits,hits
+
+
+def _objective_action_label(label):
+    return {
+        'STRONG_BUY':'BUY / strongest objective alignment',
+        'BUY':'BUY / objective trend follow-through',
+        'WATCH_BUY':'WATCH BUY / wait for confirmation',
+        'NEUTRAL':'NEUTRAL / wait for clearer alignment',
+        'MIXED':'MIXED / conflicting objective evidence',
+        'WATCH_SELL':'WATCH SELL / risk-off watch',
+        'SELL':'SELL / objective downside pressure',
+        'STRONG_SELL':'SELL / strongest downside alignment',
+    }.get(label,'NEUTRAL / wait for clearer alignment')
+
+
+def _compute_objective_judgment(df,vol_ratio):
+    if df is None or df.empty:
+        return df
+
+    idx=df.index;n=len(df)
+    N=lambda c,d=0:df.get(c,pd.Series(d,index=idx)).fillna(d)
+    close_v=df['Close'].values;open_v=df['Open'].values;high_v=df['High'].values;low_v=df['Low'].values
+    ma20_v=N('MA20',np.nan).values;ma50_v=N('MA50',np.nan).values;ma200_v=N('MA200',np.nan).values
+    ema12_v=N('EMA12',np.nan).values;ema26_v=N('EMA26',np.nan).values
+    hma_v=N('HMA',np.nan).values;hma_rising_v=df.get('HMA_Rising',pd.Series(False,index=idx)).fillna(False).values.astype(bool)
+    wt1_v=N('WT1',0.).values;wt2_v=N('WT2',0.).values;rsi_v=N('RSI',50.).values;mfi_v=N('MFI',50.).values
+    macd_hist_v=N('MACD_Hist',0.).values;adx_v=N('ADX',0.).values;pdi_v=N('Plus_DI',0.).values;mdi_v=N('Minus_DI',0.).values
+    stochk_v=N('StochK',50.).values;stochd_v=N('StochD',50.).values;atr_v=N('ATR',0.).values;percent_b_v=N('Percent_B',0.5).values
+    williams_r_v=N('Williams_R',-50.).values;cci_v=N('CCI',0.).values;roc_v=N('ROC',0.).values;rmi_v=N('RMI',50.).values
+    trix_v=N('TRIX',0.).values;price_osc_v=N('Price_Oscillator',0.).values;vol_osc_v=N('Volume_Oscillator',0.).values
+    mass_index_v=N('Mass_Index',0.).values;momentum_10_v=N('Momentum_10',0.).values
+    disparity20_v=N('Disparity_20',0.).values;disparity50_v=N('Disparity_50',0.).values;disparity200_v=N('Disparity_200',0.).values
+    intraday_intensity_v=N('Intraday_Intensity',0.).values;intraday_intensity_idx_v=N('Intraday_Intensity_Index',0.).values
+    ad_line_v=N('AD_Line',0.).values;chaikin_osc_v=N('Chaikin_Oscillator',0.).values
+    envelope_pct_v=N('Envelope_Percent',0.5).values;vwap_v=N('VWAP',np.nan).values;fixed_vwap_v=N('Fixed_VWAP',np.nan).values
+    psar_dir_v=N('PSAR_Direction',0.).values;price_channel_up_v=N('Price_Channel_Up',np.nan).values;price_channel_low_v=N('Price_Channel_Low',np.nan).values;price_channel_mid_v=N('Price_Channel_Mid',np.nan).values
+    fractal_high_v=np.asarray(N('Fractal_High',False).values,dtype=bool);fractal_low_v=np.asarray(N('Fractal_Low',False).values,dtype=bool)
+    vp_poc_v=N('VP_POC',np.nan).values;vp_vah_v=N('VP_VAH',np.nan).values;vp_val_v=N('VP_VAL',np.nan).values
+    long_rr_v=N('VP_Long_RR',1.).values;short_rr_v=N('VP_Short_RR',1.).values
+    vr_v=vol_ratio.values if isinstance(vol_ratio,pd.Series) else np.asarray(vol_ratio,dtype=float)
+    if len(vr_v)!=n:
+        vr_v=N('Volume_Ratio_20',1.).values
+
+    signal_specs={'buy':[],'sell':[]};combo_specs={'buy':[],'sell':[]};bool_arrays={}
+    for name,cfg in SIGNAL_REGISTRY.items():
+        if name in _OBJECTIVE_SIGNAL_EXCLUDE or name not in df.columns:
+            continue
+        direction=cfg.get('dir')
+        if direction not in signal_specs:
+            continue
+        bool_arrays[name]=df[name].fillna(False).values.astype(bool)
+        signal_specs[direction].append((name,float(cfg.get('w',1.0))*1.05,name in (STRONG_BUY_SIGS if direction=='buy' else STRONG_SELL_SIGS)))
+    combo_base={1:3.0,2:2.0,3:1.2}
+    for name,cfg in COMBINED_SCAN_REGISTRY.items():
+        if name not in df.columns:
+            continue
+        direction=cfg.get('dir')
+        if direction not in combo_specs:
+            continue
+        bool_arrays[name]=df[name].fillna(False).values.astype(bool)
+        tier=int(cfg.get('tier',3) or 3)
+        combo_specs[direction].append((name,float(combo_base.get(tier,1.0)),tier==1))
+
+    labels=np.full(n,'NEUTRAL',dtype=object);pre_labels=np.full(n,'NEUTRAL',dtype=object);conf=np.zeros(n,dtype=float)
+    buy_agree=np.zeros(n,dtype=int);sell_agree=np.zeros(n,dtype=int)
+    buy_score=np.zeros(n,dtype=float);sell_score=np.zeros(n,dtype=float);conflict_score=np.zeros(n,dtype=float)
+    trend_buy_score=np.zeros(n,dtype=float);trend_sell_score=np.zeros(n,dtype=float)
+    momentum_buy_score=np.zeros(n,dtype=float);momentum_sell_score=np.zeros(n,dtype=float)
+    money_buy_score=np.zeros(n,dtype=float);money_sell_score=np.zeros(n,dtype=float)
+    reversal_buy_score=np.zeros(n,dtype=float);reversal_sell_score=np.zeros(n,dtype=float)
+    location_buy_score=np.zeros(n,dtype=float);location_sell_score=np.zeros(n,dtype=float)
+    signal_buy_score=np.zeros(n,dtype=float);signal_sell_score=np.zeros(n,dtype=float)
+    combo_buy_score=np.zeros(n,dtype=float);combo_sell_score=np.zeros(n,dtype=float)
+    reasons=[];details=[];actions=[];contrast_notes=[]
+
+    for i in range(n):
+        price=float(close_v[i]);prev_close=float(close_v[i-1]) if i>0 else price
+        prev_rsi=float(rsi_v[i-1]) if i>0 else float(rsi_v[i]);prev_mfi=float(mfi_v[i-1]) if i>0 else float(mfi_v[i])
+        prev_wt1=float(wt1_v[i-1]) if i>0 else float(wt1_v[i]);prev_macd=float(macd_hist_v[i-1]) if i>0 else float(macd_hist_v[i])
+        prev_poc=float(vp_poc_v[i-1]) if i>0 else float(vp_poc_v[i])
+        prev_ad_line=float(ad_line_v[i-1]) if i>0 else float(ad_line_v[i])
+        prev_chaikin=float(chaikin_osc_v[i-1]) if i>0 else float(chaikin_osc_v[i])
+        prev_intraday_idx=float(intraday_intensity_idx_v[i-1]) if i>0 else float(intraday_intensity_idx_v[i])
+        green=price>=float(open_v[i]);red=price<float(open_v[i]);close_up=price>prev_close;close_dn=price<prev_close
+        bar_range=max(float(high_v[i]-low_v[i]),0.);atr_here=max(float(atr_v[i]),0.);atr_norm=atr_here/max(abs(price),1e-10)
+        vp_tol=max(atr_norm*1.5,0.012)
+
+        trend_buy=0.;trend_sell=0.;trend_note_buy='';trend_note_sell=''
+        if np.isfinite(hma_v[i]):
+            if price>float(hma_v[i]):
+                trend_buy+=1.0;trend_note_buy=trend_note_buy or 'close stayed above HMA'
+            elif price<float(hma_v[i]):
+                trend_sell+=1.0;trend_note_sell=trend_note_sell or 'close stayed below HMA'
+        if i>0 and np.isfinite(hma_v[i]) and np.isfinite(hma_v[i-1]):
+            if bool(hma_rising_v[i]):
+                trend_buy+=0.9;trend_note_buy=trend_note_buy or 'HMA kept rising'
+            elif float(hma_v[i])<float(hma_v[i-1]):
+                trend_sell+=0.7;trend_note_sell=trend_note_sell or 'HMA kept falling'
+        if np.isfinite(ma20_v[i]):
+            if price>float(ma20_v[i]):
+                trend_buy+=0.7
+            elif price<float(ma20_v[i]):
+                trend_sell+=0.7
+        if np.isfinite(ma50_v[i]):
+            if price>float(ma50_v[i]):
+                trend_buy+=1.1
+            elif price<float(ma50_v[i]):
+                trend_sell+=1.1
+        if np.isfinite(ma200_v[i]):
+            if price>float(ma200_v[i]):
+                trend_buy+=1.2
+            elif price<float(ma200_v[i]):
+                trend_sell+=1.2
+        if np.isfinite(ma50_v[i]) and np.isfinite(ma200_v[i]):
+            if float(ma50_v[i])>float(ma200_v[i]):
+                trend_buy+=0.8
+            elif float(ma50_v[i])<float(ma200_v[i]):
+                trend_sell+=0.8
+        if np.isfinite(ema12_v[i]) and np.isfinite(ema26_v[i]):
+            if price>float(ema12_v[i]) and float(ema12_v[i])>float(ema26_v[i]):
+                trend_buy+=1.0;trend_note_buy=trend_note_buy or 'EMA12 stayed above EMA26'
+            elif price<float(ema12_v[i]) and float(ema12_v[i])<float(ema26_v[i]):
+                trend_sell+=1.0;trend_note_sell=trend_note_sell or 'EMA12 stayed below EMA26'
+            elif float(ema12_v[i])>float(ema26_v[i]):
+                trend_buy+=0.5
+            elif float(ema12_v[i])<float(ema26_v[i]):
+                trend_sell+=0.5
+        if np.isfinite(adx_v[i]) and float(adx_v[i])>=18 and np.isfinite(pdi_v[i]) and np.isfinite(mdi_v[i]):
+            if float(pdi_v[i])>float(mdi_v[i]):
+                trend_buy+=1.1
+            elif float(mdi_v[i])>float(pdi_v[i]):
+                trend_sell+=1.1
+        if float(psar_dir_v[i])>0:
+            trend_buy+=0.7
+        elif float(psar_dir_v[i])<0:
+            trend_sell+=0.7
+        if np.isfinite(vwap_v[i]):
+            if price>float(vwap_v[i]):
+                trend_buy+=0.5
+            elif price<float(vwap_v[i]):
+                trend_sell+=0.5
+        if np.isfinite(fixed_vwap_v[i]):
+            if price>float(fixed_vwap_v[i]):
+                trend_buy+=0.5
+            elif price<float(fixed_vwap_v[i]):
+                trend_sell+=0.5
+        if np.isfinite(price_channel_mid_v[i]):
+            if price>float(price_channel_mid_v[i]):
+                trend_buy+=0.4
+            elif price<float(price_channel_mid_v[i]):
+                trend_sell+=0.4
+        if np.isfinite(disparity50_v[i]):
+            if float(disparity50_v[i])>0:
+                trend_buy+=0.35
+            elif float(disparity50_v[i])<0:
+                trend_sell+=0.35
+        if np.isfinite(disparity200_v[i]):
+            if float(disparity200_v[i])>0:
+                trend_buy+=0.45
+            elif float(disparity200_v[i])<0:
+                trend_sell+=0.45
+        trend_buy=min(trend_buy,6.0);trend_sell=min(trend_sell,6.0)
+
+        momentum_buy=0.;momentum_sell=0.;momentum_note_buy='';momentum_note_sell=''
+        if np.isfinite(macd_hist_v[i]):
+            if float(macd_hist_v[i])>0:
+                momentum_buy+=1.1;momentum_note_buy=momentum_note_buy or 'MACD histogram stayed positive'
+            elif float(macd_hist_v[i])<0:
+                momentum_sell+=1.1;momentum_note_sell=momentum_note_sell or 'MACD histogram stayed negative'
+            if i>0:
+                if float(macd_hist_v[i])>prev_macd:
+                    momentum_buy+=0.8
+                elif float(macd_hist_v[i])<prev_macd:
+                    momentum_sell+=0.8
+        if np.isfinite(wt1_v[i]) and np.isfinite(wt2_v[i]):
+            if float(wt1_v[i])>float(wt2_v[i]):
+                momentum_buy+=1.0;momentum_note_buy=momentum_note_buy or 'WT1 crossed above WT2'
+            elif float(wt1_v[i])<float(wt2_v[i]):
+                momentum_sell+=1.0;momentum_note_sell=momentum_note_sell or 'WT1 stayed below WT2'
+            if float(wt1_v[i])>prev_wt1:
+                momentum_buy+=0.8
+            elif float(wt1_v[i])<prev_wt1:
+                momentum_sell+=0.8
+        if np.isfinite(rsi_v[i]):
+            if float(rsi_v[i])>=52:
+                momentum_buy+=0.8
+            elif float(rsi_v[i])<=48:
+                momentum_sell+=0.8
+        if np.isfinite(mfi_v[i]):
+            if float(mfi_v[i])>=52:
+                momentum_buy+=0.7
+            elif float(mfi_v[i])<=48:
+                momentum_sell+=0.7
+        if np.isfinite(stochk_v[i]) and np.isfinite(stochd_v[i]):
+            if float(stochk_v[i])>float(stochd_v[i]):
+                momentum_buy+=0.6
+            elif float(stochk_v[i])<float(stochd_v[i]):
+                momentum_sell+=0.6
+        if np.isfinite(roc_v[i]):
+            if float(roc_v[i])>0:
+                momentum_buy+=0.7
+            elif float(roc_v[i])<0:
+                momentum_sell+=0.7
+        if np.isfinite(rmi_v[i]):
+            if float(rmi_v[i])>=52:
+                momentum_buy+=0.7
+            elif float(rmi_v[i])<=48:
+                momentum_sell+=0.7
+        if np.isfinite(trix_v[i]):
+            if float(trix_v[i])>0:
+                momentum_buy+=0.6
+            elif float(trix_v[i])<0:
+                momentum_sell+=0.6
+        if np.isfinite(price_osc_v[i]):
+            if float(price_osc_v[i])>0:
+                momentum_buy+=0.7
+            elif float(price_osc_v[i])<0:
+                momentum_sell+=0.7
+        if np.isfinite(momentum_10_v[i]):
+            if float(momentum_10_v[i])>0:
+                momentum_buy+=0.6
+            elif float(momentum_10_v[i])<0:
+                momentum_sell+=0.6
+        if np.isfinite(disparity20_v[i]):
+            if float(disparity20_v[i])>1.0:
+                momentum_buy+=0.4
+            elif float(disparity20_v[i])<-1.0:
+                momentum_sell+=0.4
+        momentum_buy=min(momentum_buy,5.0);momentum_sell=min(momentum_sell,5.0)
+
+        money_buy=0.;money_sell=0.;money_note_buy='';money_note_sell=''
+        if np.isfinite(mfi_v[i]):
+            if float(mfi_v[i])>=55:
+                money_buy+=0.6
+            elif float(mfi_v[i])<=45:
+                money_sell+=0.6
+        if np.isfinite(vol_osc_v[i]):
+            if float(vol_osc_v[i])>0:
+                money_buy+=0.8 if close_up else 0.5
+                money_note_buy=money_note_buy or 'volume oscillator expanded on the upside'
+            elif float(vol_osc_v[i])<0:
+                money_sell+=0.8 if close_dn else 0.5
+                money_note_sell=money_note_sell or 'volume oscillator expanded on the downside'
+        if np.isfinite(intraday_intensity_v[i]):
+            if float(intraday_intensity_v[i])>0 and green:
+                money_buy+=0.4
+            elif float(intraday_intensity_v[i])<0 and red:
+                money_sell+=0.4
+        if np.isfinite(intraday_intensity_idx_v[i]):
+            if float(intraday_intensity_idx_v[i])>=10:
+                money_buy+=0.9;money_note_buy=money_note_buy or 'intraday intensity stayed positive'
+            elif float(intraday_intensity_idx_v[i])<=-10:
+                money_sell+=0.9;money_note_sell=money_note_sell or 'intraday intensity stayed negative'
+            elif i>0:
+                if float(intraday_intensity_idx_v[i])>prev_intraday_idx:
+                    money_buy+=0.3
+                elif float(intraday_intensity_idx_v[i])<prev_intraday_idx:
+                    money_sell+=0.3
+        if np.isfinite(chaikin_osc_v[i]):
+            if float(chaikin_osc_v[i])>0:
+                money_buy+=0.9;money_note_buy=money_note_buy or 'Chaikin flow turned supportive'
+            elif float(chaikin_osc_v[i])<0:
+                money_sell+=0.9;money_note_sell=money_note_sell or 'Chaikin flow turned defensive'
+            if i>0:
+                if float(chaikin_osc_v[i])>prev_chaikin:
+                    money_buy+=0.3
+                elif float(chaikin_osc_v[i])<prev_chaikin:
+                    money_sell+=0.3
+        if i>0 and np.isfinite(ad_line_v[i]):
+            if float(ad_line_v[i])>prev_ad_line:
+                money_buy+=0.5
+            elif float(ad_line_v[i])<prev_ad_line:
+                money_sell+=0.5
+        money_buy=min(money_buy,4.8);money_sell=min(money_sell,4.8)
+
+        oversold_count=int(float(rsi_v[i])<35)+int(float(mfi_v[i])<35)+int(float(wt1_v[i])<-45)+int(float(stochk_v[i])<25)+int(float(percent_b_v[i])<0.20)+int(float(williams_r_v[i])<=-80)+int(float(cci_v[i])<=-100)+int(float(envelope_pct_v[i])<=0.20)
+        overbought_count=int(float(rsi_v[i])>65)+int(float(mfi_v[i])>65)+int(float(wt1_v[i])>45)+int(float(stochk_v[i])>75)+int(float(percent_b_v[i])>0.80)+int(float(williams_r_v[i])>=-20)+int(float(cci_v[i])>=100)+int(float(envelope_pct_v[i])>=0.80)
+        rebound_up=(green and close_up) or (float(rsi_v[i])>prev_rsi) or (float(mfi_v[i])>prev_mfi) or (float(wt1_v[i])>prev_wt1) or (float(stochk_v[i])>float(stochd_v[i]))
+        rebound_dn=(red and close_dn) or (float(rsi_v[i])<prev_rsi) or (float(mfi_v[i])<prev_mfi) or (float(wt1_v[i])<prev_wt1) or (float(stochk_v[i])<float(stochd_v[i]))
+        reversal_buy=min(oversold_count*0.95,4.5) if oversold_count>=2 and rebound_up else 0.
+        reversal_sell=min(overbought_count*0.95,4.5) if overbought_count>=2 and rebound_dn else 0.
+        reversal_note_buy='oversold cluster started rebounding' if reversal_buy>0 else ''
+        reversal_note_sell='overbought cluster started fading' if reversal_sell>0 else ''
+        if fractal_low_v[i] and rebound_up:
+            reversal_buy+=0.8;reversal_note_buy=reversal_note_buy or 'Williams fractal low appeared with rebound'
+        if fractal_high_v[i] and rebound_dn:
+            reversal_sell+=0.8;reversal_note_sell=reversal_note_sell or 'Williams fractal high appeared with fade'
+        if np.isfinite(disparity20_v[i]) and float(disparity20_v[i])<=-4 and rebound_up:
+            reversal_buy+=0.6
+        if np.isfinite(disparity20_v[i]) and float(disparity20_v[i])>=4 and rebound_dn:
+            reversal_sell+=0.6
+        if np.isfinite(mass_index_v[i]) and float(mass_index_v[i])>=26.5:
+            if rebound_up and oversold_count>=1:
+                reversal_buy+=0.7;reversal_note_buy=reversal_note_buy or 'Mass Index bulge reversed higher'
+            if rebound_dn and overbought_count>=1:
+                reversal_sell+=0.7;reversal_note_sell=reversal_note_sell or 'Mass Index bulge reversed lower'
+        reversal_buy=min(reversal_buy,5.2);reversal_sell=min(reversal_sell,5.2)
+
+        location_buy=0.;location_sell=0.;location_note_buy='';location_note_sell=''
+        if np.isfinite(vp_poc_v[i]):
+            if price>float(vp_poc_v[i]):
+                location_buy+=0.9;location_note_buy=location_note_buy or 'price held above VP POC'
+            elif price<float(vp_poc_v[i]):
+                location_sell+=0.9;location_note_sell=location_note_sell or 'price stayed below VP POC'
+            if i>0 and np.isfinite(prev_poc):
+                if prev_close<=prev_poc and price>float(vp_poc_v[i]):
+                    location_buy+=0.7
+                elif prev_close>=prev_poc and price<float(vp_poc_v[i]):
+                    location_sell+=0.7
+        if np.isfinite(vp_val_v[i]) and price<=float(vp_val_v[i])*(1+vp_tol) and green:
+            location_buy+=0.7
+        if np.isfinite(vp_vah_v[i]) and price>=float(vp_vah_v[i])*(1-vp_tol) and red:
+            location_sell+=0.7
+        if np.isfinite(price_channel_low_v[i]) and price<=float(price_channel_low_v[i])*(1+vp_tol) and green:
+            location_buy+=0.6
+        if np.isfinite(price_channel_up_v[i]) and price>=float(price_channel_up_v[i])*(1-vp_tol) and red:
+            location_sell+=0.6
+        if np.isfinite(vwap_v[i]) and np.isfinite(fixed_vwap_v[i]):
+            if price>float(vwap_v[i]) and price>float(fixed_vwap_v[i]):
+                location_buy+=0.4
+            elif price<float(vwap_v[i]) and price<float(fixed_vwap_v[i]):
+                location_sell+=0.4
+        if np.isfinite(long_rr_v[i]):
+            if float(long_rr_v[i])>=1.35:
+                location_buy+=1.4;location_note_buy=location_note_buy or 'VP long RR stayed favorable'
+            elif float(long_rr_v[i])>=1.10:
+                location_buy+=0.8
+        if np.isfinite(short_rr_v[i]):
+            if float(short_rr_v[i])>=1.35:
+                location_sell+=1.4;location_note_sell=location_note_sell or 'VP short RR stayed favorable'
+            elif float(short_rr_v[i])>=1.10:
+                location_sell+=0.8
+        if close_up and float(vr_v[i])>=1.15:
+            location_buy+=0.8
+        elif close_dn and float(vr_v[i])>=1.15:
+            location_sell+=0.8
+        if np.isfinite(envelope_pct_v[i]) and float(envelope_pct_v[i])<=0.25 and green:
+            location_buy+=0.5
+        elif np.isfinite(envelope_pct_v[i]) and float(envelope_pct_v[i])>=0.75 and red:
+            location_sell+=0.5
+        if atr_here>0 and bar_range>=atr_here*1.2:
+            if green:
+                location_buy+=0.6
+            elif red:
+                location_sell+=0.6
+        location_buy=min(location_buy,4.5);location_sell=min(location_sell,4.5)
+
+        signal_buy,signal_buy_strong,signal_buy_hits=_objective_recent_registry_score(i,signal_specs['buy'],bool_arrays,4,0.72)
+        signal_sell,signal_sell_strong,signal_sell_hits=_objective_recent_registry_score(i,signal_specs['sell'],bool_arrays,4,0.72)
+        combo_buy,combo_buy_strong,combo_buy_hits=_objective_recent_registry_score(i,combo_specs['buy'],bool_arrays,6,0.78)
+        combo_sell,combo_sell_strong,combo_sell_hits=_objective_recent_registry_score(i,combo_specs['sell'],bool_arrays,6,0.78)
+        signal_buy=min(signal_buy,7.0);signal_sell=min(signal_sell,7.0);combo_buy=min(combo_buy,6.0);combo_sell=min(combo_sell,6.0)
+
+        buy_groups={'trend':trend_buy,'momentum':momentum_buy,'money':money_buy,'reversal':reversal_buy,'location':location_buy,'signals':signal_buy,'combos':combo_buy}
+        sell_groups={'trend':trend_sell,'momentum':momentum_sell,'money':money_sell,'reversal':reversal_sell,'location':location_sell,'signals':signal_sell,'combos':combo_sell}
+        thresholds={'trend':2.2,'momentum':2.2,'money':1.6,'reversal':1.6,'location':1.4,'signals':1.5,'combos':1.2}
+        buy_ag=sum(int(buy_groups[key]>=thresholds[key] and buy_groups[key]>sell_groups[key]*0.85) for key in thresholds)
+        sell_ag=sum(int(sell_groups[key]>=thresholds[key] and sell_groups[key]>buy_groups[key]*0.85) for key in thresholds)
+        conflict=sum(min(buy_groups[key],sell_groups[key]) for key in thresholds)/3.5
+        buy_total=sum(buy_groups.values())+max(buy_ag-2,0)*0.8+min(signal_buy_strong,2)*0.6+min(combo_buy_strong,2)*0.8
+        sell_total=sum(sell_groups.values())+max(sell_ag-2,0)*0.8+min(signal_sell_strong,2)*0.6+min(combo_sell_strong,2)*0.8
+        buy_total=max(buy_total-min(conflict,2.6),0.);sell_total=max(sell_total-min(conflict,2.6),0.)
+        diff=buy_total-sell_total
+
+        if buy_ag>=2 and sell_ag>=2 and abs(diff)<=2.5:
+            label='MIXED'
+        elif diff>=10 and ((buy_ag>=4) or (buy_ag>=3 and combo_buy>=2.2)):
+            label='STRONG_BUY'
+        elif diff>=5 and (buy_ag>=3 or (buy_ag>=2 and (signal_buy+combo_buy)>=3.2)):
+            label='BUY'
+        elif diff>=2.2 and buy_ag>=2:
+            label='WATCH_BUY'
+        elif diff<=-10 and ((sell_ag>=4) or (sell_ag>=3 and combo_sell>=2.2)):
+            label='STRONG_SELL'
+        elif diff<=-5 and (sell_ag>=3 or (sell_ag>=2 and (signal_sell+combo_sell)>=3.2)):
+            label='SELL'
+        elif diff<=-2.2 and sell_ag>=2:
+            label='WATCH_SELL'
+        else:
+            label='NEUTRAL'
+
+        buy_reason_parts=[];sell_reason_parts=[]
+        if trend_buy>=2.2 and trend_buy>trend_sell:
+            buy_reason_parts.append(trend_note_buy or 'price/HMA/MA structure leaned bullish')
+        if momentum_buy>=2.2 and momentum_buy>momentum_sell:
+            buy_reason_parts.append(momentum_note_buy or 'momentum stack leaned bullish')
+        if money_buy>=1.6 and money_buy>money_sell:
+            buy_reason_parts.append(money_note_buy or 'money-flow stack leaned bullish')
+        if reversal_buy>=1.6 and reversal_buy>reversal_sell:
+            buy_reason_parts.append(reversal_note_buy)
+        if location_buy>=1.4 and location_buy>location_sell:
+            buy_reason_parts.append(location_note_buy or 'volume profile / RR favored longs')
+        if signal_buy>=1.5:
+            buy_reason_parts.append(f"recent buy signals fired ({', '.join(_objective_event_name(name) for _,name,_ in signal_buy_hits[:2])})")
+        if combo_buy>=1.2:
+            buy_reason_parts.append(f"recent buy combos fired ({', '.join(_objective_event_name(name) for _,name,_ in combo_buy_hits[:2])})")
+        if trend_sell>=2.2 and trend_sell>trend_buy:
+            sell_reason_parts.append(trend_note_sell or 'price/HMA/MA structure leaned bearish')
+        if momentum_sell>=2.2 and momentum_sell>momentum_buy:
+            sell_reason_parts.append(momentum_note_sell or 'momentum stack leaned bearish')
+        if money_sell>=1.6 and money_sell>money_buy:
+            sell_reason_parts.append(money_note_sell or 'money-flow stack leaned bearish')
+        if reversal_sell>=1.6 and reversal_sell>reversal_buy:
+            sell_reason_parts.append(reversal_note_sell)
+        if location_sell>=1.4 and location_sell>location_buy:
+            sell_reason_parts.append(location_note_sell or 'volume profile / RR favored shorts')
+        if signal_sell>=1.5:
+            sell_reason_parts.append(f"recent sell signals fired ({', '.join(_objective_event_name(name) for _,name,_ in signal_sell_hits[:2])})")
+        if combo_sell>=1.2:
+            sell_reason_parts.append(f"recent sell combos fired ({', '.join(_objective_event_name(name) for _,name,_ in combo_sell_hits[:2])})")
+
+        if label in _OBJECTIVE_BUY_LABELS:
+            reason=buy_reason_parts[0] if buy_reason_parts else 'objective bullish evidence stayed ahead of bearish evidence'
+            contrast=sell_reason_parts[0] if sell_reason_parts else ''
+        elif label in _OBJECTIVE_SELL_LABELS:
+            reason=sell_reason_parts[0] if sell_reason_parts else 'objective bearish evidence stayed ahead of bullish evidence'
+            contrast=buy_reason_parts[0] if buy_reason_parts else ''
+        elif label=='MIXED':
+            reason='buy and sell evidence fired in the same recent window'
+            contrast=' | '.join((buy_reason_parts+sell_reason_parts)[:2])
+        else:
+            reason='objective evidence stayed below the conviction threshold'
+            contrast=(buy_reason_parts or sell_reason_parts or ['signal confirmation stayed thin'])[0]
+
+        raw_conf=32.+min(abs(diff)*4.2,34.)+max(buy_ag,sell_ag)*4.5+min(max(signal_buy,signal_sell)*1.2,9.)+min(max(combo_buy,combo_sell)*1.5,10.)-min(conflict*4.0,16.)
+        if label=='NEUTRAL':
+            conf_val=np.clip(18.+min(max(buy_total,sell_total)*1.2,22.),18.,44.)
+        elif label=='MIXED':
+            conf_val=np.clip(28.+min((buy_total+sell_total)*0.8,24.)-min(abs(diff)*2.0,10.),26.,58.)
+        else:
+            conf_val=np.clip(raw_conf,22.,97.)
+
+        detail_parts=[
+            f"objective buy {buy_total:.1f} vs sell {sell_total:.1f}",
+            f"agreement B{buy_ag}/S{sell_ag}",
+            f"trend {trend_buy:.1f}/{trend_sell:.1f}",
+            f"momentum {momentum_buy:.1f}/{momentum_sell:.1f}",
+            f"money {money_buy:.1f}/{money_sell:.1f}",
+            f"signals {signal_buy:.1f}/{signal_sell:.1f}",
+            f"combos {combo_buy:.1f}/{combo_sell:.1f}",
+        ]
+        if contrast:
+            detail_parts.append(f"counter: {contrast}")
+
+        labels[i]=label;pre_labels[i]=label;conf[i]=float(conf_val);buy_agree[i]=int(buy_ag);sell_agree[i]=int(sell_ag)
+        buy_score[i]=float(buy_total);sell_score[i]=float(sell_total);conflict_score[i]=float(conflict)
+        trend_buy_score[i]=float(trend_buy);trend_sell_score[i]=float(trend_sell)
+        momentum_buy_score[i]=float(momentum_buy);momentum_sell_score[i]=float(momentum_sell)
+        money_buy_score[i]=float(money_buy);money_sell_score[i]=float(money_sell)
+        reversal_buy_score[i]=float(reversal_buy);reversal_sell_score[i]=float(reversal_sell)
+        location_buy_score[i]=float(location_buy);location_sell_score[i]=float(location_sell)
+        signal_buy_score[i]=float(signal_buy);signal_sell_score[i]=float(signal_sell)
+        combo_buy_score[i]=float(combo_buy);combo_sell_score[i]=float(combo_sell)
+        reasons.append(reason);details.append(' | '.join(detail_parts));actions.append(_objective_action_label(label));contrast_notes.append(contrast)
+
+    df['Objective_Buy_Score']=buy_score;df['Objective_Sell_Score']=sell_score;df['Objective_Conflict_Score']=conflict_score
+    df['Objective_Trend_Buy']=trend_buy_score;df['Objective_Trend_Sell']=trend_sell_score
+    df['Objective_Momentum_Buy']=momentum_buy_score;df['Objective_Momentum_Sell']=momentum_sell_score
+    df['Objective_Money_Buy']=money_buy_score;df['Objective_Money_Sell']=money_sell_score
+    df['Objective_Reversal_Buy']=reversal_buy_score;df['Objective_Reversal_Sell']=reversal_sell_score
+    df['Objective_Location_Buy']=location_buy_score;df['Objective_Location_Sell']=location_sell_score
+    df['Objective_Signal_Buy']=signal_buy_score;df['Objective_Signal_Sell']=signal_sell_score
+    df['Objective_Combo_Buy']=combo_buy_score;df['Objective_Combo_Sell']=combo_sell_score
+    df['PreVeto_Judgment']=pre_labels;df['Trade_Judgment']=labels;df['Judgment_Confidence']=conf
+    df['Buy_Agree']=buy_agree;df['Sell_Agree']=sell_agree
+    df['Downgrade_Count']=0;df['Macro_Risk_Off_Count']=0;df['Macro_Risk_On_Count']=0;df['Flip_Guard_Triggered']=False
+    df['Judgment_Reason']=reasons;df['Judgment_Detail']=details;df['Action_Label']=actions;df['Contrast_Notes']=contrast_notes
+
+    is_buy=pd.Series(labels,index=idx).isin(list(_OBJECTIVE_BUY_LABELS))
+    is_sell=pd.Series(labels,index=idx).isin(list(_OBJECTIVE_SELL_LABELS))
+    df['System_Turn_Bull']=(is_buy & ~is_buy.shift(1).fillna(False)).values
+    df['System_Turn_Bear']=(is_sell & ~is_sell.shift(1).fillna(False)).values
     return df

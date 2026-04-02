@@ -11,12 +11,12 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import yfinance as yf
 from sectors import SECTOR_GROUPS
-from config import GEMINI_API_KEY, COMBINED_SCAN_REGISTRY, CTX_KOR, JT
-from utils import _valid_fmt, _sf, fetch_fundamentals, resolve_analysis_ticker, compute_and_cache, _compute_cached
+from config import GEMINI_API_KEY, GEMINI_API_KEY_FROM_SECRETS, COMBINED_SCAN_REGISTRY, CTX_KOR, JT
+from utils import _valid_fmt, _sf, resolve_analysis_ticker, compute_and_cache, _compute_cached
 from chart import build_chart, build_metadata
 from ui import render_market_home_dashboard
 from ui_localized import render_analysis
-from ai_agent import build_prompt_text, build_ai_prompt
+from ai_agent import build_prompt_text, build_ai_prompt, parse_ai_signal_assisted_response
 from audit import build_audit_payload
 from localization import (
     localize_action_label,
@@ -110,28 +110,79 @@ def _render_sidebar_choice_buttons(label, options, state_key, columns=2, default
     return str(st.session_state.get(state_key, current))
 
 
-@st.cache_resource
-def get_gemini_model():
-    if GEMINI_API_KEY:
-        genai.configure(api_key=GEMINI_API_KEY)
+def _active_gemini_api_key():
+    return str(st.session_state.get("runtime_gemini_api_key") or GEMINI_API_KEY or "").strip()
+
+
+def _mask_secret(value):
+    text = str(value or "").strip()
+    if not text:
+        return "미설정"
+    if len(text) <= 8:
+        return "*" * len(text)
+    return f"{text[:4]}...{text[-4:]}"
+
+
+def get_gemini_model(api_key):
+    api_key = str(api_key or "").strip()
+    if not api_key:
+        raise RuntimeError("Gemini API key missing")
+    genai.configure(api_key=api_key)
     return genai.GenerativeModel('gemini-flash-latest')
+
+
+def _generate_ai_signal_assisted(ticker, prompt, engine_judgment=""):
+    active_key = _active_gemini_api_key()
+    if not active_key:
+        return {
+            "available": False,
+            "AI_Judgment": "NEUTRAL",
+            "AI_Confidence": 0,
+            "AI_Bullish_Score": 0,
+            "AI_Bearish_Score": 0,
+            "AI_Risk_Flags": [],
+            "AI_Key_Drivers": [],
+            "AI_Reason": "Gemini API 키가 없어 AI 보조 판단을 생성하지 못했습니다. Analysis Workspace의 `AI Key Setup`에서 입력해 주세요.",
+            "AI_Agreement": "UNAVAILABLE",
+            "AI_Disagreement_Type": "MIXED",
+            "raw_text": "",
+        }
+    try:
+        model = get_gemini_model(active_key)
+        response = model.generate_content(prompt)
+        raw_text = str(getattr(response, "text", "") or "").strip()
+        return parse_ai_signal_assisted_response(raw_text, engine_judgment=engine_judgment)
+    except Exception as e:
+        return {
+            "available": False,
+            "AI_Judgment": "NEUTRAL",
+            "AI_Confidence": 0,
+            "AI_Bullish_Score": 0,
+            "AI_Bearish_Score": 0,
+            "AI_Risk_Flags": [],
+            "AI_Key_Drivers": [],
+            "AI_Reason": f"AI 보조 판단 생성 중 오류가 발생했습니다: {e}",
+            "AI_Agreement": "UNAVAILABLE",
+            "AI_Disagreement_Type": "MIXED",
+            "raw_text": "",
+        }
 
 def analyze(ticker, chart_days=252, refresh=False):
     try:
         ts = int(time.time()) if refresh else None
         df = compute_and_cache(ticker, ts)
         if df is None or df.empty or len(df) < 50:
-            return None, "데이터 부족", None, None
+            return None, None, "데이터 부족", None, None
         dc = df.dropna(subset=['WT1', 'WT2']).tail(chart_days).copy()
         if dc.empty:
-            return None, "차트 데이터 부족", None, None
+            return None, None, "차트 데이터 부족", None, None
         meta = build_metadata(dc, ticker)
         audit = build_audit_payload(df, ticker=ticker, lookback_bars=max(chart_days, 252))
-        return build_chart(dc, ticker).to_json(), build_prompt_text(dc, meta), meta, audit
+        return build_chart(dc, ticker).to_json(), None, build_prompt_text(dc, meta), meta, audit
     except Exception as e:
         import traceback
         print(f"[ERR]{ticker}:\n{traceback.format_exc()}")
-        return None, f"분석 실패: {e}", None, None
+        return None, None, f"분석 실패: {e}", None, None
 
 
 def _initial_messages():
@@ -143,6 +194,9 @@ def init_session():
         '_mode': MODE_MARKET_DAILY,
         '_auto': None,
         'quick': None,
+        'runtime_gemini_api_key': '',
+        'runtime_gemini_api_key_input': '',
+        'show_runtime_gemini_key_setup': False,
         'messages': _initial_messages(),
         'pending_ai_ticker': None,
         'pending_ai_prompt': None,
@@ -173,6 +227,9 @@ def reset_session():
     st.session_state['_mode'] = MODE_MARKET_DAILY
     st.session_state['_auto'] = None
     st.session_state['quick'] = None
+    st.session_state['runtime_gemini_api_key'] = ''
+    st.session_state['runtime_gemini_api_key_input'] = ''
+    st.session_state['show_runtime_gemini_key_setup'] = False
     st.session_state['messages'] = _initial_messages()
     st.session_state['pending_ai_ticker'] = None
     st.session_state['pending_ai_prompt'] = None
@@ -2217,7 +2274,7 @@ else:
             "티커를 입력하거나 빠른 시작을 눌러 개별 종목 분석을 시작하세요.",
             badges=[
                 ("직접 입력", "accent"),
-                ("QUANT AUDIT 연동", "muted"),
+                ("AI SIGNAL-ASSISTED", "muted"),
             ],
             eyebrow="Workspace",
             tight=True,
@@ -2236,6 +2293,46 @@ else:
         )
         _render_quick_analysis_grid(key_prefix="analysis_quick")
 
+    active_gemini_key = _active_gemini_api_key()
+    key_source = (
+        "세션 입력"
+        if st.session_state.get("runtime_gemini_api_key")
+        else ("secret" if GEMINI_API_KEY_FROM_SECRETS else ("환경변수" if GEMINI_API_KEY else "미설정"))
+    )
+    if GEMINI_API_KEY_FROM_SECRETS and not st.session_state.get("show_runtime_gemini_key_setup", False):
+        info_col, action_col = st.columns([3, 1])
+        info_col.caption(f"현재 AI 키: {key_source} · {_mask_secret(active_gemini_key)}")
+        if action_col.button("AI 키 변경", key="show_runtime_gemini_key_setup_btn", use_container_width=True):
+            st.session_state["show_runtime_gemini_key_setup"] = True
+            st.rerun()
+    else:
+        with st.expander("AI Key Setup", expanded=not bool(active_gemini_key)):
+            st.caption("Gemini API 키를 여기서 직접 입력해 현재 세션에만 적용할 수 있습니다.")
+            if GEMINI_API_KEY_FROM_SECRETS:
+                st.caption("`.streamlit/secrets.toml` 키가 기본으로 적용되어 있으며, 아래 입력값은 현재 세션에서만 덮어씁니다.")
+            st.text_input(
+                "Gemini API Key",
+                key="runtime_gemini_api_key_input",
+                type="password",
+                placeholder="AIza...",
+                help="세션 입력값이 있으면 `.streamlit/secrets.toml`이나 환경변수보다 우선합니다.",
+            )
+            c1, c2 = st.columns(2)
+            if c1.button("적용", key="apply_runtime_gemini_key", use_container_width=True):
+                entered_key = str(st.session_state.get("runtime_gemini_api_key_input", "")).strip()
+                if entered_key:
+                    st.session_state["runtime_gemini_api_key"] = entered_key
+                    st.toast("AI 키를 현재 세션에 적용했습니다.", icon="🔐")
+                    st.rerun()
+                st.warning("적용할 API 키를 먼저 입력해 주세요.")
+            if c2.button("초기화", key="clear_runtime_gemini_key", use_container_width=True):
+                st.session_state["runtime_gemini_api_key"] = ""
+                st.session_state["runtime_gemini_api_key_input"] = ""
+                st.toast("세션 API 키를 초기화했습니다.", icon="🧹")
+                st.rerun()
+            st.caption(f"현재 상태: {key_source} · {_mask_secret(active_gemini_key)}")
+            st.caption("영구 저장을 원하면 `.streamlit/secrets.toml` 또는 `GOOGLE_API_KEY` 환경변수를 사용하면 됩니다.")
+
     for i, msg in enumerate(st.session_state.messages):
         av = "✨" if msg["role"] == "assistant" else "🧑‍💻"
         with st.chat_message(msg["role"], avatar=av):
@@ -2247,7 +2344,7 @@ else:
                     with st.expander(f"{msg.get('ticker', '')} 지난 분석", expanded=False):
                         render_analysis(msg, key_prefix=f"analysis_{i}_{msg.get('ticker', 'na')}")
             elif msg.get("type") == "report":
-                with st.expander(f"{msg.get('ticker', '')} QUANT AUDIT", expanded=i == latest_report_idx):
+                with st.expander(f"{msg.get('ticker', '')} AI SIGNAL-ASSISTED", expanded=i == latest_report_idx):
                     st.markdown(msg["content"])
                 st.download_button(
                     "📥", key=f"dl_{i}",
@@ -2261,50 +2358,13 @@ else:
             if msg.get("prompt") and msg.get("type") == "analysis":
                 with st.expander(f"{msg.get('ticker', '')} PROMPT TAPE"):
                     st.markdown(
-                        "<div class='prompt-caption'>QUANT AUDIT에 실제로 사용된 프롬프트입니다. 코드 블록 우측 상단 복사 아이콘을 사용하세요.</div>",
+                        "<div class='prompt-caption'>독립 AI Signal-Assisted 판단에 실제로 사용된 프롬프트입니다. 코드 블록 우측 상단 복사 아이콘을 사용하세요.</div>",
                         unsafe_allow_html=True,
                     )
                     st.code(msg["prompt"], language="markdown")
-
-    def _run_ai():
-        tp = st.session_state.pending_ai_ticker
-        pp = st.session_state.pending_ai_prompt
-        with st.chat_message("assistant", avatar="✨"):
-            pb = st.progress(0)
-            ai_note = st.empty()
-            try:
-                model = get_gemini_model()
-                pb.progress(12)
-                ai_note.caption("1/3 QUANT AUDIT 엔진을 준비하고 있습니다.")
-                col_ = []
-
-                def gen():
-                    pb.progress(32)
-                    ai_note.caption("2/3 QUANT AUDIT 초안을 생성하고 있습니다. 종목과 시장 컨텍스트를 함께 요약합니다.")
-                    for ch in model.generate_content(pp, stream=True):
-                        if ch.text:
-                            col_.append(ch.text)
-                            yield ch.text
-                    pb.progress(88)
-                    ai_note.caption("3/3 문장을 정리하고 화면에 반영합니다.")
-                    pb.progress(100)
-
-                with st.expander(f"{tp.upper()} QUANT AUDIT", expanded=True):
-                    st.write_stream(gen())
-                time.sleep(.3)
-                pb.empty()
-                ai_note.empty()
-                st.session_state.messages.append({
-                    "role": "assistant", "type": "report",
-                    "ticker": tp.upper(), "content": "".join(col_)
-                })
-                st.session_state.pending_ai_ticker = None
-                st.session_state.pending_ai_prompt = None
-                st.rerun()
-            except Exception as e:
-                pb.empty()
-                ai_note.empty()
-                st.error(f"AI 오류: {e}")
+            if msg.get("ai_raw") and msg.get("type") == "analysis":
+                with st.expander(f"{msg.get('ticker', '')} AI SIGNAL-ASSISTED RAW"):
+                    st.code(msg["ai_raw"], language="json")
 
     def process_ticker(tv, refresh=False):
         raw_tv = str(tv or "").strip().upper()
@@ -2330,23 +2390,35 @@ else:
                     st.write(f"0. 입력값을 `{raw_tv}` → `{tv}` 로 해석했습니다.")
                 st.write("1. 입력 형식과 티커 유효성을 확인했습니다.")
                 status.update(label=f"VALIDATING TARGET · {tv}", state="running", expanded=True)
-                st.write("2. 기업 기본 정보와 부가 메타데이터를 불러오고 있습니다.")
-                fund = fetch_fundamentals(tv)
+                st.write("2. 가격 데이터와 객관 지표를 계산할 준비를 합니다.")
                 status.update(label=f"DATA FEED ESTABLISHED · {tv}", state="running", expanded=True)
-                st.write("3. 가격 데이터, 기술 지표, 위원회 점수, 차트 메타데이터를 계산합니다.")
-                fj, phist, meta, audit = analyze(tv, chart_days, refresh)
+                st.write("3. 가격 데이터, 기술 지표, 시그널, 차트 메타데이터를 계산합니다.")
+                fj, lab_fj, phist, meta, audit = analyze(tv, chart_days, refresh)
                 if fj and meta:
                     act = meta.get('action_label', '')
                     es  = meta.get('ensemble_score', 0)
-                    status.update(label=f"ASSEMBLING QUANT AUDIT · {tv}", state="running", expanded=True)
-                    st.write("4. QUANT AUDIT용 프롬프트와 화면 카드 요약을 구성합니다.")
+                    status.update(label=f"ASSEMBLING AI SIGNAL-ASSISTED · {tv}", state="running", expanded=True)
+                    st.write("4. 독립 AI Signal-Assisted 프롬프트를 구성합니다.")
                     st.write(f"📍 {act} | ES {es:+.1f}")
                     _show_analysis_toasts(tv, meta)
-                    prompt = build_ai_prompt(tv, phist, fund)
-                    st.write("5. 분석 카드와 리포트 버튼을 표시할 준비가 끝났습니다.")
+                    prompt = build_ai_prompt(tv, phist)
+                    st.write("5. 같은 데이터만 사용한 독립 AI 2차 의견을 생성합니다.")
+                    ai_result = _generate_ai_signal_assisted(tv, prompt, meta.get("judgment", ""))
+                    ai_raw = ai_result.pop("raw_text", "")
+                    meta["ai_signal_assisted"] = ai_result
+                    if ai_result.get("available"):
+                        st.write(
+                            f"🤖 {ai_result.get('AI_Judgment', 'NEUTRAL')} | "
+                            f"신뢰도 {ai_result.get('AI_Confidence', 0)}% | "
+                            f"{ai_result.get('AI_Agreement', 'ALIGNED')}"
+                        )
+                    else:
+                        st.write(f"🤖 AI 보조 판단 미사용: {ai_result.get('AI_Reason', '')}")
+                    st.write("6. 엔진 판단과 AI 판단을 함께 표시할 준비가 끝났습니다.")
                     status.update(label=f"SIGNAL READY · {tv} | {act}", state="complete", expanded=False)
                 else:
                     prompt = None
+                    ai_raw = ""
                     status.update(label=f"SIGNAL BUILD FAILED · {tv}", state="error")
             if fj:
                 syn  = meta.get('reversal_synergy', 0)
@@ -2361,14 +2433,21 @@ else:
                 veto = meta.get('veto_flags', '')
                 if veto:
                     content += f"\n🚫 {veto}"
+                ai_meta = meta.get("ai_signal_assisted", {})
+                if ai_meta:
+                    if ai_meta.get("available"):
+                        content += (
+                            f"\n🤖 AI:{ai_meta.get('AI_Judgment', 'NEUTRAL')} "
+                            f"{ai_meta.get('AI_Confidence', 0)}% · {ai_meta.get('AI_Agreement', 'ALIGNED')}"
+                        )
+                    else:
+                        content += "\n🤖 AI: 사용 불가"
                 st.session_state.messages.append({
                     "role": "assistant", "type": "analysis",
                     "ticker": tv, "content": content,
                     "analyzed_at": datetime.now().isoformat(timespec="seconds"),
-                    "fig_json": fj, "meta": meta, "prompt": prompt, "audit": audit,
+                    "fig_json": fj, "indicator_lab_json": lab_fj, "meta": meta, "prompt": prompt, "audit": audit, "ai_raw": ai_raw,
                 })
-                st.session_state.pending_ai_ticker = tv
-                st.session_state.pending_ai_prompt = prompt
                 st.rerun()
             else:
                 st.session_state.messages.append({
@@ -2381,10 +2460,6 @@ else:
         process_ticker(st.session_state.pop('_auto'))
     if st.session_state.get('quick'):
         process_ticker(st.session_state.pop('quick'))
-    if st.session_state.pending_ai_ticker and st.session_state.pending_ai_prompt:
-        st.caption("QUANT AUDIT는 보통 10~20초 정도 걸립니다. 시스템 판단 요약과 반론 포인트를 함께 정리합니다.")
-        if st.button(f"🚀 {st.session_state.pending_ai_ticker.upper()} QUANT AUDIT", type="primary", use_container_width=True):
-            _run_ai()
     if ti := st.chat_input("분석할 티커를 입력하세요. 예: AAPL, 005930"):
         parsed = _parse_analysis_ticker_input(ti)
         if not parsed:

@@ -1,3 +1,6 @@
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from theme import build_brand_theme_css
 
 
@@ -12,14 +15,27 @@ INITIAL_MESSAGE_CONTENT = (
 )
 
 
+def _brand_us_market_time_text():
+    try:
+        now_et = datetime.now(ZoneInfo("America/New_York"))
+    except Exception:
+        return ""
+    return now_et.strftime("%Y-%m-%d %H:%M ET")
+
+
 def build_brand_board(payload, compact=False):
     del payload
     shell_class = "sigl-brand-shell sigl-brand-shell--compact" if compact else "sigl-brand-shell"
+    us_market_time = _brand_us_market_time_text()
     return f"""
 <style>{build_brand_theme_css()}</style>
 <div class="sigl-html-block sigl-brand-root">
   <div class="{shell_class}">
     <div class="sigl-brand-bar">
+      <div class="sigl-brand-clock" aria-label="US market time">
+        <span class="sigl-brand-clock__label">US MARKET TIME</span>
+        <span class="sigl-brand-clock__value">{us_market_time}</span>
+      </div>
       <div class="sigl-brand-lockup">
         <div class="sigl-brand-wordmark" aria-label="$SIGN (Signal)">
           <div class="sigl-brand-title">

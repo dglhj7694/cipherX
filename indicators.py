@@ -28,6 +28,72 @@ def compute_supertrend(h,l,c,tr,per=10,mult=3.):
         if dv[i-1]==1:dv[i],sv[i]=(-1,up[i]) if cl[i]<dn[i] else (1,dn[i])
         else:dv[i],sv[i]=(1,dn[i]) if cl[i]>up[i] else (-1,up[i])
     return pd.Series(sv,index=c.index),pd.Series(dv,index=c.index)
+def compute_envelope(c,p=20,pct=0.025):
+    mid=c.rolling(p).mean();up=mid*(1+pct);low=mid*(1-pct);pos=(c-low)/(up-low+1e-10)
+    return mid,up,low,pos
+def compute_williams_fractal(h,l,span=2):
+    win=span*2+1;fh=(h==h.rolling(win,center=True,min_periods=win).max())&h.notna();fl=(l==l.rolling(win,center=True,min_periods=win).min())&l.notna()
+    return fh.fillna(False),fl.fillna(False)
+def compute_parabolic_sar(h,l,c,step=0.02,max_step=0.2):
+    hv,lv,cv=h.values.astype(float),l.values.astype(float),c.values.astype(float);n=len(c);sar=np.full(n,np.nan);direction=np.zeros(n,dtype=int)
+    if n==0:return pd.Series(dtype=float,index=c.index),pd.Series(dtype=int,index=c.index),pd.Series(dtype=bool,index=c.index),pd.Series(dtype=bool,index=c.index)
+    bull=True if n==1 else bool(cv[min(1,n-1)]>=cv[0]);ep=hv[0] if bull else lv[0];af=step;sar[0]=lv[0] if bull else hv[0];direction[0]=1 if bull else -1
+    for i in range(1,n):
+        prev_sar=sar[i-1]
+        if bull:
+            sar[i]=prev_sar+af*(ep-prev_sar)
+            if i>=2:sar[i]=min(sar[i],lv[i-1],lv[i-2])
+            elif i>=1:sar[i]=min(sar[i],lv[i-1])
+            if lv[i]<sar[i]:
+                bull=False;sar[i]=ep;ep=lv[i];af=step
+            else:
+                if hv[i]>ep:ep=hv[i];af=min(af+step,max_step)
+        else:
+            sar[i]=prev_sar+af*(ep-prev_sar)
+            if i>=2:sar[i]=max(sar[i],hv[i-1],hv[i-2])
+            elif i>=1:sar[i]=max(sar[i],hv[i-1])
+            if hv[i]>sar[i]:
+                bull=True;sar[i]=ep;ep=hv[i];af=step
+            else:
+                if lv[i]<ep:ep=lv[i];af=min(af+step,max_step)
+        direction[i]=1 if bull else -1
+    dir_s=pd.Series(direction,index=c.index)
+    return pd.Series(sar,index=c.index),dir_s,(dir_s==1)&(dir_s.shift(1)==-1),(dir_s==-1)&(dir_s.shift(1)==1)
+def compute_price_channel(h,l,p=20):
+    up=h.rolling(p).max();low=l.rolling(p).min();mid=(up+low)/2
+    return up,low,mid
+def compute_vwap_series(h,l,c,v,p=20):
+    tp=(h+l+c)/3;roll=(tp*v).rolling(p,min_periods=max(5,p//2)).sum()/(v.rolling(p,min_periods=max(5,p//2)).sum()+1e-10);fixed=(tp*v).cumsum()/(v.cumsum()+1e-10)
+    return roll,fixed
+def compute_mass_index(h,l,ema_p=9,sum_p=25):
+    spread=(h-l).abs();ema1=spread.ewm(span=ema_p,adjust=False).mean();ema2=ema1.ewm(span=ema_p,adjust=False).mean()
+    return (ema1/(ema2+1e-10)).rolling(sum_p).sum()
+def compute_momentum(c,p=10):return c-c.shift(p)
+def compute_volume_oscillator(v,short_p=14,long_p=28):
+    sv=v.ewm(span=short_p,adjust=False).mean();lv=v.ewm(span=long_p,adjust=False).mean();return ((sv-lv)/(lv+1e-10))*100
+def compute_williams_r(h,l,c,p=14):
+    hh=h.rolling(p).max();ll=l.rolling(p).min();return -100*((hh-c)/(hh-ll+1e-10))
+def compute_disparity(c,ma):return ((c/(ma+1e-10))-1.0)*100
+def compute_intraday_intensity(h,l,c,v,p=21):
+    raw=((2*c-h-l)/(h-l+1e-10))*v;idx=(raw.rolling(p).sum()/(v.rolling(p).sum()+1e-10))*100
+    return raw,idx
+def compute_ad_line(h,l,c,v):
+    mf=((2*c-h-l)/(h-l+1e-10))*v
+    return mf.cumsum()
+def compute_chaikin_oscillator(ad_line,short_p=3,long_p=10):
+    return ad_line.ewm(span=short_p,adjust=False).mean()-ad_line.ewm(span=long_p,adjust=False).mean()
+def compute_trix(c,p=15):
+    e1=c.ewm(span=p,adjust=False).mean();e2=e1.ewm(span=p,adjust=False).mean();e3=e2.ewm(span=p,adjust=False).mean()
+    return e3.pct_change()*100
+def compute_price_oscillator(c,short_p=12,long_p=26):
+    sf=c.ewm(span=short_p,adjust=False).mean();lf=c.ewm(span=long_p,adjust=False).mean();return ((sf-lf)/(lf+1e-10))*100
+def compute_cci(h,l,c,p=20):
+    tp=(h+l+c)/3;sma=tp.rolling(p).mean();md=(tp-sma).abs().rolling(p).mean();return (tp-sma)/(0.015*md+1e-10)
+def compute_roc(c,p=12):return c.pct_change(p)*100
+def compute_rmi(c,length=14,momentum=5):
+    delta=c-c.shift(momentum);up=delta.clip(lower=0);down=-delta.clip(upper=0)
+    rs=up.ewm(alpha=1/length,min_periods=length).mean()/(down.ewm(alpha=1/length,min_periods=length).mean()+1e-10)
+    return 100-(100/(1+rs))
 def compute_vp(h,l,c,v,lb=20,nb=30,step=1):
     n=len(c);poc=np.full(n,np.nan);vah=np.full(n,np.nan);val_=np.full(n,np.nan);cv,hv,lv,vv=c.values,h.values,l.values,v.values;pp,pv_,pvl=np.nan,np.nan,np.nan
     for i in range(lb,n):
@@ -218,20 +284,32 @@ def compute_indicators(df):
     df['Has_Long_History']=df['History_Bars']>=JT.MIN_HISTORY_LONG
     for ma in [5,10,20,50,200]:df[f'MA{ma}']=c.rolling(ma).mean()
     df['EMA8']=c.ewm(span=8,adjust=False).mean();df['EMA21']=c.ewm(span=21,adjust=False).mean()
+    df['EMA12']=c.ewm(span=12,adjust=False).mean();df['EMA26']=c.ewm(span=26,adjust=False).mean()
     df['BB_Mid']=df['MA20'];s20=c.rolling(20).std();df['BB_Up'],df['BB_Low']=df['BB_Mid']+s20*2,df['BB_Mid']-s20*2
     df['BB_Width']=(df['BB_Up']-df['BB_Low'])/(df['BB_Mid']+1e-10);df['Percent_B']=(c-df['BB_Low'])/(df['BB_Up']-df['BB_Low']+1e-10)
+    df['Envelope_Mid'],df['Envelope_Up'],df['Envelope_Low'],df['Envelope_Percent']=compute_envelope(c,20,0.025)
     tr=compute_tr(h,l,c);df['ATR']=tr.rolling(14).mean();df['SuperTrend'],df['ST_Direction']=compute_supertrend(h,l,c,tr)
+    df['Parabolic_SAR'],df['PSAR_Direction'],df['PSAR_Bull'],df['PSAR_Bear']=compute_parabolic_sar(h,l,c)
     ak=tr.rolling(10).mean();mk=c.ewm(span=20,adjust=False).mean();df['KC_Upper']=mk+ak*1.5;df['KC_Mid']=mk;df['KC_Lower']=mk-ak*1.5
+    df['Price_Channel_Up'],df['Price_Channel_Low'],df['Price_Channel_Mid']=compute_price_channel(h,l,20)
     vol20=v.rolling(20,min_periods=5).mean();vol50=v.rolling(50,min_periods=10).mean()
     df['Volume_Ratio_20']=v/(vol20+1e-10);df['Volume_Ratio_50']=v/(vol50+1e-10)
     df['Dollar_Volume_20']=(c*v).rolling(20,min_periods=5).mean()
+    df['Volume_Oscillator']=compute_volume_oscillator(v)
     w1,w2,wu,wd=compute_wavetrend(h,l,c);df['WT1'],df['WT2'],df['WT_Up'],df['WT_Down']=w1,w2,wu,wd
     df['RSI']=compute_rsi(c,14);df['StochK'],df['StochD']=compute_stoch_rsi(c);df['MFI']=compute_mfi(h,l,c,v,14).fillna(50)
+    df['Williams_R']=compute_williams_r(h,l,c,14);df['CCI']=compute_cci(h,l,c,20);df['ROC']=compute_roc(c,12);df['RMI']=compute_rmi(c,14,5)
+    df['Momentum_10']=compute_momentum(c,10);df['TRIX']=compute_trix(c,15);df['Price_Oscillator']=compute_price_oscillator(c,12,26)
     df['RSI_MFI']=compute_rsi_mfi(h,l,c,v,60);vw=(c*v).rolling(20).sum()/(v.rolling(20).sum()+1e-10);df['VWAP_Osc']=((c-vw)/(vw+1e-10))*100
+    df['VWAP'],df['Fixed_VWAP']=compute_vwap_series(h,l,c,v,20)
     df['ADX'],df['Plus_DI'],df['Minus_DI']=compute_adx(h,l,c);df['OBV']=compute_obv(c,v)
     df['MACD_Line'],df['MACD_Signal'],df['MACD_Hist']=compute_macd(c)
     tk,kj,sa,sb=compute_ichimoku(h,l,c);df['Ichimoku_Tenkan']=tk;df['Ichimoku_Kijun']=kj;df['Ichimoku_SenkouA']=sa;df['Ichimoku_SenkouB']=sb
     df['CMF']=compute_cmf(h,l,c,v,20)
+    df['Mass_Index']=compute_mass_index(h,l,9,25);df['Intraday_Intensity'],df['Intraday_Intensity_Index']=compute_intraday_intensity(h,l,c,v,21)
+    df['AD_Line']=compute_ad_line(h,l,c,v);df['Chaikin_Oscillator']=compute_chaikin_oscillator(df['AD_Line'],3,10)
+    df['Disparity_20']=compute_disparity(c,df['MA20']);df['Disparity_50']=compute_disparity(c,df['MA50']);df['Disparity_200']=compute_disparity(c,df['MA200'])
+    df['Fractal_High'],df['Fractal_Low']=compute_williams_fractal(h,l,2)
     df['OBV_Slope']=compute_obv_slope(df['OBV'],v,5);df['Price_Slope_5']=c.pct_change(5)
     df['Low_Volume_Caution']=df['Volume_Ratio_20']<0.7
     df['Thin_Trade_Risk']=(df['Dollar_Volume_20']<JT.MIN_DOLLAR_VOLUME_20).fillna(False)
