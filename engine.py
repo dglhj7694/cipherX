@@ -6,78 +6,78 @@ from indicators import detect_pivot_div, compute_indicators, compute_hull_ma, co
 
 def _ensure_runtime_combo_registry():
     """
-    Register additional practical combo scans at runtime.
-    This keeps config.py stable while allowing faster algorithm iteration.
+    추가 실전형 콤보 스캔을 런타임에 등록합니다.
+    config.py는 안정적으로 유지하면서 알고리즘 실험 속도는 높이기 위한 장치입니다.
     """
     runtime_combos = {
         'CS_Trend_Continuation_Buy': {
-            'name': 'Trend Continuation Buy',
-            'kor': 'Trend continuation buy',
+            'name': '추세 지속 매수',
+            'kor': '추세지속매수',
             'dir': 'buy',
             'tier': 2,
             'icon': 'UP',
             'color': '#34D399',
-            'desc': 'Trend pullback hold + momentum restart',
+            'desc': '상승 추세 눌림 유지 + 모멘텀 재가속',
             'win': '60-72%',
         },
         'CS_Trend_Continuation_Sell': {
-            'name': 'Trend Continuation Sell',
-            'kor': 'Trend continuation sell',
+            'name': '추세 지속 매도',
+            'kor': '추세지속매도',
             'dir': 'sell',
             'tier': 2,
             'icon': 'DN',
             'color': '#F87171',
-            'desc': 'Bear trend bounce fail + momentum rollover',
+            'desc': '하락 추세 반등 실패 + 모멘텀 재하락',
             'win': '60-72%',
         },
         'CS_Reversal_Cluster_Buy': {
-            'name': 'Reversal Cluster Buy',
-            'kor': 'Reversal cluster buy',
+            'name': '반전 클러스터 매수',
+            'kor': '반전클러스터매수',
             'dir': 'buy',
             'tier': 1,
             'icon': 'REV',
             'color': '#22C55E',
-            'desc': 'Divergence + oversold + turn signal cluster',
+            'desc': '다이버전스 + 과매도 + 전환 시그널 동시 발생',
             'win': '68-80%',
         },
         'CS_Reversal_Cluster_Sell': {
-            'name': 'Reversal Cluster Sell',
-            'kor': 'Reversal cluster sell',
+            'name': '반전 클러스터 매도',
+            'kor': '반전클러스터매도',
             'dir': 'sell',
             'tier': 1,
             'icon': 'REV',
             'color': '#EF4444',
-            'desc': 'Divergence + overbought + turn signal cluster',
+            'desc': '다이버전스 + 과매수 + 전환 시그널 동시 발생',
             'win': '68-80%',
         },
         'CS_Breakout_Confirm_Buy': {
-            'name': 'Breakout Confirm Buy',
-            'kor': 'Breakout confirm buy',
+            'name': '돌파 확인 매수',
+            'kor': '돌파확인매수',
             'dir': 'buy',
             'tier': 2,
             'icon': 'BRK',
             'color': '#60A5FA',
-            'desc': 'Breakout with volume and ADX/momentum confirmation',
+            'desc': '거래량과 ADX·모멘텀 확인이 동반된 상방 돌파',
             'win': '62-74%',
         },
         'CS_Breakout_Confirm_Sell': {
-            'name': 'Breakout Confirm Sell',
-            'kor': 'Breakdown confirm sell',
+            'name': '붕괴 확인 매도',
+            'kor': '붕괴확인매도',
             'dir': 'sell',
             'tier': 2,
             'icon': 'BRK',
             'color': '#F97316',
-            'desc': 'Breakdown with volume and ADX/momentum confirmation',
+            'desc': '거래량과 ADX·모멘텀 확인이 동반된 하방 붕괴',
             'win': '62-74%',
         },
         'CS_Conflict_Warning': {
-            'name': 'Conflict Warning',
-            'kor': 'Direction conflict warning',
+            'name': '방향 충돌 경고',
+            'kor': '방향충돌경고',
             'dir': 'neutral',
             'tier': 3,
             'icon': 'WARN',
             'color': '#F59E0B',
-            'desc': 'Strong buy/sell conditions fired together',
+            'desc': '강한 매수 조건과 강한 매도 조건이 동시에 발생',
             'win': 'N/A',
         },
     }
@@ -852,15 +852,15 @@ def _judgment_side(label):
 
 def _default_action_label(label):
     return {
-        'STRONG_BUY':'BUY / strongest alignment',
-        'BUY':'BUY / trend follow-through',
-        'WATCH_BUY':'WATCH BUY / wait for confirmation',
-        'NEUTRAL':'NEUTRAL / wait for clarity',
-        'MIXED':'MIXED / conflicting evidence',
-        'WATCH_SELL':'WATCH SELL / tighten risk',
-        'SELL':'SELL / downside pressure',
-        'STRONG_SELL':'SELL / strongest downside alignment',
-    }.get(str(label or '').upper(),'NEUTRAL / wait for clarity')
+        'STRONG_BUY':'강한 매수 / 정렬 최상',
+        'BUY':'매수 우위 / 추세 지속',
+        'WATCH_BUY':'매수 관찰 / 확인 대기',
+        'NEUTRAL':'중립 / 방향성 대기',
+        'MIXED':'혼조 / 근거 충돌',
+        'WATCH_SELL':'매도 관찰 / 리스크 관리',
+        'SELL':'매도 우위 / 하방 압력',
+        'STRONG_SELL':'강한 매도 / 하방 정렬 최상',
+    }.get(str(label or '').upper(),'중립 / 방향성 대기')
 
 
 def _append_note(base, extra, sep=' | '):
@@ -1414,53 +1414,53 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
         elif ba>=3 and sl>=3:j[i]='MIXED'
         pre_veto_j[i]=j[i]
         notes=[];signal_notes=[]
-        if high_conflict:notes.append("buy/sell pressure conflict stayed elevated")
+        if high_conflict:notes.append("매수·매도 압력 충돌이 높게 유지됐습니다")
         macro_risk_off_count_arr[i]=macro_risk_off_count;macro_risk_on_count_arr[i]=macro_risk_on_count
-        if macro_risk_off_count>=3:notes.append("macro backdrop stayed risk-off")
-        elif macro_risk_on_count>=2 and j[i] in sell_labels:notes.append("macro backdrop stayed risk-on")
-        if macro_pressure_v[i]>=3.2:notes.append("macro pressure magnitude stayed elevated")
-        elif macro_pressure_v[i]<=-2.5 and j[i] in sell_labels:notes.append("macro pressure eased materially")
-        if market_turn_bull_v[i]:signal_notes.append("market turn stack improved early")
+        if macro_risk_off_count>=3:notes.append("거시 환경이 위험회피 쪽으로 유지됐습니다")
+        elif macro_risk_on_count>=2 and j[i] in sell_labels:notes.append("거시 환경이 위험선호 쪽으로 유지됐습니다")
+        if macro_pressure_v[i]>=3.2:notes.append("거시 압력 강도가 높게 유지됐습니다")
+        elif macro_pressure_v[i]<=-2.5 and j[i] in sell_labels:notes.append("거시 압력이 의미 있게 완화됐습니다")
+        if market_turn_bull_v[i]:signal_notes.append("시장 전환 신호가 초기에 개선됐습니다")
         if market_turn_bear_v[i]:
             if sell_supportive_stack or macro_risk_off_count>=3:
-                notes.append("market turn stack turned defensive early")
+                notes.append("시장 전환 신호가 초기에 방어적으로 기울었습니다")
             else:
-                signal_notes.append("market turn stack turned cautious")
-        if trend_inflect_bull_v[i]:signal_notes.append("early trend-turn stack fired")
+                signal_notes.append("시장 전환 신호가 조심스러워졌습니다")
+        if trend_inflect_bull_v[i]:signal_notes.append("초기 추세 전환 신호가 발생했습니다")
         if trend_inflect_bear_v[i]:
             if sell_supportive_stack or macro_risk_off_count>=3:
-                notes.append("early trend-turn stack rolled over")
+                notes.append("초기 추세 전환 신호가 약세로 꺾였습니다")
             else:
-                signal_notes.append("early trend-turn stack softened")
-        if narrow_leadership_v[i]:notes.append("index leadership stayed narrow")
-        if leader_mode:signal_notes.append("leader / theme-stock mode stayed active")
-        if pv_bear_v[i]:notes.append("price up but OBV/CMF/volume diverged")
-        elif pv_bull_v[i]:notes.append("price down but money flow improved")
-        if low_vol_v[i] and price_slope_v[i]>0:notes.append("volume below 0.7x average")
-        if thin_trade_v[i]:notes.append("20-day dollar volume stayed thin")
-        if long_rr_v[i]<JT.VP_RR_FLOOR and e>0:notes.append(f"long RR {long_rr_v[i]:.2f} vs VAH/POC")
-        if short_rr_v[i]<JT.VP_RR_FLOOR and e<0:notes.append(f"short RR {short_rr_v[i]:.2f} vs VAL/POC")
-        if hard_blowoff_v[i]:notes.append("blow-off top >3 ATR above MA20 with 2x red volume")
-        if continuation_buy_score_v[i]>=2:signal_notes.append("continuation-quality stack stayed aligned")
-        if continuation_sell_score_v[i]>=2:notes.append("exhaustion / failure stack stayed aligned")
-        if bullish_gap_reversal_v[i]:signal_notes.append("gap-down reversal recovered quickly")
-        if bearish_gap_failure_v[i]:notes.append("gap-up failed to hold and looked trap-prone")
-        if box_breakout_v[i]:signal_notes.append("box breakout confirmed with follow-through")
-        elif box_support_v[i]:signal_notes.append("box support held on pullback")
-        if channel_breakout_v[i]:signal_notes.append("rising channel pushed to a fresh breakout")
-        elif channel_support_v[i]:signal_notes.append("channel support held and trend stayed intact")
-        if triangle_breakout_v[i]:signal_notes.append("triangle compression resolved to the upside")
+                signal_notes.append("초기 추세 전환 신호가 약화됐습니다")
+        if narrow_leadership_v[i]:notes.append("지수 주도주 폭이 좁게 유지됐습니다")
+        if leader_mode:signal_notes.append("리더주 / 테마주 모드가 유지됐습니다")
+        if pv_bear_v[i]:notes.append("가격은 올랐지만 OBV·CMF·거래량은 다이버전스를 보였습니다")
+        elif pv_bull_v[i]:notes.append("가격은 내렸지만 자금 흐름은 개선됐습니다")
+        if low_vol_v[i] and price_slope_v[i]>0:notes.append("거래량이 평균 대비 0.7배 미만입니다")
+        if thin_trade_v[i]:notes.append("20일 거래대금이 얇은 상태입니다")
+        if long_rr_v[i]<JT.VP_RR_FLOOR and e>0:notes.append(f"롱 손익비 {long_rr_v[i]:.2f} (VAH/POC 기준)")
+        if short_rr_v[i]<JT.VP_RR_FLOOR and e<0:notes.append(f"숏 손익비 {short_rr_v[i]:.2f} (VAL/POC 기준)")
+        if hard_blowoff_v[i]:notes.append("MA20 대비 3ATR 이상 과열됐고 음봉 거래량이 2배 이상입니다")
+        if continuation_buy_score_v[i]>=2:signal_notes.append("지속형 매수 스택이 정렬됐습니다")
+        if continuation_sell_score_v[i]>=2:notes.append("소진·실패 스택이 정렬됐습니다")
+        if bullish_gap_reversal_v[i]:signal_notes.append("갭다운 반전이 빠르게 회복됐습니다")
+        if bearish_gap_failure_v[i]:notes.append("갭업이 유지되지 못해 함정 가능성이 커졌습니다")
+        if box_breakout_v[i]:signal_notes.append("박스 돌파 후 추세 연장이 확인됐습니다")
+        elif box_support_v[i]:signal_notes.append("눌림에서 박스 지지가 유지됐습니다")
+        if channel_breakout_v[i]:signal_notes.append("상승 채널이 새 돌파로 이어졌습니다")
+        elif channel_support_v[i]:signal_notes.append("채널 지지가 유지돼 추세가 살아 있습니다")
+        if triangle_breakout_v[i]:signal_notes.append("삼각 수렴이 상방으로 해소됐습니다")
         if box_breakdown_v[i] or channel_breakdown_v[i] or triangle_breakdown_v[i]:
-            notes.append("structure breakdown confirmed under support")
+            notes.append("지지 하단에서 구조 붕괴가 확인됐습니다")
         elif box_reject_v[i] or channel_reject_v[i]:
-            notes.append("overhead structure rejected the bounce")
+            notes.append("상단 구조 저항에 반등이 막혔습니다")
         if asc_triangle_v[i] and not triangle_breakout_v[i]:
-            signal_notes.append("ascending triangle stayed constructive")
+            signal_notes.append("상승 삼각형이 우호적으로 유지됐습니다")
         elif desc_triangle_v[i] and not triangle_breakdown_v[i]:
-            notes.append("descending triangle kept pressure overhead")
+            notes.append("하락 삼각형이 상단 압박을 유지했습니다")
         elif sym_triangle_v[i] and not triangle_breakout_v[i] and not triangle_breakdown_v[i]:
-            notes.append("symmetrical triangle still needed resolution")
-        if ut_overheat_buy_v[i] and j[i] in buy_labels:notes.append("price stretched far above UT stop")
+            notes.append("대칭 삼각형이 아직 방향 해소를 기다립니다")
+        if ut_overheat_buy_v[i] and j[i] in buy_labels:notes.append("가격이 UT 스탑 대비 과도하게 이격됐습니다")
         severe_buy=(money_eff[i]<=JT.MONEY_VETO_NEUTRAL) or (cmf[i]<0 and obv_slope_v[i]<0 and long_rr_v[i]<0.9)
         severe_sell=(money_eff[i]>=abs(JT.MONEY_VETO_NEUTRAL)) or (cmf[i]>0 and obv_slope_v[i]>0 and short_rr_v[i]<0.9)
         countertrend_buy_risk=(
@@ -1588,7 +1588,7 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
                     j[i]='MIXED'
                     flip_guard_triggered[i]=j[i]!=prev_label
                     downgrade_count[i]+=int(j[i]!=prev_label)
-                    notes.append("direct buy-to-sell flip lacked follow-through")
+                    notes.append("매수에서 즉시 매도로 뒤집힐 만큼 하락 후속 확인이 충분하지 않았습니다")
             elif prev_sell and cur_buy:
                 strong_buy_flip=(
                     (e>=sbt)
@@ -1606,7 +1606,7 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
                     j[i]='MIXED'
                     flip_guard_triggered[i]=j[i]!=prev_label
                     downgrade_count[i]+=int(j[i]!=prev_label)
-                    notes.append("direct sell-to-buy flip lacked follow-through")
+                    notes.append("매도에서 즉시 매수로 뒤집힐 만큼 상승 후속 확인이 충분하지 않았습니다")
         contrast_notes.append('; '.join(notes[:3]))
         signal_note_txt='; '.join(signal_notes[:2])
         ae=abs(e);dm=max(ba,sl);ap=dm/NUM_COMMITTEES*35;sp=min(ae/60*30,30);avp=np.mean(ec[i])/100*20;syp=min(abs(sy)/20*10,10);pp=min(abs(pred[i])/15*5,5)
@@ -1639,27 +1639,27 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
         mhu=bool(mhv[i]>mhpv[i]) if i>0 else False
         r,d,a=_gen_reason(j[i],e,int(ctx_v[i]),vstr,sy,pred[i],ba,sl,wt1_v[i],rsi_v[i],mfi_v[i],cmf[i],obr,adx_v[i],vol_ratio.values[i],ma50a,ma200a,mhu,stoch_v[i],bool(hma_r_v[i]) if i<len(hma_r_v) else False,int(ut_v[i]),bool(sq_v[i]),cms)
         if j[i]=='WATCH_BUY' and continuation_buy_score_v[i]>=2:
-            a="CONTINUATION WATCH / pullback-entry candidate"
+            a="지속형 관찰 / 눌림 진입 후보"
         elif j[i]=='WATCH_SELL':
-            a="RISK WARNING / trim or tighten stops"
+            a="리스크 경고 / 비중 축소 또는 손절선 상향"
             if leader_mode and not hard_blowoff_v[i]:
-                r="Leader stock looked extended, but breakdown confirmation was incomplete"
+                r="리더주 과열 부담은 있었지만 하락 붕괴 확인은 아직 부족했습니다"
         elif j[i]=='SELL' and leader_mode and not hard_blowoff_v[i]:
-            a="REDUCE / wait for deeper breakdown confirmation"
+            a="비중 축소 / 추가 붕괴 확인 대기"
         note_txt=contrast_notes[-1]
         if hard_blowoff_v[i]:
-            r="Blow-off top detected - take profit / sell bias"
-            a=f"TAKE_PROFIT / SELL | {a}" if a else "TAKE_PROFIT / SELL"
+            r="블로우오프 천장이 감지돼 차익실현·매도 우위로 봤습니다"
+            a=f"차익실현 / 매도 | {a}" if a else "차익실현 / 매도"
         elif j[i]=='NEUTRAL' and pv_bear_v[i] and e>0:
-            r="Money veto: breakout quality deteriorated"
+            r="수급 거부 신호: 돌파 품질이 약해졌습니다"
         elif j[i]=='NEUTRAL' and pv_bull_v[i] and e<0:
-            r="Money veto: downside follow-through deteriorated"
+            r="수급 거부 신호: 하락 추종 품질이 약해졌습니다"
         if note_txt:
             d=f"{d} | {note_txt}" if d else note_txt
             if j[i] in buy_labels and not hard_blowoff_v[i]:
-                a=f"{a} | caution" if a else "BUY with caution"
+                a=f"{a} | 주의" if a else "매수하되 주의"
             elif j[i] in sell_labels and not hard_blowoff_v[i] and (pv_bull_v[i] or short_rr_v[i]<JT.VP_RR_FLOOR):
-                a=f"{a} | caution" if a else "SELL with caution"
+                a=f"{a} | 주의" if a else "매도하되 주의"
         if signal_note_txt:
             d=f"{d} | {signal_note_txt}" if d else signal_note_txt
         rs.append(r);rd.append(d);al.append(a)
@@ -1683,7 +1683,12 @@ _OBJECTIVE_SIGNAL_EXCLUDE={'System_Turn_Bull','System_Turn_Bear'}
 
 
 def _objective_event_name(name):
-    return str(name).replace('_',' ')
+    raw=str(name or '')
+    if raw in SIGNAL_REGISTRY:
+        return str(SIGNAL_REGISTRY.get(raw,{}).get('kor') or raw.replace('_',' '))
+    if raw in COMBINED_SCAN_REGISTRY:
+        return str(COMBINED_SCAN_REGISTRY.get(raw,{}).get('kor') or raw.replace('_',' '))
+    return raw.replace('_',' ')
 
 
 def _objective_recent_registry_score(i,specs,bool_arrays,lookback,decay):
@@ -1709,15 +1714,15 @@ def _objective_recent_registry_score(i,specs,bool_arrays,lookback,decay):
 
 def _objective_action_label(label):
     return {
-        'STRONG_BUY':'BUY / strongest objective alignment',
-        'BUY':'BUY / objective trend follow-through',
-        'WATCH_BUY':'WATCH BUY / wait for confirmation',
-        'NEUTRAL':'NEUTRAL / wait for clearer alignment',
-        'MIXED':'MIXED / conflicting objective evidence',
-        'WATCH_SELL':'WATCH SELL / risk-off watch',
-        'SELL':'SELL / objective downside pressure',
-        'STRONG_SELL':'SELL / strongest downside alignment',
-    }.get(label,'NEUTRAL / wait for clearer alignment')
+        'STRONG_BUY':'강한 매수 / 객관 근거 최상',
+        'BUY':'매수 우위 / 객관 추세 지속',
+        'WATCH_BUY':'매수 관찰 / 확인 대기',
+        'NEUTRAL':'중립 / 추가 정렬 대기',
+        'MIXED':'혼조 / 객관 근거 충돌',
+        'WATCH_SELL':'매도 관찰 / 리스크 경계',
+        'SELL':'매도 우위 / 객관 하방 압력',
+        'STRONG_SELL':'강한 매도 / 객관 하방 정렬 최상',
+    }.get(label,'중립 / 추가 정렬 대기')
 
 
 def _compute_objective_judgment(df,vol_ratio):
@@ -1816,14 +1821,14 @@ def _compute_objective_judgment(df,vol_ratio):
         trend_buy=0.;trend_sell=0.;trend_note_buy='';trend_note_sell=''
         if np.isfinite(hma_v[i]):
             if price>float(hma_v[i]):
-                trend_buy+=1.0;trend_note_buy=trend_note_buy or 'close stayed above HMA'
+                trend_buy+=1.0;trend_note_buy=trend_note_buy or '종가가 HMA 위를 유지했습니다'
             elif price<float(hma_v[i]):
-                trend_sell+=1.0;trend_note_sell=trend_note_sell or 'close stayed below HMA'
+                trend_sell+=1.0;trend_note_sell=trend_note_sell or '종가가 HMA 아래에 머물렀습니다'
         if i>0 and np.isfinite(hma_v[i]) and np.isfinite(hma_v[i-1]):
             if bool(hma_rising_v[i]):
-                trend_buy+=0.9;trend_note_buy=trend_note_buy or 'HMA kept rising'
+                trend_buy+=0.9;trend_note_buy=trend_note_buy or 'HMA 상승 흐름이 이어졌습니다'
             elif float(hma_v[i])<float(hma_v[i-1]):
-                trend_sell+=0.7;trend_note_sell=trend_note_sell or 'HMA kept falling'
+                trend_sell+=0.7;trend_note_sell=trend_note_sell or 'HMA 하락 흐름이 이어졌습니다'
         if np.isfinite(ma20_v[i]):
             if price>float(ma20_v[i]):
                 trend_buy+=0.7
@@ -1846,9 +1851,9 @@ def _compute_objective_judgment(df,vol_ratio):
                 trend_sell+=0.8
         if np.isfinite(ema12_v[i]) and np.isfinite(ema26_v[i]):
             if price>float(ema12_v[i]) and float(ema12_v[i])>float(ema26_v[i]):
-                trend_buy+=1.0;trend_note_buy=trend_note_buy or 'EMA12 stayed above EMA26'
+                trend_buy+=1.0;trend_note_buy=trend_note_buy or 'EMA12가 EMA26 위를 유지했습니다'
             elif price<float(ema12_v[i]) and float(ema12_v[i])<float(ema26_v[i]):
-                trend_sell+=1.0;trend_note_sell=trend_note_sell or 'EMA12 stayed below EMA26'
+                trend_sell+=1.0;trend_note_sell=trend_note_sell or 'EMA12가 EMA26 아래를 유지했습니다'
             elif float(ema12_v[i])>float(ema26_v[i]):
                 trend_buy+=0.5
             elif float(ema12_v[i])<float(ema26_v[i]):
@@ -1879,9 +1884,9 @@ def _compute_objective_judgment(df,vol_ratio):
                 trend_sell+=0.4
         if np.isfinite(supertrend_v[i]):
             if price>float(supertrend_v[i]):
-                trend_buy+=0.7;trend_note_buy=trend_note_buy or 'price stayed above SuperTrend'
+                trend_buy+=0.7;trend_note_buy=trend_note_buy or 'SuperTrend 위를 유지했습니다'
             elif price<float(supertrend_v[i]):
-                trend_sell+=0.7;trend_note_sell=trend_note_sell or 'price stayed below SuperTrend'
+                trend_sell+=0.7;trend_note_sell=trend_note_sell or 'SuperTrend 아래에 머물렀습니다'
         if np.isfinite(tenkan_v[i]) and np.isfinite(kijun_v[i]):
             if price>float(tenkan_v[i]) and price>float(kijun_v[i]):
                 trend_buy+=0.7
@@ -1908,9 +1913,9 @@ def _compute_objective_judgment(df,vol_ratio):
         momentum_buy=0.;momentum_sell=0.;momentum_note_buy='';momentum_note_sell=''
         if np.isfinite(macd_hist_v[i]):
             if float(macd_hist_v[i])>0:
-                momentum_buy+=1.1;momentum_note_buy=momentum_note_buy or 'MACD histogram stayed positive'
+                momentum_buy+=1.1;momentum_note_buy=momentum_note_buy or 'MACD 히스토그램이 양수권을 유지했습니다'
             elif float(macd_hist_v[i])<0:
-                momentum_sell+=1.1;momentum_note_sell=momentum_note_sell or 'MACD histogram stayed negative'
+                momentum_sell+=1.1;momentum_note_sell=momentum_note_sell or 'MACD 히스토그램이 음수권을 유지했습니다'
             if i>0:
                 if float(macd_hist_v[i])>prev_macd:
                     momentum_buy+=0.8
@@ -1918,9 +1923,9 @@ def _compute_objective_judgment(df,vol_ratio):
                     momentum_sell+=0.8
         if np.isfinite(wt1_v[i]) and np.isfinite(wt2_v[i]):
             if float(wt1_v[i])>float(wt2_v[i]):
-                momentum_buy+=1.0;momentum_note_buy=momentum_note_buy or 'WT1 crossed above WT2'
+                momentum_buy+=1.0;momentum_note_buy=momentum_note_buy or 'WT1이 WT2 위로 올라섰습니다'
             elif float(wt1_v[i])<float(wt2_v[i]):
-                momentum_sell+=1.0;momentum_note_sell=momentum_note_sell or 'WT1 stayed below WT2'
+                momentum_sell+=1.0;momentum_note_sell=momentum_note_sell or 'WT1이 WT2 아래에 머물렀습니다'
             if float(wt1_v[i])>prev_wt1:
                 momentum_buy+=0.8
             elif float(wt1_v[i])<prev_wt1:
@@ -1981,10 +1986,10 @@ def _compute_objective_judgment(df,vol_ratio):
         if np.isfinite(vol_osc_v[i]):
             if float(vol_osc_v[i])>0:
                 money_buy+=0.8 if close_up else 0.5
-                money_note_buy=money_note_buy or 'volume oscillator expanded on the upside'
+                money_note_buy=money_note_buy or '거래량 오실레이터가 상승 방향으로 확장됐습니다'
             elif float(vol_osc_v[i])<0:
                 money_sell+=0.8 if close_dn else 0.5
-                money_note_sell=money_note_sell or 'volume oscillator expanded on the downside'
+                money_note_sell=money_note_sell or '거래량 오실레이터가 하락 방향으로 확장됐습니다'
         if np.isfinite(intraday_intensity_v[i]):
             if float(intraday_intensity_v[i])>0 and green:
                 money_buy+=0.4
@@ -1992,9 +1997,9 @@ def _compute_objective_judgment(df,vol_ratio):
                 money_sell+=0.4
         if np.isfinite(intraday_intensity_idx_v[i]):
             if float(intraday_intensity_idx_v[i])>=10:
-                money_buy+=0.9;money_note_buy=money_note_buy or 'intraday intensity stayed positive'
+                money_buy+=0.9;money_note_buy=money_note_buy or '장중 체결 강도가 양수 우위를 유지했습니다'
             elif float(intraday_intensity_idx_v[i])<=-10:
-                money_sell+=0.9;money_note_sell=money_note_sell or 'intraday intensity stayed negative'
+                money_sell+=0.9;money_note_sell=money_note_sell or '장중 체결 강도가 음수 우위를 유지했습니다'
             elif i>0:
                 if float(intraday_intensity_idx_v[i])>prev_intraday_idx:
                     money_buy+=0.3
@@ -2002,9 +2007,9 @@ def _compute_objective_judgment(df,vol_ratio):
                     money_sell+=0.3
         if np.isfinite(chaikin_osc_v[i]):
             if float(chaikin_osc_v[i])>0:
-                money_buy+=0.9;money_note_buy=money_note_buy or 'Chaikin flow turned supportive'
+                money_buy+=0.9;money_note_buy=money_note_buy or 'Chaikin 흐름이 매수 우호로 기울었습니다'
             elif float(chaikin_osc_v[i])<0:
-                money_sell+=0.9;money_note_sell=money_note_sell or 'Chaikin flow turned defensive'
+                money_sell+=0.9;money_note_sell=money_note_sell or 'Chaikin 흐름이 방어적 약세로 기울었습니다'
             if i>0:
                 if float(chaikin_osc_v[i])>prev_chaikin:
                     money_buy+=0.3
@@ -2028,29 +2033,29 @@ def _compute_objective_judgment(df,vol_ratio):
         rebound_dn=(red and close_dn) or (float(rsi_v[i])<prev_rsi) or (float(mfi_v[i])<prev_mfi) or (float(wt1_v[i])<prev_wt1) or (float(stochk_v[i])<float(stochd_v[i]))
         reversal_buy=min(oversold_count*0.95,4.5) if oversold_count>=2 and rebound_up else 0.
         reversal_sell=min(overbought_count*0.95,4.5) if overbought_count>=2 and rebound_dn else 0.
-        reversal_note_buy='oversold cluster started rebounding' if reversal_buy>0 else ''
-        reversal_note_sell='overbought cluster started fading' if reversal_sell>0 else ''
+        reversal_note_buy='과매도 묶음에서 반등이 시작됐습니다' if reversal_buy>0 else ''
+        reversal_note_sell='과매수 묶음에서 둔화가 시작됐습니다' if reversal_sell>0 else ''
         if fractal_low_v[i] and rebound_up:
-            reversal_buy+=0.8;reversal_note_buy=reversal_note_buy or 'Williams fractal low appeared with rebound'
+            reversal_buy+=0.8;reversal_note_buy=reversal_note_buy or '윌리엄스 프랙탈 저점과 반등이 함께 나타났습니다'
         if fractal_high_v[i] and rebound_dn:
-            reversal_sell+=0.8;reversal_note_sell=reversal_note_sell or 'Williams fractal high appeared with fade'
+            reversal_sell+=0.8;reversal_note_sell=reversal_note_sell or '윌리엄스 프랙탈 고점과 약세 전환이 함께 나타났습니다'
         if np.isfinite(disparity20_v[i]) and float(disparity20_v[i])<=-4 and rebound_up:
             reversal_buy+=0.6
         if np.isfinite(disparity20_v[i]) and float(disparity20_v[i])>=4 and rebound_dn:
             reversal_sell+=0.6
         if np.isfinite(mass_index_v[i]) and float(mass_index_v[i])>=26.5:
             if rebound_up and oversold_count>=1:
-                reversal_buy+=0.7;reversal_note_buy=reversal_note_buy or 'Mass Index bulge reversed higher'
+                reversal_buy+=0.7;reversal_note_buy=reversal_note_buy or 'Mass Index 팽창 이후 상방 반전이 나왔습니다'
             if rebound_dn and overbought_count>=1:
-                reversal_sell+=0.7;reversal_note_sell=reversal_note_sell or 'Mass Index bulge reversed lower'
+                reversal_sell+=0.7;reversal_note_sell=reversal_note_sell or 'Mass Index 팽창 이후 하방 반전이 나왔습니다'
         reversal_buy=min(reversal_buy,5.2);reversal_sell=min(reversal_sell,5.2)
 
         location_buy=0.;location_sell=0.;location_note_buy='';location_note_sell=''
         if np.isfinite(vp_poc_v[i]):
             if price>float(vp_poc_v[i]):
-                location_buy+=0.9;location_note_buy=location_note_buy or 'price held above VP POC'
+                location_buy+=0.9;location_note_buy=location_note_buy or '가격이 VP POC 위를 지켰습니다'
             elif price<float(vp_poc_v[i]):
-                location_sell+=0.9;location_note_sell=location_note_sell or 'price stayed below VP POC'
+                location_sell+=0.9;location_note_sell=location_note_sell or '가격이 VP POC 아래에 머물렀습니다'
             if i>0 and np.isfinite(prev_poc):
                 if prev_close<=prev_poc and price>float(vp_poc_v[i]):
                     location_buy+=0.7
@@ -2076,12 +2081,12 @@ def _compute_objective_judgment(df,vol_ratio):
                 location_sell+=0.6
         if np.isfinite(long_rr_v[i]):
             if float(long_rr_v[i])>=1.35:
-                location_buy+=1.4;location_note_buy=location_note_buy or 'VP long RR stayed favorable'
+                location_buy+=1.4;location_note_buy=location_note_buy or 'VP 기준 롱 손익비가 우호적이었습니다'
             elif float(long_rr_v[i])>=1.10:
                 location_buy+=0.8
         if np.isfinite(short_rr_v[i]):
             if float(short_rr_v[i])>=1.35:
-                location_sell+=1.4;location_note_sell=location_note_sell or 'VP short RR stayed favorable'
+                location_sell+=1.4;location_note_sell=location_note_sell or 'VP 기준 숏 손익비가 우호적이었습니다'
             elif float(short_rr_v[i])>=1.10:
                 location_sell+=0.8
         if close_up and float(vr_v[i])>=1.15:
@@ -2140,46 +2145,46 @@ def _compute_objective_judgment(df,vol_ratio):
 
         buy_reason_parts=[];sell_reason_parts=[]
         if trend_buy>=2.2 and trend_buy>trend_sell:
-            buy_reason_parts.append(trend_note_buy or 'price/HMA/MA structure leaned bullish')
+            buy_reason_parts.append(trend_note_buy or '가격·HMA·이평 구조가 매수 우위였습니다')
         if momentum_buy>=2.2 and momentum_buy>momentum_sell:
-            buy_reason_parts.append(momentum_note_buy or 'momentum stack leaned bullish')
+            buy_reason_parts.append(momentum_note_buy or '모멘텀 묶음이 매수 우위였습니다')
         if money_buy>=1.6 and money_buy>money_sell:
-            buy_reason_parts.append(money_note_buy or 'money-flow stack leaned bullish')
+            buy_reason_parts.append(money_note_buy or '수급 묶음이 매수 우위였습니다')
         if reversal_buy>=1.6 and reversal_buy>reversal_sell:
             buy_reason_parts.append(reversal_note_buy)
         if location_buy>=1.4 and location_buy>location_sell:
-            buy_reason_parts.append(location_note_buy or 'volume profile / RR favored longs')
+            buy_reason_parts.append(location_note_buy or '거래량 프로파일과 손익비가 롱 쪽에 우호적이었습니다')
         if signal_buy>=1.5:
-            buy_reason_parts.append(f"recent buy signals fired ({', '.join(_objective_event_name(name) for _,name,_ in signal_buy_hits[:2])})")
+            buy_reason_parts.append(f"최근 매수 시그널이 발생했습니다 ({', '.join(_objective_event_name(name) for _,name,_ in signal_buy_hits[:2])})")
         if combo_buy>=1.2:
-            buy_reason_parts.append(f"recent buy combos fired ({', '.join(_objective_event_name(name) for _,name,_ in combo_buy_hits[:2])})")
+            buy_reason_parts.append(f"최근 매수 콤보가 발생했습니다 ({', '.join(_objective_event_name(name) for _,name,_ in combo_buy_hits[:2])})")
         if trend_sell>=2.2 and trend_sell>trend_buy:
-            sell_reason_parts.append(trend_note_sell or 'price/HMA/MA structure leaned bearish')
+            sell_reason_parts.append(trend_note_sell or '가격·HMA·이평 구조가 매도 우위였습니다')
         if momentum_sell>=2.2 and momentum_sell>momentum_buy:
-            sell_reason_parts.append(momentum_note_sell or 'momentum stack leaned bearish')
+            sell_reason_parts.append(momentum_note_sell or '모멘텀 묶음이 매도 우위였습니다')
         if money_sell>=1.6 and money_sell>money_buy:
-            sell_reason_parts.append(money_note_sell or 'money-flow stack leaned bearish')
+            sell_reason_parts.append(money_note_sell or '수급 묶음이 매도 우위였습니다')
         if reversal_sell>=1.6 and reversal_sell>reversal_buy:
             sell_reason_parts.append(reversal_note_sell)
         if location_sell>=1.4 and location_sell>location_buy:
-            sell_reason_parts.append(location_note_sell or 'volume profile / RR favored shorts')
+            sell_reason_parts.append(location_note_sell or '거래량 프로파일과 손익비가 숏 쪽에 우호적이었습니다')
         if signal_sell>=1.5:
-            sell_reason_parts.append(f"recent sell signals fired ({', '.join(_objective_event_name(name) for _,name,_ in signal_sell_hits[:2])})")
+            sell_reason_parts.append(f"최근 매도 시그널이 발생했습니다 ({', '.join(_objective_event_name(name) for _,name,_ in signal_sell_hits[:2])})")
         if combo_sell>=1.2:
-            sell_reason_parts.append(f"recent sell combos fired ({', '.join(_objective_event_name(name) for _,name,_ in combo_sell_hits[:2])})")
+            sell_reason_parts.append(f"최근 매도 콤보가 발생했습니다 ({', '.join(_objective_event_name(name) for _,name,_ in combo_sell_hits[:2])})")
 
         if label in _OBJECTIVE_BUY_LABELS:
-            reason=buy_reason_parts[0] if buy_reason_parts else 'objective bullish evidence stayed ahead of bearish evidence'
+            reason=buy_reason_parts[0] if buy_reason_parts else '객관 매수 근거가 매도 근거보다 우세했습니다'
             contrast=sell_reason_parts[0] if sell_reason_parts else ''
         elif label in _OBJECTIVE_SELL_LABELS:
-            reason=sell_reason_parts[0] if sell_reason_parts else 'objective bearish evidence stayed ahead of bullish evidence'
+            reason=sell_reason_parts[0] if sell_reason_parts else '객관 매도 근거가 매수 근거보다 우세했습니다'
             contrast=buy_reason_parts[0] if buy_reason_parts else ''
         elif label=='MIXED':
-            reason='buy and sell evidence fired in the same recent window'
+            reason='최근 구간에서 매수와 매도 근거가 함께 발생했습니다'
             contrast=' | '.join((buy_reason_parts+sell_reason_parts)[:2])
         else:
-            reason='objective evidence stayed below the conviction threshold'
-            contrast=(buy_reason_parts or sell_reason_parts or ['signal confirmation stayed thin'])[0]
+            reason='객관 근거가 확신 임계치에 못 미쳤습니다'
+            contrast=(buy_reason_parts or sell_reason_parts or ['시그널 확인 강도가 약했습니다'])[0]
 
         raw_conf=32.+min(abs(diff)*4.2,34.)+max(buy_ag,sell_ag)*4.5+min(max(signal_buy,signal_sell)*1.2,9.)+min(max(combo_buy,combo_sell)*1.5,10.)-min(conflict*4.0,16.)
         if label=='NEUTRAL':
@@ -2190,16 +2195,16 @@ def _compute_objective_judgment(df,vol_ratio):
             conf_val=np.clip(raw_conf,22.,97.)
 
         detail_parts=[
-            f"objective buy {buy_total:.1f} vs sell {sell_total:.1f}",
-            f"agreement B{buy_ag}/S{sell_ag}",
-            f"trend {trend_buy:.1f}/{trend_sell:.1f}",
-            f"momentum {momentum_buy:.1f}/{momentum_sell:.1f}",
-            f"money {money_buy:.1f}/{money_sell:.1f}",
-            f"signals {signal_buy:.1f}/{signal_sell:.1f}",
-            f"combos {combo_buy:.1f}/{combo_sell:.1f}",
+            f"객관 점수 매수 {buy_total:.1f} vs 매도 {sell_total:.1f}",
+            f"합의 B{buy_ag}/S{sell_ag}",
+            f"추세 {trend_buy:.1f}/{trend_sell:.1f}",
+            f"모멘텀 {momentum_buy:.1f}/{momentum_sell:.1f}",
+            f"수급 {money_buy:.1f}/{money_sell:.1f}",
+            f"시그널 {signal_buy:.1f}/{signal_sell:.1f}",
+            f"콤보 {combo_buy:.1f}/{combo_sell:.1f}",
         ]
         if contrast:
-            detail_parts.append(f"counter: {contrast}")
+            detail_parts.append(f"반대 근거: {contrast}")
 
         labels[i]=label;pre_labels[i]=label;conf[i]=float(conf_val);buy_agree[i]=int(buy_ag);sell_agree[i]=int(sell_ag)
         buy_score[i]=float(buy_total);sell_score[i]=float(sell_total);conflict_score[i]=float(conflict)
@@ -2264,7 +2269,7 @@ def _compute_objective_judgment(df,vol_ratio):
         elif base_side!=0 and obj_side!=0 and base_side!=obj_side:
             objective_alignment[i]='CONFLICT'
             final_contrast[i]=_append_note(final_contrast[i],f"객관 엔진은 {'매수' if obj_side>0 else '매도'} 우세 ({obj_summary})",'; ')
-            final_details[i]=_append_note(final_details[i],f"objective conflict {obj_summary}")
+            final_details[i]=_append_note(final_details[i],f"객관 엔진 충돌 ({obj_summary})")
             final_conf[i]=max(28.,final_conf[i]-min(14.,obj_gap*0.9+objective_conf[i]*0.04))
             if obj_gap>=8 and objective_conf[i]>=64 and support_count>=2:
                 prev_label=final_labels[i]
