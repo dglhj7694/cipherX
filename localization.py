@@ -117,6 +117,20 @@ ACTION_LABEL_MAP = {
     "STRONG SELL": "강한 매도(Strong Sell)",
     "MIXED": "혼조(Mixed)",
     "NEUTRAL": "중립(Neutral)",
+    "BUY / STRONGEST ALIGNMENT": "강한 매수(Strong Buy)",
+    "BUY / STRONGEST OBJECTIVE ALIGNMENT": "강한 매수(Strong Buy)",
+    "BUY / TREND FOLLOW-THROUGH": "매수 우위(Buy)",
+    "BUY / OBJECTIVE TREND FOLLOW-THROUGH": "매수 우위(Buy)",
+    "WATCH BUY / WAIT FOR CONFIRMATION": "매수 관찰(Watch Buy)",
+    "WATCH SELL / TIGHTEN RISK": "매도 관찰(Watch Sell)",
+    "WATCH SELL / RISK-OFF WATCH": "매도 관찰(Watch Sell)",
+    "SELL / DOWNSIDE PRESSURE": "매도 우위(Sell)",
+    "SELL / OBJECTIVE DOWNSIDE PRESSURE": "매도 우위(Sell)",
+    "SELL / STRONGEST DOWNSIDE ALIGNMENT": "강한 매도(Strong Sell)",
+    "MIXED / CONFLICTING EVIDENCE": "혼조(Mixed)",
+    "MIXED / CONFLICTING OBJECTIVE EVIDENCE": "혼조(Mixed)",
+    "NEUTRAL / WAIT FOR CLARITY": "중립(Neutral)",
+    "NEUTRAL / WAIT FOR CLEARER ALIGNMENT": "중립(Neutral)",
 }
 
 COMBO_LABEL_MAP = {

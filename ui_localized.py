@@ -611,47 +611,63 @@ def _format_level_list(levels):
     return ", ".join(f"{level:.2f}" for level in levels if level > 0)
 
 
-def _extract_named_levels(meta):
+def _level_specs(meta):
+    return [
+        ("VAL", meta.get("vp_val"), "거래량 하단 지지"),
+        ("POC", meta.get("vp_poc"), "거래량 중심"),
+        ("VAH", meta.get("vp_vah"), "거래량 상단 저항"),
+        ("20일선", meta.get("ma20"), "단기 기준선"),
+        ("50일선", meta.get("ma50"), "중기 기준선"),
+        ("200일선", meta.get("ma200"), "장기 기준선"),
+        ("Fib 61.8%", meta.get("fib_618"), "핵심 되돌림"),
+        ("Fib 50%", meta.get("fib_50"), "중립 되돌림"),
+        ("Fib 38.2%", meta.get("fib_382"), "얕은 되돌림"),
+        ("볼린저 하단", meta.get("bb_low"), "볼밴 하단"),
+        ("볼린저 상단", meta.get("bb_up"), "볼밴 상단"),
+        ("채널 하단", meta.get("price_channel_low"), "가격 채널 지지"),
+        ("채널 상단", meta.get("price_channel_up"), "가격 채널 저항"),
+    ]
+
+
+def _collect_support_resistance_levels(meta):
     price = _safe_float(meta.get("price", 0))
     supports = []
     resistances = []
+    for label, raw_value, note in _level_specs(meta):
+        value = _safe_float(raw_value, float("nan"))
+        if not math.isfinite(value) or value <= 0:
+            continue
+        item = {
+            "label": label,
+            "value": round(value, 2),
+            "note": note,
+            "distance": abs(price - value),
+        }
+        if value <= price:
+            supports.append(item)
+        if value >= price:
+            resistances.append(item)
 
-    def add_target(bucket, label, value, predicate):
-        val = _safe_float(value, 0)
-        if val > 0 and predicate(val):
-            bucket.append((label, round(val, 2)))
+    def _dedupe_and_sort(items):
+        picked = []
+        seen = set()
+        for item in sorted(items, key=lambda row: (row["distance"], row["value"])):
+            key = round(item["value"], 2)
+            if key in seen:
+                continue
+            seen.add(key)
+            picked.append(item)
+        return picked
 
-    add_target(supports, "VP VAL", meta.get("vp_val"), lambda v: v <= price * 1.02)
-    add_target(supports, "20일선", meta.get("ma20"), lambda v: v <= price)
-    add_target(supports, "50일선", meta.get("ma50"), lambda v: v <= price)
-    add_target(supports, "200일선", meta.get("ma200"), lambda v: v <= price)
-    add_target(supports, "Fib 38.2%", meta.get("fib_382"), lambda v: v <= price)
-    add_target(supports, "Fib 50%", meta.get("fib_50"), lambda v: v <= price)
-    add_target(supports, "Fib 61.8%", meta.get("fib_618"), lambda v: v <= price)
-    add_target(supports, "Fib 161.8% 하단", meta.get("fib_ext_1618_down"), lambda v: v < price)
-    add_target(supports, "52주 저점", meta.get("low_52w"), lambda v: v < price)
+    return _dedupe_and_sort(supports), _dedupe_and_sort(resistances)
 
-    add_target(resistances, "20일선", meta.get("ma20"), lambda v: v > price)
-    add_target(resistances, "50일선", meta.get("ma50"), lambda v: v > price)
-    add_target(resistances, "200일선", meta.get("ma200"), lambda v: v > price)
-    add_target(resistances, "Fib 38.2%", meta.get("fib_382"), lambda v: v > price)
-    add_target(resistances, "Fib 50%", meta.get("fib_50"), lambda v: v > price)
-    add_target(resistances, "Fib 61.8%", meta.get("fib_618"), lambda v: v > price)
-    add_target(resistances, "Fib 161.8% 상단", meta.get("fib_ext_1618_up"), lambda v: v > price)
-    add_target(resistances, "VP VAH", meta.get("vp_vah"), lambda v: v >= price * 0.98)
-    add_target(resistances, "볼린저 상단", meta.get("bb_up"), lambda v: v >= price * 0.98)
-    add_target(resistances, "52주 고점", meta.get("high_52w"), lambda v: v > price)
 
-    support_map = {}
-    for label, value in supports:
-        support_map[round(value, 2)] = (label, value)
-    resistance_map = {}
-    for label, value in resistances:
-        resistance_map[round(value, 2)] = (label, value)
-
-    supports = sorted(support_map.values(), key=lambda item: item[1], reverse=True)[:3]
-    resistances = sorted(resistance_map.values(), key=lambda item: item[1])[:3]
-    return supports, resistances
+def _extract_named_levels(meta):
+    supports, resistances = _collect_support_resistance_levels(meta)
+    return (
+        [(item["label"], item["value"]) for item in supports[:3]],
+        [(item["label"], item["value"]) for item in resistances[:3]],
+    )
 
 
 def _extract_price_levels(meta):
@@ -1097,29 +1113,51 @@ def _build_action_guide(meta, title):
     support_label, support_level = supports_named[0] if supports_named else ("", 0.0)
     resistance_label, resistance_level = resistances_named[0] if resistances_named else ("", 0.0)
     ma20 = _safe_float(meta.get("ma20", 0))
+    objective_alignment = str(meta.get("objective_alignment", "MIXED")).upper()
+    objective_confidence = _safe_float(meta.get("objective_confidence", 0))
+    conflict_layers = _safe_int(meta.get("signal_conflict_layers", 0))
+    thin_trade_risk = bool(meta.get("thin_trade_risk"))
+    layer_edge = _safe_float(meta.get("buy_total", 0)) - _safe_float(meta.get("sell_total", 0))
 
     def _level_text(label, value):
         return f"{label} {value:.2f}" if label and value > 0 else ""
 
+    def _guide_tail():
+        if thin_trade_risk:
+            return " 거래대금이 얇아 어떤 방향이든 신규 대응은 평소보다 작은 비중이 적절합니다."
+        if objective_alignment == "CONFLICT":
+            return " 다만 객관 차트 엔진이 반대 방향을 가리켜 공격적 확대는 늦추고 종가 확인을 우선하는 편이 좋습니다."
+        if conflict_layers >= 3:
+            return f" 다만 10개 레이어 중 {conflict_layers}개가 충돌해 한 번에 크게 베팅하기보다 분할 대응이 더 적합합니다."
+        if objective_alignment == "ALIGNED" and objective_confidence >= 65 and abs(layer_edge) >= 4:
+            if code in {"STRONG_BUY", "BUY", "WATCH_BUY"}:
+                return " 객관 차트 엔진과 10개 레이어가 같은 방향이라 확인 신호가 이어지면 비중 확대를 조금 더 자신 있게 검토할 수 있습니다."
+            if code in {"WATCH_SELL", "SELL", "STRONG_SELL"}:
+                return " 객관 차트 엔진과 10개 레이어가 같은 방향이라 반등 실패나 지지 이탈 시 방어 강도를 더 빠르게 높일 수 있습니다."
+            return " 객관 차트 엔진과 10개 레이어가 같은 방향이라 다음 확인 신호의 의미가 더 커졌습니다."
+        return ""
+
+    guide_tail = _guide_tail()
+
     if code == "STRONG_BUY":
         if support_level > 0:
-            return f"실전 대응: 추격 매수보다 {support_label} {support_level:.2f} 부근 첫 눌림이 지지되는지 확인한 뒤 분할 진입하는 편이 좋습니다."
-        return "실전 대응: 추격 매수보다 첫 눌림이나 장중 지지 확인 후 분할 진입이 유리합니다."
+            return f"실전 대응: 추격 매수보다 {support_label} {support_level:.2f} 부근 첫 눌림이 지지되는지 확인한 뒤 분할 진입하는 편이 좋습니다.{guide_tail}"
+        return f"실전 대응: 추격 매수보다 첫 눌림이나 장중 지지 확인 후 분할 진입이 유리합니다.{guide_tail}"
     if code == "BUY":
         if ut_gap >= 2.0:
             if support_level > 0:
-                return f"실전 대응: 방향은 매수 우위지만 이격이 커서 추격보다 {support_label} {support_level:.2f} 지지 여부를 본 뒤 분할 접근이 좋습니다."
-            return "실전 대응: 방향은 매수 우위지만 이격이 커서 추격보다 눌림 확인 후 분할 접근이 좋습니다."
+                return f"실전 대응: 방향은 매수 우위지만 이격이 커서 추격보다 {support_label} {support_level:.2f} 지지 여부를 본 뒤 분할 접근이 좋습니다.{guide_tail}"
+            return f"실전 대응: 방향은 매수 우위지만 이격이 커서 추격보다 눌림 확인 후 분할 접근이 좋습니다.{guide_tail}"
         if support_level > 0 and resistance_level > 0:
-            return f"실전 대응: {support_label} {support_level:.2f}를 지키는지 보며 분할 진입하고, {resistance_label} {resistance_level:.2f} 돌파가 이어지면 매수 확신을 높여볼 수 있습니다."
-        return "실전 대응: 추세가 유지되는지 보며 분할 진입하고, 지지선 이탈 시 빠르게 리스크를 줄이는 접근이 좋습니다."
+            return f"실전 대응: {support_label} {support_level:.2f}를 지키는지 보며 분할 진입하고, {resistance_label} {resistance_level:.2f} 돌파가 이어지면 매수 확신을 높여볼 수 있습니다.{guide_tail}"
+        return f"실전 대응: 추세가 유지되는지 보며 분할 진입하고, 지지선 이탈 시 빠르게 리스크를 줄이는 접근이 좋습니다.{guide_tail}"
     if code == "WATCH_BUY":
         if support_level > 0:
             trigger_text = _level_text("20일선", ma20) if ma20 > 0 else _level_text(resistance_label, resistance_level)
             if trigger_text:
-                return f"실전 대응: {support_label} {support_level:.2f} 지지가 유지되는지 확인한 뒤 소액으로 접근하고, {trigger_text}를 종가 기준으로 회복하면 매수 관점을 강화할 수 있습니다."
-            return f"실전 대응: {support_label} {support_level:.2f} 지지가 유지되는지 확인한 뒤 소액으로 먼저 접근하는 전략이 좋습니다."
-        return "실전 대응: 박스/채널/이평 지지가 유지되는지 확인한 뒤 소액으로 먼저 접근하는 전략이 좋습니다."
+                return f"실전 대응: {support_label} {support_level:.2f} 지지가 유지되는지 확인한 뒤 소액으로 접근하고, {trigger_text}를 종가 기준으로 회복하면 매수 관점을 강화할 수 있습니다.{guide_tail}"
+            return f"실전 대응: {support_label} {support_level:.2f} 지지가 유지되는지 확인한 뒤 소액으로 먼저 접근하는 전략이 좋습니다.{guide_tail}"
+        return f"실전 대응: 박스/채널/이평 지지가 유지되는지 확인한 뒤 소액으로 먼저 접근하는 전략이 좋습니다.{guide_tail}"
     if code == "WATCH_SELL":
         parts = []
         if support_level > 0:
@@ -1130,25 +1168,25 @@ def _build_action_guide(meta, title):
             parts.append(f"1차 회복 확인선은 {resistance_label} {resistance_level:.2f}입니다")
         joined = ". ".join(parts)
         if joined:
-            return f"실전 대응: 신규 숏보다 보유분 방어가 우선입니다. {joined}. {support_label or '지지선'}을 지키며 반등하고 20일선이나 첫 저항을 종가 기준으로 회복하면 매수 경고는 완화될 수 있고, 반대로 지지 이탈 시 리스크 관리를 더 강하게 가져가는 편이 좋습니다."
-        return "실전 대응: 신규 숏보다 기존 보유분의 비중 축소, 손절선 상향, 반등 실패 확인에 초점을 두는 편이 좋습니다."
+            return f"실전 대응: 신규 숏보다 보유분 방어가 우선입니다. {joined}. {support_label or '지지선'}을 지키며 반등하고 20일선이나 첫 저항을 종가 기준으로 회복하면 매수 경고는 완화될 수 있고, 반대로 지지 이탈 시 리스크 관리를 더 강하게 가져가는 편이 좋습니다.{guide_tail}"
+        return f"실전 대응: 신규 숏보다 기존 보유분의 비중 축소, 손절선 상향, 반등 실패 확인에 초점을 두는 편이 좋습니다.{guide_tail}"
     if code == "SELL":
         if resistance_level > 0:
-            return f"실전 대응: 반등이 나오더라도 {resistance_label} {resistance_level:.2f} 회복 실패가 이어지는지 확인하면서 비중 축소를 우선하는 편이 좋습니다."
-        return "실전 대응: 반등이 나와도 저항 회복 실패가 이어지는지 확인하면서 비중 축소를 우선하는 편이 좋습니다."
+            return f"실전 대응: 반등이 나오더라도 {resistance_label} {resistance_level:.2f} 회복 실패가 이어지는지 확인하면서 비중 축소를 우선하는 편이 좋습니다.{guide_tail}"
+        return f"실전 대응: 반등이 나와도 저항 회복 실패가 이어지는지 확인하면서 비중 축소를 우선하는 편이 좋습니다.{guide_tail}"
     if code == "STRONG_SELL":
         if support_level > 0 and resistance_level > 0:
-            return f"실전 대응: 방어가 우선입니다. {support_label} {support_level:.2f} 이탈이 이어지면 손실 확대를 막는 쪽에 집중하고, 반대로 {resistance_label} {resistance_level:.2f}를 종가 기준으로 회복하기 전까지는 공격적 대응을 늦추는 편이 좋습니다."
-        return "실전 대응: 방어가 우선입니다. 손실 확대를 막기 위해 현금 비중 확대나 빠른 정리가 더 중요합니다."
+            return f"실전 대응: 방어가 우선입니다. {support_label} {support_level:.2f} 이탈이 이어지면 손실 확대를 막는 쪽에 집중하고, 반대로 {resistance_label} {resistance_level:.2f}를 종가 기준으로 회복하기 전까지는 공격적 대응을 늦추는 편이 좋습니다.{guide_tail}"
+        return f"실전 대응: 방어가 우선입니다. 손실 확대를 막기 위해 현금 비중 확대나 빠른 정리가 더 중요합니다.{guide_tail}"
     if code == "MIXED":
         if support_level > 0 and resistance_level > 0:
-            return f"실전 대응: 방향 베팅보다 {support_label} {support_level:.2f} 지지와 {resistance_label} {resistance_level:.2f} 돌파 여부를 확인한 뒤 대응하는 편이 좋습니다."
-        return "실전 대응: 방향 베팅보다 확인 신호를 기다리며 포지션 크기를 줄이는 편이 좋습니다."
+            return f"실전 대응: 방향 베팅보다 {support_label} {support_level:.2f} 지지와 {resistance_label} {resistance_level:.2f} 돌파 여부를 확인한 뒤 대응하는 편이 좋습니다.{guide_tail}"
+        return f"실전 대응: 방향 베팅보다 확인 신호를 기다리며 포지션 크기를 줄이는 편이 좋습니다.{guide_tail}"
     if volume_ratio <= 0.7:
-        return "실전 대응: 거래량이 약해 신호 신뢰도가 낮을 수 있으니 무리한 진입보다 관망이 낫습니다."
+        return f"실전 대응: 거래량이 약해 신호 신뢰도가 낮을 수 있으니 무리한 진입보다 관망이 낫습니다.{guide_tail}"
     if support_level > 0 and resistance_level > 0:
-        return f"실전 대응: {support_label} {support_level:.2f} 지지와 {resistance_label} {resistance_level:.2f} 회복 여부가 확인되기 전까지는 작은 포지션으로 대응하거나 관망하는 편이 좋습니다."
-    return "실전 대응: 명확한 방향 확인 전까지는 작은 포지션으로 대응하거나 관망하는 편이 좋습니다."
+        return f"실전 대응: {support_label} {support_level:.2f} 지지와 {resistance_label} {resistance_level:.2f} 회복 여부가 확인되기 전까지는 작은 포지션으로 대응하거나 관망하는 편이 좋습니다.{guide_tail}"
+    return f"실전 대응: 명확한 방향 확인 전까지는 작은 포지션으로 대응하거나 관망하는 편이 좋습니다.{guide_tail}"
 
 
 def _build_professional_reasons(meta):
@@ -1170,7 +1208,23 @@ def _build_professional_reasons(meta):
     ma20 = _safe_float(meta.get("ma20", 0))
     ma50 = _safe_float(meta.get("ma50", 0))
     ma200 = _safe_float(meta.get("ma200", 0))
+    objective_alignment = str(meta.get("objective_alignment", "MIXED")).upper()
+    objective_confidence = _safe_float(meta.get("objective_confidence", 0))
+    layer_edge = _safe_float(meta.get("buy_total", 0)) - _safe_float(meta.get("sell_total", 0))
+    conflict_layers = _safe_int(meta.get("signal_conflict_layers", 0))
     sell_bias = continuation_sell > continuation_buy or trend_sell > trend_buy or market_turn_bear > market_turn_bull
+
+    if layer_edge >= 4:
+        reasons.append(f"10개 레이어 합산이 매수 쪽으로 {layer_edge:+.1f} 우위라 추세 추종 또는 눌림 매수 전략이 상대적으로 유리했습니다.")
+    elif layer_edge <= -4:
+        reasons.append(f"10개 레이어 합산이 매도 쪽으로 {layer_edge:+.1f} 우위라 비중 축소와 방어 전략이 더 자연스러웠습니다.")
+    elif conflict_layers >= 3:
+        reasons.append(f"10개 레이어 중 {conflict_layers}개가 충돌해 방향 확신보다 확인 신호가 더 중요했습니다.")
+
+    if objective_alignment == "ALIGNED" and objective_confidence >= 60:
+        reasons.append(f"객관 차트 엔진도 같은 방향을 {objective_confidence:.0f}% 신뢰도로 확인해 판단 일관성이 높았습니다.")
+    elif objective_alignment == "CONFLICT":
+        reasons.append("객관 차트 엔진이 반대 방향을 가리켜 최종 판단을 그대로 공격적으로 해석하기보다 보수적으로 볼 필요가 있었습니다.")
 
     if continuation_buy >= 2:
         reasons.append(f"continuation 점수 {continuation_buy:.1f}로 추세 지속형 매수 스택이 유지됐습니다.")
@@ -2067,40 +2121,12 @@ def _chart_pattern_text(meta):
 
 
 def _chart_levels_text(meta):
-    price = _safe_float(meta.get("price", 0))
-    level_specs = [
-        ("VAL", meta.get("vp_val"), "거래량 하단 지지"),
-        ("POC", meta.get("vp_poc"), "거래량 중심"),
-        ("VAH", meta.get("vp_vah"), "거래량 상단 저항"),
-        ("MA20", meta.get("ma20"), "단기 기준선"),
-        ("MA50", meta.get("ma50"), "중기 기준선"),
-        ("MA200", meta.get("ma200"), "장기 기준선"),
-        ("Fib 61.8", meta.get("fib_618"), "핵심 되돌림"),
-        ("Fib 50", meta.get("fib_50"), "중립 되돌림"),
-        ("Fib 38.2", meta.get("fib_382"), "얕은 되돌림"),
-        ("BB Low", meta.get("bb_low"), "볼밴 하단"),
-        ("BB Up", meta.get("bb_up"), "볼밴 상단"),
-        ("채널 하단", meta.get("price_channel_low"), "가격 채널 지지"),
-        ("채널 상단", meta.get("price_channel_up"), "가격 채널 저항"),
-    ]
-    supports = []
-    resistances = []
-    for label, raw_value, note in level_specs:
-        value = _safe_float(raw_value, float("nan"))
-        if not math.isfinite(value) or value <= 0:
-            continue
-        item = (abs(price - value), label, value, note)
-        if value <= price:
-            supports.append(item)
-        if value >= price:
-            resistances.append(item)
-    supports.sort(key=lambda x: x[0])
-    resistances.sort(key=lambda x: x[0])
+    supports, resistances = _collect_support_resistance_levels(meta)
 
     def fmt(items):
         rows = []
-        for _, label, value, note in items[:3]:
-            rows.append(f"{label} ({_fmt_chart_price(value)}) · {note}")
+        for item in items[:3]:
+            rows.append(f"{item['label']} ({_fmt_chart_price(item['value'])}) · {item['note']}")
         return " · ".join(rows)
 
     support_text = fmt(supports) or "아직 가까운 하단 지지선 정리가 부족합니다."
@@ -2583,6 +2609,13 @@ def render_judgment_card(meta):
     objective_buy_score = _safe_float(meta.get("objective_buy_score", 0))
     objective_sell_score = _safe_float(meta.get("objective_sell_score", 0))
     objective_conflict_score = _safe_float(meta.get("objective_conflict_score", 0))
+    objective_label = localize_judgment_label(str(meta.get("objective_judgment", "NEUTRAL")))
+    objective_confidence = _safe_float(meta.get("objective_confidence", 0))
+    objective_alignment = str(meta.get("objective_alignment", "MIXED")).upper()
+    objective_adjustment = str(meta.get("objective_adjustment", "NONE")).upper()
+    objective_reason = _translate_note_text(meta.get("objective_reason", ""))
+    objective_alignment_label = {"ALIGNED": "일치", "CONFLICT": "충돌", "MIXED": "혼합"}.get(objective_alignment, objective_alignment)
+    objective_adjustment_label = {"NONE": "없음", "CONFIRM": "확인", "UPGRADE": "강화", "ACTIVATE": "활성", "DOWNGRADE": "보수조정", "MIXED": "혼합보정"}.get(objective_adjustment, objective_adjustment)
     ut_gap = max(_safe_float(meta.get("utbot_stop_atr_gap", 0)), 0.0)
     macro_risk_off_count = _safe_int(meta.get("macro_risk_off_count", 0))
     macro_risk_on_count = _safe_int(meta.get("macro_risk_on_count", 0))
@@ -2711,12 +2744,24 @@ def render_judgment_card(meta):
     ]
     leader_name, leader_buy, leader_sell = max(objective_pairs, key=lambda item: abs(item[1] - item[2]))
     objective_leader_text = f"{leader_name} {'매수' if leader_buy >= leader_sell else '매도'} 우위"
+    objective_alignment_tone = {"ALIGNED": "positive", "CONFLICT": "negative", "MIXED": "warning"}.get(objective_alignment, "muted")
+    objective_tone = _tone_from_text(objective_label)
     objective_summary_cards = [
         _mini_stat_card("객관 매수", f"{objective_buy_score:.1f}", "positive" if objective_buy_score >= objective_sell_score else "muted"),
         _mini_stat_card("객관 매도", f"{objective_sell_score:.1f}", "negative" if objective_sell_score >= objective_buy_score else "muted"),
         _mini_stat_card("충돌도", f"{objective_conflict_score:.1f}", "warning" if objective_conflict_score >= 1.5 else "muted"),
         _mini_stat_card("우세축", objective_leader_text, _objective_pair_tone(leader_buy, leader_sell)),
+        _mini_stat_card("객관 판단", objective_label or "-", objective_tone),
+        _mini_stat_card("객관 신뢰", f"{objective_confidence:.0f}%", objective_tone if objective_confidence >= 55 else "muted"),
     ]
+    objective_meta_badges = "".join(
+        badge
+        for badge in [
+            _badge(f"정렬 {objective_alignment_label}", objective_alignment_tone),
+            _badge(f"보정 {objective_adjustment_label}", "accent" if objective_adjustment not in {"NONE", "MIXED"} else "muted"),
+        ]
+        if badge
+    )
     same_note = bool(
         detail_text
         and contrast
@@ -2732,7 +2777,6 @@ def render_judgment_card(meta):
       <div class="sigl-section-head">
         <div>
           <p class="sigl-section-title">종합 판단</p>
-          <p class="sigl-section-copy">현재 가격, 신호 합의, 리스크를 한 번에 요약합니다.</p>
         </div>
         <div class="sigl-inline">{''.join(badges)}</div>
       </div>
@@ -2748,9 +2792,11 @@ def render_judgment_card(meta):
     summary_html += (
         "<div class='sigl-note'><strong>객관 엔진 요약</strong>"
         f"<div class='sigl-grid sigl-grid--4'>{''.join(objective_summary_cards)}</div>"
-        f"<div class='sigl-chip-row'>{objective_badges}</div>"
+        f"<div class='sigl-chip-row'>{objective_badges}{objective_meta_badges}</div>"
         "</div>"
     )
+    if objective_reason:
+        summary_html += f"<div class='sigl-note'><strong>객관 엔진 메모</strong><br><span class='sigl-summary'>{_esc(objective_reason)}</span></div>"
     if recent_signal_badges:
         summary_html += (
             "<div class='sigl-note'><strong>이날 발생한 시그널</strong>"
@@ -3193,10 +3239,64 @@ def render_10layer_bars_clean(meta, html_key="analysis"):
         "Leading": "선행",
         "Lagging": "후행",
     }
+    buy_layers = meta.get("buy_layers", {}) or {}
+    sell_layers = meta.get("sell_layers", {}) or {}
+    buy_total = _safe_float(meta.get("buy_total", 0))
+    sell_total = _safe_float(meta.get("sell_total", 0))
+    layer_edge = buy_total - sell_total
+    conflict_layers = _safe_int(meta.get("signal_conflict_layers", 0))
+    objective_alignment = str(meta.get("objective_alignment", "MIXED")).upper()
+    objective_confidence = _safe_float(meta.get("objective_confidence", 0))
+    thin_trade_risk = bool(meta.get("thin_trade_risk"))
+    objective_alignment_label = {"ALIGNED": "일치", "CONFLICT": "충돌", "MIXED": "혼합"}.get(objective_alignment, objective_alignment)
+    objective_alignment_tone = {"ALIGNED": "positive", "CONFLICT": "negative", "MIXED": "warning"}.get(objective_alignment, "muted")
+    ranked_buy = sorted(((name, max(_safe_float(buy_layers.get(name, 0)), 0.0)) for name in layer_names), key=lambda item: item[1], reverse=True)
+    ranked_sell = sorted(((name, max(_safe_float(sell_layers.get(name, 0)), 0.0)) for name in layer_names), key=lambda item: item[1], reverse=True)
+    top_buy = [(name, value) for name, value in ranked_buy if value > 0][:3]
+    top_sell = [(name, value) for name, value in ranked_sell if value > 0][:3]
+    dominant_buy = layer_labels.get(top_buy[0][0], top_buy[0][0]) if top_buy else "-"
+    dominant_sell = layer_labels.get(top_sell[0][0], top_sell[0][0]) if top_sell else "-"
+    buy_profile = sum(max(_safe_float(buy_layers.get(name, 0)), 0.0) for name in ("Trend", "Momentum", "Leading", "Lagging"))
+    reversal_profile = sum(max(_safe_float(buy_layers.get(name, 0)), 0.0) for name in ("Candle", "BB", "Pattern"))
+    sell_profile = sum(max(_safe_float(sell_layers.get(name, 0)), 0.0) for name in ("Trend", "Momentum", "Leading", "Lagging"))
+    sell_reversal_profile = sum(max(_safe_float(sell_layers.get(name, 0)), 0.0) for name in ("Candle", "BB", "Pattern"))
+    if layer_edge >= 4:
+        layer_profile = "추세 추종형" if buy_profile >= reversal_profile else "눌림·반전 탐색형"
+        layer_profile_tone = "positive"
+    elif layer_edge <= -4:
+        layer_profile = "방어·리스크 관리형" if sell_profile >= sell_reversal_profile else "상단 반락 대응형"
+        layer_profile_tone = "negative"
+    else:
+        layer_profile = "혼합·확인 대기형"
+        layer_profile_tone = "warning"
+    supports_named, resistances_named = _extract_named_levels(meta)
+    support_text = f"{supports_named[0][0]} {supports_named[0][1]:.2f}" if supports_named else "가까운 지지선"
+    resistance_text = f"{resistances_named[0][0]} {resistances_named[0][1]:.2f}" if resistances_named else "가까운 저항선"
+    if layer_edge >= 4 and objective_alignment == "ALIGNED":
+        strategy_note = f"매수 레이어가 우세하고 객관 엔진도 같은 방향({objective_confidence:.0f}% 신뢰)입니다. {support_text} 지지 확인 뒤 분할 진입하고, {resistance_text} 돌파가 이어질 때 추세 추종을 강화하는 쪽이 자연스럽습니다."
+    elif layer_edge <= -4 and objective_alignment == "ALIGNED":
+        strategy_note = f"매도 레이어가 우세하고 객관 엔진도 같은 방향({objective_confidence:.0f}% 신뢰)입니다. {resistance_text} 회복 실패나 {support_text} 이탈 시 비중 축소와 방어 강화를 우선하는 편이 좋습니다."
+    elif objective_alignment == "CONFLICT" or conflict_layers >= 3:
+        strategy_note = f"레이어와 객관 엔진의 충돌이 커서 한 방향 베팅보다 {support_text} 지지와 {resistance_text} 회복·이탈 확인을 먼저 보는 편이 좋습니다."
+    else:
+        strategy_note = f"현재는 {layer_profile} 성격이지만 확신은 중간 수준입니다. {support_text} 반응과 {resistance_text} 돌파·실패를 확인한 뒤 비중을 조절하는 접근이 적합합니다."
+    if thin_trade_risk:
+        strategy_note += " 거래대금이 얇아 신규 대응은 평소보다 작게 가져가는 편이 안전합니다."
+    summary_cards = [
+        _mini_stat_card("레이어 우세", f"{layer_edge:+.1f}", "positive" if layer_edge > 1 else "negative" if layer_edge < -1 else "warning"),
+        _mini_stat_card("매수 핵심", dominant_buy, "positive" if top_buy else "muted"),
+        _mini_stat_card("매도 핵심", dominant_sell, "negative" if top_sell else "muted"),
+        _mini_stat_card("레이어 충돌", f"{conflict_layers}개", "warning" if conflict_layers >= 3 else "muted"),
+        _mini_stat_card("전략 성격", layer_profile, layer_profile_tone),
+    ]
+    layer_badges = "".join(
+        [_badge(f"매수 {layer_labels.get(name, name)} {value:.1f}", "positive") for name, value in top_buy]
+        + [_badge(f"매도 {layer_labels.get(name, name)} {value:.1f}", "negative") for name, value in top_sell]
+    )
     rows = []
     for name in layer_names:
-        buy_value = max(_safe_float(meta.get("buy_layers", {}).get(name, 0)), 0.0)
-        sell_value = max(_safe_float(meta.get("sell_layers", {}).get(name, 0)), 0.0)
+        buy_value = max(_safe_float(buy_layers.get(name, 0)), 0.0)
+        sell_value = max(_safe_float(sell_layers.get(name, 0)), 0.0)
         buy_pct = min((buy_value / 12.0) * 50.0, 50.0)
         sell_pct = min((sell_value / 12.0) * 50.0, 50.0)
         rows.append(
@@ -3218,13 +3318,16 @@ def render_10layer_bars_clean(meta, html_key="analysis"):
         "<div class='sigl-section-head'>"
         "<div>"
         "<p class='sigl-section-title'>10개 레이어 비교</p>"
-        "<p class='sigl-section-copy'>매수와 매도 쪽에 각 레이어가 얼마나 기여하는지 보여줍니다.</p>"
         "</div>"
         "<div class='sigl-inline'>"
         f"{_badge(f'매수 {_safe_int(meta.get('buy_active', 0))}/10', 'positive')}"
         f"{_badge(f'매도 {_safe_int(meta.get('sell_active', 0))}/10', 'negative')}"
+        f"{_badge(f'정렬 {objective_alignment_label}', objective_alignment_tone)}"
         "</div>"
         "</div>"
+        f"<div class='sigl-grid sigl-grid--5'>{''.join(summary_cards)}</div>"
+        f"<div class='sigl-chip-row'>{layer_badges}</div>"
+        f"<div class='sigl-note'><strong>레이어 전략 해석</strong><br><span class='sigl-summary'>{_esc(strategy_note)}</span></div>"
         f"<div class='sigl-layer-board'>{_join_html(rows)}</div>"
         "</div>"
     )

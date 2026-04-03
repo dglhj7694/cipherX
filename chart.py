@@ -1092,6 +1092,11 @@ def build_metadata(dc,ticker):
         'objective_location_buy':_sf(lat.get('Objective_Location_Buy')),'objective_location_sell':_sf(lat.get('Objective_Location_Sell')),
         'objective_signal_buy':_sf(lat.get('Objective_Signal_Buy')),'objective_signal_sell':_sf(lat.get('Objective_Signal_Sell')),
         'objective_combo_buy':_sf(lat.get('Objective_Combo_Buy')),'objective_combo_sell':_sf(lat.get('Objective_Combo_Sell')),
+        'objective_judgment':str(lat.get('Objective_Judgment','NEUTRAL')),'objective_confidence':_sf(lat.get('Objective_Confidence')),
+        'objective_buy_agree':int(_sf(lat.get('Objective_Buy_Agree'))),'objective_sell_agree':int(_sf(lat.get('Objective_Sell_Agree'))),
+        'objective_reason':str(lat.get('Objective_Reason','')),'objective_detail':str(lat.get('Objective_Detail','')),
+        'objective_action_label':str(lat.get('Objective_Action_Label','')),'objective_alignment':str(lat.get('Objective_Alignment','MIXED')),
+        'objective_adjustment':str(lat.get('Objective_Adjustment','NONE')),
         'ensemble_score':_sf(lat.get('Ensemble_Score')),'prediction_boost':_sf(lat.get('Prediction_Boost')),
         'leading_verdict':str(lat.get('Leading_Verdict','중립')),'lagging_verdict':str(lat.get('Lagging_Verdict','비추세/횡보')),
         'setup_pressure_buy':_sf(lat.get('Setup_Pressure_Buy')),'setup_pressure_sell':_sf(lat.get('Setup_Pressure_Sell')),
@@ -1115,6 +1120,7 @@ def build_metadata(dc,ticker):
         'market_turn_bull_score':_sf(lat.get('Market_Turn_Bull_Score')),'market_turn_bear_score':_sf(lat.get('Market_Turn_Bear_Score')),
         'market_turn_bull':bool(lat.get('Market_Turn_Bull',False)),'market_turn_bear':bool(lat.get('Market_Turn_Bear',False)),
         'continuation_buy_score':_sf(lat.get('Continuation_Buy_Score')),'continuation_sell_score':_sf(lat.get('Continuation_Sell_Score')),
+        'signal_conflict_layers':int(_sf(lat.get('Signal_Conflict_Layers'))),
         'utbot_stop_atr_gap':_sf(lat.get('UTBot_Stop_ATR_Gap')),
         'bullish_gap_reversal':bool(lat.get('Bullish_Gap_Reversal',False)),'bearish_gap_failure':bool(lat.get('Bearish_Gap_Failure',False)),
         'thin_trade_risk':bool(lat.get('Thin_Trade_Risk',False)),
@@ -1898,12 +1904,16 @@ def build_metadata(dc,ticker):
     meta['context_label']=localize_context_label(meta.get('context'))
     meta['judgment']=localize_judgment_label(meta.get('judgment'))
     meta['pre_veto_judgment']=localize_judgment_label(meta.get('pre_veto_judgment'))
+    meta['objective_judgment']=localize_judgment_label(meta.get('objective_judgment'))
     meta['action_label']=localize_action_label(meta.get('action_label') or meta.get('judgment'))
+    meta['objective_action_label']=localize_action_label(meta.get('objective_action_label') or meta.get('objective_judgment'))
     meta['leading_verdict']=translate_chart_text(meta.get('leading_verdict'))
     meta['lagging_verdict']=translate_chart_text(meta.get('lagging_verdict'))
     meta['judgment_reason']=translate_chart_text(meta.get('judgment_reason'))
     meta['judgment_detail']=translate_chart_text(meta.get('judgment_detail'))
     meta['contrast_notes']=translate_chart_text(meta.get('contrast_notes'))
+    meta['objective_reason']=translate_chart_text(meta.get('objective_reason'))
+    meta['objective_detail']=translate_chart_text(meta.get('objective_detail'))
     localized_scans=[]
     for scan in meta.get('combined_scans',[]):
         label,desc=localize_combo(scan.get('key', scan.get('name','')), scan.get('kor'), scan.get('desc'))
