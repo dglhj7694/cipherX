@@ -10,7 +10,6 @@ BRAND_REPORT_SLUG = "sign"
 BRAND_PAGE_ICON = None
 
 INITIAL_MESSAGE_CONTENT = (
-    "**$SIGN**\n"
     "\ubd84\uc11d\ud560 \ud2f0\ucee4\ub97c \uc785\ub825\ud574 \uc8fc\uc138\uc694."
 )
 

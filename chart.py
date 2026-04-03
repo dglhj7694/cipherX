@@ -155,8 +155,8 @@ def _add_volume_profile_overlay(fig,dc,default_visible='legendonly'):
             line=dict(width=0,color='rgba(0,0,0,0)'),
             fill='toself',
             fillcolor=f'rgba(99,102,241,{alpha})',
-            name='Volume Profile',
-            legendgroup='vp_profile',
+            name='VP Overlay',
+            legendgroup='vp_overlay',
             hoverinfo='skip',
             showlegend=first_profile,
             visible=default_visible
@@ -167,9 +167,9 @@ def _add_volume_profile_overlay(fig,dc,default_visible='legendonly'):
         if col in dc.columns:
             val=float(dc[col].iloc[-1])
             if np.isfinite(val):
-                fig.add_trace(go.Scatter(x=[dc.index[0],x_right],y=[val,val],mode='lines',line=dict(color=clr,width=1.5,dash=sty),name=label,legendgroup=f'vp_{label.lower()}',hoverinfo='skip',showlegend=True,visible=default_visible),row=1,col=1)
+                fig.add_trace(go.Scatter(x=[dc.index[0],x_right],y=[val,val],mode='lines',line=dict(color=clr,width=1.5,dash=sty),name=label,legendgroup='vp_overlay',hoverinfo='skip',showlegend=False,visible=default_visible),row=1,col=1)
     fig.add_trace(go.Scatter(x=[x_right],y=[dc['Close'].iloc[-1]],mode='markers',marker=dict(size=.1,color='rgba(0,0,0,0)'),hoverinfo='skip',showlegend=False),row=1,col=1)
-    fig.add_trace(go.Scatter(x=[x_right],y=[high],mode='text',text=['VP'],textfont=dict(size=9,color='#94A3B8'),name='VP Label',legendgroup='vp_profile',hoverinfo='skip',showlegend=False,visible=default_visible),row=1,col=1)
+    fig.add_trace(go.Scatter(x=[x_right],y=[high],mode='text',text=['VP'],textfont=dict(size=9,color='#94A3B8'),name='VP Label',legendgroup='vp_overlay',hoverinfo='skip',showlegend=False,visible=default_visible),row=1,col=1)
 
 def _add_fibonacci_overlay(fig,dc,default_visible='legendonly'):
     if dc.empty:
@@ -195,7 +195,7 @@ def _add_fibonacci_overlay(fig,dc,default_visible='legendonly'):
             y=[val,val],
             mode='lines',
             line=dict(color=color,width=1.3,dash=dash),
-            name=label,
+            name='Fib Overlay' if first else label,
             legendgroup='fib_overlay',
             hovertemplate=f"{label}: %{{y:.2f}}<extra></extra>",
             showlegend=first,
@@ -788,8 +788,8 @@ def _build_chart_legacy(dc,ticker):
         ),
     )
     hover=_build_candle_hover(dc)
-    fig.add_trace(go.Candlestick(x=dc.index,open=dc['Open'],high=dc['High'],low=dc['Low'],close=dc['Close'],name="Price",increasing_line_color=SOFT_GREEN,decreasing_line_color=SOFT_RED,increasing_fillcolor=SOFT_GREEN_FILL,decreasing_fillcolor=SOFT_RED_FILL,text=hover,hoverinfo='text',hoverlabel=dict(bgcolor='rgba(11,14,20,.97)',bordercolor='#334155',font=dict(size=11,family=PLOTLY_FONT_FAMILY,color='#F1F5F9'),align='left')),row=1,col=1)
-    for mp in [20,50,200]:fig.add_trace(go.Scatter(x=dc.index,y=dc[f'MA{mp}'],line=dict(color=mac[mp],width=1.2),name=f'{mp}MA',legendgroup='moving_average',hoverinfo='skip',showlegend=True,visible='legendonly'),row=1,col=1)
+    fig.add_trace(go.Candlestick(x=dc.index,open=dc['Open'],high=dc['High'],low=dc['Low'],close=dc['Close'],name="Price",increasing_line_color=SOFT_GREEN,decreasing_line_color=SOFT_RED,increasing_fillcolor=SOFT_GREEN_FILL,decreasing_fillcolor=SOFT_RED_FILL,text=hover,hoverinfo='text',hoverlabel=dict(bgcolor='rgba(11,14,20,.97)',bordercolor='#334155',font=dict(size=11,family=PLOTLY_FONT_FAMILY,color='#F1F5F9'),align='left'),showlegend=False),row=1,col=1)
+    for mp in [20,50,200]:fig.add_trace(go.Scatter(x=dc.index,y=dc[f'MA{mp}'],line=dict(color=mac[mp],width=1.2),name=f'{mp}MA',legendgroup='moving_average',hoverinfo='skip',showlegend=True,visible=True),row=1,col=1)
     for ep,color in [(12,'#22D3EE'),(26,'#A78BFA')]:fig.add_trace(go.Scatter(x=dc.index,y=dc[f'EMA{ep}'],line=dict(color=color,width=1.2,dash='dot'),name=f'EMA{ep}',legendgroup='ema_overlay',hoverinfo='skip',showlegend=True,visible='legendonly'),row=1,col=1)
     for idx,(mc,clr) in enumerate([(dc['ST_Direction']==1,SOFT_GREEN),(dc['ST_Direction']==-1,SOFT_RED)],start=1):fig.add_trace(go.Scatter(x=dc.index,y=dc['SuperTrend'].where(mc),line=dict(color=clr,width=2),name='SuperTrend',legendgroup='supertrend',connectgaps=False,hoverinfo='skip',showlegend=(idx==1),visible='legendonly'),row=1,col=1)
     fig.add_trace(go.Scatter(x=dc.index,y=dc['BB_Up'],line=dict(color='#475569',width=1,dash='dot'),name='Bollinger Band',legendgroup='bollinger_band',hoverinfo='skip',showlegend=True,visible='legendonly'),row=1,col=1)
@@ -823,8 +823,8 @@ def _build_chart_legacy(dc,ticker):
         yoff=dc['Low']-dc['ATR']*(0.8 if 'Hull' in sn else 1.2 if 'UTBot' in sn else 1.8) if 'Bull' in sn or 'Buy' in sn else dc['High']+dc['ATR']*(0.8 if 'Hull' in sn else 1.2 if 'UTBot' in sn else 1.8)
         _sig_marker(fig,dc,sn,1,yoff,clr,sym,sz,lbl,legendgroup=legendgroup,showlegend=showlegend,visible=visible)
     sb,ss=_collect_strong_markers(dc)
-    _add_trendline_overlays(fig,dc,max_per_side=2,default_visible=True)
-    _add_pattern_overlay(fig,dc,_detect_active_pattern(dc),default_visible=True)
+    _add_trendline_overlays(fig,dc,max_per_side=2,default_visible='legendonly')
+    _add_pattern_overlay(fig,dc,_detect_active_pattern(dc),default_visible='legendonly')
     _add_volume_profile_overlay(fig,dc,default_visible='legendonly')
     _add_fibonacci_overlay(fig,dc,default_visible='legendonly')
     if sb.any():
@@ -1188,6 +1188,68 @@ def _pattern_hover(pattern,boundary_name):
     )
 
 
+def _configure_primary_chart_legend(fig):
+    top_yaxes={None,'y','y1'}
+    short_names={
+        'Bollinger Band':'BB',
+        'Envelope':'Env',
+        'Price Channel':'Channel',
+        'Fixed VWAP':'F-VWAP',
+        'SuperTrend':'SuperT',
+        'Hull MA':'HMA',
+        'UTBot Stop':'UT Stop',
+        'Parabolic SAR':'PSAR',
+        'Hull Turn':'H Turn',
+        'UTBot Signal':'UT Sig',
+        'VuManChu Signal':'VuMC',
+        'Trend Overlay':'Trend',
+        'Pattern Overlay':'Pattern',
+        'VP Overlay':'VP',
+        'Fib Overlay':'Fib',
+        'Williams Fractal':'Fractal',
+        'Strong Buy':'S-Buy',
+        'Strong Sell':'S-Sell',
+    }
+
+    for trace in fig.data:
+        yaxis=getattr(trace,'yaxis',None)
+        legendgroup=getattr(trace,'legendgroup',None)
+        name=getattr(trace,'name',None)
+
+        if yaxis not in top_yaxes:
+            trace.showlegend=False
+            continue
+
+        if name == 'Price':
+            trace.showlegend=False
+
+        if name in {'20MA','50MA','200MA'}:
+            trace.visible=True
+
+        if legendgroup in {'trend_overlay','pattern_overlay'}:
+            trace.visible='legendonly'
+
+        if name in short_names:
+            trace.name=short_names[name]
+
+    fig.update_layout(
+        legend=dict(
+            orientation='h',
+            yanchor='bottom',
+            y=1.01,
+            xanchor='left',
+            x=0,
+            font=dict(size=7,color='#94A3B8'),
+            bgcolor='rgba(0,0,0,0)',
+            traceorder='grouped',
+            groupclick='togglegroup',
+            itemsizing='constant',
+            tracegroupgap=6,
+        )
+    )
+    return fig
+
+
 def _localize_chart_figure(fig):
     legend_hover_map = {
         "웨이브트렌드(WT1)": "웨이브트렌드(WT1): %{y:.1f}<br><span style='color:#94A3B8'>과매수/과매도 압력 지표</span><extra></extra>",
@@ -1260,9 +1322,9 @@ def _build_unified_timeline_chart(dc,ticker):
 
     idx=dc.index
     hover=_build_candle_hover(dc)
-    fig.add_trace(go.Candlestick(x=idx,open=dc['Open'],high=dc['High'],low=dc['Low'],close=dc['Close'],name="Price",increasing_line_color=SOFT_GREEN,decreasing_line_color=SOFT_RED,increasing_fillcolor=SOFT_GREEN_FILL,decreasing_fillcolor=SOFT_RED_FILL,text=hover,hoverinfo='text',hoverlabel=dict(bgcolor='rgba(11,14,20,.97)',bordercolor='#334155',font=dict(size=11,family=PLOTLY_FONT_FAMILY,color='#F1F5F9'),align='left')),row=1,col=1)
+    fig.add_trace(go.Candlestick(x=idx,open=dc['Open'],high=dc['High'],low=dc['Low'],close=dc['Close'],name="Price",increasing_line_color=SOFT_GREEN,decreasing_line_color=SOFT_RED,increasing_fillcolor=SOFT_GREEN_FILL,decreasing_fillcolor=SOFT_RED_FILL,text=hover,hoverinfo='text',hoverlabel=dict(bgcolor='rgba(11,14,20,.97)',bordercolor='#334155',font=dict(size=11,family=PLOTLY_FONT_FAMILY,color='#F1F5F9'),align='left'),showlegend=False),row=1,col=1)
     for mp in [20,50,200]:
-        fig.add_trace(go.Scatter(x=idx,y=dc[f'MA{mp}'],line=dict(color=mac[mp],width=1.2),name=f'{mp}MA',legendgroup='moving_average',hoverinfo='skip',showlegend=True,visible='legendonly'),row=1,col=1)
+        fig.add_trace(go.Scatter(x=idx,y=dc[f'MA{mp}'],line=dict(color=mac[mp],width=1.2),name=f'{mp}MA',legendgroup='moving_average',hoverinfo='skip',showlegend=True,visible=True),row=1,col=1)
     for ep,color in [(12,'#22D3EE'),(26,'#A78BFA')]:
         fig.add_trace(go.Scatter(x=idx,y=dc[f'EMA{ep}'],line=dict(color=color,width=1.2,dash='dot'),name=f'EMA{ep}',legendgroup='ema_overlay',hoverinfo='skip',showlegend=True,visible='legendonly'),row=1,col=1)
     for trace_idx,(mask,color) in enumerate([(dc['ST_Direction']==1,SOFT_GREEN),(dc['ST_Direction']==-1,SOFT_RED)],start=1):
@@ -1297,8 +1359,8 @@ def _build_unified_timeline_chart(dc,ticker):
         yoff=dc['Low']-dc['ATR']*(0.8 if 'Hull' in sn else 1.2 if 'UTBot' in sn else 1.8) if 'Bull' in sn or 'Buy' in sn else dc['High']+dc['ATR']*(0.8 if 'Hull' in sn else 1.2 if 'UTBot' in sn else 1.8)
         _sig_marker(fig,dc,sn,1,yoff,color,symbol,size,label,legendgroup=legendgroup,showlegend=showlegend,visible=visible)
     sb,ss=_collect_strong_markers(dc)
-    _add_trendline_overlays(fig,dc,max_per_side=2,default_visible=True)
-    _add_pattern_overlay(fig,dc,_detect_active_pattern(dc),default_visible=True)
+    _add_trendline_overlays(fig,dc,max_per_side=2,default_visible='legendonly')
+    _add_pattern_overlay(fig,dc,_detect_active_pattern(dc),default_visible='legendonly')
     _add_volume_profile_overlay(fig,dc,default_visible='legendonly')
     _add_fibonacci_overlay(fig,dc,default_visible='legendonly')
     if sb.any():
@@ -1823,6 +1885,7 @@ def build_chart(dc,ticker):
         if "row, col" not in str(exc):
             raise
         fig=_build_chart_legacy(dc,ticker)
+    fig=_configure_primary_chart_legend(fig)
     return _localize_chart_figure(fig)
 
 

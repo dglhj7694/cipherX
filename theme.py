@@ -1061,8 +1061,22 @@ div[data-testid="stChatMessage"]{{
   background:linear-gradient(180deg, rgba(19,28,45,.96), rgba(15,23,42,.90));
   border:1px solid var(--sigl-border-soft);
   border-radius:18px;
-  padding:16px 18px;
+  gap:0!important;
+  padding:14px 16px;
   box-shadow:var(--sigl-shadow-sm);
+}}
+div[data-testid="stChatMessage"] [data-testid="stChatMessageAvatar"]{{
+  display:none!important;
+}}
+div[data-testid="stChatMessageAvatarUser"],
+div[data-testid="stChatMessageAvatarAssistant"]{{
+  display:none!important;
+}}
+div[data-testid="stChatMessage"] [data-testid="stChatMessageContent"]{{
+  width:100%!important;
+  max-width:100%!important;
+  margin:0!important;
+  padding:0!important;
 }}
 div[data-testid="stForm"]{{
   margin:16px 0 18px!important;
@@ -1125,15 +1139,16 @@ div.stChatFloatingInputContainer > div,
 div[data-testid="stBottomBlockContainer"]{{
   background:transparent!important;
   box-shadow:none!important;
-  padding-top:6px!important;
-  padding-bottom:4px!important;
+  padding-top:2px!important;
+  padding-bottom:2px!important;
 }}
 div[data-testid="stBottomBlockContainer"] > div{{
   background:transparent!important;
 }}
 div[data-testid="stChatInput"]{{
-  margin:0 auto 10px!important;
-  max-width:980px;
+  margin:0 auto 6px!important;
+  max-width:none;
+  width:100%;
   padding:0!important;
   border:none!important;
   border-radius:0!important;
@@ -1166,11 +1181,12 @@ div[data-testid="stChatInput"] [data-baseweb="base-input"] > div{{
 div[data-testid="stChatInput"] textarea{{
   background:rgba(15,23,42,.92)!important;
   border:1px solid rgba(148,163,184,.14)!important;
-  border-radius:16px!important;
+  border-radius:14px!important;
   color:var(--sigl-text-strong)!important;
   box-shadow:none!important;
-  padding:1rem 3.2rem 1rem 1rem!important;
-  min-height:58px!important;
+  padding:.82rem 3rem .82rem .9rem!important;
+  min-height:50px!important;
+  line-height:1.4!important;
   transition:
     border-color .18s ease,
     box-shadow .18s ease,
@@ -1195,7 +1211,7 @@ div[data-testid="stChatInput"] textarea:focus-visible{{
 div[data-testid="stChatInput"] button{{
   background:linear-gradient(135deg, #7C93FF, #5D7BFF)!important;
   border:none!important;
-  border-radius:14px!important;
+  border-radius:12px!important;
   color:white!important;
   box-shadow:0 10px 20px rgba(93,123,255,.22)!important;
 }}
@@ -1251,8 +1267,8 @@ div[data-testid="stMetricValue"]{{
   font-size:.88rem;
 }}
 .sigl-page-banner{{
-  margin:0 0 18px;
-  padding:20px 22px;
+  margin:0 0 14px;
+  padding:18px 20px;
 }}
 .sigl-page-banner__grid{{
   display:flex;
@@ -1286,14 +1302,14 @@ div[data-testid="stMetricValue"]{{
   min-width:0;
 }}
 .sigl-section-shell{{
-  margin:18px 0 12px;
+  margin:14px 0 10px;
 }}
 .sigl-section-shell--tight{{
-  margin-top:12px;
+  margin-top:8px;
 }}
 .sigl-empty-card{{
-  margin:14px 0 18px;
-  padding:20px 22px;
+  margin:10px 0 14px;
+  padding:18px 20px;
 }}
 .sigl-empty-card__title{{
   margin:0;
@@ -2107,6 +2123,20 @@ p[data-testid="stCaption"]{{
   .sigl-layer-label{{font-size:.68rem;padding:3px 7px}}
 }}
 @media (max-width: 640px){{
+  .block-container{{
+    padding-top:.65rem!important;
+    padding-bottom:.75rem!important;
+    padding-left:.75rem!important;
+    padding-right:.75rem!important;
+  }}
+  section[data-testid="stMain"] div[data-testid="stHorizontalBlock"]{{
+    flex-direction:column!important;
+    align-items:stretch!important;
+    gap:10px!important;
+  }}
+  section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div{{
+    width:100%!important;
+  }}
   section[data-testid="stSidebar"]{{
     --sigl-sidebar-control-h:44px;
     --sigl-sidebar-gap:10px;
@@ -2132,23 +2162,36 @@ p[data-testid="stCaption"]{{
     padding:.62rem .92rem!important;
     border-radius:13px!important;
   }}
+  .sigl-page-head__eyebrow,
+  .sigl-page-head__copy,
+  .sigl-page-banner__copy{{
+    display:none!important;
+  }}
+  .sigl-page-head__title{{
+    font-size:1.08rem;
+  }}
+  .sigl-page-banner__meta,
+  .sigl-section-shell .sigl-inline{{
+    display:none!important;
+  }}
   .sigl-grid--2,
   .sigl-grid--3,
   .sigl-grid--4,
   .sigl-grid--5,
   .sigl-result-summary{{grid-template-columns:1fr}}
-  .block-container{{padding-left:1rem!important;padding-right:1rem!important}}
-  .sigl-page-banner{{padding:18px 16px}}
-  .sigl-empty-card{{padding:18px 16px}}
-  .sigl-page-banner__meta{{justify-content:flex-start}}
+  .sigl-page-banner{{margin:0 0 10px;padding:14px 14px}}
+  .sigl-empty-card{{margin:8px 0 10px;padding:14px 14px}}
   .sigl-scanner-scope__codes{{max-height:none}}
   .sigl-price-value{{font-size:1.8rem}}
   .sigl-layer-row{{grid-template-columns:46px 1fr 46px;gap:6px}}
   .sigl-layer-track{{height:26px}}
   .sigl-layer-label{{font-size:.64rem;padding:2px 6px}}
-  .sigl-card{{padding:14px 14px}}
+  .sigl-card{{padding:13px 13px}}
   .sigl-metric-card,
   .sigl-committee-card{{padding:13px 13px}}
+  div[data-testid="stChatMessage"]{{
+    padding:12px 12px;
+  }}
   div[data-testid="stForm"] div[data-testid="stHorizontalBlock"]{{
     flex-direction:column!important;
     align-items:stretch!important;
@@ -2157,7 +2200,21 @@ p[data-testid="stCaption"]{{
   div[data-testid="stForm"] div[data-testid="stHorizontalBlock"] > div{{
     width:100%!important;
   }}
-  div[data-testid="stChatInput"]{{max-width:none}}
+  div[data-testid="stChatInput"]{{
+    max-width:none;
+    margin:0 auto 4px!important;
+  }}
+  div[data-testid="stChatInput"] textarea{{
+    min-height:44px!important;
+    padding:.68rem 2.7rem .68rem .8rem!important;
+    font-size:.95rem!important;
+  }}
+  div[data-testid="stChatInput"] button{{
+    width:38px!important;
+    height:38px!important;
+    min-width:38px!important;
+    padding:0!important;
+  }}
 }}
 @media (prefers-reduced-motion: reduce){{
   div[data-testid="stTabs"] [role="tab"],
@@ -2774,22 +2831,17 @@ html,body{{
   .sigl-brand-clock{{right:4px;top:2px}}
 }}
 @media (max-width: 640px){{
-  .sigl-brand-shell{{min-height:100px;padding:14px 16px;border-radius:18px}}
-  .sigl-brand-bar{{min-height:64px;justify-content:center}}
+  .sigl-brand-shell{{min-height:74px;padding:10px 12px;border-radius:16px}}
+  .sigl-brand-shell--compact{{min-height:64px}}
+  .sigl-brand-bar{{min-height:48px;justify-content:flex-start}}
   .sigl-brand-lockup{{width:100%}}
-  .sigl-brand-wordmark{{gap:4px}}
-  .sigl-brand-title{{font-size:clamp(1.72rem, 10vw, 2.22rem);letter-spacing:.09em}}
-  .sigl-brand-subtitle{{font-size:.64rem;letter-spacing:.14em;padding-right:10px}}
-  .sigl-brand-subtitle::after{{width:5px;height:5px}}
+  .sigl-brand-wordmark{{gap:2px;align-items:flex-start;text-align:left}}
+  .sigl-brand-title{{font-size:clamp(1.42rem, 8.8vw, 1.96rem);letter-spacing:.06em}}
+  .sigl-brand-subtitle{{display:none}}
+  .sigl-brand-subtitle::after{{display:none}}
   .sigl-brand-clock{{
-    right:0;
-    top:-2px;
-    padding:5px 7px;
-    gap:3px;
-    border-radius:10px;
+    display:none;
   }}
-  .sigl-brand-clock__label{{font-size:.46rem;letter-spacing:.14em}}
-  .sigl-brand-clock__value{{font-size:.62rem}}
 }}
 @media (prefers-reduced-motion: reduce){{
   .sigl-brand-shell::before,

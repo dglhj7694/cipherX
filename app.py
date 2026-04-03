@@ -66,6 +66,7 @@ MODE_ANALYSIS = "분석"
 MODE_SCANNER = "스캐너"
 _APP_MODE_OPTIONS = [MODE_MARKET_DAILY, MODE_ANALYSIS, MODE_SCANNER]
 _QUICK_ANALYSIS_TICKERS = ["NVDA", "TSLA", "AAPL", "GOOGL", "AMZN", "META", "MSFT", "PLTR", "HIMS", "SNDK", "LITE", "COHR", "IREN", "ORCL", "RKLB", "ASTS"]
+CHAT_INPUT_PLACEHOLDER = "티커 입력: AAPL / 005930"
 
 
 # ━━━ Constants ━━━
@@ -2237,7 +2238,7 @@ elif current_mode == MODE_MARKET_DAILY:
         tight=True,
     )
     _render_quick_analysis_grid(key_prefix="briefing_quick")
-    if ti := st.chat_input("분석할 티커를 입력하세요. 예: AAPL, 005930"):
+    if ti := st.chat_input(CHAT_INPUT_PLACEHOLDER):
         parsed = _parse_analysis_ticker_input(ti)
         if not parsed:
             st.toast("분석할 티커를 입력해 주세요. 예: AAPL / 005930", icon="⌨️")
@@ -2250,7 +2251,7 @@ elif current_mode == MODE_MARKET_DAILY:
 #  분석 모드
 # ══════════════════════════════════════════════════════════════
 else:
-    _render_brand_board(main_board_payload)
+    _render_brand_board(main_board_payload, compact=True)
 
     analysis_indices = [i for i, msg in enumerate(st.session_state.messages) if msg.get("type") == "analysis"]
     report_indices = [i for i, msg in enumerate(st.session_state.messages) if msg.get("type") == "report"]
@@ -2334,8 +2335,7 @@ else:
             st.caption("영구 저장을 원하면 `.streamlit/secrets.toml` 또는 `GOOGLE_API_KEY` 환경변수를 사용하면 됩니다.")
 
     for i, msg in enumerate(st.session_state.messages):
-        av = "✨" if msg["role"] == "assistant" else "🧑‍💻"
-        with st.chat_message(msg["role"], avatar=av):
+        with st.chat_message(msg["role"]):
             if msg.get("type") == "analysis":
                 is_latest_analysis = i == latest_analysis_idx
                 if is_latest_analysis:
@@ -2384,7 +2384,7 @@ else:
         _set_scan_focus(tv)
         if resolved.get("auto_resolved"):
             st.toast(f"{raw_tv} → {tv} 로 해석해 분석합니다.", icon="📌")
-        with st.chat_message("assistant", avatar="✨"):
+        with st.chat_message("assistant"):
             with st.status(f"READING THE TAPE · {tv}", expanded=True) as status:
                 if resolved.get("auto_resolved"):
                     st.write(f"0. 입력값을 `{raw_tv}` → `{tv}` 로 해석했습니다.")
@@ -2460,7 +2460,7 @@ else:
         process_ticker(st.session_state.pop('_auto'))
     if st.session_state.get('quick'):
         process_ticker(st.session_state.pop('quick'))
-    if ti := st.chat_input("분석할 티커를 입력하세요. 예: AAPL, 005930"):
+    if ti := st.chat_input(CHAT_INPUT_PLACEHOLDER):
         parsed = _parse_analysis_ticker_input(ti)
         if not parsed:
             st.toast("분석할 티커를 입력해 주세요. 예: AAPL / 005930", icon="⌨️")
