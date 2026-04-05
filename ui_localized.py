@@ -2861,8 +2861,17 @@ def render_ai_signal_assisted_card(meta):
         "MIXED": "혼합",
     }
 
+    def _playbook_tone(style_text, fit_score):
+        if any(token in str(style_text or "") for token in ("관망", "대기")):
+            return "warning"
+        if fit_score >= 70:
+            return tone if tone in ("positive", "negative") else "accent"
+        if fit_score >= 45:
+            return "warning"
+        return "muted"
+
     title = "AI SIGNAL-ASSISTED"
-    subtitle = "엔진 점수 없이 OHLCV, 보조지표, 시그널 탐지 목록만으로 만든 독립 2차 의견입니다."
+    subtitle = "엔진 점수 없이 OHLCV, 가격 구조, 보조지표, 시장 데이터, 차트 시그널 이벤트만으로 만든 독립 2차 의견입니다."
     if not ai.get("available"):
         reason = _translate_note_text(ai.get("AI_Reason") or ai.get("reason") or "AI 보조 판단을 생성하지 못했습니다.")
         _render_panel_html(
@@ -2891,8 +2900,13 @@ def render_ai_signal_assisted_card(meta):
     agreement_label, agreement_tone = agreement_map.get(ai.get("AI_Agreement"), ("확인 필요", "warning"))
     disagreement_label = disagreement_map.get(str(ai.get("AI_Disagreement_Type", "MIXED")).upper(), "혼합")
     reason = _translate_note_text(ai.get("AI_Reason", ""))
-    drivers = ai.get("AI_Key_Drivers") if isinstance(ai.get("AI_Key_Drivers"), list) else []
-    risks = ai.get("AI_Risk_Flags") if isinstance(ai.get("AI_Risk_Flags"), list) else []
+    trade_strategy = _translate_note_text(ai.get("AI_Trade_Strategy", ""))
+    entry_plan = _translate_note_text(ai.get("AI_Entry_Plan", ""))
+    invalidation = _translate_note_text(ai.get("AI_Invalidation", ""))
+    target_plan = _translate_note_text(ai.get("AI_Target_Plan", ""))
+    playbook = ai.get("AI_Strategy_Playbook") if isinstance(ai.get("AI_Strategy_Playbook"), list) else []
+    drivers = [_translate_note_text(item) for item in (ai.get("AI_Key_Drivers") if isinstance(ai.get("AI_Key_Drivers"), list) else [])]
+    risks = [_translate_note_text(item) for item in (ai.get("AI_Risk_Flags") if isinstance(ai.get("AI_Risk_Flags"), list) else [])]
 
     badges = [
         _badge(ai_label, tone),
@@ -2919,6 +2933,8 @@ def render_ai_signal_assisted_card(meta):
     """
     if reason:
         summary_html += f"<div class='sigl-note'><strong>AI 판단 이유</strong><br><span class='sigl-summary'>{_esc(reason)}</span></div>"
+    if trade_strategy:
+        summary_html += f"<div class='sigl-note'><strong>AI 매매전략</strong><br><span class='sigl-summary'>{_esc(trade_strategy)}</span></div>"
     summary_html += (
         f"<div class='sigl-note'><strong>비교 스냅샷</strong><div class='sigl-grid sigl-grid--4'>"
         f"{_mini_stat_card('엔진 판단', engine_label, _tone_from_text(str(meta.get('judgment', 'NEUTRAL'))))}"
@@ -2927,6 +2943,53 @@ def render_ai_signal_assisted_card(meta):
         f"{_mini_stat_card('불일치 유형', disagreement_label, 'accent' if disagreement_label != '없음' else 'muted')}"
         f"</div></div>"
     )
+    if entry_plan or invalidation or target_plan:
+        strategy_cards = []
+        if entry_plan:
+            strategy_cards.append(_mini_stat_card("진입 아이디어", entry_plan, tone))
+        if invalidation:
+            strategy_cards.append(_mini_stat_card("무효화 기준", invalidation, "warning"))
+        if target_plan:
+            strategy_cards.append(_mini_stat_card("목표 구간", target_plan, "accent"))
+        summary_html += f"<div class='sigl-note'><strong>실행 플랜</strong><div class='sigl-grid sigl-grid--3'>{''.join(strategy_cards)}</div></div>"
+    if playbook:
+        playbook_cards = []
+        for item in playbook[:5]:
+            if not isinstance(item, dict):
+                continue
+            style_text = _translate_note_text(item.get("style", ""))
+            fit_score = _safe_float(item.get("fit", 0))
+            summary_text = _translate_note_text(item.get("summary", ""))
+            entry_text = _translate_note_text(item.get("entry", ""))
+            invalidation_text = _translate_note_text(item.get("invalidation", ""))
+            target_text = _translate_note_text(item.get("target", ""))
+            if not any([style_text, summary_text, entry_text, invalidation_text, target_text]):
+                continue
+            item_tone = _playbook_tone(style_text, fit_score)
+            details = []
+            if summary_text:
+                details.append(f"<div class='sigl-summary' style='margin-bottom:8px'>{_esc(summary_text)}</div>")
+            if entry_text:
+                details.append(f"<div class='sigl-summary' style='margin-bottom:4px'><strong>진입</strong>: {_esc(entry_text)}</div>")
+            if invalidation_text:
+                details.append(f"<div class='sigl-summary' style='margin-bottom:4px'><strong>무효화</strong>: {_esc(invalidation_text)}</div>")
+            if target_text:
+                details.append(f"<div class='sigl-summary'><strong>목표</strong>: {_esc(target_text)}</div>")
+            playbook_cards.append(
+                "<div class='sigl-note'>"
+                "<div style='display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px'>"
+                f"<strong>{_esc(style_text or '전략')}</strong>"
+                f"{_badge(f'적합도 {fit_score:.0f}%', item_tone)}"
+                "</div>"
+                f"{''.join(details)}"
+                "</div>"
+            )
+        if playbook_cards:
+            summary_html += (
+                "<div class='sigl-note'><strong>스타일별 플레이북</strong>"
+                f"<div class='sigl-grid sigl-grid--2' style='margin-top:12px'>{''.join(playbook_cards)}</div>"
+                "</div>"
+            )
     if driver_badges:
         summary_html += f"<div class='sigl-note'><strong>AI 핵심 근거</strong><div class='sigl-chip-row'>{driver_badges}</div></div>"
     if risk_badges:
