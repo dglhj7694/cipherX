@@ -3193,53 +3193,241 @@ def render_leading_lagging(meta):
     _render_panel_html(panel_html)
 
 
-def render_combined_scans(meta):
-    scans = meta.get("combined_scans", [])
-    if not scans:
-        st.info("현재 활성화된 콤보 스캔이 없습니다.")
-        return
-    buy_count = sum(1 for item in scans if item.get("dir") == "buy")
-    sell_count = sum(1 for item in scans if item.get("dir") == "sell")
-    tier1_count = sum(1 for item in scans if item.get("tier") == 1)
-    tone = "warning" if tier1_count > 0 else ("positive" if buy_count > sell_count else "negative" if sell_count > buy_count else "accent")
-    cards = []
-    for item in scans:
-        direction = item.get("dir")
-        item_tone = "positive" if direction == "buy" else ("negative" if direction == "sell" else "warning")
-        tier_label = {1: "우선 T1", 2: "보강 T2", 3: "참고 T3"}.get(item.get("tier"), "참고")
-        cards.append(
-            f"""
-            <div class="sigl-card sigl-card--{'positive' if item_tone == 'positive' else 'negative' if item_tone == 'negative' else 'warning'}">
-              <div class="sigl-section-head">
-                <div>
-                  <p class="sigl-section-title">{_esc(item.get('kor'))}</p>
-                  <p class="sigl-section-copy">{_esc(item.get('win'))}</p>
-                </div>
-                <div class="sigl-inline">
-                  {_badge(tier_label, item_tone)}
-                  {_badge(item.get('date', '--/--') if not item.get('is_today') else '오늘', 'accent')}
-                </div>
-              </div>
-            </div>
-            """
+STRATEGY_STATUS_MAP = {
+    "ACTIVE": "성립",
+    "CONFIRMING": "확인 진행",
+    "TRIGGER_WAIT": "트리거 대기",
+    "READY": "준비",
+    "INTEREST": "관심",
+    "WATCH": "준비",
+    "WEAK_WATCH": "관심",
+    "INVALID": "무효",
+}
+STRATEGY_PHASE_MAP = {
+    "TRIGGERED": "트리거 완료",
+    "PULLBACK_WAIT": "눌림 대기",
+    "BREAKOUT_PENDING": "돌파 확인 대기",
+    "BREAKOUT_CONFIRMED": "돌파 확정",
+    "SQUEEZE_READY": "압축 해제 대기",
+    "REVERSAL_READY": "반전 확인 대기",
+    "DOUBLE_CONFIRMED": "이중 확인 완료",
+    "TREND_ALIGNED": "추세 정렬",
+    "DIVERGENCE_READY": "다이버전스 대기",
+    "DIVERGENCE_CONFIRMED": "다이버전스 확인",
+    "SETUP_INVALID": "환경 부족",
+}
+
+
+def _strategy_direction_label(value, fallback="-"):
+    raw = str(value or "").upper()
+    if raw == "LONG":
+        return "LONG"
+    if raw == "SHORT":
+        return "SHORT"
+    return fallback
+
+
+def _strategy_conflict_tone(level):
+    return {"LOW": "positive", "MEDIUM": "warning", "HIGH": "negative"}.get(str(level or "").upper(), "muted")
+
+
+def _strategy_price_text(value):
+    if value in (None, ""):
+        return "-"
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return "-"
+    if math.isnan(number):
+        return "-"
+    return f"{number:.2f}"
+
+
+def build_strategy_tab_view_model(meta):
+    meta = meta or {}
+    summary = dict(meta.get("strategy_summary") or {})
+    strategies = list(meta.get("strategy_visible_results") or [])
+    if not strategies:
+        strategies = [
+            dict(item)
+            for item in (meta.get("strategy_results") or [])
+            if str(item.get("status", "")).upper() in {"ACTIVE", "CONFIRMING", "TRIGGER_WAIT", "READY", "INTEREST", "WATCH", "WEAK_WATCH"}
+        ]
+
+    top_strategy = summary.get("top_strategy") if isinstance(summary.get("top_strategy"), dict) else (meta.get("top_strategy") or {})
+    bullish_count = _safe_int(summary.get("bullish_count", 0))
+    bearish_count = _safe_int(summary.get("bearish_count", 0))
+    active_count = _safe_int(summary.get("active_count", 0))
+    visible_count = _safe_int(summary.get("visible_count", len(strategies)))
+    conflict_level = str(summary.get("conflict_level", "LOW")).upper()
+    bias = str(summary.get("long_short_bias", "BALANCED")).upper()
+    bias_text = {"LONG": "Long 우세", "SHORT": "Short 우세", "BALANCED": "혼합"}.get(bias, "혼합")
+    dominant_reasons = [str(text).strip() for text in summary.get("dominant_reasons", []) if str(text).strip()]
+    opposing_reasons = [str(text).strip() for text in summary.get("opposing_reasons", []) if str(text).strip()]
+    top_label = "-"
+    top_score = 0.0
+    top_direction = "-"
+    top_entry_price_text = "-"
+    top_status_text = "-"
+    if isinstance(top_strategy, dict) and top_strategy.get("label"):
+        top_label = str(top_strategy.get("label"))
+        top_score = _safe_float(top_strategy.get("score", 0))
+        top_direction = _strategy_direction_label(top_strategy.get("direction"))
+        top_entry_price_text = _strategy_price_text(top_strategy.get("entry_price"))
+        top_status_text = STRATEGY_STATUS_MAP.get(str(top_strategy.get("status", "")).upper(), "-")
+    elif strategies:
+        top_entry_price_text = _strategy_price_text(strategies[0].get("entry_price"))
+        top_status_text = STRATEGY_STATUS_MAP.get(str(strategies[0].get("status", "")).upper(), "-")
+    secondary = [
+        f"{item.get('label')} ({_safe_float(item.get('score', 0)):.0f}점)"
+        for item in summary.get("secondary_strategies", [])
+        if isinstance(item, dict) and item.get("label")
+    ]
+    table_rows = []
+    option_labels = []
+    for item in strategies:
+        direction = _strategy_direction_label(item.get("direction"))
+        phase_text = STRATEGY_PHASE_MAP.get(str(item.get("phase", "")).upper(), str(item.get("phase", "")))
+        table_rows.append(
+            {
+                "전략명": str(item.get("label", "")),
+                "방향": direction,
+                "점수": round(_safe_float(item.get("score", 0)), 1),
+                "상태": STRATEGY_STATUS_MAP.get(str(item.get("status", "")).upper(), str(item.get("status", ""))),
+                "진입 방식": str(item.get("entry_hint", "")),
+                "진입가": _strategy_price_text(item.get("entry_price")),
+                "손절": _strategy_price_text(item.get("stop_loss")),
+                "1차 목표가": _strategy_price_text(item.get("target_1")),
+                "비고": str(item.get("note") or phase_text),
+            }
         )
-    panel_html = f"""
-        <div class="sigl-card sigl-card--{'warning' if tone == 'warning' else 'positive' if tone == 'positive' else 'negative' if tone == 'negative' else 'accent'}">
-          <div class="sigl-section-head">
-            <div>
-              <p class="sigl-section-title">콤보 스캔</p>
-              <p class="sigl-section-copy">여러 조건이 함께 만족된 고확신 패턴만 모아서 보여줍니다.</p>
-            </div>
-            <div class="sigl-inline">
-              {_badge(f'T1 {tier1_count}', 'warning')}
-              {_badge(f'매수 {buy_count}', 'positive')}
-              {_badge(f'매도 {sell_count}', 'negative')}
-            </div>
-          </div>
-        </div>
-        <div class="sigl-grid sigl-grid--2" style="margin-top:12px">{''.join(cards)}</div>
-        """
-    _render_panel_html(panel_html, min_height=_combined_scan_panel_height(len(cards)))
+        option_labels.append(
+            f"{item.get('label')} | {direction} | {_safe_float(item.get('score', 0)):.0f}점 | {phase_text}"
+        )
+    return {
+        "summary": summary,
+        "strategies": strategies,
+        "top_strategy": top_strategy,
+        "top_label": top_label,
+        "top_score": top_score,
+        "top_direction": top_direction,
+        "top_entry_price_text": top_entry_price_text,
+        "top_status_text": top_status_text,
+        "bullish_count": bullish_count,
+        "bearish_count": bearish_count,
+        "active_count": active_count,
+        "visible_count": visible_count,
+        "conflict_level": conflict_level,
+        "conflict_tone": _strategy_conflict_tone(conflict_level),
+        "bias": bias,
+        "bias_text": bias_text,
+        "secondary": secondary,
+        "dominant_reasons": dominant_reasons,
+        "opposing_reasons": opposing_reasons,
+        "table_rows": table_rows,
+        "option_labels": option_labels,
+    }
+
+
+def render_combined_scans(meta):
+    model = build_strategy_tab_view_model(meta)
+    strategies = model["strategies"]
+    overview_badges = (
+        _badge(f"성립 {model['active_count']}", "accent")
+        + _badge(f"표시 {model['visible_count']}", "muted")
+        + _badge(f"충돌 {model['conflict_level']}", model["conflict_tone"])
+    )
+    overview_cards = "".join(
+        [
+            _mini_stat_card(
+                "Top Strategy",
+                (
+                    f"{model['top_label']} ({model['top_score']:.0f}점)"
+                    + (f" · {model['top_status_text']}" if model["top_status_text"] != "-" else "")
+                    + (f" · 진입 {model['top_entry_price_text']}" if model["top_entry_price_text"] != "-" else "")
+                )
+                if model["top_label"] != "-"
+                else "-",
+                "accent",
+            ),
+            _mini_stat_card(
+                "방향 우세",
+                model["bias_text"],
+                "positive" if model["bias"] == "LONG" else "negative" if model["bias"] == "SHORT" else "warning",
+            ),
+            _mini_stat_card("Bullish", str(model["bullish_count"]), "positive"),
+            _mini_stat_card("Bearish", str(model["bearish_count"]), "negative"),
+            _mini_stat_card("Top Direction", model["top_direction"], "accent" if model["top_direction"] != "-" else "muted"),
+        ]
+    )
+    overview_html = (
+        "<div class='sigl-card'>"
+        "<div class='sigl-section-head'>"
+        "<div>"
+        "<p class='sigl-section-title'>매매전략</p>"
+        "<p class='sigl-section-copy'>기존 시그널과 지표를 실제 매매 시나리오로 묶어 현재 우세한 전략을 보여줍니다.</p>"
+        "</div>"
+        f"<div class='sigl-inline'>{overview_badges}</div>"
+        "</div>"
+        f"<div class='sigl-grid sigl-grid--5'>{overview_cards}</div>"
+        f"<div class='sigl-note'><strong>보조 전략</strong><br><span class='sigl-summary'>{_esc(', '.join(model['secondary']) if model['secondary'] else '현재는 상위 전략 1개만 뚜렷합니다.')}</span></div>"
+        f"<div class='sigl-note'><strong>우세 근거</strong><br><span class='sigl-summary'>{_esc(' / '.join(model['dominant_reasons'][:3]) if model['dominant_reasons'] else '아직 우세 전략의 근거가 충분히 쌓이지 않았습니다.')}</span></div>"
+        f"<div class='sigl-note'><strong>반대 근거</strong><br><span class='sigl-summary'>{_esc(' / '.join(model['opposing_reasons'][:3]) if model['opposing_reasons'] else '뚜렷한 반대 전략은 아직 약합니다.')}</span></div>"
+        "</div>"
+    )
+    _render_panel_html(overview_html)
+
+    if not strategies:
+        st.info("현재 표시할 활성 전략이 없습니다. 기존 시그널과 레이어 판단을 먼저 확인해 주세요.")
+        return
+
+    st.dataframe(pd.DataFrame(model["table_rows"]), use_container_width=True, hide_index=True)
+
+    selected_option = st.selectbox(
+        "전략 상세",
+        model["option_labels"],
+        index=0,
+        key=f"strategy_detail_{meta.get('ticker', 'ticker')}_{meta.get('last_date', '')}",
+    )
+    selected_index = model["option_labels"].index(selected_option) if selected_option in model["option_labels"] else 0
+    detail = dict(strategies[selected_index])
+    detail_direction = _strategy_direction_label(detail.get("direction"))
+    detail_tone = "positive" if detail_direction == "LONG" else "negative" if detail_direction == "SHORT" else "warning"
+    matched_badges = "".join(_badge(text, "positive") for text in detail.get("matched_conditions", [])) or _badge("성립 근거 없음", "muted")
+    missing_badges = "".join(_badge(text, "warning") for text in detail.get("missing_conditions", [])) or _badge("누락 조건 없음", "muted")
+    failed_badges = "".join(_badge(text, "negative") for text in detail.get("failed_conditions", [])) or _badge("실패 조건 없음", "muted")
+    change_badges = "".join(_badge(text, "accent") for text in detail.get("last5_change", [])) or _badge("최근 변화 없음", "muted")
+    detail_entry_price_text = _strategy_price_text(detail.get("entry_price"))
+    detail_rr_text = "-" if detail.get("rr") in (None, "") else f"{_safe_float(detail.get('rr', 0)):.2f}"
+    risk_cards = "".join(
+        [
+            _mini_stat_card("점수", f"{_safe_float(detail.get('score', 0)):.1f}", detail_tone),
+            _mini_stat_card("상태", STRATEGY_STATUS_MAP.get(str(detail.get("status", "")).upper(), str(detail.get("status", ""))), detail_tone),
+            _mini_stat_card("Phase", STRATEGY_PHASE_MAP.get(str(detail.get("phase", "")).upper(), str(detail.get("phase", ""))), "accent"),
+            _mini_stat_card("진입가", detail_entry_price_text, "accent"),
+            _mini_stat_card("RR", detail_rr_text, "warning"),
+            _mini_stat_card("손절", _strategy_price_text(detail.get("stop_loss")), "negative"),
+            _mini_stat_card("1차 목표가", _strategy_price_text(detail.get("target_1")), "positive"),
+        ]
+    )
+    detail_html = (
+        f"<div class='sigl-card sigl-card--{'positive' if detail_tone == 'positive' else 'negative'}'>"
+        "<div class='sigl-section-head'>"
+        "<div>"
+        f"<p class='sigl-section-title'>{_esc(detail.get('label'))}</p>"
+        f"<p class='sigl-section-copy'>{_esc(detail_direction)} · {STRATEGY_STATUS_MAP.get(str(detail.get('status', '')).upper(), str(detail.get('status', '')))} · {STRATEGY_PHASE_MAP.get(str(detail.get('phase', '')).upper(), str(detail.get('phase', '')))}</p>"
+        "</div>"
+        f"<div class='sigl-inline'>{_badge(detail.get('entry_hint'), 'accent')}{_badge(f'진입가 {detail_entry_price_text}', 'accent')}{_badge(f'위험/보상 {detail_rr_text}', 'warning')}</div>"
+        "</div>"
+        f"<div class='sigl-grid sigl-grid--3'>{risk_cards}</div>"
+        f"<div class='sigl-note'><strong>왜 성립했나</strong><br><span class='sigl-summary'>{_esc(detail.get('explanation'))}</span></div>"
+        f"<div class='sigl-note'><strong>성립 체크리스트</strong><div class='sigl-chip-row'>{matched_badges}</div></div>"
+        f"<div class='sigl-note'><strong>실패 / 부족 조건</strong><div class='sigl-chip-row'>{missing_badges}{failed_badges}</div></div>"
+        f"<div class='sigl-note'><strong>최근 5봉 변화</strong><div class='sigl-chip-row'>{change_badges}</div></div>"
+        f"<div class='sigl-note'><strong>무효화 조건</strong><br><span class='sigl-summary'>{_esc(detail.get('invalidation_text') or '-')}</span></div>"
+        "</div>"
+    )
+    _render_panel_html(detail_html)
 
 
 def render_committee_panel_clean(meta):
@@ -3668,13 +3856,13 @@ def render_analysis(msg, key_prefix="analysis"):
     if not (meta or fig_json):
         return
 
-    tab_chart, tab_judgment, tab_audit, tab_layers, tab_scans, tab_company = st.tabs(
+    tab_chart, tab_judgment, tab_audit, tab_layers, tab_strategies, tab_company = st.tabs(
         [
             "\uCC28\uD2B8",
             "\uD310\uB2E8/\uB9AC\uC2A4\uD06C",
             "\uBC31\uD14C\uC2A4\uD2B8/\uAC10\uC0AC",
             "10\uAC1C \uB808\uC774\uC5B4",
-            "\uCF64\uBCF4 \uC2A4\uCE94",
+            "\uB9E4\uB9E4\uC804\uB7B5",
             "\uAE30\uC5C5 \uC815\uBCF4",
         ]
     )
@@ -3715,7 +3903,7 @@ def render_analysis(msg, key_prefix="analysis"):
         if meta:
             render_10layer_bars_clean(meta, html_key=f"{key_prefix}_10layer")
 
-    with tab_scans:
+    with tab_strategies:
         if meta:
             render_combined_scans(meta)
 

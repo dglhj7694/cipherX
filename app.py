@@ -24,6 +24,7 @@ from localization import (
     localize_context_label,
     localize_judgment_label,
 )
+from strategy import build_strategy_payload
 from branding import (
     BRAND_NAME,
     BRAND_PAGE_ICON,
@@ -399,6 +400,13 @@ def _show_analysis_toasts(ticker, meta):
     tier1 = [str(s.get('kor', '')).strip() for s in meta.get('combined_scans', []) if s.get('tier') == 1 and s.get('is_today')]
     if tier1:
         warning_parts.append(f"핵심 콤보 {', '.join(tier1[:2])}")
+    top_strategy = (meta.get('strategy_summary') or {}).get('top_strategy') or meta.get('top_strategy')
+    if isinstance(top_strategy, dict) and top_strategy.get('label'):
+        entry_price_text = _format_strategy_entry_price(top_strategy.get('entry_price'))
+        entry_suffix = f" 진입 {entry_price_text}" if entry_price_text else ""
+        status_text = _format_strategy_status(top_strategy.get('status'))
+        status_suffix = f" {status_text}" if status_text else ""
+        warning_parts.append(f"전략 {top_strategy.get('label')} {float(top_strategy.get('score', 0) or 0):.0f}점{status_suffix}{entry_suffix}")
     if warning_parts:
         st.toast(" · ".join(warning_parts[:2]), icon='⚠️')
 
@@ -412,6 +420,29 @@ def _tone_suffix(raw_text):
     if 'WATCH' in text or 'HOLD' in text or 'NEUTRAL' in text or '관망' in text or '보유' in text:
         return 'warning'
     return 'muted'
+
+
+def _format_strategy_status(value):
+    return {
+        "ACTIVE": "성립",
+        "CONFIRMING": "확인 진행",
+        "TRIGGER_WAIT": "트리거 대기",
+        "READY": "준비",
+        "INTEREST": "관심",
+        "WATCH": "준비",
+        "WEAK_WATCH": "관심",
+        "INVALID": "무효",
+    }.get(str(value or "").upper(), str(value or ""))
+
+
+def _format_strategy_entry_price(value):
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return ""
+    if math.isnan(number):
+        return ""
+    return f"{number:.2f}"
 
 
 def _sigl_badge(label, tone='muted'):
@@ -1175,6 +1206,7 @@ def _render_scanner_result_card(rank, row):
     judgment_key = str(row.get('jg_key', ''))
     judgment_label = str(row.get('jg', 'N/A'))
     action_label = str(row.get('action', '')).strip()
+    top_strategy = row.get('top_strategy') or {}
     tone = _tone_suffix(judgment_key or action_label)
     tone_class = {
         'positive': 'sigl-card--positive',
@@ -1190,6 +1222,27 @@ def _render_scanner_result_card(rank, row):
         _sigl_badge(f"{m['icon']} {m['label']} {m['date']}", _tone_suffix(m.get('dir')))
         for m in row.get('multi_hits', [])
     ) or _sigl_badge("최근 다중 시그널 없음", 'muted')
+    strategy_hits = "".join(
+        _sigl_badge(
+            f"전략 {item.get('label')} {float(item.get('score', 0) or 0):.0f}점",
+            'positive' if str(item.get('direction', '')).upper() == 'LONG' else 'negative' if str(item.get('direction', '')).upper() == 'SHORT' else 'muted'
+        )
+        for item in (row.get('strategies') or [])[:3]
+    ) or _sigl_badge("활성 전략 없음", 'muted')
+    top_strategy_text = ""
+    if isinstance(top_strategy, dict) and top_strategy.get('label'):
+        entry_price_text = _format_strategy_entry_price(top_strategy.get('entry_price'))
+        entry_suffix = f" · 진입가 {entry_price_text}" if entry_price_text else ""
+        status_text = _format_strategy_status(top_strategy.get('status'))
+        status_suffix = f" · {html.escape(status_text)}" if status_text else ""
+        top_strategy_text = (
+            f"<div class='sigl-note'>"
+            f"<span class='sigl-summary'>상위 전략 {html.escape(str(top_strategy.get('label')))} · "
+            f"{html.escape(str(top_strategy.get('direction', '')))} · "
+            f"{float(top_strategy.get('score', 0) or 0):.0f}점 · "
+            f"충돌 {html.escape(str(row.get('strategy_conflict_level', 'LOW')))}{status_suffix}{html.escape(entry_suffix)}</span>"
+            f"</div>"
+        )
     reason_html = ""
     if row.get('reason'):
         reason_html = (
@@ -1215,7 +1268,9 @@ def _render_scanner_result_card(rank, row):
                 </div>
             </div>
             <div class="sigl-chip-row">{transitions}</div>
+            <div class="sigl-chip-row">{strategy_hits}</div>
             <div class="sigl-chip-row">{combo_hits}</div>
+            {top_strategy_text}
             {reason_html}
         </div>
         """
@@ -1227,6 +1282,28 @@ def _format_board_text(value, fallback="--"):
 
 def _format_board_code(value, fallback="--"):
     return _format_board_text(value, fallback).upper()
+
+def _strategy_focus_item(top_strategy, fallback_date="STRAT"):
+    if not isinstance(top_strategy, dict):
+        return None
+    label = _format_board_text(top_strategy.get('label'), '')
+    if not label:
+        return None
+    raw_direction = _format_board_text(top_strategy.get('direction') or top_strategy.get('dir'), 'neutral').upper()
+    direction = 'buy' if raw_direction == 'LONG' else 'sell' if raw_direction == 'SHORT' else raw_direction.lower()
+    score = top_strategy.get('score')
+    score_text = f"{float(score):.0f}점" if isinstance(score, (int, float)) else ""
+    status_text = _format_strategy_status(top_strategy.get('status'))
+    status_suffix = f" {status_text}" if status_text else ""
+    entry_price_text = _format_strategy_entry_price(top_strategy.get('entry_price'))
+    entry_suffix = f" @{entry_price_text}" if entry_price_text else ""
+    return {
+        'icon': '◆',
+        'label': f"{label} {score_text}{status_suffix}{entry_suffix}".strip(),
+        'date': fallback_date,
+        'dir': direction,
+        'is_combined': False,
+    }
 
 def _format_board_es(value):
     try:
@@ -1318,6 +1395,9 @@ def _latest_recent_signal_label(meta=None, fallback="STANDBY"):
         if isinstance(last_item, dict):
             return _format_board_text(last_item.get('label'), fallback)
         return _format_board_text(last_item[1], fallback)
+    top_strategy = (meta.get('strategy_summary') or {}).get('top_strategy') or meta.get('top_strategy')
+    if isinstance(top_strategy, dict):
+        return _format_board_text(top_strategy.get('label'), fallback)
     scans = list(meta.get('combined_scans') or [])
     if scans:
         return _format_board_text(scans[0].get('kor') or scans[0].get('name'), fallback)
@@ -1336,6 +1416,10 @@ def _latest_recent_signal_tone(meta=None, fallback="neutral"):
         if isinstance(last_item, dict):
             return _format_board_text(last_item.get('dir'), fallback).lower()
         return _format_board_text(last_item[3], fallback).lower()
+    top_strategy = (meta.get('strategy_summary') or {}).get('top_strategy') or meta.get('top_strategy')
+    if isinstance(top_strategy, dict):
+        raw_direction = _format_board_text(top_strategy.get('direction') or top_strategy.get('dir'), fallback).upper()
+        return 'buy' if raw_direction == 'LONG' else 'sell' if raw_direction == 'SHORT' else raw_direction.lower()
     scans = list(meta.get('combined_scans') or [])
     if scans:
         return _format_board_text(scans[0].get('dir'), fallback).lower()
@@ -1372,6 +1456,34 @@ def _history_signal_stack(meta=None, limit=3):
             break
 
     if not items:
+        top_strategy = (meta.get('strategy_summary') or {}).get('top_strategy') or meta.get('top_strategy')
+        strategy_item = _strategy_focus_item(top_strategy)
+        if strategy_item:
+            clean_label = _format_board_text(strategy_item.get('label'), '')
+            seen.add(clean_label)
+            items.append({
+                'icon': strategy_item['icon'],
+                'label': clean_label,
+                'tone': _format_board_text(strategy_item.get('dir'), 'neutral').lower(),
+            })
+
+    if len(items) < limit:
+        for raw in list(meta.get('strategy_visible_results') or [])[:limit]:
+            clean_label = _format_board_text(raw.get('label'), '')
+            if not clean_label or clean_label in seen:
+                continue
+            seen.add(clean_label)
+            score = raw.get('score')
+            suffix = f" {float(score):.0f}점" if isinstance(score, (int, float)) else ""
+            items.append({
+                'icon': '◆',
+                'label': f"{clean_label}{suffix}",
+                'tone': 'buy' if _format_board_text(raw.get('direction'), '').upper() == 'LONG' else 'sell' if _format_board_text(raw.get('direction'), '').upper() == 'SHORT' else _format_board_text(raw.get('direction'), 'neutral').lower(),
+            })
+            if len(items) >= limit:
+                break
+
+    if len(items) < limit:
         for raw in list(meta.get('combined_scans') or [])[:limit]:
             clean_label = _format_board_text(raw.get('kor') or raw.get('name'), '')
             if not clean_label or clean_label in seen:
@@ -1420,6 +1532,20 @@ def _history_rows_from_messages(messages, limit=8):
 
 def _focus_recent_signals_from_analysis(meta, limit=5):
     items = []
+    top_strategy = (meta or {}).get('top_strategy') or ((meta or {}).get('strategy_summary') or {}).get('top_strategy')
+    strategy_item = _strategy_focus_item(top_strategy)
+    if strategy_item:
+        items.append(strategy_item)
+    for raw in list((meta or {}).get('strategy_visible_results') or [])[: max(limit - len(items), 0)]:
+        items.append({
+            'icon': '◆',
+            'label': _format_board_text(raw.get('label'), '전략'),
+            'date': _format_board_text(raw.get('phase'), '--'),
+            'dir': 'buy' if _format_board_text(raw.get('direction'), '').upper() == 'LONG' else 'sell' if _format_board_text(raw.get('direction'), '').upper() == 'SHORT' else _format_board_text(raw.get('direction'), 'neutral').lower(),
+            'is_combined': False,
+        })
+        if len(items) >= limit:
+            return items[:limit]
     recent = list((meta or {}).get('recent_signals') or []) + list((meta or {}).get('derived_signal_events') or [])
     for raw in reversed(recent[-limit:]):
         if isinstance(raw, dict):
@@ -1437,12 +1563,29 @@ def _focus_recent_signals_from_analysis(meta, limit=5):
             'dir': _format_board_text(direction, 'neutral').lower(),
             'is_combined': bool(is_combined),
         })
-    return items
+        if len(items) >= limit:
+            break
+    return items[:limit]
 
 def _focus_recent_signals_from_scan(focus_row, limit=5):
     if not focus_row:
         return []
-    source_items = list(focus_row.get('multi_hits') or focus_row.get('scans') or [])
+    source_items = []
+    strategy_item = _strategy_focus_item(focus_row.get('top_strategy'))
+    if strategy_item:
+        source_items.append(strategy_item)
+    for raw in list(focus_row.get('strategies') or [])[: max(limit - len(source_items), 0)]:
+        source_items.append({
+            'icon': '◆',
+            'label': _format_board_text(raw.get('label'), '전략'),
+            'date': _format_board_text(raw.get('phase'), '--'),
+            'dir': 'buy' if _format_board_text(raw.get('direction'), '').upper() == 'LONG' else 'sell' if _format_board_text(raw.get('direction'), '').upper() == 'SHORT' else _format_board_text(raw.get('direction'), 'neutral').lower(),
+            'is_combined': False,
+        })
+        if len(source_items) >= limit:
+            break
+    if not source_items:
+        source_items = list(focus_row.get('multi_hits') or focus_row.get('scans') or [])
     items = []
     for raw in source_items[:limit]:
         items.append({
@@ -1460,6 +1603,8 @@ def _focus_stack_summary_from_analysis(meta):
         'buy_agree': int(_sf(meta.get('buy_agree', 0))),
         'sell_agree': int(_sf(meta.get('sell_agree', 0))),
         'combined_scans': list(meta.get('combined_scans') or [])[:2],
+        'top_strategy': (meta.get('strategy_summary') or {}).get('top_strategy') or meta.get('top_strategy'),
+        'strategy_conflict_level': ((meta.get('strategy_summary') or {}).get('conflict_level') or 'LOW'),
         'veto_flags': _format_board_text(meta.get('veto_flags'), ''),
         'leading_verdict': _format_board_text(meta.get('leading_verdict'), 'STANDBY'),
         'lagging_verdict': _format_board_text(meta.get('lagging_verdict'), 'STANDBY'),
@@ -1471,6 +1616,8 @@ def _focus_stack_summary_from_scan(focus_row):
         'buy_agree': int(_sf(focus_row.get('ba', 0))),
         'sell_agree': int(_sf(focus_row.get('sa', 0))),
         'combined_scans': list(focus_row.get('scans') or [])[:2],
+        'top_strategy': focus_row.get('top_strategy'),
+        'strategy_conflict_level': _format_board_text(focus_row.get('strategy_conflict_level'), 'LOW'),
         'veto_flags': '',
         'leading_verdict': _format_board_text(focus_row.get('action'), 'SCANNER_READY'),
         'lagging_verdict': _format_board_text(focus_row.get('ctx'), 'WATCHLIST'),
@@ -2015,6 +2162,10 @@ if current_mode == MODE_SCANNER:
 
                 dc_ = df_.tail(63)
                 lt = dc_.iloc[-1]   # 마지막 행 (오늘)
+                strategy_payload = build_strategy_payload(dc_)
+                strategy_summary = strategy_payload.get('summary', {})
+                strategy_results = list(strategy_payload.get('visible_results') or [])
+                top_strategy = strategy_summary.get('top_strategy')
 
                 # ── 1. 표시용: 최근 5일 발화 콤보 카드 수집 ──────────────────
                 acs = []
@@ -2155,6 +2306,11 @@ if current_mode == MODE_SCANNER:
                     'jg':           localize_judgment_label(raw_jg),
                     'cf':           cf,
                     'es':           es,
+                    'strategies':   strategy_results,
+                    'top_strategy': top_strategy,
+                    'strategy_conflict_level': str(strategy_summary.get('conflict_level', 'LOW')),
+                    'strategy_bias': str(strategy_summary.get('long_short_bias', 'BALANCED')),
+                    'strategy_active_count': int(strategy_summary.get('active_count', 0)),
                     'ctx':          localize_context_label(int(_sf(lt.get('Market_Context', 0)))),
                     'ba':           ba,
                     'sa':           sa,
@@ -2439,6 +2595,16 @@ else:
                 if abs(pred) > 3: content += f" | 🔮{pred:+.1f}"
                 if meta.get('combined_scans'):
                     content += f"\n🎯 CS:매수{sum(1 for s in meta['combined_scans'] if s['dir']=='buy')} 매도{sum(1 for s in meta['combined_scans'] if s['dir']=='sell')}"
+                top_strategy = (meta.get('strategy_summary') or {}).get('top_strategy') or meta.get('top_strategy')
+                if isinstance(top_strategy, dict) and top_strategy.get('label'):
+                    entry_price_text = _format_strategy_entry_price(top_strategy.get('entry_price'))
+                    entry_suffix = f" / 진입가 {entry_price_text}" if entry_price_text else ""
+                    status_text = _format_strategy_status(top_strategy.get('status'))
+                    status_suffix = f" / 상태 {status_text}" if status_text else ""
+                    content += (
+                        f"\n🧭 전략:{top_strategy.get('label')} {float(top_strategy.get('score', 0) or 0):.0f}점"
+                        f" / 충돌 {str((meta.get('strategy_summary') or {}).get('conflict_level', 'LOW'))}{status_suffix}{entry_suffix}"
+                    )
                 content += f"\n⏳ {meta['leading_verdict']} | 📊 {meta['lagging_verdict']}"
                 veto = meta.get('veto_flags', '')
                 if veto:

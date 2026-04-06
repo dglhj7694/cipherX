@@ -19,6 +19,7 @@ from localization import (
     localize_subplot_title,
     translate_chart_text,
 )
+from strategy import build_strategy_payload
 from theme import PLOTLY_FONT_FAMILY
 
 SOFT_GREEN = '#63D9A2'
@@ -1057,6 +1058,10 @@ def build_metadata(dc,ticker):
             payload={'key':key,'icon':'','label':str(cfg.get('kor') or key),'date':latest_signal_date,'dir':str(cfg.get('dir') or 'neutral'),'is_combined':False,'desc':desc_text,'meaning':explain_signal_meaning(key, desc_text, is_combo=False)}
             if str(cfg.get('surface') or 'reason')=='badge':derived_signal_events.append(payload)
             else:derived_reason_states.append(payload)
+    strategy_payload=build_strategy_payload(dc)
+    strategy_summary=strategy_payload.get('summary',{})
+    strategy_results=strategy_payload.get('results',[])
+    strategy_visible_results=strategy_payload.get('visible_results',[])
     rg=int(lat.get('Regime',0));rl={2:'STRONG BULL 🟢🟢',1:'BULL 🟢',0:'NEUTRAL ⚪',-1:'BEAR 🔴',-2:'STRONG BEAR 🔴🔴'}.get(rg,'N/A')
     committee={}
     for cm in COMMITTEE_NAMES:vv=int(_sf(lat.get(f'CM_{cm}_Vote',0)));committee[cm]={'score':_sf(lat.get(f'CM_{cm}_EffScore',0)),'conviction':_sf(lat.get(f'CM_{cm}_EffConv',0)),'vote':'BUY' if vv==1 else('SELL' if vv==-1 else('ABSTAIN' if vv==-99 else 'NEUTRAL')),'vote_int':vv}
@@ -1163,6 +1168,7 @@ def build_metadata(dc,ticker):
         'smart_money_bearish_div':bool(lat.get('Smart_Money_Bearish_Div',False)),'smart_money_bullish_div':bool(lat.get('Smart_Money_Bullish_Div',False)),
         'blowoff_top_hard':bool(lat.get('Blowoff_Top_Hard',False)),
         'combined_scans':acs,'recent_signals':recent,'derived_signal_events':derived_signal_events,'derived_reason_states':derived_reason_states,
+        'strategy_summary':strategy_summary,'strategy_results':strategy_results,'strategy_visible_results':strategy_visible_results,'top_strategy':strategy_summary.get('top_strategy'),
         'high_52w':float(dc['High'].max()),'low_52w':float(dc['Low'].min()),
         'ma20_dist':round((_sf(lat['Close'])-_sf(lat.get('MA20',_sf(lat['Close']))))/_sf(lat['Close'])*100,2) if _sf(lat.get('MA20')) else 0,
         'ma50_dist':round((_sf(lat['Close'])-_sf(lat.get('MA50',_sf(lat['Close']))))/_sf(lat['Close'])*100,2) if _sf(lat.get('MA50')) else 0,
@@ -1900,6 +1906,13 @@ _build_metadata_base = build_metadata
 
 def build_metadata(dc,ticker):
     meta=_build_metadata_base(dc,ticker)
+    def _localize_strategy_item(item):
+        payload=dict(item)
+        for key in ('label','entry_hint','explanation','invalidation_text','note'):
+            payload[key]=translate_chart_text(payload.get(key))
+        for key in ('matched_conditions','missing_conditions','failed_conditions','conflict_reasons','last5_change'):
+            payload[key]=[translate_chart_text(text) for text in payload.get(key,[]) if str(text).strip()]
+        return payload
     meta['regime_label']=localize_regime_label(meta.get('regime'), meta.get('regime_label'))
     meta['context_label']=localize_context_label(meta.get('context'))
     meta['judgment']=localize_judgment_label(meta.get('judgment'))
@@ -1953,6 +1966,16 @@ def build_metadata(dc,ticker):
         payload['meaning']=translate_chart_text(payload.get('meaning'))
         localized_derived_states.append(payload)
     meta['derived_reason_states']=localized_derived_states
+    meta['strategy_results']=[_localize_strategy_item(item) for item in meta.get('strategy_results',[])]
+    meta['strategy_visible_results']=[_localize_strategy_item(item) for item in meta.get('strategy_visible_results',[])]
+    strategy_summary=dict(meta.get('strategy_summary') or {})
+    if isinstance(strategy_summary.get('top_strategy'),dict):
+        strategy_summary['top_strategy']=_localize_strategy_item(strategy_summary.get('top_strategy'))
+    strategy_summary['secondary_strategies']=[_localize_strategy_item(item) for item in strategy_summary.get('secondary_strategies',[])]
+    strategy_summary['dominant_reasons']=[translate_chart_text(text) for text in strategy_summary.get('dominant_reasons',[]) if str(text).strip()]
+    strategy_summary['opposing_reasons']=[translate_chart_text(text) for text in strategy_summary.get('opposing_reasons',[]) if str(text).strip()]
+    meta['strategy_summary']=strategy_summary
+    meta['top_strategy']=strategy_summary.get('top_strategy')
     return meta
 
 # ━━━ UI ━━━
