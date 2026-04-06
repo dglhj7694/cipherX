@@ -402,8 +402,8 @@ def _show_analysis_toasts(ticker, meta):
         warning_parts.append(f"핵심 콤보 {', '.join(tier1[:2])}")
     top_strategy = (meta.get('strategy_summary') or {}).get('top_strategy') or meta.get('top_strategy')
     if isinstance(top_strategy, dict) and top_strategy.get('label'):
-        entry_price_text = _format_strategy_entry_price(top_strategy.get('entry_price'))
-        entry_suffix = f" 진입 {entry_price_text}" if entry_price_text else ""
+        entry_reference_text = _format_strategy_entry_reference(top_strategy)
+        entry_suffix = f" {entry_reference_text}" if entry_reference_text else ""
         status_text = _format_strategy_status(top_strategy.get('status'))
         status_suffix = f" {status_text}" if status_text else ""
         warning_parts.append(f"전략 {top_strategy.get('label')} {float(top_strategy.get('score', 0) or 0):.0f}점{status_suffix}{entry_suffix}")
@@ -443,6 +443,16 @@ def _format_strategy_entry_price(value):
     if math.isnan(number):
         return ""
     return f"{number:.2f}"
+
+
+def _format_strategy_entry_reference(item):
+    if not isinstance(item, dict):
+        return ""
+    text = str(item.get("entry_reference_text") or "").strip()
+    if text:
+        return text
+    price_text = _format_strategy_entry_price(item.get("entry_price"))
+    return f"진입가 {price_text}" if price_text else ""
 
 
 def _sigl_badge(label, tone='muted'):
@@ -1231,8 +1241,8 @@ def _render_scanner_result_card(rank, row):
     ) or _sigl_badge("활성 전략 없음", 'muted')
     top_strategy_text = ""
     if isinstance(top_strategy, dict) and top_strategy.get('label'):
-        entry_price_text = _format_strategy_entry_price(top_strategy.get('entry_price'))
-        entry_suffix = f" · 진입가 {entry_price_text}" if entry_price_text else ""
+        entry_reference_text = _format_strategy_entry_reference(top_strategy)
+        entry_suffix = f" · {html.escape(entry_reference_text)}" if entry_reference_text else ""
         status_text = _format_strategy_status(top_strategy.get('status'))
         status_suffix = f" · {html.escape(status_text)}" if status_text else ""
         top_strategy_text = (
@@ -1240,7 +1250,7 @@ def _render_scanner_result_card(rank, row):
             f"<span class='sigl-summary'>상위 전략 {html.escape(str(top_strategy.get('label')))} · "
             f"{html.escape(str(top_strategy.get('direction', '')))} · "
             f"{float(top_strategy.get('score', 0) or 0):.0f}점 · "
-            f"충돌 {html.escape(str(row.get('strategy_conflict_level', 'LOW')))}{status_suffix}{html.escape(entry_suffix)}</span>"
+            f"충돌 {html.escape(str(row.get('strategy_conflict_level', 'LOW')))}{status_suffix}{entry_suffix}</span>"
             f"</div>"
         )
     reason_html = ""
@@ -1295,8 +1305,8 @@ def _strategy_focus_item(top_strategy, fallback_date="STRAT"):
     score_text = f"{float(score):.0f}점" if isinstance(score, (int, float)) else ""
     status_text = _format_strategy_status(top_strategy.get('status'))
     status_suffix = f" {status_text}" if status_text else ""
-    entry_price_text = _format_strategy_entry_price(top_strategy.get('entry_price'))
-    entry_suffix = f" @{entry_price_text}" if entry_price_text else ""
+    entry_reference_text = _format_strategy_entry_reference(top_strategy)
+    entry_suffix = f" {entry_reference_text}" if entry_reference_text else ""
     return {
         'icon': '◆',
         'label': f"{label} {score_text}{status_suffix}{entry_suffix}".strip(),
@@ -2597,8 +2607,8 @@ else:
                     content += f"\n🎯 CS:매수{sum(1 for s in meta['combined_scans'] if s['dir']=='buy')} 매도{sum(1 for s in meta['combined_scans'] if s['dir']=='sell')}"
                 top_strategy = (meta.get('strategy_summary') or {}).get('top_strategy') or meta.get('top_strategy')
                 if isinstance(top_strategy, dict) and top_strategy.get('label'):
-                    entry_price_text = _format_strategy_entry_price(top_strategy.get('entry_price'))
-                    entry_suffix = f" / 진입가 {entry_price_text}" if entry_price_text else ""
+                    entry_reference_text = _format_strategy_entry_reference(top_strategy)
+                    entry_suffix = f" / {entry_reference_text}" if entry_reference_text else ""
                     status_text = _format_strategy_status(top_strategy.get('status'))
                     status_suffix = f" / 상태 {status_text}" if status_text else ""
                     content += (

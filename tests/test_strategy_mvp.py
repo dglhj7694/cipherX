@@ -9,6 +9,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from config import COMBINED_SCAN_REGISTRY
+import engine as root_engine
+from engine_combo_registry import ensure_runtime_combo_registry
+from engine_combo_scans import detect_combined_scans as detect_combined_scans_impl
+from engine_objective import OBJECTIVE_COMBO_BASE
 from strategy import build_strategy_payload
 from ui_localized import build_strategy_tab_view_model
 
@@ -87,6 +92,8 @@ BOOLEAN_COLUMNS = [
     "CS_Divergence_Confluence_Sell",
     "CS_Triple_Confirm_Buy",
     "CS_Triple_Confirm_Sell",
+    "CS_Ichimoku_Breakout_Buy",
+    "CS_Ichimoku_Breakout_Sell",
     "CS_Conflict_Warning",
 ]
 
@@ -468,8 +475,50 @@ def make_ichimoku_breakout_short_df():
     frame["Volume_Ratio_20"] = 1.8
     frame["Volume_Ratio_50"] = 1.6
     frame["ADX"] = 28.0
-    frame.loc[frame.index[-1], ["Kumo_Breakout_Bear", "TK_Cross_Bear"]] = True
+    frame.loc[frame.index[-1], ["Kumo_Breakout_Bear", "TK_Cross_Bear", "CS_Ichimoku_Breakout_Sell"]] = True
     return frame
+
+
+class EngineComboModuleTests(unittest.TestCase):
+    def test_runtime_combo_registry_adds_ichimoku_sell_combo(self):
+        registry = ensure_runtime_combo_registry({})
+        self.assertIn("CS_Ichimoku_Breakout_Sell", registry)
+        self.assertEqual(registry["CS_Ichimoku_Breakout_Sell"]["dir"], "sell")
+
+    def test_detect_combined_scans_marks_ichimoku_sell_combo(self):
+        frame = make_blank_frame()
+        apply_close_series(frame, [110.0 - (0.3 * i) for i in range(len(frame))])
+        frame["MA50"] = frame["Close"] + 1.0
+        frame["MA200"] = frame["Close"] + 3.0
+        frame["Plus_DI"] = 12.0
+        frame["Minus_DI"] = 28.0
+        frame["ADX"] = 26.0
+        frame["Volume_Ratio_20"] = 1.3
+        frame["Volume_Ratio_50"] = 1.2
+        frame.loc[frame.index[-1], ["Kumo_Breakout_Bear", "TK_Cross_Bear"]] = True
+        registry = ensure_runtime_combo_registry(dict(COMBINED_SCAN_REGISTRY))
+        result = detect_combined_scans_impl(frame.copy(), frame["Volume_Ratio_20"], pd.Series(False, index=frame.index), registry=registry)
+        self.assertTrue(bool(result["CS_Ichimoku_Breakout_Sell"].iloc[-1]))
+
+
+class EngineCoreSplitSmokeTests(unittest.TestCase):
+    def test_objective_combo_weights_are_confirmation_only(self):
+        self.assertLess(OBJECTIVE_COMBO_BASE[1], 3.0)
+        self.assertLess(OBJECTIVE_COMBO_BASE[2], 2.0)
+
+    def test_root_engine_layers_committee_objective_pipeline_runs(self):
+        frame = make_blank_frame()
+        apply_close_series(frame, [100.0 + (0.1 * i) for i in range(len(frame))])
+        hma_rising = pd.Series(False, index=frame.index)
+        layered = root_engine.compute_10layer_scores(frame.copy(), frame["Volume_Ratio_20"], hma_rising)
+        self.assertIn("Buy_Total", layered.columns)
+        self.assertIn("Sell_Total", layered.columns)
+        committee = root_engine.compute_committee_ensemble(layered.copy(), layered["Volume_Ratio_20"], hma_rising)
+        self.assertIn("Ensemble_Score", committee.columns)
+        self.assertIn("Trade_Judgment", committee.columns)
+        objective = root_engine._compute_objective_judgment(committee.copy(), committee["Volume_Ratio_20"])
+        self.assertIn("Objective_Buy_Score", objective.columns)
+        self.assertIn("Objective_Judgment", objective.columns)
 
 
 class StrategyEngineMvpTests(unittest.TestCase):
@@ -549,6 +598,7 @@ class StrategyEngineMvpTests(unittest.TestCase):
         self.assertEqual(scores, sorted(scores, reverse=True))
         self.assertEqual(payload["summary"]["top_strategy"]["id"], visible[0]["id"])
         self.assertEqual(payload["summary"]["top_strategy"]["entry_price"], visible[0]["entry_price"])
+        self.assertTrue(str(visible[0]["entry_reference_text"]).strip())
 
     def test_keltner_pullback_long_expands_strategy_set(self):
         payload = build_strategy_payload(make_trend_pullback_long_df())
@@ -758,7 +808,8 @@ class StrategyUiViewModelTests(unittest.TestCase):
         }
         model = build_strategy_tab_view_model(meta)
         self.assertEqual(model["top_entry_price_text"], "104.25")
-        self.assertEqual(model["table_rows"][0]["진입가"], "104.25")
+        self.assertEqual(model["top_entry_reference_text"], "진입가 104.25")
+        self.assertEqual(model["table_rows"][0]["진입 기준"], "진입가 104.25")
 
     def test_ui_view_model_maps_new_status_labels(self):
         meta = {
@@ -778,6 +829,7 @@ class StrategyUiViewModelTests(unittest.TestCase):
         }
         model = build_strategy_tab_view_model(meta)
         self.assertEqual(model["table_rows"][0]["상태"], "트리거 대기")
+        self.assertEqual(model["table_rows"][0]["진입 기준"], "확인선 101.20")
 
 
 if __name__ == "__main__":

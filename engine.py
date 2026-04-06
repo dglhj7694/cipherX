@@ -3,6 +3,39 @@ import numpy as np
 from config import *
 from utils import _volf, _recent, _cd_dir, _cooldown, _vs, _sp, _spd, _sf, _cs_str
 from indicators import detect_pivot_div, compute_indicators, compute_hull_ma, compute_ut_bot, compute_stochastic_slow, compute_squeeze_mom_enh
+from engine_combo_registry import ensure_runtime_combo_registry
+from engine_combo_scans import detect_combined_scans as _detect_combined_scans_impl
+from engine_layers import apply_layer_totals as _apply_layer_totals
+from engine_committee import (
+    OBJECTIVE_BUY_LABELS as _committee_buy_labels,
+    OBJECTIVE_SELL_LABELS as _committee_sell_labels,
+    append_note as _committee_append_note,
+    apply_adx_weight_regime as _committee_apply_adx_weight_regime,
+    committee_leading as _committee_leading_impl,
+    committee_money as _committee_money_impl,
+    committee_momentum as _committee_momentum_impl,
+    committee_structure as _committee_structure_impl,
+    committee_trend as _committee_trend_impl,
+    context_threshold_adjustments as _committee_context_threshold_adjustments,
+    default_action_label as _committee_default_action_label,
+    detect_context_vectorized as _committee_detect_context_vectorized,
+    downgrade_buy as _committee_downgrade_buy,
+    downgrade_sell as _committee_downgrade_sell,
+    judgment_side as _committee_judgment_side,
+    market_filter_adjustments as _committee_market_filter_adjustments,
+    promote_buy as _committee_promote_buy,
+    promote_sell as _committee_promote_sell,
+    stabilize_context_sequence as _committee_stabilize_context_sequence,
+)
+from engine_objective import (
+    OBJECTIVE_BUY_LABELS as _objective_buy_labels_impl,
+    OBJECTIVE_COMBO_BASE as _objective_combo_base,
+    OBJECTIVE_SELL_LABELS as _objective_sell_labels_impl,
+    OBJECTIVE_SIGNAL_EXCLUDE as _objective_signal_exclude_impl,
+    objective_action_label as _objective_action_label_impl,
+    objective_event_name as _objective_event_name_impl,
+    objective_recent_registry_score as _objective_recent_registry_score_impl,
+)
 
 def _ensure_runtime_combo_registry():
     """
@@ -503,30 +536,7 @@ def compute_10layer_scores(df, vol_ratio, hma_r_v):
     slag_+=np.clip(-regime.values*1.0,-1.5,3)+np.where(kumo_ready&(C<kumo_bot),1.5,np.where(kumo_ready&(C>kumo_top),-1,0))+np.clip((1.0-N('RS_Ratio',1))*30,-1.5,2)
     slag_+=np.where(price_below_tk,0.6,0)+np.where(price_below_super,0.5,0)+np.where(price_below_fixed,0.35,0);df['SL_Lagging']=slag_.clip(-2,JT.LAGGING_CAP)
     LN=['Trend','Momentum','Candle','BB','Volume','MF','Pattern','Combined','Leading','Lagging']
-    buy_raw=sum(df[f'BL_{n}'].clip(lower=0) for n in LN)
-    sell_raw=sum(df[f'SL_{n}'].clip(lower=0) for n in LN)
-    df['Buy_Active_Layers']=sum((df[f'BL_{n}']>0).astype(int) for n in LN)
-    df['Sell_Active_Layers']=sum((df[f'SL_{n}']>0).astype(int) for n in LN)
-
-    # Cross-layer conflict/quality modeling for more realistic trade scoring.
-    conflict_layers=sum(((df[f'BL_{n}']>0)&(df[f'SL_{n}']>0)).astype(int) for n in LN)
-    buy_core=(df['BL_Trend']+df['BL_Momentum']+df['BL_Leading']).clip(lower=0)
-    sell_core=(df['SL_Trend']+df['SL_Momentum']+df['SL_Leading']).clip(lower=0)
-    buy_quality=(1.0+np.clip((buy_core-sell_core)/36.0,-0.20,0.35)).astype(float)
-    sell_quality=(1.0+np.clip((sell_core-buy_core)/36.0,-0.20,0.35)).astype(float)
-    conflict_penalty=np.clip(conflict_layers*0.7,0,6).astype(float)
-
-    t1_buy_cols=[cn for cn,cfg in COMBINED_SCAN_REGISTRY.items() if cfg.get('dir')=='buy' and cfg.get('tier')==1 and cn in df.columns]
-    t1_sell_cols=[cn for cn,cfg in COMBINED_SCAN_REGISTRY.items() if cfg.get('dir')=='sell' and cfg.get('tier')==1 and cn in df.columns]
-    t1_buy_boost=sum(df[col].fillna(False).astype(float) for col in t1_buy_cols) if t1_buy_cols else pd.Series(0.,index=idx)
-    t1_sell_boost=sum(df[col].fillna(False).astype(float) for col in t1_sell_cols) if t1_sell_cols else pd.Series(0.,index=idx)
-
-    df['Signal_Conflict_Layers']=conflict_layers
-    df['Buy_Quality_Factor']=buy_quality
-    df['Sell_Quality_Factor']=sell_quality
-    df['Buy_Total']=((buy_raw*buy_quality)+(t1_buy_boost*0.8)-conflict_penalty).clip(lower=0)
-    df['Sell_Total']=((sell_raw*sell_quality)+(t1_sell_boost*0.8)-conflict_penalty).clip(lower=0)
-    ls_=df['BL_Leading']-df['SL_Leading'];lgs=df['BL_Lagging']-df['SL_Lagging']
+    return _apply_layer_totals(df, LN, COMBINED_SCAN_REGISTRY)
     df['Leading_Verdict']=np.select([ls_>3,ls_>1,ls_<-3,ls_<-1],['강한 상승 가속','상승 임박','강한 하락 가속','하락 임박'],default='중립')
     df['Lagging_Verdict']=np.select([lgs>3,lgs>1,lgs<-3,lgs<-1],['강한 상승 추세','상승 추세','강한 하락 추세','하락 추세'],default='비추세/횡보')
     return df
@@ -811,45 +821,6 @@ def _committee_leading(df,N):
     conv=np.clip(conv+np.maximum(N('Trend_Inflection_Buy_Score',0).values,N('Trend_Inflection_Sell_Score',0).values)*4+np.maximum(N('Market_Turn_Bull_Score',0).values,N('Market_Turn_Bear_Score',0).values)*2,10,95)
     return ns,pd.Series(conv,index=idx)
 
-def _normalize_weight_rows(wa):
-    wa=np.asarray(wa,dtype=float);rs=wa.sum(axis=1,keepdims=True);rs[rs<=0]=1.
-    return wa/rs
-
-def _apply_adx_weight_regime(wa,adx_values):
-    wa=_normalize_weight_rows(wa)
-    range_mult=np.array([0.70,0.95,1.15,1.25,0.95],dtype=float)
-    trend_mult=np.array([1.25,1.20,0.90,0.80,0.95],dtype=float)
-    low=np.isfinite(adx_values)&(adx_values<JT.ADX_RANGE_MAX);high=np.isfinite(adx_values)&(adx_values>JT.ADX_TREND_MIN)
-    if low.any():wa[low]*=range_mult
-    if high.any():wa[high]*=trend_mult
-    return _normalize_weight_rows(wa)
-
-def _downgrade_buy(label,severe=False):
-    if severe:return 'NEUTRAL'
-    return {'STRONG_BUY':'BUY','BUY':'WATCH_BUY','WATCH_BUY':'NEUTRAL'}.get(label,label)
-
-def _downgrade_sell(label,severe=False):
-    if severe:return 'NEUTRAL'
-    return {'STRONG_SELL':'SELL','SELL':'WATCH_SELL','WATCH_SELL':'NEUTRAL'}.get(label,label)
-
-
-def _promote_buy(label):
-    return {'WATCH_BUY':'BUY','BUY':'STRONG_BUY'}.get(label,label)
-
-
-def _promote_sell(label):
-    return {'WATCH_SELL':'SELL','SELL':'STRONG_SELL'}.get(label,label)
-
-
-def _judgment_side(label):
-    text=str(label or '').upper()
-    if text in _OBJECTIVE_BUY_LABELS:
-        return 1
-    if text in _OBJECTIVE_SELL_LABELS:
-        return -1
-    return 0
-
-
 def _default_action_label(label):
     return {
         'STRONG_BUY':'강한 매수 / 정렬 최상',
@@ -863,113 +834,26 @@ def _default_action_label(label):
     }.get(str(label or '').upper(),'중립 / 방향성 대기')
 
 
-def _append_note(base, extra, sep=' | '):
-    left=str(base or '').strip()
-    right=str(extra or '').strip()
-    if not right:
-        return left
-    if not left:
-        return right
-    if right in left:
-        return left
-    return f"{left}{sep}{right}"
-
-
-def _context_threshold_adjustments(ctx_code):
-    buy_adj=0.;sell_adj=0.
-    if ctx_code==CTX_EXTREME_OS:
-        buy_adj-=10.;sell_adj-=8.
-    elif ctx_code==CTX_EXTREME_OB:
-        buy_adj+=8.;sell_adj+=10.
-    elif ctx_code==CTX_STRONG_UP:
-        buy_adj-=5.;sell_adj-=5.
-    elif ctx_code==CTX_STRONG_DN:
-        buy_adj+=8.;sell_adj+=5.
-    elif ctx_code==CTX_ACCUMULATION:
-        buy_adj-=4.;sell_adj-=3.
-    elif ctx_code==CTX_DISTRIBUTION:
-        buy_adj+=5.;sell_adj+=4.
-    elif ctx_code==CTX_BOTTOMING:
-        buy_adj-=6.;sell_adj-=4.
-    elif ctx_code==CTX_TOPPING:
-        buy_adj+=6.;sell_adj+=6.
-    return buy_adj,sell_adj
-
-
-def _market_filter_adjustments(
-    spy_trend_score,
-    breadth_score=0.,
-    risk_on=False,
-    risk_off=False,
-    breadth_risk_on=False,
-    breadth_risk_off=False,
-    narrow_leadership=False,
-    vix_risk_on=False,
-    vix_risk_off=False,
-    vix_pressure_score=0.,
-    tnx_tailwind=False,
-    tnx_headwind=False,
-    tnx_pressure_score=0.,
-    dxy_tailwind=False,
-    dxy_headwind=False,
-    dxy_pressure_score=0.,
-    leader_stock_mode=False,
-):
-    buy_adj=0.;sell_adj=0.
-    bias=np.clip(spy_trend_score*JT.MARKET_ENSEMBLE_SCALE,-6.,6.)
-    if risk_off:
-        buy_adj+=4.;sell_adj+=4.;bias-=JT.MARKET_RISK_OFF_PENALTY
-    elif risk_on:
-        buy_adj-=4.;sell_adj-=4.;bias+=JT.MARKET_RISK_ON_BONUS
-    elif spy_trend_score>=JT.MARKET_SCORE_TREND_ON:
-        buy_adj-=2.;sell_adj-=2.
-    elif spy_trend_score<=JT.MARKET_SCORE_TREND_OFF:
-        buy_adj+=3.;sell_adj+=2.
-    bias+=np.clip(breadth_score*0.75,-1.8,1.8)
-    buy_adj-=np.clip(max(breadth_score,0)*0.35,0,1.0)
-    buy_adj+=np.clip(max(-breadth_score,0)*0.28,0,1.0)
-    if breadth_risk_off:
-        buy_adj+=1.5;sell_adj+=1.;bias-=1.6
-    elif breadth_risk_on:
-        buy_adj-=2.;sell_adj-=1.;bias+=1.2
-    if narrow_leadership:
-        buy_adj+=0.5;bias-=0.8
-    if vix_pressure_score:
-        buy_adj+=np.clip(max(vix_pressure_score,0)*0.55,0,2.0)
-        sell_adj+=np.clip(max(vix_pressure_score,0)*0.4,0,1.4)
-        buy_adj-=np.clip(max(-vix_pressure_score,0)*0.45,0,1.4)
-        bias-=np.clip(vix_pressure_score*0.75,-2.2,2.2)
-    if vix_risk_off:
-        buy_adj+=2.5;sell_adj+=2.;bias-=2.2
-    elif vix_risk_on:
-        buy_adj-=2.;sell_adj-=1.;bias+=1.5
-    if tnx_pressure_score:
-        buy_adj+=np.clip(max(tnx_pressure_score,0)*0.3,0,1.1)
-        buy_adj-=np.clip(max(-tnx_pressure_score,0)*0.25,0,0.9)
-        bias-=np.clip(tnx_pressure_score*0.5,-1.5,1.5)
-    if tnx_headwind:
-        buy_adj+=1.25;bias-=1.1
-    elif tnx_tailwind:
-        buy_adj-=1.;bias+=0.8
-    if dxy_pressure_score:
-        buy_adj+=np.clip(max(dxy_pressure_score,0)*0.3,0,1.1)
-        sell_adj+=np.clip(max(dxy_pressure_score,0)*0.25,0,0.8)
-        buy_adj-=np.clip(max(-dxy_pressure_score,0)*0.25,0,0.9)
-        bias-=np.clip(dxy_pressure_score*0.45,-1.5,1.5)
-    if dxy_headwind:
-        buy_adj+=1.25;sell_adj+=1.;bias-=1.1
-    elif dxy_tailwind:
-        buy_adj-=1.;bias+=0.8
-    if leader_stock_mode:
-        buy_adj-=JT.LEADER_BUY_SUPPORT
-        sell_adj-=JT.LEADER_SELL_RELIEF
-        if narrow_leadership or breadth_risk_on:
-            sell_adj-=1.0
-            bias+=0.8
-    return np.clip(buy_adj,-12.,12.),np.clip(sell_adj,-12.,12.),np.clip(bias,-12.,12.)
-
-
 def compute_committee_ensemble(df,vol_ratio,hma_r_v):
+    _detect_context_vectorized=_committee_detect_context_vectorized
+    _stabilize_context_sequence=_committee_stabilize_context_sequence
+    _committee_trend=_committee_trend_impl
+    _committee_momentum=_committee_momentum_impl
+    _committee_money=_committee_money_impl
+    _committee_structure=_committee_structure_impl
+    _committee_leading=_committee_leading_impl
+    _apply_adx_weight_regime=_committee_apply_adx_weight_regime
+    _downgrade_buy=_committee_downgrade_buy
+    _downgrade_sell=_committee_downgrade_sell
+    _promote_buy=_committee_promote_buy
+    _promote_sell=_committee_promote_sell
+    _judgment_side=_committee_judgment_side
+    _default_action_label=_committee_default_action_label
+    _append_note=_committee_append_note
+    _context_threshold_adjustments=_committee_context_threshold_adjustments
+    _market_filter_adjustments=_committee_market_filter_adjustments
+    _OBJECTIVE_BUY_LABELS=_committee_buy_labels
+    _OBJECTIVE_SELL_LABELS=_committee_sell_labels
     idx=df.index;n=len(df);N=lambda c,d=0:df.get(c,pd.Series(d,index=idx)).fillna(d);F=lambda c:df.get(c,pd.Series(False,index=idx)).fillna(False)
     raw_ctx=_detect_context_vectorized(df);ctx=_stabilize_context_sequence(df,raw_ctx);df['Raw_Market_Context']=raw_ctx;df['Context_Smoothed']=(raw_ctx.values!=ctx.values);df['Market_Context']=ctx
     scores={};convictions={}
@@ -1677,41 +1561,6 @@ def compute_committee_ensemble(df,vol_ratio,hma_r_v):
     return df
 
 
-_OBJECTIVE_BUY_LABELS={'STRONG_BUY','BUY','WATCH_BUY'}
-_OBJECTIVE_SELL_LABELS={'STRONG_SELL','SELL','WATCH_SELL'}
-_OBJECTIVE_SIGNAL_EXCLUDE={'System_Turn_Bull','System_Turn_Bear'}
-
-
-def _objective_event_name(name):
-    raw=str(name or '')
-    if raw in SIGNAL_REGISTRY:
-        return str(SIGNAL_REGISTRY.get(raw,{}).get('kor') or raw.replace('_',' '))
-    if raw in COMBINED_SCAN_REGISTRY:
-        return str(COMBINED_SCAN_REGISTRY.get(raw,{}).get('kor') or raw.replace('_',' '))
-    return raw.replace('_',' ')
-
-
-def _objective_recent_registry_score(i,specs,bool_arrays,lookback,decay):
-    score=0.;strong_hits=0;hits=[]
-    for name,base,is_strong in specs:
-        arr=bool_arrays.get(name)
-        if arr is None:
-            continue
-        best=0.;best_age=None
-        max_age=min(i,lookback-1)
-        for age in range(max_age+1):
-            if arr[i-age]:
-                cur=base*(decay**age)
-                if cur>best:
-                    best=cur;best_age=age
-        if best>0:
-            score+=best;hits.append((best,name,best_age))
-            if is_strong:
-                strong_hits+=1
-    hits.sort(key=lambda x:x[0],reverse=True)
-    return score,strong_hits,hits
-
-
 def _objective_action_label(label):
     return {
         'STRONG_BUY':'강한 매수 / 객관 근거 최상',
@@ -1728,6 +1577,19 @@ def _objective_action_label(label):
 def _compute_objective_judgment(df,vol_ratio):
     if df is None or df.empty:
         return df
+
+    _OBJECTIVE_BUY_LABELS=_objective_buy_labels_impl
+    _OBJECTIVE_SELL_LABELS=_objective_sell_labels_impl
+    _OBJECTIVE_SIGNAL_EXCLUDE=_objective_signal_exclude_impl
+    _objective_event_name=_objective_event_name_impl
+    _objective_recent_registry_score=_objective_recent_registry_score_impl
+    _objective_action_label=_objective_action_label_impl
+    _judgment_side=_committee_judgment_side
+    _append_note=_committee_append_note
+    _downgrade_buy=_committee_downgrade_buy
+    _downgrade_sell=_committee_downgrade_sell
+    _promote_buy=_committee_promote_buy
+    _promote_sell=_committee_promote_sell
 
     idx=df.index;n=len(df)
     N=lambda c,d=0:df.get(c,pd.Series(d,index=idx)).fillna(d)
@@ -1782,7 +1644,7 @@ def _compute_objective_judgment(df,vol_ratio):
             continue
         bool_arrays[name]=df[name].fillna(False).values.astype(bool)
         signal_specs[direction].append((name,float(cfg.get('w',1.0))*1.05,name in (STRONG_BUY_SIGS if direction=='buy' else STRONG_SELL_SIGS)))
-    combo_base={1:3.0,2:2.0,3:1.2}
+    combo_base=_objective_combo_base
     for name,cfg in COMBINED_SCAN_REGISTRY.items():
         if name not in df.columns:
             continue
@@ -2313,3 +2175,12 @@ def _compute_objective_judgment(df,vol_ratio):
     df['System_Turn_Bull']=(is_buy & ~is_buy.shift(1).fillna(False)).values
     df['System_Turn_Bear']=(is_sell & ~is_sell.shift(1).fillna(False)).values
     return df
+
+
+# Active combo path extracted into dedicated modules.
+def _ensure_runtime_combo_registry():
+    return ensure_runtime_combo_registry(COMBINED_SCAN_REGISTRY)
+
+
+def detect_combined_scans(df,vol_ratio,hma_rising):
+    return _detect_combined_scans_impl(df, vol_ratio, hma_rising, registry=COMBINED_SCAN_REGISTRY)

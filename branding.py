@@ -37,6 +37,16 @@ def _brand_strategy_entry_text(value):
     return f"{number:.2f}"
 
 
+def _brand_strategy_entry_reference(item):
+    if not isinstance(item, dict):
+        return ""
+    text = str(item.get("entry_reference_text") or "").strip()
+    if text:
+        return text
+    price_text = _brand_strategy_entry_text(item.get("entry_price"))
+    return f"진입가 {price_text}" if price_text else ""
+
+
 def _brand_strategy_status_text(value):
     return {
         "ACTIVE": "성립",
@@ -62,10 +72,10 @@ def build_brand_board(payload, compact=False):
     top_strategy = stack.get("top_strategy") if isinstance(stack.get("top_strategy"), dict) else {}
     strategy_text = ""
     if top_strategy.get("label"):
-        entry_price_text = _brand_strategy_entry_text(top_strategy.get("entry_price"))
+        entry_reference_text = _brand_strategy_entry_reference(top_strategy)
         status_text = _brand_strategy_status_text(top_strategy.get("status"))
         status_suffix = f" / 상태 {status_text}" if status_text else ""
-        entry_suffix = f" / 진입가 {entry_price_text}" if entry_price_text else ""
+        entry_suffix = f" / {entry_reference_text}" if entry_reference_text else ""
         strategy_text = (
             f"{_brand_escape(top_strategy.get('label'))} {_brand_escape(top_strategy.get('score'))}"
             f"{_brand_escape(status_suffix)}{_brand_escape(entry_suffix)} / 충돌 {_brand_escape(stack.get('strategy_conflict_level', 'LOW'))}"

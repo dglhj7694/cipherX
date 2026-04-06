@@ -1,85 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
 from typing import Iterable
 
 import numpy as np
 import pandas as pd
 
-
-VISIBLE_STATUSES = {"ACTIVE", "CONFIRMING", "TRIGGER_WAIT", "READY", "INTEREST"}
-
-
-@dataclass(frozen=True)
-class StrategyDefinition:
-    id: str
-    label: str
-    category: str
-    direction: str
-    family: str
-    ui_label: str | None = None
-    presentation_type: str = "strategy"
-    implementation_level: str = "implemented"
-    deterministic: bool = True
-
-
-@dataclass
-class StrategyResult:
-    id: str
-    label: str
-    canonical_label: str
-    direction: str
-    category: str
-    score: float
-    status: str
-    phase: str
-    entry_hint: str
-    setup_score: float
-    trigger_score: float
-    risk_score: float
-    presentation_type: str = "strategy"
-    implementation_level: str = "implemented"
-    deterministic: bool = True
-    entry_price: float | None = None
-    matched_conditions: list[str] = field(default_factory=list)
-    missing_conditions: list[str] = field(default_factory=list)
-    failed_conditions: list[str] = field(default_factory=list)
-    stop_loss: float | None = None
-    target_1: float | None = None
-    target_2: float | None = None
-    rr: float | None = None
-    conflict_reasons: list[str] = field(default_factory=list)
-    explanation: str = ""
-    last5_change: list[str] = field(default_factory=list)
-    invalidation_text: str = ""
-    note: str = ""
-
-    def to_dict(self) -> dict:
-        payload = asdict(self)
-        for key in ("score", "entry_price", "setup_score", "trigger_score", "risk_score", "stop_loss", "target_1", "target_2", "rr"):
-            payload[key] = _round_or_none(payload.get(key))
-        return payload
-
-
-@dataclass
-class StrategySummary:
-    active_count: int
-    visible_count: int
-    bullish_count: int
-    bearish_count: int
-    long_short_bias: str
-    conflict_level: str
-    top_strategy: dict | None
-    secondary_strategies: list[dict] = field(default_factory=list)
-    hidden_invalid_count: int = 0
-    dominant_reasons: list[str] = field(default_factory=list)
-    opposing_reasons: list[str] = field(default_factory=list)
-
-    def to_dict(self) -> dict:
-        return asdict(self)
-
-
 from .explainer import build_strategy_explanation
+from .models import VISIBLE_STATUSES, StrategyDefinition, StrategyResult, StrategySummary
 from .registry import build_strategy_definitions
 
 
@@ -498,6 +425,7 @@ def _build_market_state(dc: pd.DataFrame) -> dict:
                 "CS_Triple_Confirm_Sell",
                 "CS_Institutional_Accumulation",
                 "CS_Ichimoku_Breakout_Buy",
+                "CS_Ichimoku_Breakout_Sell",
                 "CS_Conflict_Warning",
             )
         },
@@ -538,6 +466,7 @@ def _evaluate_trend_pullback(definition: StrategyDefinition, state: dict) -> Str
     status = _status_from_score(total_score, trigger_passed, rr, setup_score, trigger_score, phase)
     entry_hint = _entry_hint(status, phase, long_side, "trend_pullback")
     entry_price = _entry_price(state, long_side, "trend_pullback", phase, status)
+    entry_reference = _entry_reference_payload(state, long_side, "trend_pullback", phase, status, entry_price, stop_loss)
     matched = setup_matched + trigger_matched
     missing = setup_missing + trigger_missing
     failed = _failed_from_conflicts(conflict_reasons)
@@ -555,7 +484,13 @@ def _evaluate_trend_pullback(definition: StrategyDefinition, state: dict) -> Str
         presentation_type=definition.presentation_type,
         implementation_level=definition.implementation_level,
         deterministic=definition.deterministic,
+        entry_reference_type=entry_reference["entry_reference_type"],
+        entry_reference_text=entry_reference["entry_reference_text"],
         entry_price=entry_price,
+        interest_low=entry_reference["interest_low"],
+        interest_high=entry_reference["interest_high"],
+        confirmation_level=entry_reference["confirmation_level"],
+        invalidation_level=entry_reference["invalidation_level"],
         setup_score=setup_score,
         trigger_score=trigger_score,
         risk_score=risk_score,
@@ -612,6 +547,7 @@ def _evaluate_breakout_confirmation(definition: StrategyDefinition, state: dict)
     status = _status_from_score(total_score, trigger_passed, rr, setup_score, trigger_score, phase)
     entry_hint = _entry_hint(status, phase, long_side, "breakout")
     entry_price = _entry_price(state, long_side, "breakout", phase, status)
+    entry_reference = _entry_reference_payload(state, long_side, "breakout", phase, status, entry_price, stop_loss)
     matched = setup_matched + trigger_matched
     missing = setup_missing + trigger_missing
     failed = _failed_from_conflicts(conflict_reasons)
@@ -629,7 +565,13 @@ def _evaluate_breakout_confirmation(definition: StrategyDefinition, state: dict)
         presentation_type=definition.presentation_type,
         implementation_level=definition.implementation_level,
         deterministic=definition.deterministic,
+        entry_reference_type=entry_reference["entry_reference_type"],
+        entry_reference_text=entry_reference["entry_reference_text"],
         entry_price=entry_price,
+        interest_low=entry_reference["interest_low"],
+        interest_high=entry_reference["interest_high"],
+        confirmation_level=entry_reference["confirmation_level"],
+        invalidation_level=entry_reference["invalidation_level"],
         setup_score=setup_score,
         trigger_score=trigger_score,
         risk_score=risk_score,
@@ -680,6 +622,7 @@ def _evaluate_squeeze_expansion(definition: StrategyDefinition, state: dict) -> 
     status = _status_from_score(total_score, trigger_passed, rr, setup_score, trigger_score, phase)
     entry_hint = _entry_hint(status, phase, long_side, "squeeze")
     entry_price = _entry_price(state, long_side, "squeeze", phase, status)
+    entry_reference = _entry_reference_payload(state, long_side, "squeeze", phase, status, entry_price, stop_loss)
     matched = setup_matched + trigger_matched
     missing = setup_missing + trigger_missing
     failed = _failed_from_conflicts(conflict_reasons)
@@ -697,7 +640,13 @@ def _evaluate_squeeze_expansion(definition: StrategyDefinition, state: dict) -> 
         presentation_type=definition.presentation_type,
         implementation_level=definition.implementation_level,
         deterministic=definition.deterministic,
+        entry_reference_type=entry_reference["entry_reference_type"],
+        entry_reference_text=entry_reference["entry_reference_text"],
         entry_price=entry_price,
+        interest_low=entry_reference["interest_low"],
+        interest_high=entry_reference["interest_high"],
+        confirmation_level=entry_reference["confirmation_level"],
+        invalidation_level=entry_reference["invalidation_level"],
         setup_score=setup_score,
         trigger_score=trigger_score,
         risk_score=risk_score,
@@ -749,6 +698,7 @@ def _evaluate_reversal_cluster(definition: StrategyDefinition, state: dict) -> S
     status = _status_from_score(total_score, trigger_passed, rr, setup_score, trigger_score, phase)
     entry_hint = _entry_hint(status, phase, long_side, "reversal")
     entry_price = _entry_price(state, long_side, "reversal", phase, status)
+    entry_reference = _entry_reference_payload(state, long_side, "reversal", phase, status, entry_price, stop_loss)
     matched = setup_matched + trigger_matched
     missing = setup_missing + trigger_missing
     failed = _failed_from_conflicts(conflict_reasons)
@@ -766,7 +716,13 @@ def _evaluate_reversal_cluster(definition: StrategyDefinition, state: dict) -> S
         presentation_type=definition.presentation_type,
         implementation_level=definition.implementation_level,
         deterministic=definition.deterministic,
+        entry_reference_type=entry_reference["entry_reference_type"],
+        entry_reference_text=entry_reference["entry_reference_text"],
         entry_price=entry_price,
+        interest_low=entry_reference["interest_low"],
+        interest_high=entry_reference["interest_high"],
+        confirmation_level=entry_reference["confirmation_level"],
+        invalidation_level=entry_reference["invalidation_level"],
         setup_score=setup_score,
         trigger_score=trigger_score,
         risk_score=risk_score,
@@ -815,6 +771,7 @@ def _evaluate_supertrend_psar(definition: StrategyDefinition, state: dict) -> St
     status = _status_from_score(total_score, trigger_passed, rr, setup_score, trigger_score, phase)
     entry_hint = _entry_hint(status, phase, long_side, "supertrend_psar")
     entry_price = _entry_price(state, long_side, "supertrend_psar", phase, status)
+    entry_reference = _entry_reference_payload(state, long_side, "supertrend_psar", phase, status, entry_price, stop_loss)
     matched = setup_matched + trigger_matched
     missing = setup_missing + trigger_missing
     failed = _failed_from_conflicts(conflict_reasons)
@@ -832,7 +789,13 @@ def _evaluate_supertrend_psar(definition: StrategyDefinition, state: dict) -> St
         presentation_type=definition.presentation_type,
         implementation_level=definition.implementation_level,
         deterministic=definition.deterministic,
+        entry_reference_type=entry_reference["entry_reference_type"],
+        entry_reference_text=entry_reference["entry_reference_text"],
         entry_price=entry_price,
+        interest_low=entry_reference["interest_low"],
+        interest_high=entry_reference["interest_high"],
+        confirmation_level=entry_reference["confirmation_level"],
+        invalidation_level=entry_reference["invalidation_level"],
         setup_score=setup_score,
         trigger_score=trigger_score,
         risk_score=risk_score,
@@ -884,6 +847,7 @@ def _evaluate_obv_divergence(definition: StrategyDefinition, state: dict) -> Str
     status = _status_from_score(total_score, trigger_passed, rr, setup_score, trigger_score, phase)
     entry_hint = _entry_hint(status, phase, long_side, "obv_divergence")
     entry_price = _entry_price(state, long_side, "obv_divergence", phase, status)
+    entry_reference = _entry_reference_payload(state, long_side, "obv_divergence", phase, status, entry_price, stop_loss)
     matched = setup_matched + trigger_matched
     missing = setup_missing + trigger_missing
     failed = _failed_from_conflicts(conflict_reasons)
@@ -901,7 +865,13 @@ def _evaluate_obv_divergence(definition: StrategyDefinition, state: dict) -> Str
         presentation_type=definition.presentation_type,
         implementation_level=definition.implementation_level,
         deterministic=definition.deterministic,
+        entry_reference_type=entry_reference["entry_reference_type"],
+        entry_reference_text=entry_reference["entry_reference_text"],
         entry_price=entry_price,
+        interest_low=entry_reference["interest_low"],
+        interest_high=entry_reference["interest_high"],
+        confirmation_level=entry_reference["confirmation_level"],
+        invalidation_level=entry_reference["invalidation_level"],
         setup_score=setup_score,
         trigger_score=trigger_score,
         risk_score=risk_score,
@@ -1272,7 +1242,7 @@ def _evaluate_ichimoku_breakout(definition: StrategyDefinition, state: dict) -> 
         (_side(long_side, volume_flow["volume_support"], volume_flow["volume_support"]), "구름 돌파 거래량 준비", 10),
     ]
     trigger_items = [
-        (_side(long_side, signals["Kumo_Breakout_Bull"] or signals["CS_Ichimoku_Breakout_Buy"], signals["Kumo_Breakout_Bear"]), "Kumo 돌파 신호 발생", 15),
+        (_side(long_side, signals["Kumo_Breakout_Bull"] or signals["CS_Ichimoku_Breakout_Buy"], signals["Kumo_Breakout_Bear"] or signals["CS_Ichimoku_Breakout_Sell"]), "Kumo 돌파 신호 발생", 15),
         (_side(long_side, signals["TK_Cross_Bull"] or tk_bull, signals["TK_Cross_Bear"] or tk_bear), "TK 교차 확인", 10),
         (_side(long_side, momentum["macd_hist_rising"], momentum["macd_hist_falling"]), "모멘텀 후속 확장", 10),
     ]
@@ -1392,6 +1362,7 @@ def _build_result_from_groups(
     status = _status_from_score(total_score, trigger_passed, rr, setup_score, trigger_score, phase)
     entry_hint = _entry_hint(status, phase, long_side, family)
     entry_price = _entry_price(state, long_side, family, phase, status)
+    entry_reference = _entry_reference_payload(state, long_side, family, phase, status, entry_price, stop_loss)
     matched = setup_matched + trigger_matched
     missing = setup_missing + trigger_missing
     failed = _failed_from_conflicts(conflict_reasons)
@@ -1409,7 +1380,13 @@ def _build_result_from_groups(
         presentation_type=definition.presentation_type,
         implementation_level=definition.implementation_level,
         deterministic=definition.deterministic,
+        entry_reference_type=entry_reference["entry_reference_type"],
+        entry_reference_text=entry_reference["entry_reference_text"],
         entry_price=entry_price,
+        interest_low=entry_reference["interest_low"],
+        interest_high=entry_reference["interest_high"],
+        confirmation_level=entry_reference["confirmation_level"],
+        invalidation_level=entry_reference["invalidation_level"],
         setup_score=setup_score,
         trigger_score=trigger_score,
         risk_score=risk_score,
@@ -1880,14 +1857,6 @@ def _pct_of(value: float, base: float) -> float:
     return (value / base) * 100.0
 
 
-def _round_or_none(value: float | None) -> float | None:
-    if value is None:
-        return None
-    if not np.isfinite(value):
-        return None
-    return round(float(value), 2)
-
-
 def _ordered_unique(items: Iterable[str]) -> list[str]:
     seen = set()
     ordered: list[str] = []
@@ -1959,6 +1928,155 @@ def _build_summary(visible: list[StrategyResult], results: list[StrategyResult])
         dominant_reasons=dominant_reasons,
         opposing_reasons=opposing_reasons,
     )
+
+
+def _sorted_finite(values: list[float]) -> list[float]:
+    cleaned: list[float] = []
+    for value in values:
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            continue
+        if np.isfinite(number):
+            cleaned.append(number)
+    return sorted(cleaned)
+
+
+def _range_pair(values: list[float], fallback: float | None = None) -> tuple[float | None, float | None]:
+    ordered = _sorted_finite(values)
+    if ordered:
+        return ordered[0], ordered[-1]
+    if fallback is None:
+        return None, None
+    return fallback, fallback
+
+
+def _format_price_text(value: float | None) -> str:
+    if value is None:
+        return "-"
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return "-"
+    if not np.isfinite(number):
+        return "-"
+    return f"{number:.2f}"
+
+
+def _format_range_text(low: float | None, high: float | None) -> str:
+    low_text = _format_price_text(low)
+    high_text = _format_price_text(high)
+    if low_text == "-" and high_text == "-":
+        return "-"
+    if low_text == high_text:
+        return low_text
+    return f"{low_text}~{high_text}"
+
+
+def _confirmation_level(state: dict, long_side: bool, family: str, phase: str) -> float | None:
+    price = state["price"]
+    levels = state["levels"]
+    structure = state["structure"]
+    if family in {"breakout", "squeeze"}:
+        return structure["breakout_level"] if long_side else structure["breakdown_level"]
+    if family == "keltner_breakout":
+        return price["kc_upper"] if long_side else price["kc_lower"]
+    if family == "ichimoku_breakout":
+        return levels["cloud_top"] if long_side else levels["cloud_bottom"]
+    if family in {"fractal_breakout", "fractal_alligator"}:
+        return structure["recent_fractal_high"] if long_side else structure["recent_fractal_low"]
+    if family in {"reversal", "obv_divergence", "chaikin_flow", "vwap_reclaim"}:
+        return _finite_max([price["ema8"], levels["vwap"]], np.nan) if long_side else _finite_min([price["ema8"], levels["vwap"]], np.nan)
+    if family == "morning_star_fib":
+        return _finite_max([levels["fib_50"], levels["fib_618"], levels["vwap"]], np.nan) if long_side else _finite_min([levels["fib_50"], levels["fib_618"], levels["vwap"]], np.nan)
+    if family == "poc_rotation":
+        return levels["vp_poc"]
+    if family == "accumulation_pattern":
+        return _finite_max([levels["vp_poc"], levels["fixed_vwap"], structure["breakout_level"]], np.nan)
+    if family == "supertrend_psar":
+        return price["ema21"] if long_side else price["ema21"]
+    if phase in {"BREAKOUT_PENDING", "KELTNER_BREAKOUT_PENDING", "FRACTAL_BREAKOUT_PENDING", "ICHI_PENDING"}:
+        return structure["breakout_level"] if long_side else structure["breakdown_level"]
+    return None
+
+
+def _interest_zone(state: dict, long_side: bool, family: str) -> tuple[float | None, float | None]:
+    price = state["price"]
+    levels = state["levels"]
+    structure = state["structure"]
+    atr = price["atr"]
+    if family in {"trend_pullback", "supertrend_psar"}:
+        return _range_pair([price["ema21"], price["ma20"], price["kc_mid"]], fallback=price["ema21"])
+    if family == "keltner_pullback":
+        return _range_pair([price["kc_mid"] - (0.25 * atr), price["kc_mid"] + (0.25 * atr)], fallback=price["kc_mid"])
+    if family == "anchored_vwap":
+        return _range_pair([levels["fixed_vwap"] - (0.3 * atr), levels["fixed_vwap"] + (0.3 * atr)], fallback=levels["fixed_vwap"])
+    if family in {"reversal", "obv_divergence", "chaikin_flow"}:
+        return _range_pair([price["ema8"], levels["vwap"], structure["swing_low_5"] if long_side else structure["swing_high_5"]])
+    if family == "vwap_reclaim":
+        return _range_pair([levels["vwap"], levels["fixed_vwap"], price["ema21"]])
+    if family == "morning_star_fib":
+        return _range_pair([levels["fib_50"], levels["fib_618"], levels["fixed_vwap"]], fallback=levels["fib_50"])
+    if family == "accumulation_pattern":
+        return _range_pair([levels["vp_poc"], levels["fixed_vwap"], levels["vp_val"]], fallback=levels["vp_poc"])
+    if family == "poc_rotation":
+        if long_side:
+            return _range_pair([levels["vp_val"], levels["vp_poc"]], fallback=levels["vp_poc"])
+        return _range_pair([levels["vp_poc"], levels["vp_vah"]], fallback=levels["vp_poc"])
+    if family == "ichimoku_breakout":
+        if long_side:
+            return _range_pair([levels["cloud_top"], levels["kijun"]], fallback=levels["cloud_top"])
+        return _range_pair([levels["cloud_bottom"], levels["kijun"]], fallback=levels["cloud_bottom"])
+    if family in {"fractal_breakout", "fractal_alligator"}:
+        ref = structure["recent_fractal_high"] if long_side else structure["recent_fractal_low"]
+        return _range_pair([ref - (0.2 * atr), ref + (0.2 * atr)], fallback=ref)
+    return _range_pair([price["entry"] - (0.3 * atr), price["entry"] + (0.3 * atr)], fallback=price["entry"])
+
+
+def _entry_reference_payload(
+    state: dict,
+    long_side: bool,
+    family: str,
+    phase: str,
+    status: str,
+    entry_price: float | None,
+    stop_loss: float | None,
+) -> dict:
+    confirmation_level = _confirmation_level(state, long_side, family, phase)
+    interest_low, interest_high = _interest_zone(state, long_side, family)
+    invalidation_level = stop_loss
+    reference_type = "ENTRY_PRICE"
+    reference_text = ""
+    confirmation_phases = {
+        "BREAKOUT_PENDING",
+        "KELTNER_BREAKOUT_PENDING",
+        "VWAP_RECLAIM_PENDING",
+        "FIB_GOLDEN_ZONE_WAIT",
+        "FRACTAL_BREAKOUT_PENDING",
+        "VALUE_ROTATION_READY",
+        "ICHI_PENDING",
+        "CHAIKIN_READY",
+        "DIVERGENCE_READY",
+        "REVERSAL_READY",
+    }
+    if status in {"ACTIVE", "CONFIRMING"}:
+        price_text = _format_price_text(entry_price)
+        reference_type = "ENTRY_PRICE" if status == "ACTIVE" else "CONFIRMATION"
+        reference_text = ("진입가 " if status == "ACTIVE" else "확인 진행 ") + price_text
+    elif phase in confirmation_phases:
+        reference_type = "CONFIRMATION"
+        reference_text = f"확인선 {_format_price_text(confirmation_level)}"
+    else:
+        reference_type = "ZONE"
+        reference_text = f"관심구간 {_format_range_text(interest_low, interest_high)}"
+    return {
+        "entry_reference_type": reference_type,
+        "entry_reference_text": reference_text,
+        "interest_low": interest_low,
+        "interest_high": interest_high,
+        "confirmation_level": confirmation_level,
+        "invalidation_level": invalidation_level,
+    }
 
 
 def _entry_price(state: dict, long_side: bool, family: str, phase: str, status: str) -> float | None:
