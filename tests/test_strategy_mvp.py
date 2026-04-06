@@ -458,6 +458,20 @@ def make_ichimoku_breakout_long_df():
     return frame
 
 
+def make_ichimoku_breakout_short_df():
+    frame = make_trend_pullback_short_df()
+    frame = frame.copy()
+    frame["Ichimoku_Tenkan"] = frame["Close"] + 0.2
+    frame["Ichimoku_Kijun"] = frame["Close"] + 0.6
+    frame["Ichimoku_SenkouA"] = frame["Close"] + 1.0
+    frame["Ichimoku_SenkouB"] = frame["Close"] + 1.4
+    frame["Volume_Ratio_20"] = 1.8
+    frame["Volume_Ratio_50"] = 1.6
+    frame["ADX"] = 28.0
+    frame.loc[frame.index[-1], ["Kumo_Breakout_Bear", "TK_Cross_Bear"]] = True
+    return frame
+
+
 class StrategyEngineMvpTests(unittest.TestCase):
     def test_empty_payload_is_safe(self):
         payload = build_strategy_payload(pd.DataFrame())
@@ -577,6 +591,9 @@ class StrategyEngineMvpTests(unittest.TestCase):
         result = result_by_id(payload, "anchored_vwap_long")
         self.assertEqual(result["status"], "ACTIVE")
         self.assertEqual(result["phase"], "AVWAP_CONFIRMED")
+        self.assertEqual(result["label"], "Fixed VWAP 기반 롱 컨텍스트")
+        self.assertEqual(result["canonical_label"], "Anchored VWAP")
+        self.assertEqual(result["presentation_type"], "context")
 
     def test_institutional_accumulation_long_is_visible(self):
         payload = build_strategy_payload(make_accumulation_long_df())
@@ -595,6 +612,14 @@ class StrategyEngineMvpTests(unittest.TestCase):
         result = result_by_id(payload, "ichimoku_breakout_long")
         self.assertIn(result["status"], {"ACTIVE", "CONFIRMING", "TRIGGER_WAIT"})
         self.assertEqual(result["phase"], "ICHI_BREAKOUT_CONFIRMED")
+
+    def test_ichimoku_breakout_short_uses_bearish_wording(self):
+        payload = build_strategy_payload(make_ichimoku_breakout_short_df())
+        result = result_by_id(payload, "ichimoku_breakout_short")
+        self.assertIn(result["status"], {"ACTIVE", "CONFIRMING", "TRIGGER_WAIT"})
+        self.assertEqual(result["label"], "Ichimoku 하향 이탈형")
+        self.assertIn("하단", result["explanation"])
+        self.assertNotIn("상단 돌파", result["explanation"])
 
     def test_fractal_alligator_long_is_active(self):
         payload = build_strategy_payload(make_trend_pullback_long_df())

@@ -3243,6 +3243,18 @@ def _strategy_price_text(value):
     return f"{number:.2f}"
 
 
+def _strategy_implementation_text(item):
+    presentation_type = str((item or {}).get("presentation_type", "")).lower()
+    implementation_level = str((item or {}).get("implementation_level", "")).lower()
+    if presentation_type == "context":
+        return "컨텍스트형"
+    if implementation_level == "proxy":
+        return "프록시"
+    if implementation_level == "partial":
+        return "부분 구현"
+    return "독립 전략"
+
+
 def build_strategy_tab_view_model(meta):
     meta = meta or {}
     summary = dict(meta.get("strategy_summary") or {})
@@ -3288,6 +3300,7 @@ def build_strategy_tab_view_model(meta):
     for item in strategies:
         direction = _strategy_direction_label(item.get("direction"))
         phase_text = STRATEGY_PHASE_MAP.get(str(item.get("phase", "")).upper(), str(item.get("phase", "")))
+        implementation_text = _strategy_implementation_text(item)
         table_rows.append(
             {
                 "전략명": str(item.get("label", "")),
@@ -3298,7 +3311,7 @@ def build_strategy_tab_view_model(meta):
                 "진입가": _strategy_price_text(item.get("entry_price")),
                 "손절": _strategy_price_text(item.get("stop_loss")),
                 "1차 목표가": _strategy_price_text(item.get("target_1")),
-                "비고": str(item.get("note") or phase_text),
+                "비고": f"{implementation_text} · {str(item.get('note') or phase_text)}" if implementation_text != "독립 전략" else str(item.get("note") or phase_text),
             }
         )
         option_labels.append(
@@ -3393,6 +3406,8 @@ def render_combined_scans(meta):
     detail = dict(strategies[selected_index])
     detail_direction = _strategy_direction_label(detail.get("direction"))
     detail_tone = "positive" if detail_direction == "LONG" else "negative" if detail_direction == "SHORT" else "warning"
+    detail_impl_text = _strategy_implementation_text(detail)
+    detail_canonical_label = str(detail.get("canonical_label") or detail.get("label") or "")
     matched_badges = "".join(_badge(text, "positive") for text in detail.get("matched_conditions", [])) or _badge("성립 근거 없음", "muted")
     missing_badges = "".join(_badge(text, "warning") for text in detail.get("missing_conditions", [])) or _badge("누락 조건 없음", "muted")
     failed_badges = "".join(_badge(text, "negative") for text in detail.get("failed_conditions", [])) or _badge("실패 조건 없음", "muted")
@@ -3417,9 +3432,10 @@ def render_combined_scans(meta):
         f"<p class='sigl-section-title'>{_esc(detail.get('label'))}</p>"
         f"<p class='sigl-section-copy'>{_esc(detail_direction)} · {STRATEGY_STATUS_MAP.get(str(detail.get('status', '')).upper(), str(detail.get('status', '')))} · {STRATEGY_PHASE_MAP.get(str(detail.get('phase', '')).upper(), str(detail.get('phase', '')))}</p>"
         "</div>"
-        f"<div class='sigl-inline'>{_badge(detail.get('entry_hint'), 'accent')}{_badge(f'진입가 {detail_entry_price_text}', 'accent')}{_badge(f'위험/보상 {detail_rr_text}', 'warning')}</div>"
+        f"<div class='sigl-inline'>{_badge(detail.get('entry_hint'), 'accent')}{_badge(detail_impl_text, 'warning' if detail_impl_text != '독립 전략' else 'muted')}{_badge(f'진입가 {detail_entry_price_text}', 'accent')}{_badge(f'위험/보상 {detail_rr_text}', 'warning')}</div>"
         "</div>"
         f"<div class='sigl-grid sigl-grid--3'>{risk_cards}</div>"
+        f"<div class='sigl-note'><strong>구현 메타</strong><br><span class='sigl-summary'>{_esc(detail_impl_text + (f' · 원본명 {detail_canonical_label}' if detail_canonical_label and detail_canonical_label != str(detail.get('label')) else ''))}</span></div>"
         f"<div class='sigl-note'><strong>왜 성립했나</strong><br><span class='sigl-summary'>{_esc(detail.get('explanation'))}</span></div>"
         f"<div class='sigl-note'><strong>성립 체크리스트</strong><div class='sigl-chip-row'>{matched_badges}</div></div>"
         f"<div class='sigl-note'><strong>실패 / 부족 조건</strong><div class='sigl-chip-row'>{missing_badges}{failed_badges}</div></div>"

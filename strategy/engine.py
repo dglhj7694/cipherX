@@ -17,12 +17,17 @@ class StrategyDefinition:
     category: str
     direction: str
     family: str
+    ui_label: str | None = None
+    presentation_type: str = "strategy"
+    implementation_level: str = "implemented"
+    deterministic: bool = True
 
 
 @dataclass
 class StrategyResult:
     id: str
     label: str
+    canonical_label: str
     direction: str
     category: str
     score: float
@@ -32,6 +37,9 @@ class StrategyResult:
     setup_score: float
     trigger_score: float
     risk_score: float
+    presentation_type: str = "strategy"
+    implementation_level: str = "implemented"
+    deterministic: bool = True
     entry_price: float | None = None
     matched_conditions: list[str] = field(default_factory=list)
     missing_conditions: list[str] = field(default_factory=list)
@@ -71,43 +79,11 @@ class StrategySummary:
         return asdict(self)
 
 
-STRATEGY_DEFINITIONS: tuple[StrategyDefinition, ...] = (
-    StrategyDefinition("trend_pullback_long", "추세 지속 눌림목", "trend", "LONG", "trend_pullback"),
-    StrategyDefinition("trend_pullback_short", "추세 지속 눌림목", "trend", "SHORT", "trend_pullback"),
-    StrategyDefinition("breakout_confirmation_long", "돌파 확인형", "breakout", "LONG", "breakout_confirmation"),
-    StrategyDefinition("breakout_confirmation_short", "돌파 확인형", "breakout", "SHORT", "breakout_confirmation"),
-    StrategyDefinition("squeeze_expansion_long", "스퀴즈 발사형", "volatility", "LONG", "squeeze_expansion"),
-    StrategyDefinition("squeeze_expansion_short", "스퀴즈 발사형", "volatility", "SHORT", "squeeze_expansion"),
-    StrategyDefinition("reversal_cluster_long", "반전 클러스터", "reversal", "LONG", "reversal_cluster"),
-    StrategyDefinition("reversal_cluster_short", "반전 클러스터", "reversal", "SHORT", "reversal_cluster"),
-    StrategyDefinition("supertrend_psar_long", "SuperTrend + PSAR 이중확인", "confirmation", "LONG", "supertrend_psar"),
-    StrategyDefinition("supertrend_psar_short", "SuperTrend + PSAR 이중확인", "confirmation", "SHORT", "supertrend_psar"),
-    StrategyDefinition("obv_divergence_long", "OBV 다이버전스", "divergence", "LONG", "obv_divergence"),
-    StrategyDefinition("obv_divergence_short", "OBV 다이버전스", "divergence", "SHORT", "obv_divergence"),
-    StrategyDefinition("keltner_pullback_long", "Keltner Pullback", "trend", "LONG", "keltner_pullback"),
-    StrategyDefinition("keltner_pullback_short", "Keltner Pullback", "trend", "SHORT", "keltner_pullback"),
-    StrategyDefinition("keltner_breakout_long", "Keltner Breakout", "breakout", "LONG", "keltner_breakout"),
-    StrategyDefinition("keltner_breakout_short", "Keltner Breakout", "breakout", "SHORT", "keltner_breakout"),
-    StrategyDefinition("keltner_mean_reversion_long", "Keltner Mean Reversion", "reversal", "LONG", "keltner_mean_reversion"),
-    StrategyDefinition("keltner_mean_reversion_short", "Keltner Mean Reversion", "reversal", "SHORT", "keltner_mean_reversion"),
-    StrategyDefinition("vwap_reclaim_long", "VWAP 반등/거절형", "trend", "LONG", "vwap_reclaim"),
-    StrategyDefinition("vwap_reclaim_short", "VWAP 반등/거절형", "trend", "SHORT", "vwap_reclaim"),
-    StrategyDefinition("morning_star_fib_long", "Morning Star + Fib 골든존", "reversal", "LONG", "morning_star_fib"),
-    StrategyDefinition("morning_star_fib_short", "Morning Star + Fib 골든존", "reversal", "SHORT", "morning_star_fib"),
-    StrategyDefinition("fractal_breakout_long", "Fractal Breakout", "breakout", "LONG", "fractal_breakout"),
-    StrategyDefinition("fractal_breakout_short", "Fractal Breakout", "breakout", "SHORT", "fractal_breakout"),
-    StrategyDefinition("anchored_vwap_long", "Anchored VWAP", "trend", "LONG", "anchored_vwap"),
-    StrategyDefinition("anchored_vwap_short", "Anchored VWAP", "trend", "SHORT", "anchored_vwap"),
-    StrategyDefinition("institutional_accumulation_long", "기관 매집형", "accumulation", "LONG", "accumulation_pattern"),
-    StrategyDefinition("poc_rotation_long", "POC 리클레임 / VAH-VAL 회전", "levels", "LONG", "poc_rotation"),
-    StrategyDefinition("poc_rotation_short", "POC 리클레임 / VAH-VAL 회전", "levels", "SHORT", "poc_rotation"),
-    StrategyDefinition("ichimoku_breakout_long", "Ichimoku 돌파형", "breakout", "LONG", "ichimoku_breakout"),
-    StrategyDefinition("ichimoku_breakout_short", "Ichimoku 돌파형", "breakout", "SHORT", "ichimoku_breakout"),
-    StrategyDefinition("fractal_alligator_long", "Fractal + Alligator", "trend", "LONG", "fractal_alligator"),
-    StrategyDefinition("fractal_alligator_short", "Fractal + Alligator", "trend", "SHORT", "fractal_alligator"),
-    StrategyDefinition("chaikin_flow_long", "Chaikin 독립 전략", "flow", "LONG", "chaikin_flow"),
-    StrategyDefinition("chaikin_flow_short", "Chaikin 독립 전략", "flow", "SHORT", "chaikin_flow"),
-)
+from .explainer import build_strategy_explanation
+from .registry import build_strategy_definitions
+
+
+STRATEGY_DEFINITIONS: tuple[StrategyDefinition, ...] = build_strategy_definitions(StrategyDefinition)
 
 
 def build_strategy_payload(dc: pd.DataFrame) -> dict:
@@ -164,6 +140,31 @@ class StrategyEngine:
             "chaikin_flow": _evaluate_chaikin_flow,
         }
         return evaluators[definition.family](definition, market_state)
+
+
+def _strategy_public_label(definition: StrategyDefinition) -> str:
+    return str(definition.ui_label or definition.label)
+
+
+def _strategy_explanation(
+    definition: StrategyDefinition,
+    status: str,
+    matched: list[str],
+    missing: list[str],
+    conflicts: list[str],
+) -> str:
+    return build_strategy_explanation(
+        label=_strategy_public_label(definition),
+        canonical_label=definition.label,
+        family=definition.family,
+        direction=definition.direction,
+        status=status,
+        matched=matched,
+        missing=missing,
+        conflicts=conflicts,
+        presentation_type=definition.presentation_type,
+        implementation_level=definition.implementation_level,
+    )
 
 
 def _build_market_state(dc: pd.DataFrame) -> dict:
@@ -540,16 +541,20 @@ def _evaluate_trend_pullback(definition: StrategyDefinition, state: dict) -> Str
     matched = setup_matched + trigger_matched
     missing = setup_missing + trigger_missing
     failed = _failed_from_conflicts(conflict_reasons)
-    explanation = _build_explanation(definition.label, status, matched, missing, conflict_reasons)
+    explanation = _strategy_explanation(definition, status, matched, missing, conflict_reasons)
     return StrategyResult(
         id=definition.id,
-        label=definition.label,
+        label=_strategy_public_label(definition),
+        canonical_label=definition.label,
         direction=definition.direction,
         category=definition.category,
         score=total_score,
         status=status,
         phase=phase,
         entry_hint=entry_hint,
+        presentation_type=definition.presentation_type,
+        implementation_level=definition.implementation_level,
+        deterministic=definition.deterministic,
         entry_price=entry_price,
         setup_score=setup_score,
         trigger_score=trigger_score,
@@ -610,16 +615,20 @@ def _evaluate_breakout_confirmation(definition: StrategyDefinition, state: dict)
     matched = setup_matched + trigger_matched
     missing = setup_missing + trigger_missing
     failed = _failed_from_conflicts(conflict_reasons)
-    explanation = _build_explanation(definition.label, status, matched, missing, conflict_reasons)
+    explanation = _strategy_explanation(definition, status, matched, missing, conflict_reasons)
     return StrategyResult(
         id=definition.id,
-        label=definition.label,
+        label=_strategy_public_label(definition),
+        canonical_label=definition.label,
         direction=definition.direction,
         category=definition.category,
         score=total_score,
         status=status,
         phase=phase,
         entry_hint=entry_hint,
+        presentation_type=definition.presentation_type,
+        implementation_level=definition.implementation_level,
+        deterministic=definition.deterministic,
         entry_price=entry_price,
         setup_score=setup_score,
         trigger_score=trigger_score,
@@ -674,16 +683,20 @@ def _evaluate_squeeze_expansion(definition: StrategyDefinition, state: dict) -> 
     matched = setup_matched + trigger_matched
     missing = setup_missing + trigger_missing
     failed = _failed_from_conflicts(conflict_reasons)
-    explanation = _build_explanation(definition.label, status, matched, missing, conflict_reasons)
+    explanation = _strategy_explanation(definition, status, matched, missing, conflict_reasons)
     return StrategyResult(
         id=definition.id,
-        label=definition.label,
+        label=_strategy_public_label(definition),
+        canonical_label=definition.label,
         direction=definition.direction,
         category=definition.category,
         score=total_score,
         status=status,
         phase=phase,
         entry_hint=entry_hint,
+        presentation_type=definition.presentation_type,
+        implementation_level=definition.implementation_level,
+        deterministic=definition.deterministic,
         entry_price=entry_price,
         setup_score=setup_score,
         trigger_score=trigger_score,
@@ -739,16 +752,20 @@ def _evaluate_reversal_cluster(definition: StrategyDefinition, state: dict) -> S
     matched = setup_matched + trigger_matched
     missing = setup_missing + trigger_missing
     failed = _failed_from_conflicts(conflict_reasons)
-    explanation = _build_explanation(definition.label, status, matched, missing, conflict_reasons)
+    explanation = _strategy_explanation(definition, status, matched, missing, conflict_reasons)
     return StrategyResult(
         id=definition.id,
-        label=definition.label,
+        label=_strategy_public_label(definition),
+        canonical_label=definition.label,
         direction=definition.direction,
         category=definition.category,
         score=total_score,
         status=status,
         phase=phase,
         entry_hint=entry_hint,
+        presentation_type=definition.presentation_type,
+        implementation_level=definition.implementation_level,
+        deterministic=definition.deterministic,
         entry_price=entry_price,
         setup_score=setup_score,
         trigger_score=trigger_score,
@@ -801,16 +818,20 @@ def _evaluate_supertrend_psar(definition: StrategyDefinition, state: dict) -> St
     matched = setup_matched + trigger_matched
     missing = setup_missing + trigger_missing
     failed = _failed_from_conflicts(conflict_reasons)
-    explanation = _build_explanation(definition.label, status, matched, missing, conflict_reasons)
+    explanation = _strategy_explanation(definition, status, matched, missing, conflict_reasons)
     return StrategyResult(
         id=definition.id,
-        label=definition.label,
+        label=_strategy_public_label(definition),
+        canonical_label=definition.label,
         direction=definition.direction,
         category=definition.category,
         score=total_score,
         status=status,
         phase=phase,
         entry_hint=entry_hint,
+        presentation_type=definition.presentation_type,
+        implementation_level=definition.implementation_level,
+        deterministic=definition.deterministic,
         entry_price=entry_price,
         setup_score=setup_score,
         trigger_score=trigger_score,
@@ -866,16 +887,20 @@ def _evaluate_obv_divergence(definition: StrategyDefinition, state: dict) -> Str
     matched = setup_matched + trigger_matched
     missing = setup_missing + trigger_missing
     failed = _failed_from_conflicts(conflict_reasons)
-    explanation = _build_explanation(definition.label, status, matched, missing, conflict_reasons)
+    explanation = _strategy_explanation(definition, status, matched, missing, conflict_reasons)
     return StrategyResult(
         id=definition.id,
-        label=definition.label,
+        label=_strategy_public_label(definition),
+        canonical_label=definition.label,
         direction=definition.direction,
         category=definition.category,
         score=total_score,
         status=status,
         phase=phase,
         entry_hint=entry_hint,
+        presentation_type=definition.presentation_type,
+        implementation_level=definition.implementation_level,
+        deterministic=definition.deterministic,
         entry_price=entry_price,
         setup_score=setup_score,
         trigger_score=trigger_score,
@@ -1370,16 +1395,20 @@ def _build_result_from_groups(
     matched = setup_matched + trigger_matched
     missing = setup_missing + trigger_missing
     failed = _failed_from_conflicts(conflict_reasons)
-    explanation = _build_explanation(definition.label, status, matched, missing, conflict_reasons)
+    explanation = _strategy_explanation(definition, status, matched, missing, conflict_reasons)
     return StrategyResult(
         id=definition.id,
-        label=definition.label,
+        label=_strategy_public_label(definition),
+        canonical_label=definition.label,
         direction=definition.direction,
         category=definition.category,
         score=total_score,
         status=status,
         phase=phase,
         entry_hint=entry_hint,
+        presentation_type=definition.presentation_type,
+        implementation_level=definition.implementation_level,
+        deterministic=definition.deterministic,
         entry_price=entry_price,
         setup_score=setup_score,
         trigger_score=trigger_score,
