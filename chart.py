@@ -19,6 +19,7 @@ from localization import (
     localize_subplot_title,
     translate_chart_text,
 )
+from domain import AnalysisViewModel
 from strategy import build_strategy_payload
 from theme import PLOTLY_FONT_FAMILY
 
@@ -1083,7 +1084,7 @@ def build_metadata(dc,ticker):
     stock_return_20=_sf(lat.get('Stock_Return'))*100.0
     spy_return_20=_sf(lat.get('SPY_Return'))*100.0
     excess_return_20=stock_return_20-spy_return_20
-    return {'ticker':ticker.upper(),'price':_sf(lat['Close']),'price_change':pc,'price_change_pct':pp,'volume':_sf(lat['Volume']),'avg_volume':_sf(dc['Volume'].rolling(20).mean().iloc[-1]),
+    payload={'ticker':ticker.upper(),'price':_sf(lat['Close']),'price_change':pc,'price_change_pct':pp,'volume':_sf(lat['Volume']),'avg_volume':_sf(dc['Volume'].rolling(20).mean().iloc[-1]),
         'wt1':_sf(lat.get('WT1')),'rsi':_sf(lat.get('RSI'),50),'mfi':_sf(lat.get('MFI'),50),'stochk':_sf(lat.get('StochK'),50),'adx':_sf(lat.get('ADX')),'atr':_sf(lat.get('ATR')),'atr_pct':_sf(lat.get('ATR'))/(max(_sf(lat['Close']),0.01))*100,
         'macd_hist':_sf(lat.get('MACD_Hist')),'cmf':_sf(lat.get('CMF')),'composite_accel':_sf(lat.get('Composite_Accel')),'rs_ratio':_sf(lat.get('RS_Ratio'),1),
         'regime':rg,'regime_label':rl,'regime_score':_sf(lat.get('Regime_Score')),'last_date':dc.index[-1].strftime('%Y-%m-%d'),'squeeze_on':bool(lat.get('Squeeze_On',False)),
@@ -1173,6 +1174,7 @@ def build_metadata(dc,ticker):
         'ma20_dist':round((_sf(lat['Close'])-_sf(lat.get('MA20',_sf(lat['Close']))))/_sf(lat['Close'])*100,2) if _sf(lat.get('MA20')) else 0,
         'ma50_dist':round((_sf(lat['Close'])-_sf(lat.get('MA50',_sf(lat['Close']))))/_sf(lat['Close'])*100,2) if _sf(lat.get('MA50')) else 0,
         'ma200_dist':round((_sf(lat['Close'])-_sf(lat.get('MA200',_sf(lat['Close']))))/_sf(lat['Close'])*100,2) if _sf(lat.get('MA200')) else 0}
+    return AnalysisViewModel.from_payload(payload).to_dict()
 
 
 def _trendline_hover(line,label):

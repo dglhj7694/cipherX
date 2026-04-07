@@ -1242,16 +1242,10 @@ def compute_committee_ensemble(df, vol_ratio, hma_r_v):
         if not a:
             a=default_action_label(j[i])
         rs.append(r);rd.append(d);al.append(a)
-    df['PreVeto_Judgment']=pre_veto_j;df['Trade_Judgment']=j;df['Judgment_Confidence']=conf;df['Buy_Agree']=bag;df['Sell_Agree']=sag
-    df['Downgrade_Count']=downgrade_count;df['Macro_Risk_Off_Count']=macro_risk_off_count_arr;df['Macro_Risk_On_Count']=macro_risk_on_count_arr
-    df['Flip_Guard_Triggered']=flip_guard_triggered
-    df['Judgment_Reason']=rs;df['Judgment_Detail']=rd;df['Action_Label']=al;df['Contrast_Notes']=contrast_notes
-    
-    # ?렞 ?쒖뒪???꾨㈃ ?꾪솚(Macro Flip) ?쒓렇??異붽?
-    is_buy = pd.Series(j).isin(['STRONG_BUY', 'BUY', 'WATCH_BUY'])
-    is_sell = pd.Series(j).isin(['STRONG_SELL', 'SELL', 'WATCH_SELL'])
-    df['System_Turn_Bull'] = (is_buy & ~is_buy.shift(1).fillna(False)).values
-    df['System_Turn_Bear'] = (is_sell & ~is_sell.shift(1).fillna(False)).values
+    df['Committee_PreVeto_Judgment']=pre_veto_j;df['Committee_Judgment']=j;df['Committee_Confidence']=conf;df['Committee_Buy_Agree']=bag;df['Committee_Sell_Agree']=sag
+    df['Committee_Downgrade_Count']=downgrade_count;df['Committee_Macro_Risk_Off_Count']=macro_risk_off_count_arr;df['Committee_Macro_Risk_On_Count']=macro_risk_on_count_arr
+    df['Committee_Flip_Guard_Triggered']=flip_guard_triggered
+    df['Committee_Judgment_Reason']=rs;df['Committee_Judgment_Detail']=rd;df['Committee_Action_Label']=al;df['Committee_Contrast_Notes']=contrast_notes
     
     return df
 

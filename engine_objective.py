@@ -113,19 +113,7 @@ def compute_objective_judgment(df, vol_ratio):
     buy_total = N("Buy_Total", 0.0)
     sell_total = N("Sell_Total", 0.0)
     ensemble = N("Ensemble_Score", 0.0)
-    base_labels = np.asarray(df.get("Trade_Judgment", pd.Series("NEUTRAL", index=idx)).astype(str).values, dtype=object)
-    base_pre_labels = np.asarray(df.get("PreVeto_Judgment", pd.Series("NEUTRAL", index=idx)).astype(str).values, dtype=object)
-    base_conf = N("Judgment_Confidence", 0.0).astype(float).values
-    base_buy_agree = N("Buy_Agree", 0).astype(int).values
-    base_sell_agree = N("Sell_Agree", 0).astype(int).values
-    base_downgrade = N("Downgrade_Count", 0).astype(int).values
-    base_macro_off = N("Macro_Risk_Off_Count", 0).astype(int).values
-    base_macro_on = N("Macro_Risk_On_Count", 0).astype(int).values
-    base_flip_guard = N("Flip_Guard_Triggered", False).astype(bool).values
-    base_reasons = np.asarray(df.get("Judgment_Reason", pd.Series("", index=idx)).astype(str).values, dtype=object)
-    base_details = np.asarray(df.get("Judgment_Detail", pd.Series("", index=idx)).astype(str).values, dtype=object)
-    base_actions = np.asarray(df.get("Action_Label", pd.Series("", index=idx)).astype(str).values, dtype=object)
-    base_contrast = np.asarray(df.get("Contrast_Notes", pd.Series("", index=idx)).astype(str).values, dtype=object)
+    base_labels = np.asarray(df.get("Committee_Judgment", pd.Series("NEUTRAL", index=idx)).astype(str).values, dtype=object)
 
     trend_buy = ((close > ma50).fillna(False).astype(float) * 8.0) + ((close > ma200).fillna(False).astype(float) * 10.0) + ((st_dir == 1).astype(float) * 6.0)
     trend_sell = ((close < ma50).fillna(False).astype(float) * 8.0) + ((close < ma200).fillna(False).astype(float) * 10.0) + ((st_dir == -1).astype(float) * 6.0)
@@ -154,24 +142,15 @@ def compute_objective_judgment(df, vol_ratio):
     objective_labels = np.array([_label_from_scores(b, s, c) for b, s, c in zip(buy_score, sell_score, conflict_score)], dtype=object)
     objective_pre_labels = objective_labels.copy()
     objective_conf = np.clip(np.abs(buy_score - sell_score) * 2.0 + conflict_score, 5, 99)
-    objective_buy_agree = np.where(buy_score >= sell_score, np.maximum(base_buy_agree, 1), 0)
-    objective_sell_agree = np.where(sell_score > buy_score, np.maximum(base_sell_agree, 1), 0)
-    objective_alignment = np.where(buy_score > sell_score, "BUY", np.where(sell_score > buy_score, "SELL", "MIXED"))
-    objective_adjustment = np.where(objective_labels != "NEUTRAL", "ACTIVE", "NONE")
+    objective_buy_agree = np.where(buy_score >= sell_score, 1, 0)
+    objective_sell_agree = np.where(sell_score > buy_score, 1, 0)
 
     objective_reasons = []
     objective_details = []
     objective_actions = []
     objective_contrasts = []
-    final_labels = base_labels.copy()
-    final_conf = base_conf.copy()
-    final_buy_agree = base_buy_agree.copy()
-    final_sell_agree = base_sell_agree.copy()
-    final_downgrade = base_downgrade.copy()
-    final_reasons = base_reasons.copy()
-    final_details = base_details.copy()
-    final_actions = base_actions.copy()
-    final_contrast = base_contrast.copy()
+    objective_alignment = []
+    objective_adjustment = []
 
     for i in range(len(df)):
         gap = float(buy_score.iloc[i] - sell_score.iloc[i])
@@ -185,35 +164,24 @@ def compute_objective_judgment(df, vol_ratio):
         objective_details.append(detail)
         objective_actions.append(action)
         objective_contrasts.append(conflict)
-
-        base_label = str(final_labels[i])
-        base_side = judgment_side(base_label)
-        obj_side = judgment_side(obj_label)
-        if base_label in {"NEUTRAL", "MIXED"} and obj_side != 0 and abs(gap) >= 10:
-            final_labels[i] = obj_label
-            final_reasons[i] = append_note(final_reasons[i], reason, " ")
-            final_details[i] = append_note(final_details[i], detail)
-            final_actions[i] = default_action_label(final_labels[i])
-        elif base_side != 0 and obj_side == base_side and abs(gap) >= 20:
-            promoted = promote_buy(base_label) if obj_side > 0 else promote_sell(base_label)
-            final_labels[i] = promoted
-            final_details[i] = append_note(final_details[i], f"Objective confirms {side_text} side")
-            final_actions[i] = default_action_label(final_labels[i])
-        elif base_side != 0 and obj_side == -base_side and abs(gap) >= 24:
-            final_labels[i] = downgrade_buy(base_label, severe=False) if base_side > 0 else downgrade_sell(base_label, severe=False)
-            final_downgrade[i] += 1
-            final_contrast[i] = append_note(final_contrast[i], f"Objective conflict {gap:+.1f}", "; ")
-            final_actions[i] = default_action_label(final_labels[i])
-
-        final_conf[i] = max(float(final_conf[i]), float(objective_conf[i]) * 0.85)
-        final_buy_agree[i] = max(int(final_buy_agree[i]), int(objective_buy_agree[i]))
-        final_sell_agree[i] = max(int(final_sell_agree[i]), int(objective_sell_agree[i]))
-        if not str(final_reasons[i] or "").strip():
-            final_reasons[i] = reason
-        if not str(final_details[i] or "").strip():
-            final_details[i] = detail
-        if not str(final_actions[i] or "").strip():
-            final_actions[i] = default_action_label(final_labels[i])
+        committee_label = str(base_labels[i])
+        committee_side = judgment_side(committee_label)
+        objective_side = judgment_side(obj_label)
+        if committee_side == 0 and objective_side != 0 and abs(gap) >= 10:
+            objective_alignment.append("MIXED")
+            objective_adjustment.append("ADOPT")
+        elif committee_side != 0 and objective_side == committee_side and abs(gap) >= 20:
+            objective_alignment.append("ALIGNED")
+            objective_adjustment.append("CONFIRM")
+        elif committee_side != 0 and objective_side == -committee_side and abs(gap) >= 24:
+            objective_alignment.append("CONFLICT")
+            objective_adjustment.append("CONFLICT")
+        elif objective_side == 0:
+            objective_alignment.append("MIXED")
+            objective_adjustment.append("NONE")
+        else:
+            objective_alignment.append("MIXED")
+            objective_adjustment.append("ACTIVE")
 
     df["Objective_Buy_Score"] = buy_score
     df["Objective_Sell_Score"] = sell_score
@@ -243,23 +211,4 @@ def compute_objective_judgment(df, vol_ratio):
     df["Objective_Contrast_Notes"] = objective_contrasts
     df["Objective_Alignment"] = objective_alignment
     df["Objective_Adjustment"] = objective_adjustment
-
-    df["PreVeto_Judgment"] = base_pre_labels
-    df["Trade_Judgment"] = final_labels
-    df["Judgment_Confidence"] = final_conf
-    df["Buy_Agree"] = final_buy_agree
-    df["Sell_Agree"] = final_sell_agree
-    df["Downgrade_Count"] = final_downgrade
-    df["Macro_Risk_Off_Count"] = base_macro_off
-    df["Macro_Risk_On_Count"] = base_macro_on
-    df["Flip_Guard_Triggered"] = base_flip_guard
-    df["Judgment_Reason"] = final_reasons
-    df["Judgment_Detail"] = final_details
-    df["Action_Label"] = final_actions
-    df["Contrast_Notes"] = final_contrast
-
-    is_buy = pd.Series(final_labels, index=idx).isin(list(OBJECTIVE_BUY_LABELS))
-    is_sell = pd.Series(final_labels, index=idx).isin(list(OBJECTIVE_SELL_LABELS))
-    df["System_Turn_Bull"] = (is_buy & ~is_buy.shift(1).fillna(False)).values
-    df["System_Turn_Bear"] = (is_sell & ~is_sell.shift(1).fillna(False)).values
     return df

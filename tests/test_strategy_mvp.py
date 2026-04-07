@@ -10,12 +10,18 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from config import COMBINED_SCAN_REGISTRY
+from domain import AnalysisRequest, AnalysisViewModel, ScannerRequest, ScannerResultRow
 import engine as root_engine
 from engine_combo_registry import ensure_runtime_combo_registry
 from engine_combo_scans import detect_combined_scans as detect_combined_scans_impl
 from engine_objective import OBJECTIVE_COMBO_BASE
+from engine_runtime.final_decision import compute_final_decision
+from engine_runtime.pipeline import build_engine_result
+from infrastructure.etf import FunctionHoldingsProvider, HoldingsProviderRegistry
+from services.analysis_service import AnalysisArtifacts
 from strategy import build_strategy_payload
 from ui_localized import build_strategy_tab_view_model
+from workflows import AnalysisWorkflow, ScannerWorkflow
 
 
 BOOLEAN_COLUMNS = [
@@ -515,10 +521,195 @@ class EngineCoreSplitSmokeTests(unittest.TestCase):
         self.assertIn("Sell_Total", layered.columns)
         committee = root_engine.compute_committee_ensemble(layered.copy(), layered["Volume_Ratio_20"], hma_rising)
         self.assertIn("Ensemble_Score", committee.columns)
-        self.assertIn("Trade_Judgment", committee.columns)
+        self.assertIn("Committee_Judgment", committee.columns)
+        self.assertNotIn("Trade_Judgment", committee.columns)
         objective = root_engine._compute_objective_judgment(committee.copy(), committee["Volume_Ratio_20"])
         self.assertIn("Objective_Buy_Score", objective.columns)
         self.assertIn("Objective_Judgment", objective.columns)
+        self.assertNotIn("Trade_Judgment", objective.columns)
+
+
+class FinalDecisionOwnershipTests(unittest.TestCase):
+    def _build_objective_frame(self):
+        frame = make_blank_frame()
+        apply_close_series(frame, [100.0 + (0.1 * i) for i in range(len(frame))])
+        hma_rising = pd.Series(False, index=frame.index)
+        layered = root_engine.compute_10layer_scores(frame.copy(), frame["Volume_Ratio_20"], hma_rising)
+        committee = root_engine.compute_committee_ensemble(layered.copy(), layered["Volume_Ratio_20"], hma_rising)
+        return root_engine._compute_objective_judgment(committee.copy(), committee["Volume_Ratio_20"])
+
+    def test_final_decision_module_owns_trade_judgment_columns(self):
+        objective = self._build_objective_frame()
+        self.assertNotIn("Trade_Judgment", objective.columns)
+        self.assertNotIn("Action_Label", objective.columns)
+        self.assertNotIn("Judgment_Confidence", objective.columns)
+
+        finalised = compute_final_decision(objective.copy())
+        self.assertIn("Trade_Judgment", finalised.columns)
+        self.assertIn("Action_Label", finalised.columns)
+        self.assertIn("Judgment_Confidence", finalised.columns)
+        self.assertIn("Final_Decision_Score", finalised.columns)
+
+    def test_build_engine_result_returns_typed_contract(self):
+        objective = self._build_objective_frame()
+        finalised = compute_final_decision(objective.copy())
+        result = build_engine_result(finalised)
+        self.assertEqual(result.decision.label, str(finalised["Trade_Judgment"].iloc[-1]))
+        self.assertEqual(result.committee.label, str(finalised["Committee_Judgment"].iloc[-1]))
+        self.assertEqual(result.objective.advisory_label, str(finalised["Objective_Judgment"].iloc[-1]))
+        self.assertAlmostEqual(result.evidence.ensemble_score, float(finalised["Ensemble_Score"].iloc[-1]), places=6)
+
+
+class WorkflowContractTests(unittest.TestCase):
+    def test_analysis_workflow_returns_response_contract(self):
+        class FakeAnalysisService:
+            def analyze(self, request, prompt_builder):
+                self.request = request
+                self.prompt_builder = prompt_builder
+                meta = AnalysisViewModel.from_payload(
+                    {
+                        "ticker": request.ticker,
+                        "price": 101.25,
+                        "price_change_pct": 1.5,
+                        "judgment": "BUY",
+                        "action_label": "매수 우세",
+                        "confidence": 82,
+                        "ensemble_score": 14.5,
+                        "context_label": "추세",
+                        "leading_verdict": "리드 양호",
+                        "lagging_verdict": "후행 확인",
+                        "combined_scans": [],
+                        "top_strategy": {"label": "추세 지속 눌림목", "score": 81},
+                        "strategy_summary": {"conflict_level": "LOW"},
+                    }
+                )
+                return AnalysisArtifacts(
+                    data_frame=None,
+                    display_frame=None,
+                    meta=meta,
+                    prompt_text="PROMPT",
+                    chart_json="{}",
+                    audit={"ok": True},
+                )
+
+        workflow = AnalysisWorkflow(FakeAnalysisService())
+        response = workflow.run(AnalysisRequest(ticker="AAPL", chart_days=126), prompt_builder=lambda *_: "PROMPT")
+        self.assertEqual(response.chart_json, "{}")
+        self.assertEqual(response.prompt_text, "PROMPT")
+        self.assertEqual(response.meta.ticker, "AAPL")
+        self.assertEqual(response.meta.top_strategy["label"], "추세 지속 눌림목")
+
+    def test_scanner_workflow_uses_analysis_service_boundary(self):
+        class FakeAnalysisService:
+            def __init__(self):
+                self.calls = []
+
+            def analyze(self, request, prompt_builder):
+                self.calls.append(request.ticker)
+                meta = AnalysisViewModel.from_payload(
+                    {
+                        "ticker": request.ticker,
+                        "price": 100.0,
+                        "price_change_pct": 0.5,
+                        "judgment": "WATCH_BUY",
+                        "action_label": "관심",
+                        "confidence": 61,
+                        "ensemble_score": 6.5,
+                        "context_label": "중립",
+                        "leading_verdict": "관찰",
+                        "lagging_verdict": "보류",
+                        "combined_scans": [],
+                        "top_strategy": {"label": "돌파 확인형", "score": 67, "direction": "LONG"},
+                        "strategy_summary": {"conflict_level": "LOW"},
+                    }
+                )
+                return AnalysisArtifacts(
+                    data_frame=None,
+                    display_frame=None,
+                    meta=meta,
+                    prompt_text="PROMPT",
+                    chart_json=None,
+                    audit=None,
+                )
+
+        workflow = ScannerWorkflow(FakeAnalysisService())
+        request = ScannerRequest(tickers=["AAPL", "MSFT"], chart_days=126, max_workers=2)
+        results = workflow.run(
+            request,
+            row_builder={
+                "prompt_builder": lambda *_: "PROMPT",
+                "build_row": lambda ticker, artifacts: ScannerResultRow(
+                    ticker=ticker,
+                    decision=artifacts.meta.decision_label,
+                    confidence=artifacts.meta.confidence,
+                    ensemble_score=artifacts.meta.ensemble_score,
+                    scan_score=artifacts.meta.ensemble_score,
+                    top_strategy=artifacts.meta.top_strategy,
+                ),
+            },
+        )
+        self.assertEqual(len(results), 2)
+        self.assertEqual({row["ticker"] for row in results}, {"AAPL", "MSFT"})
+        self.assertTrue(all("top_strategy" in row for row in results))
+
+
+class EtfProviderContractTests(unittest.TestCase):
+    def test_registry_uses_supported_provider_before_fallback(self):
+        registry = HoldingsProviderRegistry(
+            providers=[
+                FunctionHoldingsProvider(
+                    supported_symbols={"QQQ"},
+                    fetcher=lambda symbol: {
+                        "symbol": symbol,
+                        "tickers": ["AAPL", "MSFT"],
+                        "note": "primary",
+                        "error": "",
+                        "as_of": "2026-04-07",
+                    },
+                )
+            ],
+            fallback=FunctionHoldingsProvider(
+                fetcher=lambda symbol: {
+                    "symbol": symbol,
+                    "tickers": ["SPY"],
+                    "note": "fallback",
+                    "error": "",
+                    "as_of": "",
+                }
+            ),
+        )
+        payload = registry.fetch("QQQ")
+        self.assertEqual(payload.symbol, "QQQ")
+        self.assertEqual(payload.tickers, ["AAPL", "MSFT"])
+        self.assertEqual(payload.note, "primary")
+
+    def test_registry_returns_fallback_when_primary_is_empty(self):
+        registry = HoldingsProviderRegistry(
+            providers=[
+                FunctionHoldingsProvider(
+                    supported_symbols={"IGV"},
+                    fetcher=lambda symbol: {
+                        "symbol": symbol,
+                        "tickers": [],
+                        "note": "",
+                        "error": "not found",
+                        "as_of": "",
+                    },
+                )
+            ],
+            fallback=FunctionHoldingsProvider(
+                fetcher=lambda symbol: {
+                    "symbol": symbol,
+                    "tickers": ["MSFT", "NOW"],
+                    "note": "fallback",
+                    "error": "",
+                    "as_of": "",
+                }
+            ),
+        )
+        payload = registry.fetch("IGV")
+        self.assertEqual(payload.tickers, ["MSFT", "NOW"])
+        self.assertEqual(payload.note, "fallback")
 
 
 class StrategyEngineMvpTests(unittest.TestCase):

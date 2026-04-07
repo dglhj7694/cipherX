@@ -9,6 +9,7 @@ from engine_combo_scans import detect_combined_scans as _detect_combined_scans_i
 from engine_layers import compute_10layer_scores as _compute_10layer_scores_impl
 from engine_committee import compute_committee_ensemble as _compute_committee_ensemble_impl
 from engine_objective import compute_objective_judgment as _compute_objective_judgment_impl
+from engine_runtime.pipeline import apply_runtime_pipeline
 
 def det_123pb(h,l,c,adx,pdi,mdi):
     sb=(adx>30)&(pdi>mdi);sbe=(adx>30)&(mdi>pdi);ins=(h<h.shift(1))&(l>l.shift(1))
@@ -176,8 +177,7 @@ def detect_all_signals(df):
     df['VuManChu_Bull']=((wt1<-30)&(hrb|hma_r)&(df['Bull_Divergence'].fillna(False)|df['RSI_Bull_Divergence'].fillna(False)|df['Bullish_Engulfing'].fillna(False)|df['Hammer'].fillna(False)|df['Morning_Star'].fillna(False)))&vok
     df['VuManChu_Bear']=((wt1>30)&(hrbe|~hma_r)&(df['Bear_Divergence'].fillna(False)|df['RSI_Bear_Divergence'].fillna(False)|df['Bearish_Engulfing'].fillna(False)|df['Shooting_Star'].fillna(False)|df['Evening_Star'].fillna(False)))&vok
     for (bs,ss),cd in {('UTBot_Buy','UTBot_Sell'):10,('Hull_Turn_Bull','Hull_Turn_Bear'):7,('StochSlow_Cross_Buy','StochSlow_Cross_Sell'):7,('Squeeze_Mom_Cross_Up','Squeeze_Mom_Cross_Down'):5,('VuManChu_Bull','VuManChu_Bear'):10}.items():_cd_dir(df,bs,ss,cd)
-    df=detect_combined_scans(df,vol_ratio,hma_r);df=compute_10layer_scores(df,vol_ratio,hma_r_v);df=compute_committee_ensemble(df,vol_ratio,hma_r_v);df=_compute_objective_judgment(df,vol_ratio)
-    return df
+    return apply_runtime_pipeline(df, vol_ratio, hma_r, hma_r_v, COMBINED_SCAN_REGISTRY)
 
 def compute_10layer_scores(df, vol_ratio, hma_r_v):
     return _compute_10layer_scores_impl(df, vol_ratio, hma_r_v, COMBINED_SCAN_REGISTRY)

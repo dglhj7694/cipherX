@@ -7,6 +7,13 @@ from config import JT
 from utils import _sp, _spd
 
 
+def _capped_signal_cluster(df, specs, cap):
+    total = pd.Series(0.0, index=df.index)
+    for signal_name, points in specs:
+        total += _sp(df, signal_name, points)
+    return total.clip(upper=cap)
+
+
 def apply_layer_totals(df, layer_names, combo_registry):
     buy_raw = sum(df[f"BL_{name}"].clip(lower=0) for name in layer_names)
     sell_raw = sum(df[f"SL_{name}"].clip(lower=0) for name in layer_names)
@@ -161,8 +168,11 @@ def compute_10layer_scores(df, vol_ratio, hma_r_v, combo_registry):
     df["BL_Trend"] = bt.clip(-2, JT.TREND_CAP)
 
     bm = pd.Series(0.0, index=idx)
-    for s, p in [("MACD_Cross_Buy", 2.5), ("MACD_Zero_Cross_Buy", 2), ("StochRSI_Cross_Buy", 2), ("ADX_Momentum_Buy", 2), ("VWAP_Bounce_Buy", 1.5)]:
-        bm += _sp(df, s, p)
+    bm += _capped_signal_cluster(
+        df,
+        [("MACD_Cross_Buy", 2.5), ("MACD_Zero_Cross_Buy", 2), ("StochRSI_Cross_Buy", 2), ("ADX_Momentum_Buy", 2), ("VWAP_Bounce_Buy", 1.5)],
+        cap=5.0,
+    )
     bm = bm.clip(upper=6)
     bm += np.select([(N("MACD_Hist") > 0) & mhr, (N("MACD_Hist") > 0) & mhf, (N("MACD_Hist") < 0) & mhr], [2, 0.5, 1.5], default=0.0)
     bm += np.clip((40 - N("RSI")) * 0.15, 0, 3) + rr_.astype(float) + np.clip((25 - N("StochK")) * 0.15, 0, 2.5) + np.clip((-10 - N("WT1")) * 0.05, 0, 3) + wr_.astype(float)
@@ -183,14 +193,22 @@ def compute_10layer_scores(df, vol_ratio, hma_r_v, combo_registry):
     df["BL_BB"] = bb_.clip(-1, JT.BB_CAP)
 
     bv = pd.Series(0.0, index=idx)
-    bv += _sp(df, "Volume_Climax_Buy", 3) + _sp(df, "Pocket_Pivot", 2) + _sp(df, "OBV_Div_Buy", 1.5) + _sp(df, "Volume_POC_Breakout", 2.5) + _sp(df, "Volume_Dry_Breakout_Buy", 2)
+    bv += _capped_signal_cluster(
+        df,
+        [("Volume_Climax_Buy", 3), ("Pocket_Pivot", 2), ("OBV_Div_Buy", 1.5), ("Volume_POC_Breakout", 2.5), ("Volume_Dry_Breakout_Buy", 2)],
+        cap=5.5,
+    )
     bv += np.clip((vr - 1) * 1.5, 0, 3) * (C > O).astype(float) + np.where(obv > obvm, 1, np.where(obv < obvm, -1, 0))
     bv += np.where((vol_osc > 0) & (C > O), 0.9, np.where((vol_osc < 0) & (C < O), -0.7, 0)) + np.where(dv_z > 0.35, 0.6, np.where(dv_z < -0.35, -0.5, 0))
     bv -= np.where(F("Thin_Trade_Risk"), 1.4, 0)
     df["BL_Volume"] = bv.clip(-1, JT.VOLUME_CAP)
 
     bmf = pd.Series(0.0, index=idx)
-    bmf += np.clip(-rmfi * 0.2, -0.5, 2) + _sp(df, "MF_Cross_Bull", 2) + _sp(df, "MF_Bull_Div", 2) + _sp(df, "MF_Accel_Up", 1) + _sp(df, "CMF_Bull", 1.5)
+    bmf += np.clip(-rmfi * 0.2, -0.5, 2) + _capped_signal_cluster(
+        df,
+        [("MF_Cross_Bull", 2), ("MF_Bull_Div", 2), ("MF_Accel_Up", 1), ("CMF_Bull", 1.5)],
+        cap=4.5,
+    )
     bmf += np.clip(cmf * 8, -1, 2) + np.where(intensity_idx > 10, 0.9, np.where(intensity_idx < -10, -0.7, 0))
     bmf += np.where(chaikin > 0, 0.8, np.where(chaikin < 0, -0.8, 0)) + np.where(ad_z > 0.4, 0.7, np.where(ad_z < -0.4, -0.7, 0))
     df["BL_MF"] = bmf.clip(-1, JT.MF_CAP)
@@ -268,8 +286,11 @@ def compute_10layer_scores(df, vol_ratio, hma_r_v, combo_registry):
     df["SL_Trend"] = st_.clip(-2, JT.TREND_CAP)
 
     sm_ = pd.Series(0.0, index=idx)
-    for s, p in [("MACD_Cross_Sell", 2.5), ("MACD_Zero_Cross_Sell", 2), ("StochRSI_Cross_Sell", 2), ("ADX_Momentum_Sell", 2), ("VWAP_Reject_Sell", 1.5)]:
-        sm_ += _sp(df, s, p)
+    sm_ += _capped_signal_cluster(
+        df,
+        [("MACD_Cross_Sell", 2.5), ("MACD_Zero_Cross_Sell", 2), ("StochRSI_Cross_Sell", 2), ("ADX_Momentum_Sell", 2), ("VWAP_Reject_Sell", 1.5)],
+        cap=5.0,
+    )
     sm_ = sm_.clip(upper=6)
     sm_ += np.select([(N("MACD_Hist") < 0) & mhf, (N("MACD_Hist") < 0) & mhr, (N("MACD_Hist") > 0) & mhf], [2, 0.5, 1.5], default=0.0)
     sm_ += np.clip((N("RSI") - 60) * 0.15, 0, 3) + rf_.astype(float) + np.clip((N("StochK") - 75) * 0.15, 0, 2.5) + np.clip((N("WT1") - 10) * 0.05, 0, 3) + wf_.astype(float)
@@ -290,14 +311,22 @@ def compute_10layer_scores(df, vol_ratio, hma_r_v, combo_registry):
     df["SL_BB"] = sbb_.clip(-1, JT.BB_CAP)
 
     sv_ = pd.Series(0.0, index=idx)
-    sv_ += _sp(df, "Volume_Climax_Sell", 3) + _sp(df, "OBV_Div_Sell", 1.5) + _sp(df, "Volume_POC_Breakdown", 2.5) + _sp(df, "Volume_Dry_Breakout_Sell", 2)
+    sv_ += _capped_signal_cluster(
+        df,
+        [("Volume_Climax_Sell", 3), ("OBV_Div_Sell", 1.5), ("Volume_POC_Breakdown", 2.5), ("Volume_Dry_Breakout_Sell", 2)],
+        cap=5.5,
+    )
     sv_ += np.clip((vr - 1) * 1.5, 0, 3) * (C < O).astype(float) + np.where(obv < obvm, 1, np.where(obv > obvm, -1, 0))
     sv_ += np.where((vol_osc < 0) & (C < O), 0.9, np.where((vol_osc > 0) & (C > O), -0.7, 0)) + np.where(dv_z > 0.35, 0.25, np.where(dv_z < -0.35, 0.55, 0))
     sv_ -= np.where(F("Thin_Trade_Risk"), 1.2, 0)
     df["SL_Volume"] = sv_.clip(-1, JT.VOLUME_CAP)
 
     smf_ = pd.Series(0.0, index=idx)
-    smf_ += np.clip(rmfi * 0.2, -0.5, 2) + _sp(df, "MF_Cross_Bear", 2) + _sp(df, "MF_Bear_Div", 2) + _sp(df, "MF_Accel_Dn", 1) + _sp(df, "CMF_Bear", 1.5)
+    smf_ += np.clip(rmfi * 0.2, -0.5, 2) + _capped_signal_cluster(
+        df,
+        [("MF_Cross_Bear", 2), ("MF_Bear_Div", 2), ("MF_Accel_Dn", 1), ("CMF_Bear", 1.5)],
+        cap=4.5,
+    )
     smf_ += np.clip(-cmf * 8, -1, 2) + np.where(intensity_idx < -10, 0.9, np.where(intensity_idx > 10, -0.7, 0))
     smf_ += np.where(chaikin < 0, 0.8, np.where(chaikin > 0, -0.8, 0)) + np.where(ad_z < -0.4, 0.7, np.where(ad_z > 0.4, -0.7, 0))
     df["SL_MF"] = smf_.clip(-1, JT.MF_CAP)

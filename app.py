@@ -3,27 +3,34 @@
 #  설정, 레지스트리, 유틸리티, 기술지표
 # ══════════════════════════════════════════════════════════════
 
-import streamlit as st, google.generativeai as genai
+import streamlit as st
 import time, math, html
 import re
 import textwrap
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import yfinance as yf
+from app_ui.pages import render_analysis_message, render_market_daily_dashboard
 from sectors import SECTOR_GROUPS
+from bootstrap import build_default_session_state, ensure_session_defaults as _ensure_session_defaults, reset_session_state as _reset_session_state
 from config import GEMINI_API_KEY, GEMINI_API_KEY_FROM_SECRETS, COMBINED_SCAN_REGISTRY, CTX_KOR, JT
+from domain import AnalysisRequest
+from infrastructure.etf import FunctionHoldingsProvider, HoldingsProviderRegistry
 from utils import _valid_fmt, _sf, resolve_analysis_ticker, compute_and_cache, _compute_cached
-from chart import build_chart, build_metadata
-from ui import render_market_home_dashboard
-from ui_localized import render_analysis
 from ai_agent import build_prompt_text, build_ai_prompt, parse_ai_signal_assisted_response
-from audit import build_audit_payload
 from localization import (
     localize_action_label,
     localize_combo,
     localize_context_label,
     localize_judgment_label,
 )
+from services.ai_signal_service import (
+    build_ai_client,
+    generate_ai_signal_assisted,
+    mask_secret as _service_mask_secret,
+    resolve_ai_key,
+)
+from workflows import AnalysisWorkflow
 from strategy import build_strategy_payload
 from branding import (
     BRAND_NAME,
@@ -44,6 +51,8 @@ INITIAL_MESSAGE = {
     "type": "text",
     "content": INITIAL_MESSAGE_CONTENT,
 }
+
+_ANALYSIS_WORKFLOW = AnalysisWorkflow()
 
 _SCAN_SYMBOL_PATTERN = re.compile(r"\b[A-Z]{1,6}(?:[.-][A-Z0-9]{1,4})?\b")
 _ETF_UNIVERSE_PRESETS = [
@@ -113,84 +122,40 @@ def _render_sidebar_choice_buttons(label, options, state_key, columns=2, default
 
 
 def _active_gemini_api_key():
-    return str(st.session_state.get("runtime_gemini_api_key") or GEMINI_API_KEY or "").strip()
+    key_state = resolve_ai_key(
+        st.session_state.get("runtime_gemini_api_key"),
+        GEMINI_API_KEY,
+        GEMINI_API_KEY_FROM_SECRETS,
+    )
+    return key_state.active_key
 
 
 def _mask_secret(value):
-    text = str(value or "").strip()
-    if not text:
-        return "미설정"
-    if len(text) <= 8:
-        return "*" * len(text)
-    return f"{text[:4]}...{text[-4:]}"
+    return _service_mask_secret(value)
 
 
 def get_gemini_model(api_key):
-    api_key = str(api_key or "").strip()
-    if not api_key:
-        raise RuntimeError("Gemini API key missing")
-    genai.configure(api_key=api_key)
-    return genai.GenerativeModel('gemini-flash-latest')
+    return build_ai_client(api_key)
 
 
 def _generate_ai_signal_assisted(ticker, prompt, engine_judgment=""):
-    active_key = _active_gemini_api_key()
-    if not active_key:
-        return {
-            "available": False,
-            "AI_Judgment": "NEUTRAL",
-            "AI_Confidence": 0,
-            "AI_Bullish_Score": 0,
-            "AI_Bearish_Score": 0,
-            "AI_Risk_Flags": [],
-            "AI_Key_Drivers": [],
-            "AI_Reason": "Gemini API 키가 없어 AI 보조 판단을 생성하지 못했습니다. Analysis Workspace의 `AI Key Setup`에서 입력해 주세요.",
-            "AI_Trade_Strategy": "",
-            "AI_Entry_Plan": "",
-            "AI_Invalidation": "",
-            "AI_Target_Plan": "",
-            "AI_Strategy_Playbook": [],
-            "AI_Agreement": "UNAVAILABLE",
-            "AI_Disagreement_Type": "MIXED",
-            "raw_text": "",
-        }
-    try:
-        model = get_gemini_model(active_key)
-        response = model.generate_content(prompt)
-        raw_text = str(getattr(response, "text", "") or "").strip()
-        return parse_ai_signal_assisted_response(raw_text, engine_judgment=engine_judgment)
-    except Exception as e:
-        return {
-            "available": False,
-            "AI_Judgment": "NEUTRAL",
-            "AI_Confidence": 0,
-            "AI_Bullish_Score": 0,
-            "AI_Bearish_Score": 0,
-            "AI_Risk_Flags": [],
-            "AI_Key_Drivers": [],
-            "AI_Reason": f"AI 보조 판단 생성 중 오류가 발생했습니다: {e}",
-            "AI_Trade_Strategy": "",
-            "AI_Entry_Plan": "",
-            "AI_Invalidation": "",
-            "AI_Target_Plan": "",
-            "AI_Strategy_Playbook": [],
-            "AI_Agreement": "UNAVAILABLE",
-            "AI_Disagreement_Type": "MIXED",
-            "raw_text": "",
-        }
+    return generate_ai_signal_assisted(
+        runtime_key=st.session_state.get("runtime_gemini_api_key"),
+        configured_key=GEMINI_API_KEY,
+        configured_from_secrets=GEMINI_API_KEY_FROM_SECRETS,
+        prompt=prompt,
+        engine_judgment=engine_judgment,
+        parser=parse_ai_signal_assisted_response,
+    )
 
 def analyze(ticker, chart_days=252, refresh=False):
     try:
-        ts = int(time.time()) if refresh else None
-        df = compute_and_cache(ticker, ts)
-        if df is None or df.empty or len(df) < 50:
-            return None, None, "데이터 부족", None, None
-        dc = df.dropna(subset=['WT1', 'WT2']).tail(chart_days).copy()
-        if dc.empty:
-            return None, None, "차트 데이터 부족", None, None
-        meta = build_metadata(dc, ticker)
-        audit = build_audit_payload(df, ticker=ticker, lookback_bars=max(chart_days, 252))
-        return build_chart(dc, ticker).to_json(), None, build_prompt_text(dc, meta), meta, audit
+        response = _ANALYSIS_WORKFLOW.run(
+            AnalysisRequest(ticker=ticker, chart_days=chart_days, refresh=refresh),
+            prompt_builder=build_prompt_text,
+        )
+        meta = response.meta.to_dict() if response.meta else None
+        return response.chart_json, None, response.prompt_text, meta, response.audit
     except Exception as e:
         import traceback
         print(f"[ERR]{ticker}:\n{traceback.format_exc()}")
@@ -200,67 +165,18 @@ def analyze(ticker, chart_days=252, refresh=False):
 def _initial_messages():
     return [dict(INITIAL_MESSAGE)]
 
+
+def _session_defaults():
+    return build_default_session_state(_initial_messages(), MODE_MARKET_DAILY)
+
+
 # ━━━ Session + Main ━━━
 def init_session():
-    defs = {
-        '_mode': MODE_MARKET_DAILY,
-        '_auto': None,
-        'quick': None,
-        'runtime_gemini_api_key': '',
-        'runtime_gemini_api_key_input': '',
-        'show_runtime_gemini_key_setup': False,
-        'messages': _initial_messages(),
-        'pending_ai_ticker': None,
-        'pending_ai_prompt': None,
-        'last_ticker': None,
-        'scan_results': [],
-        'scan_source': '',
-        'scan_total': 0,
-        'scan_focus_idx': None,
-        'scan_focus_ticker': None,
-        'scan_nav_select_idx': None,
-        'selected_sector': None,
-        'selected_sectors': [],
-        'scan_tickers_override': None,
-        'scan_etf_items': [],
-        'scan_etf_tickers_override': None,
-        'scan_etf_note': '',
-        'scan_etf_errors': [],
-        'scan_etf_picker': [],
-        'scan_sector_picker': [],
-        '_clear_scan_pending': False,
-    }
-    for k, v in defs.items():
-        if k not in st.session_state:
-            st.session_state[k] = v
+    _ensure_session_defaults(_session_defaults())
 
 
 def reset_session():
-    st.session_state['_mode'] = MODE_MARKET_DAILY
-    st.session_state['_auto'] = None
-    st.session_state['quick'] = None
-    st.session_state['runtime_gemini_api_key'] = ''
-    st.session_state['runtime_gemini_api_key_input'] = ''
-    st.session_state['show_runtime_gemini_key_setup'] = False
-    st.session_state['messages'] = _initial_messages()
-    st.session_state['pending_ai_ticker'] = None
-    st.session_state['pending_ai_prompt'] = None
-    st.session_state['last_ticker'] = None
-    st.session_state['scan_results'] = []
-    st.session_state['scan_source'] = ''
-    st.session_state['scan_total'] = 0
-    st.session_state['scan_focus_idx'] = None
-    st.session_state['scan_focus_ticker'] = None
-    st.session_state['scan_nav_select_idx'] = None
-    st.session_state['selected_sector'] = None
-    st.session_state['selected_sectors'] = []
-    st.session_state['scan_tickers_override'] = None
-    st.session_state['scan_etf_items'] = []
-    st.session_state['scan_etf_tickers_override'] = None
-    st.session_state['scan_etf_note'] = ''
-    st.session_state['scan_etf_errors'] = []
-    st.session_state['scan_etf_picker'] = []
-    st.session_state['scan_sector_picker'] = []
+    _reset_session_state(_session_defaults())
 
 init_session()
 
@@ -981,33 +897,55 @@ def _fetch_etf_holdings_preview(symbol):
     symbol = str(symbol or "").strip().upper()
     if not symbol:
         return {"symbol": symbol, "tickers": [], "note": "", "error": "ETF 심볼이 비어 있습니다.", "as_of": ""}
-    if symbol in {"QQQ", "SPY"}:
-        try:
-            wiki_payload = _fetch_wikipedia_index_constituents(symbol)
-            if wiki_payload.get("tickers"):
-                return wiki_payload
-        except Exception as exc:
-            print(f"[ETF-WIKI]{symbol}: {exc}")
-    official_fetchers = {
-        "SKYY": _fetch_first_trust_holdings,
-        "IGV": _fetch_ishares_holdings,
-        "QMOM": _fetch_alpha_architect_holdings,
-        "FFTY": _fetch_innovator_holdings,
-        "IVES": _fetch_wedbush_holdings,
-        "ARKK": _fetch_ark_holdings,
-        "ARKQ": _fetch_ark_holdings,
-        "ARKW": _fetch_ark_holdings,
-        "ARKG": _fetch_ark_holdings,
-        "ARKF": _fetch_ark_holdings,
-        "WCBR": _fetch_wisdomtree_holdings,
-    }
-    if symbol in official_fetchers:
-        try:
-            official_payload = official_fetchers[symbol](symbol)
-            if official_payload.get("tickers"):
-                return official_payload
-        except Exception as exc:
-            print(f"[ETF-OFFICIAL]{symbol}: {exc}")
+    registry = HoldingsProviderRegistry(
+        providers=[
+            FunctionHoldingsProvider(
+                supported_symbols={"QQQ", "SPY"},
+                fetcher=lambda ticker: _safe_fetch_etf_payload(_fetch_wikipedia_index_constituents, ticker, "[ETF-WIKI]"),
+            ),
+            FunctionHoldingsProvider(
+                supported_symbols={"SKYY"},
+                fetcher=lambda ticker: _safe_fetch_etf_payload(_fetch_first_trust_holdings, ticker, "[ETF-OFFICIAL]"),
+            ),
+            FunctionHoldingsProvider(
+                supported_symbols={"IGV"},
+                fetcher=lambda ticker: _safe_fetch_etf_payload(_fetch_ishares_holdings, ticker, "[ETF-OFFICIAL]"),
+            ),
+            FunctionHoldingsProvider(
+                supported_symbols={"QMOM"},
+                fetcher=lambda ticker: _safe_fetch_etf_payload(_fetch_alpha_architect_holdings, ticker, "[ETF-OFFICIAL]"),
+            ),
+            FunctionHoldingsProvider(
+                supported_symbols={"FFTY"},
+                fetcher=lambda ticker: _safe_fetch_etf_payload(_fetch_innovator_holdings, ticker, "[ETF-OFFICIAL]"),
+            ),
+            FunctionHoldingsProvider(
+                supported_symbols={"IVES"},
+                fetcher=lambda ticker: _safe_fetch_etf_payload(_fetch_wedbush_holdings, ticker, "[ETF-OFFICIAL]"),
+            ),
+            FunctionHoldingsProvider(
+                supported_symbols={"ARKK", "ARKQ", "ARKW", "ARKG", "ARKF"},
+                fetcher=lambda ticker: _safe_fetch_etf_payload(_fetch_ark_holdings, ticker, "[ETF-OFFICIAL]"),
+            ),
+            FunctionHoldingsProvider(
+                supported_symbols={"WCBR"},
+                fetcher=lambda ticker: _safe_fetch_etf_payload(_fetch_wisdomtree_holdings, ticker, "[ETF-OFFICIAL]"),
+            ),
+        ],
+        fallback=FunctionHoldingsProvider(fetcher=_fetch_yahoo_holdings_payload),
+    )
+    return registry.fetch(symbol).to_dict()
+
+
+def _safe_fetch_etf_payload(fetcher, symbol, log_prefix):
+    try:
+        return fetcher(symbol)
+    except Exception as exc:
+        print(f"{log_prefix}{symbol}: {exc}")
+        return {"symbol": symbol, "tickers": [], "note": "", "error": str(exc), "as_of": ""}
+
+
+def _fetch_yahoo_holdings_payload(symbol):
     try:
         holdings = yf.Ticker(symbol).funds_data.top_holdings
     except Exception as exc:
@@ -1027,7 +965,6 @@ def _fetch_etf_holdings_preview(symbol):
     tickers = list(dict.fromkeys(tickers))
     if not tickers:
         return {"symbol": symbol, "tickers": [], "note": "", "error": "스캔 가능한 종목이 없습니다.", "as_of": ""}
-
     return _build_etf_payload(symbol, tickers, "Yahoo Finance 상위 보유")
 
 
@@ -2402,7 +2339,7 @@ if current_mode == MODE_SCANNER:
 # ══════════════════════════════════════════════════════════════
 elif current_mode == MODE_MARKET_DAILY:
     _render_brand_board(main_board_payload)
-    render_market_home_dashboard()
+    render_market_daily_dashboard()
     _render_section_heading(
         "브리핑에서 바로 분석",
         "티커를 입력하거나 빠른 시작에서 선택하면 분석 모드로 전환되어 상세 분석을 이어갑니다.",
@@ -2470,12 +2407,13 @@ else:
         )
         _render_quick_analysis_grid(key_prefix="analysis_quick")
 
-    active_gemini_key = _active_gemini_api_key()
-    key_source = (
-        "세션 입력"
-        if st.session_state.get("runtime_gemini_api_key")
-        else ("secret" if GEMINI_API_KEY_FROM_SECRETS else ("환경변수" if GEMINI_API_KEY else "미설정"))
+    key_state = resolve_ai_key(
+        st.session_state.get("runtime_gemini_api_key"),
+        GEMINI_API_KEY,
+        GEMINI_API_KEY_FROM_SECRETS,
     )
+    active_gemini_key = key_state.active_key
+    key_source = key_state.source
     if GEMINI_API_KEY_FROM_SECRETS and not st.session_state.get("show_runtime_gemini_key_setup", False):
         info_col, action_col = st.columns([3, 1])
         info_col.caption(f"현재 AI 키: {key_source} · {_mask_secret(active_gemini_key)}")
@@ -2515,10 +2453,10 @@ else:
             if msg.get("type") == "analysis":
                 is_latest_analysis = i == latest_analysis_idx
                 if is_latest_analysis:
-                    render_analysis(msg, key_prefix=f"analysis_{i}_{msg.get('ticker', 'na')}")
+                    render_analysis_message(msg, key_prefix=f"analysis_{i}_{msg.get('ticker', 'na')}")
                 else:
                     with st.expander(f"{msg.get('ticker', '')} 지난 분석", expanded=False):
-                        render_analysis(msg, key_prefix=f"analysis_{i}_{msg.get('ticker', 'na')}")
+                        render_analysis_message(msg, key_prefix=f"analysis_{i}_{msg.get('ticker', 'na')}")
             elif msg.get("type") == "report":
                 with st.expander(f"{msg.get('ticker', '')} AI SIGNAL-ASSISTED", expanded=i == latest_report_idx):
                     st.markdown(msg["content"])
