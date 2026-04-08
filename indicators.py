@@ -84,12 +84,12 @@ def compute_chaikin_oscillator(ad_line,short_p=3,long_p=10):
     return ad_line.ewm(span=short_p,adjust=False).mean()-ad_line.ewm(span=long_p,adjust=False).mean()
 def compute_trix(c,p=15):
     e1=c.ewm(span=p,adjust=False).mean();e2=e1.ewm(span=p,adjust=False).mean();e3=e2.ewm(span=p,adjust=False).mean()
-    return e3.pct_change()*100
+    return e3.pct_change(fill_method=None)*100
 def compute_price_oscillator(c,short_p=12,long_p=26):
     sf=c.ewm(span=short_p,adjust=False).mean();lf=c.ewm(span=long_p,adjust=False).mean();return ((sf-lf)/(lf+1e-10))*100
 def compute_cci(h,l,c,p=20):
     tp=(h+l+c)/3;sma=tp.rolling(p).mean();md=(tp-sma).abs().rolling(p).mean();return (tp-sma)/(0.015*md+1e-10)
-def compute_roc(c,p=12):return c.pct_change(p)*100
+def compute_roc(c,p=12):return c.pct_change(p,fill_method=None)*100
 def compute_rmi(c,length=14,momentum=5):
     delta=c-c.shift(momentum);up=delta.clip(lower=0);down=-delta.clip(upper=0)
     rs=up.ewm(alpha=1/length,min_periods=length).mean()/(down.ewm(alpha=1/length,min_periods=length).mean()+1e-10)
@@ -98,9 +98,14 @@ def compute_vp(h,l,c,v,lb=20,nb=30,step=1):
     n=len(c);poc=np.full(n,np.nan);vah=np.full(n,np.nan);val_=np.full(n,np.nan);cv,hv,lv,vv=c.values,h.values,l.values,v.values;pp,pv_,pvl=np.nan,np.nan,np.nan
     for i in range(lb,n):
         if i>lb and abs(cv[i]-cv[i-1])/(cv[i-1]+1e-10)<0.001:poc[i]=pp;vah[i]=pv_;val_[i]=pvl;continue
-        s=i-lb;hw,lw,vw=hv[s:i+1],lv[s:i+1],vv[s:i+1];plo,phi=lw.min(),hw.max()
+        s=i-lb;hw,lw,vw=hv[s:i+1],lv[s:i+1],vv[s:i+1]
+        valid=np.isfinite(hw)&np.isfinite(lw)&np.isfinite(vw)
+        if valid.sum()<max(5,lb//3):
+            poc[i]=pp;vah[i]=pv_;val_[i]=pvl;continue
+        hw,lw,vw,cvw=hw[valid],lw[valid],vw[valid],cv[s:i+1][valid]
+        plo,phi=np.nanmin(lw),np.nanmax(hw)
         if phi-plo<1e-10:poc[i]=cv[i];vah[i]=phi;val_[i]=plo;pp=poc[i];pv_=vah[i];pvl=val_[i];continue
-        tp_=(hw+lw+cv[s:i+1])/3;vp_,be=np.histogram(tp_,bins=nb,range=(plo,phi),weights=vw);bc=(be[:-1]+be[1:])/2;pb_=np.argmax(vp_);poc[i]=bc[pb_]
+        tp_=(hw+lw+cvw)/3;vp_,be=np.histogram(tp_,bins=nb,range=(plo,phi),weights=vw);bc=(be[:-1]+be[1:])/2;pb_=np.argmax(vp_);poc[i]=bc[pb_]
         tv=vp_.sum();tgt=tv*.7;cm=vp_[pb_];lo_i,hi_i=pb_,pb_
         while cm<tgt and (lo_i>0 or hi_i<nb-1):
             lv2=vp_[lo_i-1] if lo_i>0 else 0;hv2=vp_[hi_i+1] if hi_i<nb-1 else 0
@@ -131,7 +136,7 @@ def detect_pivot_div(price,osc,lb=60,pw=5,os_lim=None,ob_lim=None,atr=None):
 def compute_hull_ma(c,period=20):
     half_p=max(int(period/2),1);sqrt_p=max(int(np.sqrt(period)),1)
     def _wma(s,p):weights=np.arange(1,p+1,dtype=float);return s.rolling(p).apply(lambda x:np.dot(x,weights[-len(x):])/weights[-len(x):].sum(),raw=True)
-    hma=_wma(2*_wma(c,half_p)-_wma(c,period),sqrt_p);rising=hma>hma.shift(1);return hma,rising,rising&~rising.shift(1).fillna(False),~rising&rising.shift(1).fillna(False)
+    hma=_wma(2*_wma(c,half_p)-_wma(c,period),sqrt_p);rising=hma>hma.shift(1);return hma,rising,rising&~rising.shift(1,fill_value=False),~rising&rising.shift(1,fill_value=False)
 def compute_ut_bot(c,h,l,atr,key_value=1):
     n=len(c);xatr=(atr*key_value).values;cv=c.values;ts_=np.zeros(n);dir_=np.zeros(n,dtype=int);ts_[0]=cv[0];dir_[0]=1
     for i in range(1,n):
@@ -202,16 +207,16 @@ def compute_structure_pattern_features(c,h,l,atr,window=24):
 
     box_support_hold=box_base&(l<=lfit+(atr*JT.BOX_TOUCH_ATR))&(c>=lfit)&(c>=c.shift(1))
     box_resistance_reject=box_base&(h>=hfit-(atr*JT.BOX_TOUCH_ATR))&(c<=hfit)&(c<=c.shift(1))
-    box_breakout_bull=box_base.shift(1).fillna(False)&(c>hfit.shift(1)+(atr*JT.BOX_BREAK_ATR))&(c.shift(1)<=hfit.shift(1)+(atr*0.15))
-    box_breakdown_bear=box_base.shift(1).fillna(False)&(c<lfit.shift(1)-(atr*JT.BOX_BREAK_ATR))&(c.shift(1)>=lfit.shift(1)-(atr*0.15))
+    box_breakout_bull=box_base.shift(1,fill_value=False)&(c>hfit.shift(1)+(atr*JT.BOX_BREAK_ATR))&(c.shift(1)<=hfit.shift(1)+(atr*0.15))
+    box_breakdown_bear=box_base.shift(1,fill_value=False)&(c<lfit.shift(1)-(atr*JT.BOX_BREAK_ATR))&(c.shift(1)>=lfit.shift(1)-(atr*0.15))
 
     channel_support_hold=channel_up&(l<=lfit+(atr*JT.CHANNEL_TOUCH_ATR))&(c>=lfit)&(c>=c.shift(1))
     channel_resistance_reject=channel_down&(h>=hfit-(atr*JT.CHANNEL_TOUCH_ATR))&(c<=hfit)&(c<=c.shift(1))
-    channel_breakout_bull=(channel_up|box_base).shift(1).fillna(False)&(c>hfit.shift(1)+(atr*JT.CHANNEL_BREAK_ATR))&(c.shift(1)<=hfit.shift(1)+(atr*0.20))
-    channel_breakdown_bear=(channel_down|box_base).shift(1).fillna(False)&(c<lfit.shift(1)-(atr*JT.CHANNEL_BREAK_ATR))&(c.shift(1)>=lfit.shift(1)-(atr*0.20))
+    channel_breakout_bull=(channel_up|box_base).shift(1,fill_value=False)&(c>hfit.shift(1)+(atr*JT.CHANNEL_BREAK_ATR))&(c.shift(1)<=hfit.shift(1)+(atr*0.20))
+    channel_breakdown_bear=(channel_down|box_base).shift(1,fill_value=False)&(c<lfit.shift(1)-(atr*JT.CHANNEL_BREAK_ATR))&(c.shift(1)>=lfit.shift(1)-(atr*0.20))
 
-    triangle_breakout_bull=(asc_triangle|sym_triangle).shift(1).fillna(False)&(c>hfit.shift(1)+(atr*JT.TRIANGLE_BREAK_ATR))&(c.shift(1)<=hfit.shift(1)+(atr*0.20))
-    triangle_breakdown_bear=(desc_triangle|sym_triangle).shift(1).fillna(False)&(c<lfit.shift(1)-(atr*JT.TRIANGLE_BREAK_ATR))&(c.shift(1)>=lfit.shift(1)-(atr*0.20))
+    triangle_breakout_bull=(asc_triangle|sym_triangle).shift(1,fill_value=False)&(c>hfit.shift(1)+(atr*JT.TRIANGLE_BREAK_ATR))&(c.shift(1)<=hfit.shift(1)+(atr*0.20))
+    triangle_breakdown_bear=(desc_triangle|sym_triangle).shift(1,fill_value=False)&(c<lfit.shift(1)-(atr*JT.TRIANGLE_BREAK_ATR))&(c.shift(1)>=lfit.shift(1)-(atr*0.20))
 
     return {
         'box_base':box_base.fillna(False),
@@ -310,7 +315,7 @@ def compute_indicators(df):
     df['AD_Line']=compute_ad_line(h,l,c,v);df['Chaikin_Oscillator']=compute_chaikin_oscillator(df['AD_Line'],3,10)
     df['Disparity_20']=compute_disparity(c,df['MA20']);df['Disparity_50']=compute_disparity(c,df['MA50']);df['Disparity_200']=compute_disparity(c,df['MA200'])
     df['Fractal_High'],df['Fractal_Low']=compute_williams_fractal(h,l,2)
-    df['OBV_Slope']=compute_obv_slope(df['OBV'],v,5);df['Price_Slope_5']=c.pct_change(5)
+    df['OBV_Slope']=compute_obv_slope(df['OBV'],v,5);df['Price_Slope_5']=c.pct_change(5,fill_method=None)
     df['Low_Volume_Caution']=df['Volume_Ratio_20']<0.7
     df['Thin_Trade_Risk']=(df['Dollar_Volume_20']<JT.MIN_DOLLAR_VOLUME_20).fillna(False)
     df['Smart_Money_Bearish_Div']=(df['Price_Slope_5']>0)&((df['OBV_Slope']<0)|(df['CMF']<0)|(df['Volume_Ratio_20']<0.7))
@@ -322,6 +327,7 @@ def compute_indicators(df):
     df['Trendline_Slope_Pct']=tl['slope_pct'];df['Trendline_Fit']=tl['fit'];df['Trendline_Dist_ATR']=tl['dist_atr']
     df['Diag_Support_Hold']=tl['support_hold'];df['Diag_Resistance_Reject']=tl['resistance_reject']
     df['Diag_Breakout_Bull']=tl['breakout_bull'];df['Diag_Breakdown_Bear']=tl['breakdown_bear']
+    df=df.copy()
     sp=compute_structure_pattern_features(c,h,l,df['ATR'],JT.STRUCTURE_PATTERN_WINDOW)
     df['Box_Base']=sp['box_base'];df['Box_Support_Hold']=sp['box_support_hold'];df['Box_Resistance_Reject']=sp['box_resistance_reject']
     df['Box_Breakout_Bull']=sp['box_breakout_bull'];df['Box_Breakdown_Bear']=sp['box_breakdown_bear']
@@ -391,7 +397,7 @@ def compute_indicators(df):
     try:
         spy=fetch_spy()
         if not spy.empty:
-            sc_=c.copy();spc=spy['Close'].reindex(sc_.index,method='ffill');sr=sc_.pct_change(20).fillna(0);spr=spc.pct_change(20).fillna(0);df['Stock_Return']=sr;df['SPY_Return']=spr;df['RS_Ratio']=((1+sr)/(1+spr+1e-10)).rolling(10,min_periods=5).mean()
+            sc_=c.copy();spc=spy['Close'].reindex(sc_.index,method='ffill');sr=sc_.pct_change(20,fill_method=None).fillna(0);spr=spc.pct_change(20,fill_method=None).fillna(0);df['Stock_Return']=sr;df['SPY_Return']=spr;df['RS_Ratio']=((1+sr)/(1+spr+1e-10)).rolling(10,min_periods=5).mean()
             spy_ma20=spc.rolling(20,min_periods=10).mean();spy_ma50=spc.rolling(50,min_periods=20).mean();spy_ma200=spc.rolling(200,min_periods=80).mean()
             spy_ma20_ready=spy_ma20.notna();spy_ma50_ready=spy_ma50.notna();spy_ma200_ready=spy_ma200.notna()
             spy_dd20=(spc/(spc.rolling(20,min_periods=5).max()+1e-10))-1.0
@@ -410,16 +416,16 @@ def compute_indicators(df):
             rsp=fetch_market_proxy("RSP")
             breadth_score=pd.Series(0.,index=sc_.index)
             if not qqq.empty:
-                qqqc=qqq['Close'].reindex(sc_.index,method='ffill');qqq_ret20=qqqc.pct_change(20).fillna(0);qqq_rs20=qqq_ret20-spr
+                qqqc=qqq['Close'].reindex(sc_.index,method='ffill');qqq_ret20=qqqc.pct_change(20,fill_method=None).fillna(0);qqq_rs20=qqq_ret20-spr
                 df['QQQ_Close']=qqqc
                 df['QQQ_RS_20']=qqq_rs20
                 breadth_score+=np.where(qqq_rs20>=JT.BREADTH_RS_POS,0.5,np.where(qqq_rs20<=JT.BREADTH_RS_NEG,-0.5,0))
             if not iwm.empty:
-                iwmc=iwm['Close'].reindex(sc_.index,method='ffill');iwm_ret20=iwmc.pct_change(20).fillna(0);iwm_rs20=iwm_ret20-spr
+                iwmc=iwm['Close'].reindex(sc_.index,method='ffill');iwm_ret20=iwmc.pct_change(20,fill_method=None).fillna(0);iwm_rs20=iwm_ret20-spr
                 df['IWM_RS_20']=iwm_rs20
                 breadth_score+=np.where(iwm_rs20>=JT.BREADTH_RS_POS,1.0,np.where(iwm_rs20<=JT.BREADTH_RS_NEG,-1.0,0))
             if not rsp.empty:
-                rspc=rsp['Close'].reindex(sc_.index,method='ffill');rsp_ret20=rspc.pct_change(20).fillna(0);rsp_rs20=rsp_ret20-spr
+                rspc=rsp['Close'].reindex(sc_.index,method='ffill');rsp_ret20=rspc.pct_change(20,fill_method=None).fillna(0);rsp_rs20=rsp_ret20-spr
                 df['RSP_RS_20']=rsp_rs20
                 breadth_score+=np.where(rsp_rs20>=JT.BREADTH_RS_POS,1.0,np.where(rsp_rs20<=JT.BREADTH_RS_NEG,-1.0,0))
             df['Market_Breadth_Score']=breadth_score
@@ -431,7 +437,7 @@ def compute_indicators(df):
             ).fillna(False)
         vix=fetch_market_proxy("^VIX")
         if not vix.empty:
-            vixc=vix['Close'].reindex(c.index,method='ffill');vix_ma20=vixc.rolling(20,min_periods=10).mean();vix_ret10=vixc.pct_change(10).fillna(0)
+            vixc=vix['Close'].reindex(c.index,method='ffill');vix_ma20=vixc.rolling(20,min_periods=10).mean();vix_ret10=vixc.pct_change(10,fill_method=None).fillna(0)
             df['VIX_Trend_10']=vix_ret10
             df['VIX_Risk_Off']=((vixc>(vix_ma20*JT.VIX_RISK_OFF_RATIO))|(vix_ret10>=JT.VIX_RISK_OFF_PCT10)).fillna(False)
             df['VIX_Risk_On']=((vixc<(vix_ma20*JT.VIX_RISK_ON_RATIO))&(vix_ret10<=JT.VIX_RISK_ON_PCT10)).fillna(False)
@@ -448,7 +454,7 @@ def compute_indicators(df):
             df['TNX_Pressure_Score']=np.clip((tnx_delta20/(abs(JT.TNX_HEADWIND_DELTA20)+1e-10))*1.4+tnx_dist*6,-3,3)
         dxy=fetch_market_proxy("DX-Y.NYB")
         if not dxy.empty:
-            dxyc=dxy['Close'].reindex(c.index,method='ffill');dxy_ret20=dxyc.pct_change(20).fillna(0)
+            dxyc=dxy['Close'].reindex(c.index,method='ffill');dxy_ret20=dxyc.pct_change(20,fill_method=None).fillna(0)
             df['DXY_Return_20']=dxy_ret20
             df['DXY_Headwind']=(dxy_ret20>=JT.DXY_HEADWIND_PCT20).fillna(False)
             df['DXY_Tailwind']=(dxy_ret20<=JT.DXY_TAILWIND_PCT20).fillna(False)
@@ -465,6 +471,7 @@ def compute_indicators(df):
     rsc=pd.Series(0.,index=df.index);rsc+=np.where(c>df['MA200'],1,-1);rsc+=np.where(c>df['MA50'],1,-1);rsc+=np.where(c>df['MA20'],.5,-.5)
     rsc+=np.where(df['MA50']>df['MA50'].shift(10),1,-1);rsc+=np.where(df['ST_Direction']==1,1,-1);rsc+=np.where(df['Plus_DI']>df['Minus_DI'],.5,-.5);rsc+=np.where(df['MACD_Line']>0,.5,-.5)
     rr_=rsc.rolling(5,min_periods=3).mean();df['Regime_Score']=rr_.clip(-8,8);df['Regime']=np.select([rr_>=4,rr_>=1.5,rr_<=-4,rr_<=-1.5],[2,1,-2,-1],default=0)
+    df=df.copy()
     df['HMA'],df['HMA_Rising'],df['Hull_Turn_Bull_Raw'],df['Hull_Turn_Bear_Raw']=compute_hull_ma(c,20)
     df['UTBot_Stop'],df['UTBot_Dir'],df['UTBot_Buy_Raw'],df['UTBot_Sell_Raw']=compute_ut_bot(c,h,l,df['ATR'],1)
     df['SlowK'],df['SlowD']=compute_stochastic_slow(h,l,c)
