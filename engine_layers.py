@@ -34,8 +34,6 @@ def apply_layer_totals(df, layer_names, combo_registry):
     t1_sell_boost = sum(df[col].fillna(False).astype(float) for col in t1_sell_cols) if t1_sell_cols else pd.Series(0.0, index=idx)
 
     df["Signal_Conflict_Layers"] = conflict_layers
-    df["Buy_Quality_Factor"] = buy_quality
-    df["Sell_Quality_Factor"] = sell_quality
     df["Buy_Total"] = ((buy_raw * buy_quality) + (t1_buy_boost * 0.8) - conflict_penalty).clip(lower=0)
     df["Sell_Total"] = ((sell_raw * sell_quality) + (t1_sell_boost * 0.8) - conflict_penalty).clip(lower=0)
 

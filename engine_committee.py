@@ -12,6 +12,10 @@ OBJECTIVE_BUY_LABELS = {"STRONG_BUY", "BUY", "WATCH_BUY"}
 OBJECTIVE_SELL_LABELS = {"STRONG_SELL", "SELL", "WATCH_SELL"}
 
 
+def _finite_array(values, default=0.0):
+    return np.nan_to_num(np.asarray(values, dtype=float), nan=default, posinf=default, neginf=default)
+
+
 def detect_context_vectorized(df):
     n = len(df)
     idx = df.index
@@ -48,7 +52,7 @@ def detect_context_vectorized(df):
     ctx = np.where((ma50s > 0) & (ma50s < ma50s.shift(5)) & flat & (cmf < 0), CTX_TOPPING, ctx)
     ctx = np.where((vr < 0.5) & (N("BB_Width") < N("BB_Width").rolling(60, min_periods=30).quantile(0.1)), CTX_VOL_DRY, ctx)
     wb = (df["High"] - df["Low"]) > atr * 2
-    pe = wb.shift(1).fillna(False) | wb.shift(2).fillna(False)
+    pe = wb.shift(1, fill_value=False) | wb.shift(2, fill_value=False)
     ctx = np.where(pe & ~wb, CTX_POST_EXPLOSION, ctx)
     return pd.Series(ctx, index=idx)
 
@@ -116,7 +120,10 @@ def stabilize_context_sequence(df, raw_ctx):
     return pd.Series(stable, index=idx)
 
 
-def committee_trend(df, N):
+def committee_trend(df, N, bias_profile=None):
+    bias_profile = bias_profile or get_bias_profile()
+    bear_turn_scale = float(bias_profile.get("bear_turn_score_scale", JT.BEAR_TURN_SCORE_SCALE))
+    market_turn_bear_scale = float(bias_profile.get("market_turn_bear_scale", JT.MARKET_TURN_BEAR_SCALE))
     C = df["Close"]
     idx = df.index
     score = pd.Series(0.0, index=idx)
@@ -156,8 +163,8 @@ def committee_trend(df, N):
     score += np.where((rsi < 35) & (rsi > rsi.shift(1)), 6, 0) + np.where((rsi > 65) & (rsi < rsi.shift(1)), -6, 0)
     ma50a = ma50s - ma50s.shift(5)
     score += np.where((ma50s < 0) & (ma50a > 0.5), 8, 0) + np.where((ma50s > 0) & (ma50a < -0.5), -8, 0)
-    score += np.clip((N("Trend_Inflection_Buy_Score", 0) * JT.TREND_INFLECTION_COMMITTEE_BUY_W) - (N("Trend_Inflection_Sell_Score", 0) * JT.BEAR_TURN_SCORE_SCALE * JT.TREND_INFLECTION_COMMITTEE_SELL_W), -24, 24)
-    score += np.clip((N("Market_Turn_Bull_Score", 0) * 3) - (N("Market_Turn_Bear_Score", 0) * JT.MARKET_TURN_BEAR_SCALE * 3), -12, 12)
+    score += np.clip((N("Trend_Inflection_Buy_Score", 0) * JT.TREND_INFLECTION_COMMITTEE_BUY_W) - (N("Trend_Inflection_Sell_Score", 0) * bear_turn_scale * JT.TREND_INFLECTION_COMMITTEE_SELL_W), -24, 24)
+    score += np.clip((N("Market_Turn_Bull_Score", 0) * 3) - (N("Market_Turn_Bear_Score", 0) * market_turn_bear_scale * 3), -12, 12)
     ns = (score / JT.TREND_NORM * 100).clip(-100, 100)
     conv = np.clip(adx_val.values * 2, 5, 95)
     wt1v = wt1.values
@@ -300,7 +307,10 @@ def committee_structure(df, N):
     return ns, pd.Series(conv, index=idx)
 
 
-def committee_leading(df, N):
+def committee_leading(df, N, bias_profile=None):
+    bias_profile = bias_profile or get_bias_profile()
+    bear_turn_scale = float(bias_profile.get("bear_turn_score_scale", JT.BEAR_TURN_SCORE_SCALE))
+    market_turn_bear_scale = float(bias_profile.get("market_turn_bear_scale", JT.MARKET_TURN_BEAR_SCALE))
     idx = df.index
     score = pd.Series(0.0, index=idx)
     ut = N("UTBot_Dir")
@@ -338,8 +348,8 @@ def committee_leading(df, N):
     score += np.where(ut_support_buy, 8, 0) - np.where(ut_support_sell, 8, 0)
     score -= np.where(ut_overheat_buy, 10, 0)
     score += np.where(ut_overheat_sell, 10, 0)
-    score += np.clip((N("Trend_Inflection_Buy_Score", 0) * JT.TREND_INFLECTION_COMMITTEE_BUY_W * 1.05) - (N("Trend_Inflection_Sell_Score", 0) * JT.BEAR_TURN_SCORE_SCALE * JT.TREND_INFLECTION_COMMITTEE_SELL_W), -28, 28)
-    score += np.clip((N("Market_Turn_Bull_Score", 0) * 3.5) - (N("Market_Turn_Bear_Score", 0) * JT.MARKET_TURN_BEAR_SCALE * 3.5), -14, 14)
+    score += np.clip((N("Trend_Inflection_Buy_Score", 0) * JT.TREND_INFLECTION_COMMITTEE_BUY_W * 1.05) - (N("Trend_Inflection_Sell_Score", 0) * bear_turn_scale * JT.TREND_INFLECTION_COMMITTEE_SELL_W), -28, 28)
+    score += np.clip((N("Market_Turn_Bull_Score", 0) * 3.5) - (N("Market_Turn_Bear_Score", 0) * market_turn_bear_scale * 3.5), -14, 14)
     ma_gap = N("MA20_ATR_Gap")
     score -= np.clip((ma_gap - 1.5) * 8, 0, 20)
     score += np.clip((-ma_gap - 1.5) * 8, 0, 20)
@@ -481,7 +491,11 @@ def market_filter_adjustments(
     dxy_headwind=False,
     dxy_pressure_score=0.0,
     leader_stock_mode=False,
+    bias_profile=None,
 ):
+    bias_profile = bias_profile or get_bias_profile()
+    leader_buy_support = float(bias_profile.get("leader_buy_support", JT.LEADER_BUY_SUPPORT))
+    leader_sell_relief = float(bias_profile.get("leader_sell_relief", JT.LEADER_SELL_RELIEF))
     buy_adj = 0.0
     sell_adj = 0.0
     bias = np.clip(spy_trend_score * JT.MARKET_ENSEMBLE_SCALE, -6.0, 6.0)
@@ -549,8 +563,8 @@ def market_filter_adjustments(
         buy_adj -= 1.0
         bias += 0.8
     if leader_stock_mode:
-        buy_adj -= JT.LEADER_BUY_SUPPORT
-        sell_adj -= JT.LEADER_SELL_RELIEF
+        buy_adj -= leader_buy_support
+        sell_adj -= leader_sell_relief
         if narrow_leadership or breadth_risk_on:
             sell_adj -= 1.0
             bias += 0.8
@@ -585,14 +599,26 @@ def _gen_reason(j,es,ctx,veto,syn,pred,ba,sa,wt1,rsi,mfi,cmf,obv_up,adx,vr,ma50a
         detail_parts.append(f"veto={veto}")
     detail = " | ".join(detail_parts)
     return reason_map.get(side, "Directional evidence is still limited."), detail, action
-def compute_committee_ensemble(df, vol_ratio, hma_r_v):
+def compute_committee_ensemble(df, vol_ratio, hma_r_v, bias_mode=DEFAULT_BIAS_MODE):
+    bias_profile = get_bias_profile(bias_mode)
+    bias_mode = str(bias_profile.get("name", DEFAULT_BIAS_MODE))
+    strong_buy_th = float(bias_profile.get("strong_buy_th", JT.STRONG_BUY_TH))
+    buy_th = float(bias_profile.get("buy_th", JT.BUY_TH))
+    watch_buy_th = float(bias_profile.get("watch_buy_th", JT.WATCH_BUY_TH))
+    strong_sell_th = float(bias_profile.get("strong_sell_th", JT.STRONG_SELL_TH))
+    sell_th = float(bias_profile.get("sell_th", JT.SELL_TH))
+    watch_sell_th = float(bias_profile.get("watch_sell_th", JT.WATCH_SELL_TH))
+    bear_turn_scale = float(bias_profile.get("bear_turn_score_scale", JT.BEAR_TURN_SCORE_SCALE))
+    market_turn_bear_scale = float(bias_profile.get("market_turn_bear_scale", JT.MARKET_TURN_BEAR_SCALE))
     idx=df.index;n=len(df);N=lambda c,d=0:df.get(c,pd.Series(d,index=idx)).fillna(d);F=lambda c:df.get(c,pd.Series(False,index=idx)).fillna(False)
-    raw_ctx=detect_context_vectorized(df);ctx=stabilize_context_sequence(df,raw_ctx);df['Raw_Market_Context']=raw_ctx;df['Context_Smoothed']=(raw_ctx.values!=ctx.values);df['Market_Context']=ctx
+    raw_ctx=detect_context_vectorized(df);ctx=stabilize_context_sequence(df,raw_ctx);df['Market_Context']=ctx
     scores={};convictions={}
-    scores['Trend'],convictions['Trend']=committee_trend(df,N);scores['Momentum'],convictions['Momentum']=committee_momentum(df,N)
+    scores['Trend'],convictions['Trend']=committee_trend(df,N,bias_profile=bias_profile);scores['Momentum'],convictions['Momentum']=committee_momentum(df,N)
     scores['Money'],convictions['Money']=committee_money(df,N);scores['Structure'],convictions['Structure']=committee_structure(df,N)
-    scores['Leading'],convictions['Leading']=committee_leading(df,N)
-    for cm in COMMITTEE_NAMES:df[f'CM_{cm}_Score']=scores[cm];df[f'CM_{cm}_Conv']=convictions[cm]
+    scores['Leading'],convictions['Leading']=committee_leading(df,N,bias_profile=bias_profile)
+    for cm in COMMITTEE_NAMES:
+        scores[cm]=pd.Series(_finite_array(scores[cm].values),index=idx)
+        convictions[cm]=pd.Series(_finite_array(convictions[cm].values),index=idx).clip(lower=0,upper=100)
     ctx_v=ctx.values;wa=np.zeros((n,NUM_COMMITTEES))
     for cc,cn in CTX_LABELS.items():
         m=(ctx_v==cc)
@@ -600,7 +626,9 @@ def compute_committee_ensemble(df, vol_ratio, hma_r_v):
     
     wa = pd.DataFrame(wa).ewm(span=3, adjust=False).mean().values
     wa = apply_adx_weight_regime(wa, N('ADX').values)
+    wa = _finite_array(wa)
     wt1=N('WT1').values;rsi=N('RSI').values;cmf=N('CMF').values;obv=N('OBV').values;obv_ma=N('OBV').rolling(20,min_periods=10).mean().values;C=df['Close'].values;O=df['Open'].values
+    hma_r_arr=np.asarray(pd.Series(hma_r_v,index=idx).fillna(False).astype(bool).values if isinstance(hma_r_v,pd.Series) else np.asarray(hma_r_v,dtype=bool),dtype=bool)
     vr_v=vol_ratio.values;obv_slope_v=N('OBV_Slope').values;price_slope_v=N('Price_Slope_5').values;long_rr_v=N('VP_Long_RR',1.).values;short_rr_v=N('VP_Short_RR',1.).values
     pv_bear_v=F('Smart_Money_Bearish_Div').values;pv_bull_v=F('Smart_Money_Bullish_Div').values;low_vol_v=F('Low_Volume_Caution').values;hard_blowoff_v=F('Blowoff_Top_Hard').values
     spy_trend_score_v=N('SPY_Trend_Score',0.).values;spy_risk_on_v=F('SPY_Risk_On').values;spy_risk_off_v=F('SPY_Risk_Off').values
@@ -751,18 +779,21 @@ def compute_committee_ensemble(df, vol_ratio, hma_r_v):
     hbo=veto_masks['HardBlowoff']
     if hbo.any():
         es[hbo]=np.where(es[hbo]>0,es[hbo]*0.60,es[hbo]);es[hbo,trend_i]-=15;es[hbo,mom_i]-=20;es[hbo,lead_i]=np.minimum(es[hbo,lead_i],-55);ec[hbo,lead_i]=np.maximum(ec[hbo,lead_i],85)
+    es=_finite_array(es)
     ec=np.clip(ec,0,100)
+    ec=_finite_array(ec)
     # ?쒕꼫吏
     syn=np.zeros(n);ts_=es[:,0];ms_=es[:,1];mns_=es[:,2];ss_=es[:,3];ls_=es[:,4]
     bc=(ms_>20)&(ls_>10)&(ts_<10);bstr=np.clip((ms_+ls_)*0.15+np.abs(np.minimum(ts_,0))*0.1,0,25)
     syn+=np.where(bc,bstr,0)+np.where(bc&(mns_>5),8,0)+np.where(bc&(ss_>10),5,0)
     brc=(ms_<-20)&(ls_<-10)&(ts_>-10);brstr=np.clip((-ms_-ls_)*0.15+np.abs(np.maximum(ts_,0))*0.1,0,25)
     syn-=np.where(brc,brstr,0)+np.where(brc&(mns_<-5),8,0)+np.where(brc&(ss_<-10),5,0)
+    syn=_finite_array(syn)
     df['Reversal_Synergy']=syn
     # ?덉륫
     cav=N('Composite_Accel');ab=np.clip(cav.values*JT.ACCEL_PREDICTION_SCALE,-12,12);mh=N('MACD_Hist');mu=_vs(mh>mh.shift(1));md=_vs(mh<mh.shift(1))
     mb=np.where(mu.values>=3,8,np.where(md.values>=3,-8,0));stk=N('StochK');sb=np.where((stk.values<20)&(stk.values>N('StochD').values),5,np.where((stk.values>80)&(stk.values<N('StochD').values),-5,0))
-    pred=ab+mb+sb;df['Prediction_Boost']=pred
+    pred=_finite_array(ab+mb+sb);df['Prediction_Boost']=pred
     contribs=es*(ec/100.)*wa;ens=contribs.sum(axis=1)+syn+pred
     buy_total_arr=N('Buy_Total').values;sell_total_arr=N('Sell_Total').values
     ba_layers=N('Buy_Active_Layers').values;sa_layers=N('Sell_Active_Layers').values
@@ -778,9 +809,9 @@ def compute_committee_ensemble(df, vol_ratio, hma_r_v):
     ens=np.where(veto_masks['RRShort']&(ens<0),ens*0.82,ens)
     ens=np.where(veto_masks['HardBlowoff']&(ens>0),ens-22,ens)
     ens+=np.where(trend_inflect_buy_score_v>=JT.TREND_INFLECTION_STRONG,np.clip((trend_inflect_buy_score_v-(JT.TREND_INFLECTION_STRONG-1))*JT.TREND_INFLECTION_SIGNAL_BONUS,0,12),0)
-    ens-=np.where(trend_inflect_sell_score_v>=JT.TREND_INFLECTION_STRONG,np.clip((trend_inflect_sell_score_v-(JT.TREND_INFLECTION_STRONG-1))*JT.TREND_INFLECTION_SIGNAL_BONUS*JT.BEAR_TURN_SCORE_SCALE,0,9),0)
+    ens-=np.where(trend_inflect_sell_score_v>=JT.TREND_INFLECTION_STRONG,np.clip((trend_inflect_sell_score_v-(JT.TREND_INFLECTION_STRONG-1))*JT.TREND_INFLECTION_SIGNAL_BONUS*bear_turn_scale,0,9),0)
     ens+=np.where(market_turn_bull_v,np.clip(market_turn_bull_score_v*JT.MARKET_TURN_SIGNAL_BONUS,0,10),0)
-    ens-=np.where(market_turn_bear_v,np.clip(market_turn_bear_score_v*JT.MARKET_TURN_SIGNAL_BONUS*JT.MARKET_TURN_BEAR_SCALE,0,8),0)
+    ens-=np.where(market_turn_bear_v,np.clip(market_turn_bear_score_v*JT.MARKET_TURN_SIGNAL_BONUS*market_turn_bear_scale,0,8),0)
     ens+=np.where(turn_alignment_buy_v,JT.TURN_ALIGNMENT_BONUS_BUY,0)
     ens-=np.where(turn_alignment_sell_v,JT.TURN_ALIGNMENT_BONUS_SELL,0)
     ens+=np.where(continuation_buy_score_v>=2,np.clip((continuation_buy_score_v-1)*JT.CONTINUATION_SIGNAL_BONUS,0,12),0)
@@ -791,6 +822,9 @@ def compute_committee_ensemble(df, vol_ratio, hma_r_v):
     ens=np.where(ut_overheat_sell_v&(ens<0),ens+4.5,ens)
     ens=np.where(fib_ext_up_hit_v&(ens>0),ens-2.5,ens)
     ens=np.where(fib_ext_down_hit_v&(ens<0),ens+2.0,ens)
+    ensemble_fallback=np.clip(layer_edge*0.55,-100,100)
+    ens=np.where(np.isfinite(ens),ens,ensemble_fallback)
+    ens=_finite_array(ens)
     market_buy_adj=np.zeros(n);market_sell_adj=np.zeros(n);market_bias=np.zeros(n)
     for i in range(n):
         market_buy_adj[i],market_sell_adj[i],market_bias[i]=market_filter_adjustments(
@@ -811,7 +845,9 @@ def compute_committee_ensemble(df, vol_ratio, hma_r_v):
             bool(dxy_headwind_v[i]),
             float(dxy_pressure_v[i]),
             bool(leader_stock_mode_v[i]),
+            bias_profile=bias_profile,
         )
+    df['Bias_Mode']=bias_mode
     df['Market_Filter_Bias']=market_bias
     for ci,cm in enumerate(COMMITTEE_NAMES):
         s=es[:,ci];c=ec[:,ci];v=np.full(n,0,dtype=int);v=np.where((s>15)&(c>=25),1,v);v=np.where((s<-15)&(c>=25),-1,v);v=np.where(c<15,-99,v)
@@ -852,8 +888,8 @@ def compute_committee_ensemble(df, vol_ratio, hma_r_v):
         if leader_mode:
             buy_adj-=0.6
             sell_adj-=5.5
-        sbt=(JT.STRONG_BUY_TH * asc)+buy_adj;bt=(JT.BUY_TH * asc)+buy_adj;wbt=(JT.WATCH_BUY_TH * asc)+buy_adj*.5
-        sst=(JT.STRONG_SELL_TH * asc)+sell_adj;st=(JT.SELL_TH * asc)+sell_adj;wst=(JT.WATCH_SELL_TH * asc)+sell_adj*.5
+        sbt=(strong_buy_th * asc)+buy_adj;bt=(buy_th * asc)+buy_adj;wbt=(watch_buy_th * asc)+buy_adj*.5
+        sst=(strong_sell_th * asc)+sell_adj;st=(sell_th * asc)+sell_adj;wst=(watch_sell_th * asc)+sell_adj*.5
         if continuation_buy_score_v[i]>=2 and not ut_overheat_buy_v[i]:
             bt-=0.8
             wbt-=2.4
@@ -1233,7 +1269,7 @@ def compute_committee_ensemble(df, vol_ratio, hma_r_v):
         ma200a=bool(C[i]>ma200_v[i]) if not np.isnan(ma200_v[i]) else False
         mhu=bool(mhv[i]>mhpv[i]) if i>0 else False
         signal_note_txt='; '.join(signal_notes[:2])
-        r,d,a=_gen_reason(j[i],e,int(ctx_v[i]),vstr,sy,pred[i],ba,sl,wt1_v[i],rsi_v[i],mfi_v[i],cmf[i],obr,adx_v[i],vol_ratio.values[i],ma50a,ma200a,mhu,stoch_v[i],bool(hma_r_v[i]) if i<len(hma_r_v) else False,int(ut_v[i]),bool(sq_v[i]),cms)
+        r,d,a=_gen_reason(j[i],e,int(ctx_v[i]),vstr,sy,pred[i],ba,sl,wt1_v[i],rsi_v[i],mfi_v[i],cmf[i],obr,adx_v[i],vr_v[i],ma50a,ma200a,mhu,stoch_v[i],bool(hma_r_arr[i]) if i<len(hma_r_arr) else False,int(ut_v[i]),bool(sq_v[i]),cms)
         note_txt=contrast_notes[-1]
         if note_txt:
             d=f"{d} | {note_txt}" if d else note_txt

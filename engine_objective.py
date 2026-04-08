@@ -110,9 +110,6 @@ def compute_objective_judgment(df, vol_ratio):
     obv_up = (obv > obv.shift(5)).fillna(False)
     macd_hist = N("MACD_Hist", 0.0)
     st_dir = N("ST_Direction", 0)
-    buy_total = N("Buy_Total", 0.0)
-    sell_total = N("Sell_Total", 0.0)
-    ensemble = N("Ensemble_Score", 0.0)
     base_labels = np.asarray(df.get("Committee_Judgment", pd.Series("NEUTRAL", index=idx)).astype(str).values, dtype=object)
 
     trend_buy = ((close > ma50).fillna(False).astype(float) * 8.0) + ((close > ma200).fillna(False).astype(float) * 10.0) + ((st_dir == 1).astype(float) * 6.0)
@@ -130,8 +127,8 @@ def compute_objective_judgment(df, vol_ratio):
     location_buy = (F("Fib_618_Support").astype(float) * 4.0) + (F("Box_Support_Hold").astype(float) * 4.0) + (F("Channel_Support_Hold").astype(float) * 4.0)
     location_sell = (F("Fib_618_Resistance").astype(float) * 4.0) + (F("Box_Resistance_Reject").astype(float) * 4.0) + (F("Channel_Resistance_Reject").astype(float) * 4.0)
 
-    signal_buy = buy_total * 0.25 + ensemble.clip(lower=0) * 0.20
-    signal_sell = sell_total * 0.25 + (-ensemble.clip(upper=0)) * 0.20
+    signal_buy = pd.Series(0.0, index=idx)
+    signal_sell = pd.Series(0.0, index=idx)
     combo_buy = (F("CS_Breakout_Confirm_Buy").astype(float) * 3.0) + (F("CS_Reversal_Cluster_Buy").astype(float) * 3.0) + (F("CS_Trend_Continuation_Buy").astype(float) * 2.0)
     combo_sell = (F("CS_Breakout_Confirm_Sell").astype(float) * 3.0) + (F("CS_Reversal_Cluster_Sell").astype(float) * 3.0) + (F("CS_Trend_Continuation_Sell").astype(float) * 2.0)
 
@@ -167,21 +164,18 @@ def compute_objective_judgment(df, vol_ratio):
         committee_label = str(base_labels[i])
         committee_side = judgment_side(committee_label)
         objective_side = judgment_side(obj_label)
-        if committee_side == 0 and objective_side != 0 and abs(gap) >= 10:
-            objective_alignment.append("MIXED")
-            objective_adjustment.append("ADOPT")
-        elif committee_side != 0 and objective_side == committee_side and abs(gap) >= 20:
+        if committee_side != 0 and objective_side == committee_side and abs(gap) >= 20:
             objective_alignment.append("ALIGNED")
             objective_adjustment.append("CONFIRM")
         elif committee_side != 0 and objective_side == -committee_side and abs(gap) >= 24:
             objective_alignment.append("CONFLICT")
-            objective_adjustment.append("CONFLICT")
+            objective_adjustment.append("DOWNGRADE")
         elif objective_side == 0:
             objective_alignment.append("MIXED")
             objective_adjustment.append("NONE")
         else:
             objective_alignment.append("MIXED")
-            objective_adjustment.append("ACTIVE")
+            objective_adjustment.append("NONE")
 
     df["Objective_Buy_Score"] = buy_score
     df["Objective_Sell_Score"] = sell_score

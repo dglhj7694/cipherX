@@ -303,7 +303,8 @@ def _show_analysis_toasts(ticker, meta):
     judgment = str(meta.get('judgment', 'NEUTRAL'))
     action = str(meta.get('action_label', '')).strip() or localize_judgment_label(judgment)
     ensemble = float(meta.get('ensemble_score', 0))
-    primary_icon = '🟢' if 'BUY' in judgment else ('🔴' if 'SELL' in judgment else '🟡')
+    tone = _tone_suffix(judgment or action)
+    primary_icon = '🟢' if tone == 'positive' else ('🔴' if tone == 'negative' else '🟡')
     st.toast(f"{ticker} {action} · ES {ensemble:+.1f}", icon=primary_icon)
 
     warning_parts = []

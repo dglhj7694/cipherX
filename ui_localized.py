@@ -1,4 +1,4 @@
-import html
+﻿import html
 import json
 import math
 import re
@@ -32,9 +32,10 @@ SOFT_MUTED = "#94A3B8"
 
 def _safe_float(value, default=0.0):
     try:
-        return float(value)
+        numeric = float(value)
     except (TypeError, ValueError):
         return default
+    return numeric if math.isfinite(numeric) else default
 
 
 def _safe_int(value, default=0):
@@ -42,6 +43,47 @@ def _safe_int(value, default=0):
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def _summary_date_text(meta):
+    return str(meta.get("summary_date") or meta.get("last_date") or "").strip()
+
+
+def _summary_price_available(meta):
+    flag = meta.get("summary_price_available")
+    if flag is None:
+        value = _safe_float(meta.get("price"), float("nan"))
+        return math.isfinite(value) and value > 0
+    return bool(flag)
+
+
+def _summary_change_available(meta):
+    flag = meta.get("summary_change_available")
+    if flag is None:
+        value = _safe_float(meta.get("price_change_pct"), float("nan"))
+        return math.isfinite(value)
+    return bool(flag)
+
+
+def _bias_mode_label(value):
+    key = str(value or "").strip().lower()
+    return {
+        "equity_long_bias": "롱 바이어스",
+        "market_neutral": "중립 모드",
+        "aggressive_short": "공격 숏",
+    }.get(key, key or "-")
+
+
+def _ensemble_score_source_label(value):
+    key = str(value or "").strip().lower()
+    return {
+        "final_decision": "최종 점수",
+        "ensemble": "위원회 점수",
+        "recent_final_decision": "직전 최종 점수",
+        "recent_ensemble": "직전 위원회 점수",
+        "layer_edge_fallback": "레이어 복구값",
+        "unavailable": "점수 미집계",
+    }.get(key, key or "점수 미집계")
 
 
 def _us_market_time_text():
@@ -234,11 +276,14 @@ def render_price_header(meta, key_prefix="analysis"):
     action_label = localize_action_label(meta.get("action_label", ""))
     confidence = _safe_float(meta.get("confidence", 0))
     es = _safe_float(meta.get("ensemble_score", 0))
+    bias_mode_label = _bias_mode_label(meta.get("bias_mode"))
+    ensemble_source = _ensemble_score_source_label(meta.get("ensemble_score_source"))
     volume_ratio = _safe_float(meta.get("volume", 0)) / max(_safe_float(meta.get("avg_volume", 1), 1), 1)
     chips = "".join([
         _badge(action_label or localize_judgment_label(meta.get("judgment", "")), tone),
         _badge(f"신뢰도 {confidence:.0f}%", tone),
         _badge(f"맥락 {context_label}", "accent"),
+        _badge(f"모드 {bias_mode_label}", "muted"),
         _badge(f"WT { _safe_float(meta.get('wt1', 0)):.0f}", "positive" if _safe_float(meta.get("wt1", 0)) < -20 else ("negative" if _safe_float(meta.get("wt1", 0)) > 20 else "warning")),
         _badge(f"RSI { _safe_float(meta.get('rsi', 0)):.0f}", "positive" if _safe_float(meta.get("rsi", 0)) < 40 else ("negative" if _safe_float(meta.get("rsi", 0)) > 60 else "warning")),
         _badge(f"거래량 {volume_ratio:.1f}x", "positive" if volume_ratio > 1.5 else "muted"),
@@ -260,6 +305,7 @@ def render_price_header(meta, key_prefix="analysis"):
           <div class="sigl-focus-stack">
             {_badge(f"ES {es:+.1f}", tone if tone != 'muted' else 'accent')}
             {_badge(f"B:S {_safe_int(meta.get('buy_agree', 0))}:{_safe_int(meta.get('sell_agree', 0))}", "muted")}
+            {_badge(ensemble_source, "warning" if meta.get("ensemble_score_source") == "layer_edge_fallback" else "muted")}
             {_badge(_esc(regime_label), "accent")}
           </div>
         </div>
@@ -2257,7 +2303,121 @@ def _build_chart_summary_html(meta):
     )
 
 
-def render_chart_indicator_snapshot(meta):
+def _build_recap_headline(meta):
+    ticker = str(meta.get("ticker", "")).upper()
+    signal_items = _recent_signal_items(meta, limit=2)
+    has_change = _summary_change_available(meta)
+    change_pct = _safe_float(meta.get("price_change_pct", 0)) if has_change else 0.0
+
+    if signal_items:
+        lead_label, lead_tone = signal_items[0]
+        if lead_tone == "positive":
+            if has_change and abs(change_pct) >= 2:
+                return f"{ticker}, {abs(change_pct):.2f}% \uC6C0\uC9C1\uC784 \uC18D {lead_label} \uC2E0\uD638 \uD3EC\uCC29"
+            return f"{ticker}, {lead_label} \uC2E0\uD638 \uD3EC\uCC29"
+        if lead_tone == "negative":
+            if has_change and abs(change_pct) >= 2:
+                return f"{ticker}, {abs(change_pct):.2f}% \uC6C0\uC9C1\uC784 \uC18D {lead_label} \uACBD\uACE0"
+            return f"{ticker}, {lead_label} \uC2E0\uD638\uB85C \uC57D\uC138 \uACBD\uACC4"
+        return f"{ticker}, {lead_label} \uD655\uC778 \uD750\uB984"
+    if has_change and change_pct >= 2:
+        return f"{ticker}, \uAC15\uD55C \uC0C1\uC2B9 \uC18D \uCD94\uC138 \uC7AC\uAC1C \uAD6C\uAC04"
+    if has_change and change_pct <= -2:
+        return f"{ticker}, \uAE09\uB77D \uC774\uD6C4 \uBC18\uC751 \uD655\uC778 \uAD6C\uAC04"
+    return f"{ticker}, \uAE30\uC220\uC801 \uD750\uB984 \uC694\uC57D"
+
+
+def _build_judgment_recap(meta, title):
+    ticker = str(meta.get("ticker", "")).upper()
+    date_text = _summary_date_text(meta)
+    has_change = _summary_change_available(meta)
+    change_pct = _safe_float(meta.get("price_change_pct", 0)) if has_change else 0.0
+    volume_ratio = _safe_float(meta.get("volume", 0)) / max(_safe_float(meta.get("avg_volume", 1), 1), 1)
+    supports_named, resistances_named = _extract_named_levels(meta)
+    supports, resistances = _extract_price_levels(meta)
+    signal_narrative = _build_signal_narrative(meta)
+    momentum_narrative = _build_momentum_narrative(meta)
+
+    if has_change:
+        if change_pct >= 0.2:
+            move_text = f"{change_pct:+.2f}% \uC0C1\uC2B9"
+        elif change_pct <= -0.2:
+            move_text = f"{change_pct:+.2f}% \uD558\uB77D"
+        else:
+            move_text = f"{change_pct:+.2f}% \uBCF4\uD569\uAD8C"
+    else:
+        move_text = "\uBCC0\uB3D9\uB960 \uC9D1\uACC4\uAC00 \uC5B4\uB824\uC6B4 \uC0C1\uD0DC\uB85C"
+
+    if volume_ratio >= 1.8:
+        volume_text = f"\uAC70\uB798\uB7C9\uC740 \uD3C9\uC18C \uB300\uBE44 {volume_ratio:.1f}\uBC30\uB85C \uD06C\uAC8C \uB298\uC5C8\uC2B5\uB2C8\uB2E4."
+    elif volume_ratio >= 1.15:
+        volume_text = f"\uAC70\uB798\uB7C9\uC740 \uD3C9\uC18C \uB300\uBE44 {volume_ratio:.1f}\uBC30\uB85C \uB2E4\uC18C \uB298\uC5C8\uC2B5\uB2C8\uB2E4."
+    elif volume_ratio <= 0.7:
+        volume_text = f"\uAC70\uB798\uB7C9\uC740 \uD3C9\uC18C \uB300\uBE44 {volume_ratio:.1f}\uBC30\uB85C \uC904\uC5C8\uC2B5\uB2C8\uB2E4."
+    else:
+        volume_text = f"\uAC70\uB798\uB7C9\uC740 \uD3C9\uC18C \uB300\uBE44 {volume_ratio:.1f}\uBC30 \uC218\uC900\uC774\uC5C8\uC2B5\uB2C8\uB2E4."
+
+    prefix = f"{date_text} {ticker}\uB294" if date_text else f"{ticker}\uB294"
+    recap = f"{prefix} {move_text} \uB9C8\uAC10\uD588\uACE0, {volume_text}" if has_change else f"{prefix} {move_text}, {volume_text}"
+    if signal_narrative:
+        recap += f" {signal_narrative}"
+    if supports:
+        support_text = ", ".join(f"{value:.2f}" for value in supports[:3])
+        recap += f" \uC8FC\uC694 \uC9C0\uC9C0 \uD6C4\uBCF4\uB294 {support_text}\uC785\uB2C8\uB2E4."
+        if supports_named:
+            recap += f" \uAC00\uC7A5 \uBA3C\uC800 \uBD10\uC57C \uD560 \uD68C\uBCF5 \uAD6C\uAC04\uC740 {supports_named[0][0]} {supports_named[0][1]:.2f}\uC785\uB2C8\uB2E4."
+    if resistances:
+        resistance_text = ", ".join(f"{value:.2f}" for value in resistances[:3])
+        recap += f" \uC800\uD56D \uD6C4\uBCF4\uB294 {resistance_text}\uC785\uB2C8\uB2E4."
+        if resistances_named:
+            recap += f" \uAC00\uC7A5 \uAC00\uAE4C\uC6B4 \uC800\uD56D\uC740 {resistances_named[0][0]} {resistances_named[0][1]:.2f}\uC785\uB2C8\uB2E4."
+    if momentum_narrative:
+        recap += f" {momentum_narrative}"
+    return recap
+
+
+def _chart_headline_text(meta):
+    ticker = str(meta.get("ticker", "")).upper()
+    date_text = _summary_date_text(meta)
+    has_change = _summary_change_available(meta)
+    has_price = _summary_price_available(meta)
+    change_pct = _safe_float(meta.get("price_change_pct", 0)) if has_change else 0.0
+    price = _safe_float(meta.get("price"), float("nan")) if has_price else float("nan")
+    vwap = _safe_float(meta.get("vwap", 0))
+    percent_b = _safe_float(meta.get("percent_b", 0.5))
+    rsi = _safe_float(meta.get("rsi", 50))
+    rmi = _safe_float(meta.get("rmi", 50))
+    wt1 = _safe_float(meta.get("wt1", 0))
+    macd_hist = _safe_float(meta.get("macd_hist", 0))
+
+    bullish = sum([has_price and price >= vwap if vwap else False, rsi >= 55, rmi >= 55, wt1 > 0, macd_hist > 0])
+    bearish = sum([has_price and price < vwap if vwap else False, rsi <= 45, rmi <= 45, wt1 < 0, macd_hist < 0])
+
+    if bullish >= 4:
+        core = "\uAE30\uC220 \uC9C0\uD45C\uC0C1 \uAC15\uC138 \uC555\uB825"
+    elif bearish >= 4:
+        core = "\uAE30\uC900\uC120 \uC544\uB798 \uC57D\uC138 \uC555\uB825"
+    elif percent_b <= 0.18:
+        core = "\uD558\uB2E8 \uB20C\uB9BC \uBC18\uB4F1 \uAD6C\uAC04"
+    elif percent_b >= 0.82:
+        core = "\uC0C1\uB2E8 \uACFC\uC5F4 \uBD80\uB2F4 \uAD6C\uAC04"
+    else:
+        core = "\uBC29\uD5A5 \uC7AC\uC815\uB9AC \uAD6C\uAC04"
+
+    if has_change:
+        move = "\uC0C1\uC2B9" if change_pct > 0 else ("\uD558\uB77D" if change_pct < 0 else "\uBCF4\uD569")
+        move_text = f"{change_pct:+.2f}% {move}"
+    else:
+        move_text = "\uBCC0\uB3D9\uB960 \uC9D1\uACC4 \uBD88\uAC00"
+
+    prefix = f"{ticker} \uBD84\uC11D" if ticker else "\uC885\uBAA9 \uBD84\uC11D"
+    suffix = f" ({date_text})" if date_text else ""
+    formatted_price = _fmt_chart_price(price)
+    price_text = f"\uC885\uAC00 ({formatted_price})" if has_price and formatted_price else "\uC885\uAC00 \uC9D1\uACC4 \uBD88\uAC00"
+    return f"{prefix}{suffix}: {move_text} \u00B7 {core} \u00B7 {price_text}"
+
+
+def render_chart_indicator_snapshot(meta, key_prefix="analysis"):
     price = _safe_float(meta.get("price", 0))
     vwap = _safe_float(meta.get("vwap", 0))
     fixed_vwap = _safe_float(meta.get("fixed_vwap", 0))
@@ -2538,7 +2698,13 @@ def render_chart_indicator_snapshot(meta):
         objective_component_fig.update_layout(barmode="relative")
         component_height = _category_chart_height(len(component_labels), min_height=360, per_item=38, extra=120)
         _base_layout(objective_component_fig, "매수 vs 매도 축 비교", x_range=(-component_range, component_range), height=component_height, left_margin=108)
-        st.plotly_chart(objective_component_fig, use_container_width=True, theme=None, config={"displayModeBar": False})
+        st.plotly_chart(
+            objective_component_fig,
+            use_container_width=True,
+            theme=None,
+            config={"displayModeBar": False},
+            key=f"{key_prefix}_objective_component_chart",
+        )
 
         system_fig = go.Figure(go.Bar(
             x=system_scores,
@@ -2551,7 +2717,13 @@ def render_chart_indicator_snapshot(meta):
         ))
         system_height = _category_chart_height(len(system_labels), min_height=380, per_item=38, extra=128)
         _base_layout(system_fig, "시장 / 시스템 상태축", height=system_height, left_margin=124)
-        st.plotly_chart(system_fig, use_container_width=True, theme=None, config={"displayModeBar": False})
+        st.plotly_chart(
+            system_fig,
+            use_container_width=True,
+            theme=None,
+            config={"displayModeBar": False},
+            key=f"{key_prefix}_system_state_chart",
+        )
 
     with col_right:
         st.caption("원시 지표 기반 방향성 요약")
@@ -2566,7 +2738,13 @@ def render_chart_indicator_snapshot(meta):
         ))
         raw_height = _category_chart_height(len(raw_indicator_labels), min_height=1180, per_item=28, extra=150)
         _base_layout(raw_indicator_fig, "원시 지표 최신 스냅샷", height=raw_height, left_margin=144)
-        st.plotly_chart(raw_indicator_fig, use_container_width=True, theme=None, config={"displayModeBar": False})
+        st.plotly_chart(
+            raw_indicator_fig,
+            use_container_width=True,
+            theme=None,
+            config={"displayModeBar": False},
+            key=f"{key_prefix}_raw_indicator_chart",
+        )
 
     chart_badges = _build_chart_interpretation_badges(meta)
     if chart_badges:
@@ -2613,6 +2791,7 @@ def render_judgment_card(meta):
     objective_confidence = _safe_float(meta.get("objective_confidence", 0))
     objective_alignment = str(meta.get("objective_alignment", "MIXED")).upper()
     objective_adjustment = str(meta.get("objective_adjustment", "NONE")).upper()
+    bias_mode_label = _bias_mode_label(meta.get("bias_mode"))
     objective_reason = _translate_note_text(meta.get("objective_reason", ""))
     objective_alignment_label = {"ALIGNED": "일치", "CONFLICT": "충돌", "MIXED": "혼합"}.get(objective_alignment, objective_alignment)
     objective_adjustment_label = {"NONE": "없음", "CONFIRM": "확인", "UPGRADE": "강화", "ACTIVATE": "활성", "DOWNGRADE": "보수조정", "MIXED": "혼합보정"}.get(objective_adjustment, objective_adjustment)
@@ -2703,6 +2882,8 @@ def render_judgment_card(meta):
         _mini_stat_card("최종 판단", title or localize_judgment_label(raw_judgment), tone),
         _mini_stat_card("강등 횟수", f"{downgrade_count}회", "warning" if downgrade_count else "muted"),
         _mini_stat_card("시장 필터", f"{market_filter_bias:+.1f}", "positive" if market_filter_bias > 0.3 else "negative" if market_filter_bias < -0.3 else "warning"),
+        _mini_stat_card("바이어스 모드", bias_mode_label, "accent"),
+        _mini_stat_card("레이어 충돌", f"{_safe_int(meta.get('signal_conflict_layers', 0))}개", "warning" if _safe_int(meta.get("signal_conflict_layers", 0)) >= 3 else "muted"),
     ]
     driver_cards = [
         _mini_stat_card("지속 매수", f"{continuation_buy:.1f}", "positive" if continuation_buy >= max(continuation_sell, 1.0) else "muted"),
@@ -2996,18 +3177,6 @@ def render_ai_signal_assisted_card(meta):
         summary_html += f"<div class='sigl-note'><strong>AI 리스크 플래그</strong><div class='sigl-chip-row'>{risk_badges}</div></div>"
     summary_html += "</div>"
     _render_panel_html(summary_html)
-
-
-def render_committee_panel(meta):
-    return render_committee_panel_clean(meta)
-
-
-def render_10layer_bars(meta, html_key="analysis"):
-    return render_10layer_bars_clean(meta, html_key=html_key)
-
-
-
-
 def render_leading_lagging(meta):
     leading = translate_chart_text(meta.get("leading_verdict", ""))
     lagging = translate_chart_text(meta.get("lagging_verdict", ""))
@@ -3579,36 +3748,6 @@ def render_indicator_help():
             "- `Williams %R / CCI / RMI / TRIX / Mass Index`: 과열, 반전, 모멘텀 전환을 읽는 지표입니다.\n"
             "- `Volume Osc / Intraday Intensity / Chaikin`: 수급과 체결 에너지 방향을 확인하는 지표입니다."
         )
-
-
-def _fmt_audit_number(value, digits=1, signed=False):
-    if value is None:
-        return "-"
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return "-"
-    if math.isnan(number):
-        return "-"
-    prefix = "+" if signed and number > 0 else ""
-    return f"{prefix}{number:.{digits}f}"
-
-
-def _fmt_audit_percent(value, digits=1, signed=False):
-    if value is None:
-        return "-"
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return "-"
-    if math.isnan(number):
-        return "-"
-    scaled = number * 100.0
-    prefix = "+" if signed and scaled > 0 else ""
-    return f"{prefix}{scaled:.{digits}f}%"
-
-
-# Safe overrides for audit rendering and analysis tabs.
 def _fmt_audit_number(value, digits=1, signed=False):
     if value is None:
         return "-"
@@ -3707,6 +3846,53 @@ def _build_example_frame(rows, horizon):
     return pd.DataFrame(records)
 
 
+def _build_regime_frame(rows):
+    if not rows:
+        return pd.DataFrame()
+    records = []
+    for row in rows:
+        records.append(
+            {
+                "Regime": row.get("name", "-"),
+                "표본": _safe_int(row.get("samples", 0)),
+                "BUY 비중": _fmt_audit_percent(row.get("buy_share")),
+                "SELL 비중": _fmt_audit_percent(row.get("sell_share")),
+                "평균 ES": _fmt_audit_number(row.get("avg_es"), signed=True),
+                "평균 신뢰도": _fmt_audit_number(row.get("avg_confidence")),
+                "BUY 적중": _fmt_audit_percent(row.get("buy_hit_ref")),
+                "SELL 적중": _fmt_audit_percent(row.get("sell_hit_ref")),
+                "BUY 방향수익": _fmt_audit_percent(row.get("buy_edge_ref"), signed=True),
+                "SELL 방향수익": _fmt_audit_percent(row.get("sell_edge_ref"), signed=True),
+                "순수익 프록시": _fmt_audit_percent(row.get("net_return"), signed=True),
+                "MDD": _fmt_audit_percent(row.get("max_drawdown"), signed=True),
+                "회전율": _fmt_audit_number(row.get("turnover"), digits=1),
+            }
+        )
+    return pd.DataFrame(records)
+
+
+def _build_walkforward_frame(rows):
+    if not rows:
+        return pd.DataFrame()
+    records = []
+    for row in rows:
+        records.append(
+            {
+                "구간": row.get("name", "-"),
+                "표본": _safe_int(row.get("samples", 0)),
+                "BUY 비중": _fmt_audit_percent(row.get("buy_share")),
+                "SELL 비중": _fmt_audit_percent(row.get("sell_share")),
+                "평균 신뢰도": _fmt_audit_number(row.get("avg_confidence")),
+                "BUY 방향수익": _fmt_audit_percent(row.get("buy_edge_ref"), signed=True),
+                "SELL 방향수익": _fmt_audit_percent(row.get("sell_edge_ref"), signed=True),
+                "순수익 프록시": _fmt_audit_percent(row.get("net_return"), signed=True),
+                "MDD": _fmt_audit_percent(row.get("max_drawdown"), signed=True),
+                "회전율": _fmt_audit_number(row.get("turnover"), digits=1),
+            }
+        )
+    return pd.DataFrame(records)
+
+
 def render_audit_panel(audit):
     if not audit or not audit.get("available"):
         reason = (audit or {}).get("reason") or "\uBC31\uD14C\uC2A4\uD2B8/\uAC10\uC0AC \uD45C\uBCF8\uC774 \uC544\uC9C1 \uBD80\uC871\uD569\uB2C8\uB2E4."
@@ -3717,11 +3903,12 @@ def render_audit_panel(audit):
     horizons = list(audit.get("horizons", []))
     h_ref = _safe_int(audit.get("reference_horizon", 5), 5)
     distribution = audit.get("distribution", [])
+    bias_mode_label = _bias_mode_label(audit.get("bias_mode"))
+    simulation_summary = audit.get("simulation_summary", {})
     method_note = (
         f"\uCD5C\uADFC {_safe_int(summary.get('lookback_bars', 0))}\uBD09 \uAE30\uC900\uC73C\uB85C "
         f"{', '.join(str(h) for h in horizons)}\uBD09 \uD6C4 \uC218\uC775\uB960\uACFC SPY/QQQ \uB300\uBE44 \uBC29\uD5A5 \uCD08\uACFC\uC218\uC775\uC744 \uBE44\uAD50\uD588\uC2B5\uB2C8\uB2E4. "
-        "\uC218\uC218\uB8CC, \uC2AC\uB9AC\uD53C\uC9C0, \uCCB4\uACB0 \uC9C0\uC5F0\uC740 \uBC18\uC601\uD558\uC9C0 \uC54A\uC740 "
-        "\uAC10\uC0AC\uC6A9 \uC9C0\uD45C\uC785\uB2C8\uB2E4."
+        "\uB3D9\uC2DC\uC5D0 10bp \uBE44\uC6A9\uC744 \uC801\uC6A9\uD55C \uB2E8\uC21C \uC5D0\uD000\uD2F0 \uD504\uB85D\uC2DC\uB85C \uC21C\uC218\uC775, MDD, \uD68C\uC804\uC728\uB3C4 \uD568\uAED8 \uBD05\uB2C8\uB2E4."
     )
     veto_stats = audit.get("veto_stats", {})
 
@@ -3735,6 +3922,7 @@ def render_audit_panel(audit):
             </div>
             <div class="sigl-inline">
               {_badge((audit.get('ticker') or '-').upper(), 'accent')}
+              {_badge(f"모드 {bias_mode_label}", 'muted')}
               {_badge(f"\uAE30\uC900 {summary.get('as_of', '-')}", 'muted')}
             </div>
           </div>
@@ -3788,6 +3976,8 @@ def render_audit_panel(audit):
             _mini_stat_card("\uAC15\uB4F1 \uD69F\uC218", f"{_safe_int(veto_stats.get('downgraded_count', 0)):,}", "warning"),
             _mini_stat_card("\uB9E4\uC218 \uAC15\uB4F1 \uB3C4\uC6C0", _fmt_audit_percent(veto_stats.get("buy_downgrade_help_rate")), "positive"),
             _mini_stat_card("\uB9E4\uB3C4 \uAC15\uB4F1 \uB3C4\uC6C0", _fmt_audit_percent(veto_stats.get("sell_downgrade_help_rate")), "positive"),
+            _mini_stat_card("Objective 충돌 도움", _fmt_audit_percent(veto_stats.get("objective_conflict_help_rate")), "positive"),
+            _mini_stat_card("Objective 충돌 손상", _fmt_audit_percent(veto_stats.get("objective_conflict_hurt_rate")), "negative"),
             _mini_stat_card("\uD310\uB2E8 \uAE09\uBC18\uC804", f"{_safe_int(veto_stats.get('flip_count', 0)):,}", "negative"),
             _mini_stat_card("Flip Guard \uBC1C\uB3D9", f"{_safe_int(veto_stats.get('flip_guard_count', 0)):,}", "muted"),
             _mini_stat_card("Flip Guard \uBE44\uC911", _fmt_audit_percent(veto_stats.get("flip_guard_share")), "muted"),
@@ -3806,6 +3996,43 @@ def render_audit_panel(audit):
         </div>
         """
     )
+
+    if simulation_summary:
+        simulation_cards = "".join(
+            [
+                _mini_stat_card("거래비용", f"{_safe_int(simulation_summary.get('cost_bps', 0))}bp", "muted"),
+                _mini_stat_card("전체 순수익", _fmt_audit_percent(simulation_summary.get("overall_return"), signed=True), "positive" if (simulation_summary.get("overall_return") or 0) >= 0 else "negative"),
+                _mini_stat_card("전체 MDD", _fmt_audit_percent(simulation_summary.get("overall_max_drawdown"), signed=True), "warning"),
+                _mini_stat_card("전체 회전율", _fmt_audit_number(simulation_summary.get("overall_turnover"), digits=1), "accent"),
+                _mini_stat_card("롱 순수익", _fmt_audit_percent(simulation_summary.get("long_return"), signed=True), "positive" if (simulation_summary.get("long_return") or 0) >= 0 else "negative"),
+                _mini_stat_card("숏 순수익", _fmt_audit_percent(simulation_summary.get("short_return"), signed=True), "positive" if (simulation_summary.get("short_return") or 0) >= 0 else "negative"),
+                _mini_stat_card("롱 활동비중", _fmt_audit_percent(simulation_summary.get("long_active_share")), "muted"),
+                _mini_stat_card("숏 활동비중", _fmt_audit_percent(simulation_summary.get("short_active_share")), "muted"),
+            ]
+        )
+        _render_panel_html(
+            f"""
+            <div class="sigl-card">
+              <div class="sigl-section-head">
+                <div>
+                  <p class="sigl-section-title">거래 프록시</p>
+                  <p class="sigl-section-copy">판단 라벨을 1일 지연 진입한 단순 시뮬레이션으로 전체/롱/숏 효율을 확인합니다.</p>
+                </div>
+              </div>
+              <div class="sigl-grid sigl-grid--4">{simulation_cards}</div>
+            </div>
+            """
+        )
+
+    regime_df = _build_regime_frame(audit.get("regime_rows", []))
+    if not regime_df.empty:
+        st.markdown("#### 컨텍스트 / Regime 성과")
+        st.dataframe(regime_df, use_container_width=True, hide_index=True)
+
+    walkforward_df = _build_walkforward_frame(audit.get("walkforward_rows", []))
+    if not walkforward_df.empty:
+        st.markdown("#### 63/21 롤링 안정성")
+        st.dataframe(walkforward_df, use_container_width=True, hide_index=True)
 
     examples = audit.get("examples", {})
     best_df = _build_example_frame(examples.get("best", []), h_ref)
@@ -3858,7 +4085,7 @@ def render_analysis(msg, key_prefix="analysis"):
                 key=f"{key_prefix}_price_chart",
             )
             if meta:
-                render_chart_indicator_snapshot(meta)
+                render_chart_indicator_snapshot(meta, key_prefix=f"{key_prefix}_indicator_snapshot")
             if meta:
                 st.markdown(
                     _build_chart_summary_html(meta),

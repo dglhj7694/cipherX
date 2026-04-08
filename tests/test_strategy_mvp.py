@@ -9,7 +9,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from config import COMBINED_SCAN_REGISTRY
+from audit import build_audit_payload
+from chart import build_metadata
+from config import BIAS_MODE_EQUITY_LONG, COMBINED_SCAN_REGISTRY, DEFAULT_BIAS_MODE, JT, get_bias_profile, resolve_bias_mode
 from domain import AnalysisRequest, AnalysisViewModel, ScannerRequest, ScannerResultRow
 import engine as root_engine
 from engine_combo_registry import ensure_runtime_combo_registry
@@ -20,7 +22,7 @@ from engine_runtime.pipeline import build_engine_result
 from infrastructure.etf import FunctionHoldingsProvider, HoldingsProviderRegistry
 from services.analysis_service import AnalysisArtifacts
 from strategy import build_strategy_payload
-from ui_localized import build_strategy_tab_view_model
+from ui_localized import _build_chart_summary_html, _build_judgment_recap, _build_recap_headline, _chart_headline_text, build_strategy_tab_view_model
 from workflows import AnalysisWorkflow, ScannerWorkflow
 
 
@@ -179,6 +181,35 @@ def apply_close_series(frame, closes):
     frame["High"] = highs
     frame["Low"] = lows
     frame["Price_Channel_Mid"] = (frame["Price_Channel_Up"] + frame["Price_Channel_Low"]) / 2.0
+    return frame
+
+
+def make_audit_frame(rows=126):
+    index = pd.date_range("2025-01-01", periods=rows, freq="D")
+    close = 100.0 + np.cumsum(np.where(np.arange(rows) % 2 == 0, 1.2, -0.6))
+    spy_close = 400.0 + np.linspace(0.0, 18.0, rows)
+    qqq_close = 300.0 + np.linspace(0.0, 24.0, rows)
+    labels = np.array(["BUY", "SELL", "NEUTRAL", "WATCH_BUY", "WATCH_SELL", "MIXED"] * ((rows // 6) + 1), dtype=object)[:rows]
+    committee_labels = np.array(["BUY", "SELL", "NEUTRAL", "BUY", "SELL", "MIXED"] * ((rows // 6) + 1), dtype=object)[:rows]
+    objective_adjustment = np.array(["NONE", "DOWNGRADE", "NONE", "NONE", "DOWNGRADE", "NONE"] * ((rows // 6) + 1), dtype=object)[:rows]
+    market_context = np.array([0, 3, 7, 8, 9, 1] * ((rows // 6) + 1), dtype=int)[:rows]
+    frame = pd.DataFrame(
+        {
+            "Close": close,
+            "Trade_Judgment": labels,
+            "PreVeto_Judgment": committee_labels,
+            "Committee_Judgment": committee_labels,
+            "Objective_Adjustment": objective_adjustment,
+            "Judgment_Confidence": np.linspace(45.0, 80.0, rows),
+            "Ensemble_Score": np.linspace(-18.0, 18.0, rows),
+            "Flip_Guard_Triggered": (np.arange(rows) % 10 == 0),
+            "Market_Context": market_context,
+            "SPY_Close": spy_close,
+            "QQQ_Close": qqq_close,
+            "Bias_Mode": DEFAULT_BIAS_MODE,
+        },
+        index=index,
+    )
     return frame
 
 
@@ -519,14 +550,89 @@ class EngineCoreSplitSmokeTests(unittest.TestCase):
         layered = root_engine.compute_10layer_scores(frame.copy(), frame["Volume_Ratio_20"], hma_rising)
         self.assertIn("Buy_Total", layered.columns)
         self.assertIn("Sell_Total", layered.columns)
+        self.assertNotIn("Buy_Quality_Factor", layered.columns)
+        self.assertNotIn("Sell_Quality_Factor", layered.columns)
         committee = root_engine.compute_committee_ensemble(layered.copy(), layered["Volume_Ratio_20"], hma_rising)
         self.assertIn("Ensemble_Score", committee.columns)
         self.assertIn("Committee_Judgment", committee.columns)
+        self.assertNotIn("CM_Trend_Score", committee.columns)
+        self.assertNotIn("CM_Trend_Conv", committee.columns)
+        self.assertNotIn("Raw_Market_Context", committee.columns)
+        self.assertNotIn("Context_Smoothed", committee.columns)
         self.assertNotIn("Trade_Judgment", committee.columns)
         objective = root_engine._compute_objective_judgment(committee.copy(), committee["Volume_Ratio_20"])
         self.assertIn("Objective_Buy_Score", objective.columns)
         self.assertIn("Objective_Judgment", objective.columns)
         self.assertNotIn("Trade_Judgment", objective.columns)
+
+    def test_committee_ensemble_stays_finite_with_non_finite_money_inputs(self):
+        frame = make_blank_frame(rows=60)
+        apply_close_series(frame, [100.0 + (0.1 * i) for i in range(len(frame))])
+        frame.loc[frame.index[-12:], "OBV"] = np.inf
+        frame.loc[frame.index[-1], "CMF"] = np.inf
+        hma_rising = pd.Series(False, index=frame.index)
+        layered = root_engine.compute_10layer_scores(frame.copy(), frame["Volume_Ratio_20"], hma_rising)
+        committee = root_engine.compute_committee_ensemble(layered.copy(), layered["Volume_Ratio_20"], hma_rising)
+
+        self.assertTrue(np.isfinite(float(committee["Ensemble_Score"].iloc[-1])))
+        self.assertTrue(np.isfinite(float(committee["CM_Money_EffScore"].iloc[-1])))
+
+
+class BiasProfileTests(unittest.TestCase):
+    def test_default_bias_profile_matches_existing_long_bias_values(self):
+        self.assertEqual(resolve_bias_mode(None), BIAS_MODE_EQUITY_LONG)
+        profile = get_bias_profile()
+        self.assertEqual(profile["name"], BIAS_MODE_EQUITY_LONG)
+        self.assertEqual(profile["strong_buy_th"], JT.STRONG_BUY_TH)
+        self.assertEqual(profile["buy_th"], JT.BUY_TH)
+        self.assertEqual(profile["watch_buy_th"], JT.WATCH_BUY_TH)
+        self.assertEqual(profile["strong_sell_th"], JT.STRONG_SELL_TH)
+        self.assertEqual(profile["sell_th"], JT.SELL_TH)
+        self.assertEqual(profile["watch_sell_th"], JT.WATCH_SELL_TH)
+        self.assertEqual(profile["leader_sell_relief"], JT.LEADER_SELL_RELIEF)
+        self.assertEqual(profile["bear_turn_score_scale"], JT.BEAR_TURN_SCORE_SCALE)
+        self.assertEqual(profile["market_turn_bear_scale"], JT.MARKET_TURN_BEAR_SCALE)
+
+    def test_committee_can_stamp_explicit_bias_mode(self):
+        frame = make_blank_frame(rows=60)
+        apply_close_series(frame, [100.0 + (0.2 * i) for i in range(len(frame))])
+        hma_rising = pd.Series(False, index=frame.index)
+        layered = root_engine.compute_10layer_scores(frame.copy(), frame["Volume_Ratio_20"], hma_rising)
+        committee = root_engine.compute_committee_ensemble(layered.copy(), layered["Volume_Ratio_20"], hma_rising, bias_mode="market_neutral")
+        self.assertEqual(str(committee["Bias_Mode"].iloc[-1]), "market_neutral")
+
+
+class ObjectiveIsolationTests(unittest.TestCase):
+    def _build_committee_frame(self):
+        frame = make_blank_frame(rows=60)
+        apply_close_series(frame, [100.0 + (0.15 * i) for i in range(len(frame))])
+        hma_rising = pd.Series(False, index=frame.index)
+        layered = root_engine.compute_10layer_scores(frame.copy(), frame["Volume_Ratio_20"], hma_rising)
+        return root_engine.compute_committee_ensemble(layered.copy(), layered["Volume_Ratio_20"], hma_rising)
+
+    def test_objective_ignores_layer_and_ensemble_totals(self):
+        committee = self._build_committee_frame()
+        baseline = root_engine._compute_objective_judgment(committee.copy(), committee["Volume_Ratio_20"])
+        variant = committee.copy()
+        variant["Buy_Total"] = variant["Buy_Total"] + 500.0
+        variant["Sell_Total"] = variant["Sell_Total"] + 300.0
+        variant["Ensemble_Score"] = variant["Ensemble_Score"] * -4.0
+        changed = root_engine._compute_objective_judgment(variant, variant["Volume_Ratio_20"])
+
+        numeric_cols = [
+            "Objective_Buy_Score",
+            "Objective_Sell_Score",
+            "Objective_Conflict_Score",
+            "Objective_Signal_Buy",
+            "Objective_Signal_Sell",
+        ]
+        label_cols = ["Objective_Judgment", "Objective_Alignment", "Objective_Adjustment"]
+        for column in numeric_cols:
+            self.assertTrue(np.allclose(baseline[column].values, changed[column].values))
+        for column in label_cols:
+            self.assertListEqual(list(baseline[column].astype(str).values), list(changed[column].astype(str).values))
+        self.assertTrue((changed["Objective_Signal_Buy"] == 0).all())
+        self.assertTrue((changed["Objective_Signal_Sell"] == 0).all())
 
 
 class FinalDecisionOwnershipTests(unittest.TestCase):
@@ -549,6 +655,7 @@ class FinalDecisionOwnershipTests(unittest.TestCase):
         self.assertIn("Action_Label", finalised.columns)
         self.assertIn("Judgment_Confidence", finalised.columns)
         self.assertIn("Final_Decision_Score", finalised.columns)
+        self.assertNotIn("Final_Decision_Contract", finalised.columns)
 
     def test_build_engine_result_returns_typed_contract(self):
         objective = self._build_objective_frame()
@@ -558,6 +665,254 @@ class FinalDecisionOwnershipTests(unittest.TestCase):
         self.assertEqual(result.committee.label, str(finalised["Committee_Judgment"].iloc[-1]))
         self.assertEqual(result.objective.advisory_label, str(finalised["Objective_Judgment"].iloc[-1]))
         self.assertAlmostEqual(result.evidence.ensemble_score, float(finalised["Ensemble_Score"].iloc[-1]), places=6)
+
+    def test_objective_no_longer_adopts_neutral_committee_label(self):
+        frame = pd.DataFrame(
+            [
+                {
+                    "Committee_Judgment": "NEUTRAL",
+                    "Committee_PreVeto_Judgment": "NEUTRAL",
+                    "Committee_Confidence": 55.0,
+                    "Committee_Buy_Agree": 0,
+                    "Committee_Sell_Agree": 0,
+                    "Committee_Judgment_Reason": "committee neutral",
+                    "Committee_Judgment_Detail": "committee detail",
+                    "Committee_Action_Label": "Neutral",
+                    "Committee_Contrast_Notes": "",
+                    "Committee_Downgrade_Count": 0,
+                    "Committee_Macro_Risk_Off_Count": 0,
+                    "Committee_Macro_Risk_On_Count": 0,
+                    "Committee_Flip_Guard_Triggered": False,
+                    "Objective_Judgment": "BUY",
+                    "Objective_Confidence": 91.0,
+                    "Objective_Buy_Agree": 1,
+                    "Objective_Sell_Agree": 0,
+                    "Objective_Reason": "objective buy",
+                    "Objective_Detail": "objective detail",
+                    "Objective_Buy_Score": 42.0,
+                    "Objective_Sell_Score": 10.0,
+                    "Ensemble_Score": 3.5,
+                }
+            ]
+        )
+        finalised = compute_final_decision(frame.copy())
+        self.assertEqual(str(finalised["Trade_Judgment"].iloc[0]), "NEUTRAL")
+        self.assertAlmostEqual(float(finalised["Final_Decision_Score"].iloc[0]), 3.5, places=6)
+
+    def test_objective_no_longer_promotes_aligned_committee_label(self):
+        frame = pd.DataFrame(
+            [
+                {
+                    "Committee_Judgment": "BUY",
+                    "Committee_PreVeto_Judgment": "BUY",
+                    "Committee_Confidence": 72.0,
+                    "Committee_Buy_Agree": 3,
+                    "Committee_Sell_Agree": 0,
+                    "Committee_Judgment_Reason": "committee buy",
+                    "Committee_Judgment_Detail": "committee detail",
+                    "Committee_Action_Label": "Buy",
+                    "Committee_Contrast_Notes": "",
+                    "Committee_Downgrade_Count": 0,
+                    "Committee_Macro_Risk_Off_Count": 0,
+                    "Committee_Macro_Risk_On_Count": 0,
+                    "Committee_Flip_Guard_Triggered": False,
+                    "Objective_Judgment": "BUY",
+                    "Objective_Confidence": 95.0,
+                    "Objective_Buy_Agree": 1,
+                    "Objective_Sell_Agree": 0,
+                    "Objective_Reason": "objective confirms buy",
+                    "Objective_Detail": "objective detail",
+                    "Objective_Buy_Score": 45.0,
+                    "Objective_Sell_Score": 15.0,
+                    "Ensemble_Score": 18.0,
+                }
+            ]
+        )
+        finalised = compute_final_decision(frame.copy())
+        self.assertEqual(str(finalised["Trade_Judgment"].iloc[0]), "BUY")
+        self.assertIn("Objective confirms buy side", str(finalised["Judgment_Detail"].iloc[0]))
+
+    def test_objective_conflict_only_downgrades_committee_label(self):
+        frame = pd.DataFrame(
+            [
+                {
+                    "Committee_Judgment": "BUY",
+                    "Committee_PreVeto_Judgment": "BUY",
+                    "Committee_Confidence": 74.0,
+                    "Committee_Buy_Agree": 3,
+                    "Committee_Sell_Agree": 0,
+                    "Committee_Judgment_Reason": "committee buy",
+                    "Committee_Judgment_Detail": "committee detail",
+                    "Committee_Action_Label": "Buy",
+                    "Committee_Contrast_Notes": "",
+                    "Committee_Downgrade_Count": 0,
+                    "Committee_Macro_Risk_Off_Count": 0,
+                    "Committee_Macro_Risk_On_Count": 0,
+                    "Committee_Flip_Guard_Triggered": False,
+                    "Objective_Judgment": "SELL",
+                    "Objective_Confidence": 88.0,
+                    "Objective_Buy_Agree": 0,
+                    "Objective_Sell_Agree": 1,
+                    "Objective_Reason": "objective sell",
+                    "Objective_Detail": "objective detail",
+                    "Objective_Buy_Score": 5.0,
+                    "Objective_Sell_Score": 35.0,
+                    "Ensemble_Score": 16.0,
+                }
+            ]
+        )
+        finalised = compute_final_decision(frame.copy())
+        self.assertEqual(str(finalised["Trade_Judgment"].iloc[0]), "WATCH_BUY")
+        self.assertIn("Objective conflict", str(finalised["Contrast_Notes"].iloc[0]))
+
+
+class AuditExtensionTests(unittest.TestCase):
+    def test_audit_payload_exposes_phase_one_validation_extensions(self):
+        audit = build_audit_payload(make_audit_frame(), ticker="AAPL", lookback_bars=120)
+        self.assertTrue(audit["available"])
+        self.assertEqual(audit["bias_mode"], DEFAULT_BIAS_MODE)
+        self.assertIn("regime_rows", audit)
+        self.assertIn("walkforward_rows", audit)
+        self.assertIn("simulation_summary", audit)
+        self.assertGreater(len(audit["regime_rows"]), 1)
+        self.assertGreater(len(audit["walkforward_rows"]), 0)
+        self.assertEqual(audit["simulation_summary"]["cost_bps"], 10)
+        self.assertGreater(audit["simulation_summary"]["overall_turnover"], 0)
+        self.assertIn("objective_conflict_help_rate", audit["veto_stats"])
+        self.assertIn("objective_conflict_hurt_rate", audit["veto_stats"])
+
+    def test_audit_group_rows_include_cost_adjusted_edges(self):
+        audit = build_audit_payload(make_audit_frame(), ticker="MSFT", lookback_bars=120)
+        buy_row = next(row for row in audit["group_rows"] if row["name"] == "BUY \uACC4\uC5F4")
+        self.assertIn("edge_net_5", buy_row)
+
+
+class ChartSummarySafetyTests(unittest.TestCase):
+    def test_build_metadata_uses_latest_valid_close_snapshot(self):
+        frame = make_blank_frame(rows=5)
+        apply_close_series(frame, [100.0, 101.0, 102.0, 103.0, 104.0])
+        frame.loc[frame.index[-1], "Close"] = np.nan
+        frame.loc[frame.index[-1], ["MA20", "MA50", "MA200"]] = np.nan
+
+        meta = build_metadata(frame, "IREN")
+
+        self.assertTrue(meta["summary_price_available"])
+        self.assertTrue(meta["summary_change_available"])
+        self.assertEqual(meta["summary_date"], frame.index[-2].strftime("%Y-%m-%d"))
+        self.assertAlmostEqual(meta["price"], 103.0)
+        self.assertAlmostEqual(meta["price_change"], 1.0)
+        self.assertAlmostEqual(meta["price_change_pct"], (1.0 / 102.0) * 100.0, places=6)
+
+    def test_build_metadata_uses_latest_valid_ensemble_score_snapshot(self):
+        frame = make_blank_frame(rows=5)
+        apply_close_series(frame, [100.0, 101.0, 102.0, 103.0, 104.0])
+        frame["Ensemble_Score"] = [3.0, 5.0, 7.0, 11.5, np.nan]
+        frame["Final_Decision_Score"] = [3.0, 5.0, 7.0, 11.5, np.nan]
+        frame["Bias_Mode"] = "market_neutral"
+
+        meta = build_metadata(frame, "IREN")
+
+        self.assertTrue(meta["ensemble_score_available"])
+        self.assertAlmostEqual(meta["ensemble_score"], 11.5)
+        self.assertEqual(meta["ensemble_score_source"], "recent_final_decision")
+        self.assertEqual(meta["bias_mode"], "market_neutral")
+
+    def test_build_metadata_falls_back_to_layer_edge_when_ensemble_missing(self):
+        frame = make_blank_frame(rows=5)
+        apply_close_series(frame, [100.0, 101.0, 102.0, 103.0, 104.0])
+        frame["Ensemble_Score"] = np.nan
+        frame["Final_Decision_Score"] = np.nan
+        frame["Buy_Total"] = 28.0
+        frame["Sell_Total"] = 10.0
+
+        meta = build_metadata(frame, "IREN")
+
+        self.assertTrue(meta["ensemble_score_available"])
+        self.assertAlmostEqual(meta["ensemble_score"], (28.0 - 10.0) * 0.55, places=6)
+        self.assertEqual(meta["ensemble_score_source"], "layer_edge_fallback")
+
+    def test_build_metadata_marks_summary_unavailable_without_valid_close(self):
+        frame = make_blank_frame(rows=3)
+        frame["Close"] = np.nan
+        frame[["MA20", "MA50", "MA200"]] = np.nan
+
+        meta = build_metadata(frame, "IREN")
+
+        self.assertFalse(meta["summary_price_available"])
+        self.assertFalse(meta["summary_change_available"])
+        self.assertEqual(meta["summary_date"], "")
+        self.assertEqual(meta["price"], 0.0)
+        self.assertEqual(meta["price_change_pct"], 0.0)
+
+    def test_summary_helpers_hide_nan_and_empty_price_text(self):
+        meta = {
+            "ticker": "IREN",
+            "last_date": "2026-04-07",
+            "summary_date": "",
+            "price": 0.0,
+            "price_change_pct": float("nan"),
+            "summary_price_available": False,
+            "summary_change_available": False,
+            "volume": 700000.0,
+            "avg_volume": 1000000.0,
+            "rsi": 41.0,
+            "rmi": 43.0,
+            "wt1": -12.0,
+            "macd_hist": -0.2,
+            "percent_b": 0.52,
+            "vwap": 35.0,
+            "recent_signals": [],
+            "support_levels": [],
+            "resistance_levels": [],
+        }
+
+        headline = _chart_headline_text(meta)
+        recap_headline = _build_recap_headline(meta)
+        judgment_recap = _build_judgment_recap(meta, "WATCH_BUY")
+        summary_html = _build_chart_summary_html(meta)
+
+        for text in (headline, recap_headline, judgment_recap, summary_html):
+            lowered = text.lower()
+            self.assertNotIn("nan", lowered)
+            self.assertNotIn("+nan%", lowered)
+            self.assertNotIn("()", text)
+        self.assertNotIn("$", headline)
+        return
+
+        for text in (headline, recap_headline, judgment_recap, summary_html):
+            lowered = text.lower()
+            self.assertNotIn("nan", lowered)
+            self.assertNotIn("+nan%", lowered)
+            self.assertNotIn("()", text)
+        self.assertIn("종가 집계 불가", headline)
+        self.assertIn("변동률 집계", headline)
+
+    def test_summary_helpers_keep_normal_price_and_change_text(self):
+        meta = {
+            "ticker": "IREN",
+            "summary_date": "2026-04-07",
+            "last_date": "2026-04-07",
+            "price": 34.65,
+            "price_change_pct": 1.25,
+            "summary_price_available": True,
+            "summary_change_available": True,
+            "volume": 1300000.0,
+            "avg_volume": 1000000.0,
+            "rsi": 58.0,
+            "rmi": 57.0,
+            "wt1": 12.0,
+            "macd_hist": 0.3,
+            "percent_b": 0.61,
+            "vwap": 33.8,
+            "recent_signals": [],
+            "support_levels": [],
+            "resistance_levels": [],
+        }
+
+        headline = _chart_headline_text(meta)
+
+        self.assertIn("+1.25%", headline)
+        self.assertIn("$34.65", headline)
 
 
 class WorkflowContractTests(unittest.TestCase):

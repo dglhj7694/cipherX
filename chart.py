@@ -1013,8 +1013,86 @@ def _build_indicator_lab_chart_legacy(dc,ticker):
         ann['yshift']=8
     return fig
 
+def _build_summary_snapshot(dc):
+    snapshot={
+        'price':0.0,
+        'price_change':0.0,
+        'price_change_pct':0.0,
+        'summary_price_available':False,
+        'summary_change_available':False,
+        'summary_date':'',
+    }
+    if dc is None or dc.empty or 'Close' not in dc.columns:
+        return snapshot
+    close_series=pd.to_numeric(dc['Close'],errors='coerce')
+    valid_close=close_series[close_series.notna() & np.isfinite(close_series) & (close_series>0)]
+    if valid_close.empty:
+        return snapshot
+    latest_idx=valid_close.index[-1]
+    latest_price=_sf(valid_close.iloc[-1])
+    summary_date=latest_idx.strftime('%Y-%m-%d') if hasattr(latest_idx,'strftime') else str(latest_idx)
+    snapshot.update({'price':latest_price,'summary_price_available':True,'summary_date':summary_date})
+    if len(valid_close)<2:
+        return snapshot
+    prev_price=_sf(valid_close.iloc[-2])
+    if prev_price<=0:
+        return snapshot
+    price_change=latest_price-prev_price
+    snapshot.update({
+        'price_change':price_change,
+        'price_change_pct':(price_change/prev_price)*100.0,
+        'summary_change_available':True,
+    })
+    return snapshot
+
+
+def _build_ensemble_snapshot(dc):
+    snapshot = {
+        'ensemble_score': 0.0,
+        'ensemble_score_available': False,
+        'ensemble_score_source': 'unavailable',
+    }
+    if dc is None or dc.empty:
+        return snapshot
+
+    latest = dc.iloc[-1]
+    for column in ('Final_Decision_Score', 'Ensemble_Score'):
+        value = latest.get(column)
+        numeric = pd.to_numeric(pd.Series([value]), errors='coerce').iloc[0]
+        if pd.notna(numeric) and np.isfinite(float(numeric)):
+            source = 'final_decision' if column == 'Final_Decision_Score' else 'ensemble'
+            snapshot.update({'ensemble_score': float(numeric), 'ensemble_score_available': True, 'ensemble_score_source': source})
+            return snapshot
+
+    for column in ('Final_Decision_Score', 'Ensemble_Score'):
+        if column not in dc.columns:
+            continue
+        series = pd.to_numeric(dc[column], errors='coerce')
+        series = series.replace([np.inf, -np.inf], np.nan).dropna()
+        if not series.empty:
+            source = 'recent_final_decision' if column == 'Final_Decision_Score' else 'recent_ensemble'
+            snapshot.update({'ensemble_score': float(series.iloc[-1]), 'ensemble_score_available': True, 'ensemble_score_source': source})
+            return snapshot
+
+    buy_total = pd.to_numeric(pd.Series([latest.get('Buy_Total')]), errors='coerce').iloc[0]
+    sell_total = pd.to_numeric(pd.Series([latest.get('Sell_Total')]), errors='coerce').iloc[0]
+    if pd.notna(buy_total) and pd.notna(sell_total):
+        snapshot.update({
+            'ensemble_score': float(np.clip((float(buy_total) - float(sell_total)) * 0.55, -100.0, 100.0)),
+            'ensemble_score_available': True,
+            'ensemble_score_source': 'layer_edge_fallback',
+        })
+    return snapshot
+
+
 def build_metadata(dc,ticker):
-    lat=dc.iloc[-1];prev=dc.iloc[-2] if len(dc)>=2 else lat;pc=lat['Close']-prev['Close'];pp=pc/(prev['Close']+1e-10)*100
+    lat=dc.iloc[-1]
+    summary_snapshot=_build_summary_snapshot(dc)
+    ensemble_snapshot=_build_ensemble_snapshot(dc)
+    summary_price=_sf(summary_snapshot['price'])
+    summary_price_available=bool(summary_snapshot['summary_price_available'])
+    display_close=max(summary_price if summary_price_available else _sf(lat.get('Close')),0.01)
+    pc=summary_snapshot['price_change'];pp=summary_snapshot['price_change_pct']
     LN=['Trend','Momentum','Candle','BB','Volume','MF','Pattern','Combined','Leading','Lagging']
     bl={n:_sf(lat.get(f'BL_{n}',0)) for n in LN};sl={n:_sf(lat.get(f'SL_{n}',0)) for n in LN}
     acs=[]
@@ -1067,7 +1145,7 @@ def build_metadata(dc,ticker):
     committee={}
     for cm in COMMITTEE_NAMES:vv=int(_sf(lat.get(f'CM_{cm}_Vote',0)));committee[cm]={'score':_sf(lat.get(f'CM_{cm}_EffScore',0)),'conviction':_sf(lat.get(f'CM_{cm}_EffConv',0)),'vote':'BUY' if vv==1 else('SELL' if vv==-1 else('ABSTAIN' if vv==-99 else 'NEUTRAL')),'vote_int':vv}
     ctx_code=int(_sf(lat.get('Market_Context',0)))
-    close_latest=max(_sf(lat.get('Close')),0.01)
+    close_latest=display_close
     dollar_volume_20=_sf(lat.get('Dollar_Volume_20'))
     dollar_volume_log=np.log10(dc.get('Dollar_Volume_20',pd.Series(0,index=dc.index)).clip(lower=1))
     dollar_volume_z=_sf((((dollar_volume_log-dollar_volume_log.rolling(60,min_periods=20).mean())/(dollar_volume_log.rolling(60,min_periods=20).std()+1e-10))*1.0).iloc[-1])
@@ -1084,10 +1162,11 @@ def build_metadata(dc,ticker):
     stock_return_20=_sf(lat.get('Stock_Return'))*100.0
     spy_return_20=_sf(lat.get('SPY_Return'))*100.0
     excess_return_20=stock_return_20-spy_return_20
-    payload={'ticker':ticker.upper(),'price':_sf(lat['Close']),'price_change':pc,'price_change_pct':pp,'volume':_sf(lat['Volume']),'avg_volume':_sf(dc['Volume'].rolling(20).mean().iloc[-1]),
-        'wt1':_sf(lat.get('WT1')),'rsi':_sf(lat.get('RSI'),50),'mfi':_sf(lat.get('MFI'),50),'stochk':_sf(lat.get('StochK'),50),'adx':_sf(lat.get('ADX')),'atr':_sf(lat.get('ATR')),'atr_pct':_sf(lat.get('ATR'))/(max(_sf(lat['Close']),0.01))*100,
+    payload={'ticker':ticker.upper(),'price':summary_price,'price_change':pc,'price_change_pct':pp,'summary_price_available':summary_snapshot['summary_price_available'],'summary_change_available':summary_snapshot['summary_change_available'],'summary_date':summary_snapshot['summary_date'],'volume':_sf(lat['Volume']),'avg_volume':_sf(dc['Volume'].rolling(20).mean().iloc[-1]),
+        'wt1':_sf(lat.get('WT1')),'rsi':_sf(lat.get('RSI'),50),'mfi':_sf(lat.get('MFI'),50),'stochk':_sf(lat.get('StochK'),50),'adx':_sf(lat.get('ADX')),'atr':_sf(lat.get('ATR')),'atr_pct':_sf(lat.get('ATR'))/(close_latest)*100,
         'macd_hist':_sf(lat.get('MACD_Hist')),'cmf':_sf(lat.get('CMF')),'composite_accel':_sf(lat.get('Composite_Accel')),'rs_ratio':_sf(lat.get('RS_Ratio'),1),
         'regime':rg,'regime_label':rl,'regime_score':_sf(lat.get('Regime_Score')),'last_date':dc.index[-1].strftime('%Y-%m-%d'),'squeeze_on':bool(lat.get('Squeeze_On',False)),
+        'bias_mode':str(lat.get('Bias_Mode', DEFAULT_BIAS_MODE)),
         'buy_total':_sf(lat.get('Buy_Total')),'sell_total':_sf(lat.get('Sell_Total')),'buy_active':int(_sf(lat.get('Buy_Active_Layers'))),'sell_active':int(_sf(lat.get('Sell_Active_Layers'))),
         'buy_layers':bl,'sell_layers':sl,'judgment':str(lat.get('Trade_Judgment','NEUTRAL')),'confidence':_sf(lat.get('Judgment_Confidence')),
         'objective_buy_score':_sf(lat.get('Objective_Buy_Score')),'objective_sell_score':_sf(lat.get('Objective_Sell_Score')),'objective_conflict_score':_sf(lat.get('Objective_Conflict_Score')),
@@ -1103,7 +1182,7 @@ def build_metadata(dc,ticker):
         'objective_reason':str(lat.get('Objective_Reason','')),'objective_detail':str(lat.get('Objective_Detail','')),
         'objective_action_label':str(lat.get('Objective_Action_Label','')),'objective_alignment':str(lat.get('Objective_Alignment','MIXED')),
         'objective_adjustment':str(lat.get('Objective_Adjustment','NONE')),
-        'ensemble_score':_sf(lat.get('Ensemble_Score')),'prediction_boost':_sf(lat.get('Prediction_Boost')),
+        'ensemble_score':ensemble_snapshot['ensemble_score'],'ensemble_score_available':ensemble_snapshot['ensemble_score_available'],'ensemble_score_source':ensemble_snapshot['ensemble_score_source'],'prediction_boost':_sf(lat.get('Prediction_Boost')),
         'leading_verdict':str(lat.get('Leading_Verdict','중립')),'lagging_verdict':str(lat.get('Lagging_Verdict','비추세/횡보')),
         'setup_pressure_buy':_sf(lat.get('Setup_Pressure_Buy')),'setup_pressure_sell':_sf(lat.get('Setup_Pressure_Sell')),
         'utbot_dir':int(_sf(lat.get('UTBot_Dir'))),'hma_rising':bool(lat.get('HMA_Rising',False)),'slowk':_sf(lat.get('SlowK'),50),'squeeze_mom':_sf(lat.get('Squeeze_Momentum')),
@@ -1171,9 +1250,9 @@ def build_metadata(dc,ticker):
         'combined_scans':acs,'recent_signals':recent,'derived_signal_events':derived_signal_events,'derived_reason_states':derived_reason_states,
         'strategy_summary':strategy_summary,'strategy_results':strategy_results,'strategy_visible_results':strategy_visible_results,'top_strategy':strategy_summary.get('top_strategy'),
         'high_52w':float(dc['High'].max()),'low_52w':float(dc['Low'].min()),
-        'ma20_dist':round((_sf(lat['Close'])-_sf(lat.get('MA20',_sf(lat['Close']))))/_sf(lat['Close'])*100,2) if _sf(lat.get('MA20')) else 0,
-        'ma50_dist':round((_sf(lat['Close'])-_sf(lat.get('MA50',_sf(lat['Close']))))/_sf(lat['Close'])*100,2) if _sf(lat.get('MA50')) else 0,
-        'ma200_dist':round((_sf(lat['Close'])-_sf(lat.get('MA200',_sf(lat['Close']))))/_sf(lat['Close'])*100,2) if _sf(lat.get('MA200')) else 0}
+        'ma20_dist':round((summary_price-_sf(lat.get('MA20',summary_price)))/close_latest*100,2) if summary_price_available and _sf(lat.get('MA20')) else 0,
+        'ma50_dist':round((summary_price-_sf(lat.get('MA50',summary_price)))/close_latest*100,2) if summary_price_available and _sf(lat.get('MA50')) else 0,
+        'ma200_dist':round((summary_price-_sf(lat.get('MA200',summary_price)))/close_latest*100,2) if summary_price_available and _sf(lat.get('MA200')) else 0}
     return AnalysisViewModel.from_payload(payload).to_dict()
 
 

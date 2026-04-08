@@ -97,6 +97,65 @@ class JT:
     STRONG_SELL_SCAN_BIAS=-5.2
     WATCH_BUY_SCAN_BIAS=4.0
 
+
+BIAS_MODE_EQUITY_LONG = "equity_long_bias"
+BIAS_MODE_MARKET_NEUTRAL = "market_neutral"
+BIAS_MODE_AGGRESSIVE_SHORT = "aggressive_short"
+DEFAULT_BIAS_MODE = BIAS_MODE_EQUITY_LONG
+
+BIAS_PROFILE_REGISTRY = {
+    BIAS_MODE_EQUITY_LONG: {
+        "strong_buy_th": JT.STRONG_BUY_TH,
+        "buy_th": JT.BUY_TH,
+        "watch_buy_th": JT.WATCH_BUY_TH,
+        "strong_sell_th": JT.STRONG_SELL_TH,
+        "sell_th": JT.SELL_TH,
+        "watch_sell_th": JT.WATCH_SELL_TH,
+        "leader_buy_support": JT.LEADER_BUY_SUPPORT,
+        "leader_sell_relief": JT.LEADER_SELL_RELIEF,
+        "bear_turn_score_scale": JT.BEAR_TURN_SCORE_SCALE,
+        "market_turn_bear_scale": JT.MARKET_TURN_BEAR_SCALE,
+    },
+    BIAS_MODE_MARKET_NEUTRAL: {
+        "strong_buy_th": 58.0,
+        "buy_th": 24.0,
+        "watch_buy_th": 4.0,
+        "strong_sell_th": -58.0,
+        "sell_th": -24.0,
+        "watch_sell_th": -4.0,
+        "leader_buy_support": 0.0,
+        "leader_sell_relief": 0.0,
+        "bear_turn_score_scale": 1.0,
+        "market_turn_bear_scale": 1.0,
+    },
+    BIAS_MODE_AGGRESSIVE_SHORT: {
+        "strong_buy_th": 60.0,
+        "buy_th": 26.0,
+        "watch_buy_th": 6.0,
+        "strong_sell_th": -50.0,
+        "sell_th": -22.0,
+        "watch_sell_th": -6.0,
+        "leader_buy_support": 0.0,
+        "leader_sell_relief": 1.5,
+        "bear_turn_score_scale": 1.18,
+        "market_turn_bear_scale": 1.12,
+    },
+}
+
+
+def resolve_bias_mode(bias_mode=None):
+    mode = str(bias_mode or DEFAULT_BIAS_MODE).strip().lower()
+    if mode in BIAS_PROFILE_REGISTRY:
+        return mode
+    return DEFAULT_BIAS_MODE
+
+
+def get_bias_profile(bias_mode=None):
+    mode = resolve_bias_mode(bias_mode)
+    profile = dict(BIAS_PROFILE_REGISTRY[mode])
+    profile["name"] = mode
+    return profile
+
 # ── Context (11종) ──
 CTX_DEFAULT=0;CTX_EXTREME_OS=1;CTX_EXTREME_OB=2;CTX_STRONG_UP=3;CTX_STRONG_DN=4
 CTX_ACCUMULATION=5;CTX_DISTRIBUTION=6;CTX_RANGING=7;CTX_BOTTOMING=8;CTX_TOPPING=9

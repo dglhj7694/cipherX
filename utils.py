@@ -4,6 +4,8 @@ import numpy as np
 import yfinance as yf
 import math, time, re
 
+from config import DEFAULT_BIAS_MODE, resolve_bias_mode
+
 _ANALYSIS_US_TICKER_PATTERN = re.compile(r"^[A-Z]{1,6}(?:[.\-][A-Z0-9]{1,4})?$")
 _ANALYSIS_KR_CODE_PATTERN = re.compile(r"^\d{6}$")
 _ANALYSIS_KR_TICKER_PATTERN = re.compile(r"^\d{6}\.(?:KS|KQ)$")
@@ -127,10 +129,12 @@ def resolve_analysis_ticker(t):
             }
     return {"input": raw, "resolved": None, "valid": False, "reason": "not_found", "candidates": candidates}
 @st.cache_data(ttl=300,max_entries=50,show_spinner=False)
-def _compute_cached(t,k):
+def _compute_cached(t,k,bias_mode=DEFAULT_BIAS_MODE):
     from engine import detect_all_signals
     from indicators import compute_indicators
-    try:df=fetch_history(t);return detect_all_signals(compute_indicators(df)) if not df.empty else None
+    bias_mode = resolve_bias_mode(bias_mode)
+    try:df=fetch_history(t);return detect_all_signals(compute_indicators(df), bias_mode=bias_mode) if not df.empty else None
     except Exception as e:print(f"[ERR]{t}:{e}");return None
-def compute_and_cache(t,ts=None):
-    ck=f"{t}_{ts}" if ts else f"{t}_{math.floor(time.time()/300)}";return _compute_cached(t,ck)
+def compute_and_cache(t,ts=None,bias_mode=DEFAULT_BIAS_MODE):
+    mode = resolve_bias_mode(bias_mode)
+    ck=f"{t}_{ts}_{mode}" if ts else f"{t}_{math.floor(time.time()/300)}_{mode}";return _compute_cached(t,ck,mode)

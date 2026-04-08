@@ -5,19 +5,22 @@ import pandas as pd
 from domain import CommitteeReview, DecisionEvidence, EngineResult, FinalDecision, ObjectiveReview
 from engine_combo_registry import ensure_runtime_combo_registry
 from engine_combo_scans import detect_combined_scans
+from config import DEFAULT_BIAS_MODE, resolve_bias_mode
 from engine_runtime.committee_scores import compute_committee_scores
 from engine_runtime.final_decision import compute_final_decision
 from engine_runtime.objective_scores import compute_objective_scores
 from engine_runtime.scoring.layer_scores import compute_layer_scores
 
 
-def apply_runtime_pipeline(df: pd.DataFrame, vol_ratio, hma_rising, hma_rising_values, combo_registry):
+def apply_runtime_pipeline(df: pd.DataFrame, vol_ratio, hma_rising, hma_rising_values, combo_registry, bias_mode=DEFAULT_BIAS_MODE):
+    bias_mode = resolve_bias_mode(bias_mode)
     registry = ensure_runtime_combo_registry(combo_registry)
     df = detect_combined_scans(df, vol_ratio, hma_rising, registry=registry)
     df = compute_layer_scores(df, vol_ratio, hma_rising_values, registry)
-    df = compute_committee_scores(df, vol_ratio, hma_rising_values)
+    df = compute_committee_scores(df, vol_ratio, hma_rising_values, bias_mode=bias_mode)
     df = compute_objective_scores(df, vol_ratio)
     df = compute_final_decision(df)
+    df["Bias_Mode"] = bias_mode
     return df
 
 

@@ -48,7 +48,7 @@ def det_bb(c,o,h,l,bbu,bbl,bbw,kcu,kcl):
     return {'BB_Squeeze':tight,'BB_Squeeze_Started':ss_bb&~ss_bb.shift(1).fillna(False),'BB_Squeeze_End_Bull':seb,'BB_Squeeze_End_Bear':ses,'BB_Upper_Touch':ut&~ub,'BB_Lower_Touch':lt&~lb_,'BB_Upper_Break':ub,'BB_Lower_Break':lb_,'BB_Lower_Bounce':lbo,'BB_Upper_Walk':uw,'BB_Lower_Walk':lw,'BB_Wide_Bands':wd}
 
 # ?곣봺??detect_all_signals ?곣봺??
-def detect_all_signals(df):
+def detect_all_signals(df, bias_mode=DEFAULT_BIAS_MODE):
     _ensure_runtime_combo_registry()
     H,L,C,O,V=df['High'],df['Low'],df['Close'],df['Open'],df['Volume']
     e8,e21=df['EMA8'],df['EMA21'];m10,m20,m50,m200=df['MA10'],df['MA20'],df['MA50'],df['MA200']
@@ -177,15 +177,15 @@ def detect_all_signals(df):
     df['VuManChu_Bull']=((wt1<-30)&(hrb|hma_r)&(df['Bull_Divergence'].fillna(False)|df['RSI_Bull_Divergence'].fillna(False)|df['Bullish_Engulfing'].fillna(False)|df['Hammer'].fillna(False)|df['Morning_Star'].fillna(False)))&vok
     df['VuManChu_Bear']=((wt1>30)&(hrbe|~hma_r)&(df['Bear_Divergence'].fillna(False)|df['RSI_Bear_Divergence'].fillna(False)|df['Bearish_Engulfing'].fillna(False)|df['Shooting_Star'].fillna(False)|df['Evening_Star'].fillna(False)))&vok
     for (bs,ss),cd in {('UTBot_Buy','UTBot_Sell'):10,('Hull_Turn_Bull','Hull_Turn_Bear'):7,('StochSlow_Cross_Buy','StochSlow_Cross_Sell'):7,('Squeeze_Mom_Cross_Up','Squeeze_Mom_Cross_Down'):5,('VuManChu_Bull','VuManChu_Bear'):10}.items():_cd_dir(df,bs,ss,cd)
-    return apply_runtime_pipeline(df, vol_ratio, hma_r, hma_r_v, COMBINED_SCAN_REGISTRY)
+    return apply_runtime_pipeline(df, vol_ratio, hma_r, hma_r_v, COMBINED_SCAN_REGISTRY, bias_mode=bias_mode)
 
 def compute_10layer_scores(df, vol_ratio, hma_r_v):
     return _compute_10layer_scores_impl(df, vol_ratio, hma_r_v, COMBINED_SCAN_REGISTRY)
 
 # Committee/objective wrappers keep the root pipeline stable
 # while the heavy implementations live in dedicated modules.
-def compute_committee_ensemble(df,vol_ratio,hma_r_v):
-    return _compute_committee_ensemble_impl(df, vol_ratio, hma_r_v)
+def compute_committee_ensemble(df,vol_ratio,hma_r_v,bias_mode=DEFAULT_BIAS_MODE):
+    return _compute_committee_ensemble_impl(df, vol_ratio, hma_r_v, bias_mode=bias_mode)
 
 
 def _compute_objective_judgment(df,vol_ratio):

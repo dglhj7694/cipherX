@@ -9,6 +9,7 @@ class AnalysisRequest:
     ticker: str
     chart_days: int
     refresh: bool = False
+    bias_mode: str = "equity_long_bias"
 
 
 @dataclass

@@ -24,7 +24,7 @@ class AnalysisArtifacts:
 class AnalysisService:
     def analyze(self, request: AnalysisRequest, prompt_builder) -> AnalysisArtifacts:
         cache_buster = int(time.time()) if request.refresh else None
-        df = compute_and_cache(request.ticker, cache_buster)
+        df = compute_and_cache(request.ticker, cache_buster, bias_mode=request.bias_mode)
         if df is None or getattr(df, "empty", True) or len(df) < 50:
             return AnalysisArtifacts(None, None, None, "데이터 부족", None, None)
 
@@ -34,7 +34,12 @@ class AnalysisService:
 
         meta_payload = build_metadata(dc, request.ticker)
         meta = AnalysisViewModel.from_payload(meta_payload)
-        audit = build_audit_payload(df, ticker=request.ticker, lookback_bars=max(request.chart_days, 252))
+        audit = build_audit_payload(
+            df,
+            ticker=request.ticker,
+            lookback_bars=max(request.chart_days, 252),
+            bias_mode=request.bias_mode,
+        )
         prompt_text = prompt_builder(dc, meta.to_dict())
         chart_json = build_chart(dc, request.ticker).to_json()
         return AnalysisArtifacts(df, dc, meta, prompt_text, chart_json, audit)
