@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 
 from config import *
+from signal_catalog import COOPER_BUY_SIGNAL_KEYS, COOPER_SELL_SIGNAL_KEYS
 from utils import _sp, _vs
 
 
@@ -14,6 +15,34 @@ OBJECTIVE_SELL_LABELS = {"STRONG_SELL", "SELL", "WATCH_SELL"}
 
 def _finite_array(values, default=0.0):
     return np.nan_to_num(np.asarray(values, dtype=float), nan=default, posinf=default, neginf=default)
+
+
+def _top_component_notes(components: pd.DataFrame, *, limit: int = 3, score_floor: float = 0.5) -> pd.Series:
+    if components is None or components.empty:
+        return pd.Series("", index=getattr(components, "index", None), dtype=object)
+    labels = list(components.columns)
+    values = components.fillna(0.0).to_numpy(dtype=float)
+    notes: list[str] = []
+    for row in values:
+        ranked = sorted(
+            ((float(row[idx]), labels[idx]) for idx in range(len(labels)) if float(row[idx]) >= score_floor),
+            key=lambda item: item[0],
+            reverse=True,
+        )
+        notes.append("; ".join(f"{label} {score:.0f}" for score, label in ranked[:limit]))
+    return pd.Series(notes, index=components.index, dtype=object)
+
+
+def _active_flag_notes(flags: pd.DataFrame, *, limit: int = 4) -> pd.Series:
+    if flags is None or flags.empty:
+        return pd.Series("", index=getattr(flags, "index", None), dtype=object)
+    labels = list(flags.columns)
+    values = flags.fillna(False).to_numpy(dtype=bool)
+    notes: list[str] = []
+    for row in values:
+        active = [labels[idx] for idx, flag in enumerate(row) if bool(flag)]
+        notes.append("; ".join(active[:limit]))
+    return pd.Series(notes, index=flags.index, dtype=object)
 
 
 def detect_context_vectorized(df):
@@ -309,66 +338,313 @@ def committee_structure(df, N):
 
 def committee_leading(df, N, bias_profile=None):
     bias_profile = bias_profile or get_bias_profile()
-    bear_turn_scale = float(bias_profile.get("bear_turn_score_scale", JT.BEAR_TURN_SCORE_SCALE))
-    market_turn_bear_scale = float(bias_profile.get("market_turn_bear_scale", JT.MARKET_TURN_BEAR_SCALE))
     idx = df.index
     score = pd.Series(0.0, index=idx)
+    F = lambda c: df.get(c, pd.Series(False, index=idx)).fillna(False).astype(bool)
+    close = df["Close"]
     ut = N("UTBot_Dir")
-    hma = df.get("HMA_Rising", pd.Series(False, index=idx)).fillna(False)
-    score += np.where(ut == 1, 20, np.where(ut == -1, -20, 0)) + np.where(hma, 15, -15)
+    hma_available = "HMA_Rising" in df.columns
+    hma = df.get("HMA_Rising", pd.Series(False, index=idx)).fillna(False).astype(bool)
+    hma_down = (~hma) if hma_available else pd.Series(False, index=idx)
     sq = N("Squeeze_Momentum")
-    sr = df.get("Squeeze_Mom_Rising", pd.Series(False, index=idx)).fillna(False)
-    score += np.where(sq > 0, 10, np.where(sq < 0, -10, 0)) + np.where((sq > 0) & sr, 5, np.where((sq < 0) & ~sr, -5, 0))
-    ca = N("Composite_Accel")
-    score += np.clip(ca * JT.ACCEL_COMMITTEE_LEAD, -16, 16)
-    spb = N("Setup_Pressure_Buy")
-    sps = N("Setup_Pressure_Sell")
-    score += np.clip(spb * 2, 0, 20) - np.clip(sps * 2, 0, 20)
-    F = lambda c: df.get(c, pd.Series(False, index=idx)).fillna(False)
+    sr = df.get("Squeeze_Mom_Rising", pd.Series(False, index=idx)).fillna(False).astype(bool)
     sq_pos = F("Squeeze_Mom_Positive")
+    sq_neg = (sq < 0) & (~sq_pos)
+    volume_ratio = N("Volume_Ratio_20", 1.0)
+    adx = N("ADX", 0.0)
+    rsi = N("RSI", 50.0)
+    wt1 = N("WT1", 0.0)
+    history_bars = N("History_Bars", 0)
+    ma50 = N("MA50", np.nan)
+    ma200 = N("MA200", np.nan)
+    vwap = N("VWAP", np.nan)
+    fixed_vwap = N("Fixed_VWAP", np.nan)
+    prev_close = close.shift(1).fillna(close)
+    vwap_prev = vwap.shift(1).fillna(vwap)
+    fixed_vwap_prev = fixed_vwap.shift(1).fillna(fixed_vwap)
+    above_vwap = (close >= vwap).fillna(False)
+    below_vwap = (close <= vwap).fillna(False)
+    above_fixed_vwap = (close >= fixed_vwap).fillna(False)
+    below_fixed_vwap = (close <= fixed_vwap).fillna(False)
+    vwap_reclaim_buy = F("VWAP_Bounce_Buy") | (above_vwap & (prev_close <= vwap_prev))
+    vwap_reclaim_sell = F("VWAP_Reject_Sell") | (below_vwap & (prev_close >= vwap_prev))
+    fixed_vwap_hold_buy = above_fixed_vwap & (fixed_vwap >= fixed_vwap_prev)
+    fixed_vwap_hold_sell = below_fixed_vwap & (fixed_vwap <= fixed_vwap_prev)
+    above_ma50 = (history_bars >= JT.MIN_HISTORY_MA50) & (close > ma50)
+    above_ma200 = (history_bars >= JT.MIN_HISTORY_MA200) & (close > ma200)
+    below_ma50 = (history_bars >= JT.MIN_HISTORY_MA50) & (close < ma50)
+    below_ma200 = (history_bars >= JT.MIN_HISTORY_MA200) & (close < ma200)
+
     ut_stop_gap = (df["Close"] - N("UTBot_Stop", np.nan)) / (N("ATR") + 1e-10)
     ut_valid = ut_stop_gap.replace([np.inf, -np.inf], np.nan).notna()
     ut_support_buy = ut_valid & (ut_stop_gap >= 0) & (ut_stop_gap <= JT.UTBOT_SUPPORT_MAX_ATR) & (ut == 1)
     ut_support_sell = ut_valid & (ut_stop_gap <= 0) & ((-ut_stop_gap) <= JT.UTBOT_SUPPORT_MAX_ATR) & (ut == -1)
     ut_overheat_buy = ut_valid & (ut_stop_gap >= JT.UTBOT_OVERHEAT_ATR)
     ut_overheat_sell = ut_valid & ((-ut_stop_gap) >= JT.UTBOT_OVERHEAT_ATR)
-    score += np.where(sq_pos & (sq > 0), 6, np.where((~sq_pos) & (sq < 0), -6, 0))
-    score += np.where(F("Pocket_Pivot"), 10, 0) + np.where(F("Pocket_Pivot") & F("Three_Weeks_Tight"), 8, 0)
-    score += np.where(F("Gap_Down_Closed") & (F("Pocket_Pivot") | sq_pos), 10, 0) - np.where(F("Gap_Up_Closed") & (F("Parabolic_Rise") | F("Volume_Surge")), 12, 0)
-    score += F("Multiple_Ten_Bull").astype(float) * 4 - F("Multiple_Ten_Bear").astype(float) * 4
-    score += np.where(F("Fib_50_Support"), 5, 0) + np.where(F("Fib_618_Support"), 7, 0) + np.where(F("Fib_618_Reclaim"), 8, 0)
-    score -= np.where(F("Fib_50_Resistance"), 5, 0) + np.where(F("Fib_618_Resistance"), 7, 0) + np.where(F("Fib_618_Breakdown"), 8, 0)
-    score += np.where(F("Fib_Confluence_Buy"), 8, 0) - np.where(F("Fib_Confluence_Sell"), 8, 0)
-    score += np.where(F("Box_Support_Hold"), 6, 0) - np.where(F("Box_Resistance_Reject"), 6, 0)
-    score += np.where(F("Channel_Support_Hold"), 7, 0) - np.where(F("Channel_Resistance_Reject"), 7, 0)
-    score += np.where(F("Box_Breakout_Bull"), 8, 0) - np.where(F("Box_Breakdown_Bear"), 8, 0)
-    score += np.where(F("Channel_Breakout_Bull"), 9, 0) - np.where(F("Channel_Breakdown_Bear"), 9, 0)
-    score += np.where(F("Triangle_Breakout_Bull"), 10, 0) - np.where(F("Triangle_Breakdown_Bear"), 10, 0)
-    score += np.where(F("Triangle_Breakout_Bull") & (F("Pocket_Pivot") | sq_pos), 6, 0) - np.where(F("Triangle_Breakdown_Bear") & (F("Parabolic_Rise") | F("Volume_Surge")), 6, 0)
-    score += np.where(ut_support_buy, 8, 0) - np.where(ut_support_sell, 8, 0)
-    score -= np.where(ut_overheat_buy, 10, 0)
-    score += np.where(ut_overheat_sell, 10, 0)
-    score += np.clip((N("Trend_Inflection_Buy_Score", 0) * JT.TREND_INFLECTION_COMMITTEE_BUY_W * 1.05) - (N("Trend_Inflection_Sell_Score", 0) * bear_turn_scale * JT.TREND_INFLECTION_COMMITTEE_SELL_W), -28, 28)
-    score += np.clip((N("Market_Turn_Bull_Score", 0) * 3.5) - (N("Market_Turn_Bear_Score", 0) * market_turn_bear_scale * 3.5), -14, 14)
-    ma_gap = N("MA20_ATR_Gap")
-    score -= np.clip((ma_gap - 1.5) * 8, 0, 20)
-    score += np.clip((-ma_gap - 1.5) * 8, 0, 20)
-    for cn, cfg in COMBINED_SCAN_REGISTRY.items():
-        if cn not in df.columns:
-            continue
-        pts = {1: 15, 2: 8, 3: 3}.get(cfg["tier"], 3)
-        if cfg["dir"] == "buy":
-            score += np.where(F(cn), pts, 0)
-        elif cfg["dir"] == "sell":
-            score -= np.where(F(cn), pts, 0)
-    score += np.where(F("VuManChu_Bull"), 20, 0) - np.where(F("VuManChu_Bear"), 20, 0)
-    score += np.where(F("Washout_Bottom_Hard"), 35, 0) - np.where(F("Blowoff_Top_Hard"), 45, 0)
-    ns = (score / JT.LEADING_NORM * 100).clip(-100, 100)
-    ag = (ut == 1).astype(float) + hma.astype(float) + (sq > 0).astype(float) + (ca > 0).astype(float) + ut_support_buy.astype(float) + F("Pocket_Pivot").astype(float) + F("Gap_Down_Closed").astype(float) + F("Box_Support_Hold").astype(float) + F("Channel_Support_Hold").astype(float) + F("Triangle_Breakout_Bull").astype(float) + F("Fib_618_Support").astype(float) + F("Fib_618_Reclaim").astype(float) + F("Fib_Confluence_Buy").astype(float)
-    dg = (ut == -1).astype(float) + (~hma).astype(float) + (sq < 0).astype(float) + (ca < 0).astype(float) + ut_support_sell.astype(float) + F("Gap_Up_Closed").astype(float) + F("Parabolic_Rise").astype(float) + F("Box_Resistance_Reject").astype(float) + F("Channel_Resistance_Reject").astype(float) + F("Triangle_Breakdown_Bear").astype(float) + F("Fib_618_Resistance").astype(float) + F("Fib_618_Breakdown").astype(float) + F("Fib_Confluence_Sell").astype(float)
-    conv = np.clip(np.maximum(ag.values, dg.values) * 20 + 10 + np.where(F("Blowoff_Top_Hard") | F("Washout_Bottom_Hard"), 12, 0), 10, 90)
-    conv = np.clip(conv + np.maximum(N("Trend_Inflection_Buy_Score", 0).values, N("Trend_Inflection_Sell_Score", 0).values) * 4 + np.maximum(N("Market_Turn_Bull_Score", 0).values, N("Market_Turn_Bear_Score", 0).values) * 2, 10, 95)
-    return ns, pd.Series(conv, index=idx)
+    bullish_gap_reversal = F("Gap_Down_Closed") & (
+        F("Pocket_Pivot")
+        | F("Three_Weeks_Tight")
+        | F("Box_Support_Hold")
+        | F("Channel_Support_Hold")
+        | F("Triangle_Breakout_Bull")
+        | (sq > 0)
+    )
+    bearish_gap_failure = F("Gap_Up_Closed") & (
+        F("Parabolic_Rise")
+        | F("Volume_Surge")
+        | F("Box_Breakdown_Bear")
+        | F("Channel_Breakdown_Bear")
+        | F("Triangle_Breakdown_Bear")
+        | (sq < 0)
+    )
+
+    def _weighted_signal_score(weight_map: dict[str, float], cap: float) -> pd.Series:
+        total = pd.Series(0.0, index=idx)
+        for key, weight in weight_map.items():
+            total += F(key).astype(float) * float(weight)
+        return total.clip(lower=0.0, upper=float(cap))
+
+    cooper_buy_score = _weighted_signal_score(
+        {
+            "Pullback_123_Bull": 4.0,
+            "Setup_180_Bull": 4.0,
+            "Boomer_Buy": 4.0,
+            "Expansion_BO": 6.0,
+            "Expansion_Pivot_Buy": 4.0,
+            "Gilligans_Buy": 5.0,
+            "Lizard_Bull": 3.0,
+            "Slingshot_Bull": 5.0,
+        },
+        cap=18.0,
+    )
+    cooper_sell_score = _weighted_signal_score(
+        {
+            "Pullback_123_Bear": 4.0,
+            "Setup_180_Bear": 4.0,
+            "Boomer_Sell": 4.0,
+            "Expansion_BD": 6.0,
+            "Expansion_Pivot_Sell": 4.0,
+            "Expansion_Double_Sticks": 5.0,
+            "Gilligans_Sell": 5.0,
+            "Lizard_Bear": 3.0,
+            "Slingshot_Bear": 5.0,
+        },
+        cap=18.0,
+    )
+
+    buy_components = pd.DataFrame(
+        {
+            "UT Bot aligned": np.where(ut == 1, 22.0, 0.0) + np.where(ut_support_buy, 4.0, 0.0),
+            "Hull slope up": hma.astype(float) * 18.0,
+            "VuManChu bull": F("VuManChu_Bull").astype(float) * 28.0,
+            "VWAP support": (
+                above_vwap.astype(float) * 8.0
+                + vwap_reclaim_buy.astype(float) * 6.0
+                + fixed_vwap_hold_buy.astype(float) * 6.0
+            ).clip(upper=20.0),
+            "Cooper setups": cooper_buy_score,
+            "Confirmation stack": (
+                F("CS_Triple_Confirm_Buy").astype(float) * 8.0
+                + F("CS_VuManChu_Squeeze_Buy").astype(float) * 8.0
+                + F("CS_Cooper_Setup_Buy").astype(float) * 6.0
+                + F("Pocket_Pivot").astype(float) * 4.0
+                + F("Fib_Confluence_Buy").astype(float) * 4.0
+                + bullish_gap_reversal.astype(float) * 5.0
+                + np.clip(N("Trend_Inflection_Buy_Score", 0.0) * 2.0, 0, 8)
+                + np.clip(N("Market_Turn_Bull_Score", 0.0) * 1.5, 0, 6)
+                + np.where(sq_pos & (sq > 0) & sr, 3.0, 0.0)
+                + F("Washout_Bottom_Hard").astype(float) * 10.0
+            ).clip(upper=22.0),
+        },
+        index=idx,
+    )
+    sell_components = pd.DataFrame(
+        {
+            "UT Bot aligned": np.where(ut == -1, 22.0, 0.0) + np.where(ut_support_sell, 4.0, 0.0),
+            "Hull slope down": hma_down.astype(float) * 18.0,
+            "VuManChu bear": F("VuManChu_Bear").astype(float) * 28.0,
+            "VWAP resistance": (
+                below_vwap.astype(float) * 8.0
+                + vwap_reclaim_sell.astype(float) * 6.0
+                + fixed_vwap_hold_sell.astype(float) * 6.0
+            ).clip(upper=20.0),
+            "Cooper setups": cooper_sell_score,
+            "Confirmation stack": (
+                F("CS_Triple_Confirm_Sell").astype(float) * 8.0
+                + F("CS_VuManChu_Squeeze_Sell").astype(float) * 8.0
+                + F("CS_Cooper_Setup_Sell").astype(float) * 6.0
+                + F("Parabolic_Rise").astype(float) * 4.0
+                + F("Fib_Confluence_Sell").astype(float) * 4.0
+                + bearish_gap_failure.astype(float) * 5.0
+                + np.clip(N("Trend_Inflection_Sell_Score", 0.0) * 2.0, 0, 8)
+                + np.clip(N("Market_Turn_Bear_Score", 0.0) * 1.5, 0, 6)
+                + np.where(sq_neg & (~sr), 3.0, 0.0)
+                + F("Blowoff_Top_Hard").astype(float) * 12.0
+            ).clip(upper=22.0),
+        },
+        index=idx,
+    )
+    buy_raw = buy_components.sum(axis=1)
+    sell_raw = sell_components.sum(axis=1)
+
+    buy_penalties = pd.DataFrame(
+        {
+            "Opposing core conflict": (
+                (ut == -1).astype(float) * 6.0
+                + hma_down.astype(float) * 5.0
+                + F("VuManChu_Bear").astype(float) * 8.0
+                + below_vwap.astype(float) * 3.0
+                + below_fixed_vwap.astype(float) * 2.0
+            ).clip(upper=18.0),
+            "Weak ADX / volume": (
+                (adx < 18).astype(float) * 6.0
+                + (volume_ratio < 0.85).astype(float) * 4.0
+                + F("Thin_Trade_Risk").astype(float) * 6.0
+            ).clip(upper=14.0),
+            "Overheat risk": (
+                ut_overheat_buy.astype(float) * 10.0
+                + ((rsi >= 70) & (wt1 >= 55)).astype(float) * 6.0
+                + F("Blowoff_Top_Hard").astype(float) * 18.0
+            ).clip(upper=22.0),
+            "Pattern headwind": (
+                bearish_gap_failure.astype(float) * 8.0
+                + F("Box_Breakdown_Bear").astype(float) * 5.0
+                + F("Channel_Breakdown_Bear").astype(float) * 5.0
+                + F("Triangle_Breakdown_Bear").astype(float) * 6.0
+                + F("Fib_618_Breakdown").astype(float) * 5.0
+                + F("Fib_Confluence_Sell").astype(float) * 6.0
+            ).clip(upper=18.0),
+        },
+        index=idx,
+    )
+    sell_penalties = pd.DataFrame(
+        {
+            "Opposing core conflict": (
+                (ut == 1).astype(float) * 6.0
+                + hma.astype(float) * 5.0
+                + F("VuManChu_Bull").astype(float) * 8.0
+                + above_vwap.astype(float) * 3.0
+                + above_fixed_vwap.astype(float) * 2.0
+            ).clip(upper=18.0),
+            "Weak ADX / volume": (
+                (adx < 18).astype(float) * 6.0
+                + (volume_ratio < 0.85).astype(float) * 4.0
+                + F("Thin_Trade_Risk").astype(float) * 6.0
+            ).clip(upper=14.0),
+            "Washout risk": (
+                ut_overheat_sell.astype(float) * 10.0
+                + ((rsi <= 30) & (wt1 <= -55)).astype(float) * 6.0
+                + F("Washout_Bottom_Hard").astype(float) * 18.0
+            ).clip(upper=22.0),
+            "Pattern headwind": (
+                bullish_gap_reversal.astype(float) * 8.0
+                + F("Box_Support_Hold").astype(float) * 5.0
+                + F("Channel_Support_Hold").astype(float) * 5.0
+                + F("Triangle_Breakout_Bull").astype(float) * 6.0
+                + F("Fib_618_Reclaim").astype(float) * 5.0
+                + F("Fib_Confluence_Buy").astype(float) * 6.0
+            ).clip(upper=18.0),
+        },
+        index=idx,
+    )
+
+    buy_penalty = buy_penalties.sum(axis=1).clip(lower=0.0, upper=40.0)
+    sell_penalty = sell_penalties.sum(axis=1).clip(lower=0.0, upper=40.0)
+    buy_score = (buy_raw - buy_penalty).clip(lower=0.0, upper=100.0)
+    sell_score = (sell_raw - sell_penalty).clip(lower=0.0, upper=100.0)
+    spread = (buy_score - sell_score).clip(lower=-100.0, upper=100.0)
+
+    buy_block = (
+        (buy_penalty >= 24.0)
+        | (((adx < 16) & (volume_ratio < 0.80)) & (buy_raw >= 40.0))
+        | ((buy_penalties["Opposing core conflict"] >= 14.0) & (buy_raw < 75.0))
+    )
+    sell_block = (
+        (sell_penalty >= 24.0)
+        | (((adx < 16) & (volume_ratio < 0.80)) & (sell_raw >= 40.0))
+        | ((sell_penalties["Opposing core conflict"] >= 14.0) & (sell_raw < 75.0))
+    )
+    dominant_buy = buy_score >= sell_score
+    dominant_penalty = pd.Series(np.where(dominant_buy, buy_penalty, sell_penalty), index=idx)
+    dominant_block = pd.Series(np.where(dominant_buy, buy_block, sell_block), index=idx).astype(bool)
+
+    buy_reason_notes = _top_component_notes(buy_components, limit=3, score_floor=3.0)
+    sell_reason_notes = _top_component_notes(sell_components, limit=3, score_floor=3.0)
+    buy_noise_notes = _active_flag_notes(
+        pd.DataFrame(
+            {
+                "Signal conflict": buy_penalties["Opposing core conflict"] >= 8.0,
+                "Weak ADX": adx < 18,
+                "Light volume": volume_ratio < 0.85,
+                "UTBot overheat": ut_overheat_buy,
+                "Pattern headwind": buy_penalties["Pattern headwind"] >= 6.0,
+            },
+            index=idx,
+        )
+    )
+    sell_noise_notes = _active_flag_notes(
+        pd.DataFrame(
+            {
+                "Signal conflict": sell_penalties["Opposing core conflict"] >= 8.0,
+                "Weak ADX": adx < 18,
+                "Light volume": volume_ratio < 0.85,
+                "UTBot squeeze risk": ut_overheat_sell,
+                "Pattern headwind": sell_penalties["Pattern headwind"] >= 6.0,
+            },
+            index=idx,
+        )
+    )
+    dominant_reasons = pd.Series(np.where(dominant_buy, buy_reason_notes, sell_reason_notes), index=idx)
+    dominant_noise_notes = pd.Series(np.where(dominant_buy, buy_noise_notes, sell_noise_notes), index=idx)
+
+    score = spread
+    align_buy = (
+        (ut == 1).astype(float)
+        + hma.astype(float)
+        + F("VuManChu_Bull").astype(float)
+        + above_vwap.astype(float)
+        + above_fixed_vwap.astype(float)
+        + (cooper_buy_score > 0).astype(float)
+        + (buy_components["Confirmation stack"] >= 8.0).astype(float)
+        + above_ma50.astype(float)
+        + above_ma200.astype(float)
+    )
+    align_sell = (
+        (ut == -1).astype(float)
+        + hma_down.astype(float)
+        + F("VuManChu_Bear").astype(float)
+        + below_vwap.astype(float)
+        + below_fixed_vwap.astype(float)
+        + (cooper_sell_score > 0).astype(float)
+        + (sell_components["Confirmation stack"] >= 8.0).astype(float)
+        + below_ma50.astype(float)
+        + below_ma200.astype(float)
+    )
+    conviction = (
+        np.maximum(buy_score.values, sell_score.values) * 0.55
+        + np.abs(spread.values) * 0.35
+        + np.maximum(align_buy.values, align_sell.values) * 4.0
+        - dominant_penalty.values * 0.25
+        + np.where(F("Washout_Bottom_Hard") | F("Blowoff_Top_Hard"), 6.0, 0.0)
+    )
+    conviction = np.clip(conviction, 10.0, 95.0)
+
+    details = {
+        "Leading_Buy_Score": buy_score,
+        "Leading_Sell_Score": sell_score,
+        "Leading_Score_Spread": spread,
+        "Leading_Noise_Penalty": dominant_penalty,
+        "Leading_Noise_Block": dominant_block,
+        "Leading_Buy_Noise_Block": buy_block.astype(bool),
+        "Leading_Sell_Noise_Block": sell_block.astype(bool),
+        "Leading_Buy_Reasons": buy_reason_notes,
+        "Leading_Sell_Reasons": sell_reason_notes,
+        "Leading_Core_Reasons": dominant_reasons,
+        "Leading_Noise_Flags": dominant_noise_notes,
+        "Leading_Cooper_Buy_Count": pd.Series(sum(F(key).astype(int) for key in COOPER_BUY_SIGNAL_KEYS), index=idx),
+        "Leading_Cooper_Sell_Count": pd.Series(sum(F(key).astype(int) for key in COOPER_SELL_SIGNAL_KEYS), index=idx),
+    }
+    return score, pd.Series(conviction, index=idx), details
 
 
 def normalize_weight_rows(wa):
@@ -615,7 +891,9 @@ def compute_committee_ensemble(df, vol_ratio, hma_r_v, bias_mode=DEFAULT_BIAS_MO
     scores={};convictions={}
     scores['Trend'],convictions['Trend']=committee_trend(df,N,bias_profile=bias_profile);scores['Momentum'],convictions['Momentum']=committee_momentum(df,N)
     scores['Money'],convictions['Money']=committee_money(df,N);scores['Structure'],convictions['Structure']=committee_structure(df,N)
-    scores['Leading'],convictions['Leading']=committee_leading(df,N,bias_profile=bias_profile)
+    scores['Leading'],convictions['Leading'],leading_details=committee_leading(df,N,bias_profile=bias_profile)
+    for column_name, column_values in leading_details.items():
+        df[column_name] = column_values
     for cm in COMMITTEE_NAMES:
         scores[cm]=pd.Series(_finite_array(scores[cm].values),index=idx)
         convictions[cm]=pd.Series(_finite_array(convictions[cm].values),index=idx).clip(lower=0,upper=100)
@@ -670,6 +948,15 @@ def compute_committee_ensemble(df, vol_ratio, hma_r_v, bias_mode=DEFAULT_BIAS_MO
     hull_turn_bear_v=F('Hull_Turn_Bear').values
     ut_buy_v=F('UTBot_Buy').values
     ut_sell_v=F('UTBot_Sell').values
+    leading_buy_score_v=N('Leading_Buy_Score',0.).values
+    leading_sell_score_v=N('Leading_Sell_Score',0.).values
+    leading_spread_v=N('Leading_Score_Spread',0.).values
+    leading_noise_penalty_v=N('Leading_Noise_Penalty',0.).values
+    leading_noise_block_v=F('Leading_Noise_Block').values
+    leading_buy_noise_block_v=F('Leading_Buy_Noise_Block').values
+    leading_sell_noise_block_v=F('Leading_Sell_Noise_Block').values
+    leading_reason_v=np.asarray(df.get('Leading_Core_Reasons',pd.Series('',index=idx)).fillna('').astype(str).values,dtype=object)
+    leading_noise_flag_v=np.asarray(df.get('Leading_Noise_Flags',pd.Series('',index=idx)).fillna('').astype(str).values,dtype=object)
     continuation_buy_score_v=(
         pocket_pivot_v.astype(int)
         +(three_weeks_tight_v&squeeze_positive_v).astype(int)
@@ -874,6 +1161,15 @@ def compute_committee_ensemble(df, vol_ratio, hma_r_v, bias_mode=DEFAULT_BIAS_MO
         above_ma50=bool(C[i]>ma50_v[i]) if not np.isnan(ma50_v[i]) else False
         above_ma200=bool(C[i]>ma200_v[i]) if not np.isnan(ma200_v[i]) else False
         leader_mode=bool(leader_stock_mode_v[i])
+        lead_buy=float(leading_buy_score_v[i])
+        lead_sell=float(leading_sell_score_v[i])
+        lead_spread=float(leading_spread_v[i])
+        lead_penalty=float(leading_noise_penalty_v[i])
+        lead_noise_block=bool(leading_noise_block_v[i])
+        lead_buy_block=bool(leading_buy_noise_block_v[i])
+        lead_sell_block=bool(leading_sell_noise_block_v[i])
+        lead_reason=str(leading_reason_v[i] or "").strip()
+        lead_noise_text=str(leading_noise_flag_v[i] or "").strip()
         macro_risk_off_count=int(bool(spy_risk_off_v[i]))+int(bool(breadth_risk_off_v[i]))+int(bool(vix_risk_off_v[i]))+int(bool(tnx_headwind_v[i]))+int(bool(dxy_headwind_v[i]))
         macro_risk_on_count=int(bool(spy_risk_on_v[i]))+int(bool(breadth_risk_on_v[i]))+int(bool(vix_risk_on_v[i]))+int(bool(tnx_tailwind_v[i]))+int(bool(dxy_tailwind_v[i]))
         buy_adj,sell_adj=context_threshold_adjustments(int(ctx_v[i]))
@@ -931,6 +1227,8 @@ def compute_committee_ensemble(df, vol_ratio, hma_r_v, bias_mode=DEFAULT_BIAS_MO
             +int(vr_v[i]>=JT.STRONG_BUY_MIN_VOL_RATIO)
             +int(above_ma50)
             +int(above_ma200)
+            +int(lead_buy>=52.0)
+            +int(lead_spread>=8.0)
         )
         sell_confirm_count=(
             int(continuation_sell_score_v[i]>=2)
@@ -942,8 +1240,14 @@ def compute_committee_ensemble(df, vol_ratio, hma_r_v, bias_mode=DEFAULT_BIAS_MO
             +int(breadth_risk_off_v[i])
             +int(not above_ma50)
             +int(not above_ma200)
+            +int(lead_sell>=52.0)
+            +int(lead_spread<=-8.0)
         )
         strong_buy_ready=(
+            (lead_buy>=62.0)
+            and (lead_spread>=12.0)
+            and (not lead_buy_block)
+            and
             (continuation_buy_score_v[i]>=JT.STRONG_BUY_CONTINUATION_MIN)
             and (buy_confirm_count>=5)
             and (bullish_gap_reversal_v[i] or diag_breakout_v[i] or box_breakout_v[i] or channel_breakout_v[i] or triangle_breakout_v[i] or pocket_pivot_v[i] or three_weeks_tight_v[i] or fib_confluence_buy_v[i])
@@ -957,6 +1261,10 @@ def compute_committee_ensemble(df, vol_ratio, hma_r_v, bias_mode=DEFAULT_BIAS_MO
             and (macro_risk_off_count<4)
         )
         buy_ready=(
+            (lead_buy>=48.0)
+            and (lead_spread>=4.0)
+            and (not lead_buy_block)
+            and
             (buy_confirm_count>=3)
             and (
                 (continuation_buy_score_v[i]>=2)
@@ -967,11 +1275,16 @@ def compute_committee_ensemble(df, vol_ratio, hma_r_v, bias_mode=DEFAULT_BIAS_MO
             )
         )
         watch_buy_ready=(
-            (continuation_buy_score_v[i]>=2)
-            or bullish_gap_reversal_v[i]
-            or buy_supportive_stack_light
-            or early_bull_turn
-            or ut_support_buy_v[i]
+            (lead_buy>=38.0)
+            and (lead_spread>=-4.0)
+            and (not lead_buy_block)
+            and (
+                (continuation_buy_score_v[i]>=2)
+                or bullish_gap_reversal_v[i]
+                or buy_supportive_stack_light
+                or early_bull_turn
+                or ut_support_buy_v[i]
+            )
         )
         sell_breakdown_stack=(
             bearish_gap_failure_v[i]
@@ -983,6 +1296,10 @@ def compute_committee_ensemble(df, vol_ratio, hma_r_v, bias_mode=DEFAULT_BIAS_MO
             or fib_confluence_sell_v[i]
         )
         strong_sell_ready=(
+            (lead_sell>=62.0)
+            and (lead_spread<=-12.0)
+            and (not lead_sell_block)
+            and
             (sell_confirm_count>=JT.STRONG_SELL_CONFIRM_MIN)
             and (
                 hard_blowoff_v[i]
@@ -997,6 +1314,10 @@ def compute_committee_ensemble(df, vol_ratio, hma_r_v, bias_mode=DEFAULT_BIAS_MO
             )
         )
         sell_ready=(
+            (lead_sell>=48.0)
+            and (lead_spread<=-4.0)
+            and (not lead_sell_block)
+            and
             (sell_confirm_count>=JT.SELL_CONFIRM_MIN)
             and (
                 hard_blowoff_v[i]
@@ -1008,16 +1329,21 @@ def compute_committee_ensemble(df, vol_ratio, hma_r_v, bias_mode=DEFAULT_BIAS_MO
             )
         )
         watch_sell_ready=(
-            hard_blowoff_v[i]
-            or (
-                (sell_confirm_count>=JT.WATCH_SELL_CONFIRM_MIN)
-                and (
-                    continuation_sell_score_v[i]>=2
-                    or bearish_gap_failure_v[i]
-                    or diag_reject_v[i]
-                    or box_reject_v[i]
-                    or channel_reject_v[i]
-                    or market_turn_bear_v[i]
+            (lead_sell>=38.0)
+            and (lead_spread<=4.0)
+            and (not lead_sell_block)
+            and (
+                hard_blowoff_v[i]
+                or (
+                    (sell_confirm_count>=JT.WATCH_SELL_CONFIRM_MIN)
+                    and (
+                        continuation_sell_score_v[i]>=2
+                        or bearish_gap_failure_v[i]
+                        or diag_reject_v[i]
+                        or box_reject_v[i]
+                        or channel_reject_v[i]
+                        or market_turn_bear_v[i]
+                    )
                 )
             )
         )
@@ -1069,6 +1395,10 @@ def compute_committee_ensemble(df, vol_ratio, hma_r_v, bias_mode=DEFAULT_BIAS_MO
         macro_risk_off_count_arr[i]=macro_risk_off_count;macro_risk_on_count_arr[i]=macro_risk_on_count
         if high_conflict:
             notes.append("Flip guard active")
+        if lead_noise_block:
+            notes.append("Leading noise block")
+        elif lead_penalty>=18:
+            notes.append("Leading noise elevated")
         if macro_risk_off_count>=3:
             notes.append("Flip guard active")
         elif macro_risk_on_count>=2 and j[i] in sell_labels:
@@ -1199,6 +1529,14 @@ def compute_committee_ensemble(df, vol_ratio, hma_r_v, bias_mode=DEFAULT_BIAS_MO
                 prev_label=j[i]
                 j[i]=downgrade_sell(j[i],severe=(leader_mode or (short_rr_v[i]<0.75 and money_eff[i]>0)))
                 downgrade_count[i]+=int(j[i]!=prev_label)
+        if j[i] in buy_labels and lead_buy_block:
+            prev_label=j[i]
+            j[i]=downgrade_buy(j[i],severe=bool((lead_sell>=lead_buy) or (lead_spread<=0) or (lead_buy<42.0) or (lead_penalty>=28.0)))
+            downgrade_count[i]+=int(j[i]!=prev_label)
+        elif j[i] in sell_labels and lead_sell_block:
+            prev_label=j[i]
+            j[i]=downgrade_sell(j[i],severe=bool((lead_buy>=lead_sell) or (lead_spread>=0) or (lead_sell<42.0) or (lead_penalty>=28.0)))
+            downgrade_count[i]+=int(j[i]!=prev_label)
         if i>0:
             prev_final=j[i-1];prev_buy=prev_final in buy_labels;prev_sell=prev_final in sell_labels;cur_buy=j[i] in buy_labels;cur_sell=j[i] in sell_labels
             if prev_buy and cur_sell:
@@ -1275,6 +1613,10 @@ def compute_committee_ensemble(df, vol_ratio, hma_r_v, bias_mode=DEFAULT_BIAS_MO
             d=f"{d} | {note_txt}" if d else note_txt
         if signal_note_txt:
             d=f"{d} | {signal_note_txt}" if d else signal_note_txt
+        if lead_reason:
+            d=f"{d} | leading={lead_reason}" if d else f"leading={lead_reason}"
+        if lead_noise_text:
+            d=f"{d} | noise={lead_noise_text}" if d else f"noise={lead_noise_text}"
         if not a:
             a=default_action_label(j[i])
         rs.append(r);rd.append(d);al.append(a)

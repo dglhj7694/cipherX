@@ -1162,6 +1162,30 @@ def build_metadata(dc,ticker):
     stock_return_20=_sf(lat.get('Stock_Return'))*100.0
     spy_return_20=_sf(lat.get('SPY_Return'))*100.0
     excess_return_20=stock_return_20-spy_return_20
+    leading_spread=_sf(lat.get('Leading_Score_Spread'))
+    leading_breakdown={
+        'buy_score':_sf(lat.get('Leading_Buy_Score')),
+        'sell_score':_sf(lat.get('Leading_Sell_Score')),
+        'spread':leading_spread,
+        'noise_penalty':_sf(lat.get('Leading_Noise_Penalty')),
+        'noise_block':bool(lat.get('Leading_Noise_Block',False)),
+        'buy_noise_block':bool(lat.get('Leading_Buy_Noise_Block',False)),
+        'sell_noise_block':bool(lat.get('Leading_Sell_Noise_Block',False)),
+        'cooper_buy_count':int(_sf(lat.get('Leading_Cooper_Buy_Count'))),
+        'cooper_sell_count':int(_sf(lat.get('Leading_Cooper_Sell_Count'))),
+        'dominant_side':'buy' if leading_spread>0 else ('sell' if leading_spread<0 else 'mixed'),
+    }
+    leading_reasons={
+        'core':str(lat.get('Leading_Core_Reasons','')),
+        'buy':str(lat.get('Leading_Buy_Reasons','')),
+        'sell':str(lat.get('Leading_Sell_Reasons','')),
+    }
+    leading_noise_flags={
+        'summary':str(lat.get('Leading_Noise_Flags','')),
+        'noise_block':bool(lat.get('Leading_Noise_Block',False)),
+        'buy_noise_block':bool(lat.get('Leading_Buy_Noise_Block',False)),
+        'sell_noise_block':bool(lat.get('Leading_Sell_Noise_Block',False)),
+    }
     payload={'ticker':ticker.upper(),'price':summary_price,'price_change':pc,'price_change_pct':pp,'summary_price_available':summary_snapshot['summary_price_available'],'summary_change_available':summary_snapshot['summary_change_available'],'summary_date':summary_snapshot['summary_date'],'volume':_sf(lat['Volume']),'avg_volume':_sf(dc['Volume'].rolling(20).mean().iloc[-1]),
         'wt1':_sf(lat.get('WT1')),'rsi':_sf(lat.get('RSI'),50),'mfi':_sf(lat.get('MFI'),50),'stochk':_sf(lat.get('StochK'),50),'adx':_sf(lat.get('ADX')),'atr':_sf(lat.get('ATR')),'atr_pct':_sf(lat.get('ATR'))/(close_latest)*100,
         'macd_hist':_sf(lat.get('MACD_Hist')),'cmf':_sf(lat.get('CMF')),'composite_accel':_sf(lat.get('Composite_Accel')),'rs_ratio':_sf(lat.get('RS_Ratio'),1),
@@ -1182,6 +1206,7 @@ def build_metadata(dc,ticker):
         'objective_reason':str(lat.get('Objective_Reason','')),'objective_detail':str(lat.get('Objective_Detail','')),
         'objective_action_label':str(lat.get('Objective_Action_Label','')),'objective_alignment':str(lat.get('Objective_Alignment','MIXED')),
         'objective_adjustment':str(lat.get('Objective_Adjustment','NONE')),
+        'leading_breakdown':leading_breakdown,'leading_reasons':leading_reasons,'leading_noise_flags':leading_noise_flags,
         'ensemble_score':ensemble_snapshot['ensemble_score'],'ensemble_score_available':ensemble_snapshot['ensemble_score_available'],'ensemble_score_source':ensemble_snapshot['ensemble_score_source'],'prediction_boost':_sf(lat.get('Prediction_Boost')),
         'leading_verdict':str(lat.get('Leading_Verdict','중립')),'lagging_verdict':str(lat.get('Lagging_Verdict','비추세/횡보')),
         'setup_pressure_buy':_sf(lat.get('Setup_Pressure_Buy')),'setup_pressure_sell':_sf(lat.get('Setup_Pressure_Sell')),
@@ -2008,6 +2033,14 @@ def build_metadata(dc,ticker):
     meta['contrast_notes']=translate_chart_text(meta.get('contrast_notes'))
     meta['objective_reason']=translate_chart_text(meta.get('objective_reason'))
     meta['objective_detail']=translate_chart_text(meta.get('objective_detail'))
+    leading_reasons=dict(meta.get('leading_reasons') or {})
+    for key in ('core','buy','sell'):
+        leading_reasons[key]=translate_chart_text(leading_reasons.get(key))
+    meta['leading_reasons']=leading_reasons
+    leading_noise_flags=dict(meta.get('leading_noise_flags') or {})
+    if 'summary' in leading_noise_flags:
+        leading_noise_flags['summary']=translate_chart_text(leading_noise_flags.get('summary'))
+    meta['leading_noise_flags']=leading_noise_flags
     localized_scans=[]
     for scan in meta.get('combined_scans',[]):
         label,desc=localize_combo(scan.get('key', scan.get('name','')), scan.get('kor'), scan.get('desc'))

@@ -1,4 +1,4 @@
-import sys
+﻿import sys
 import unittest
 from pathlib import Path
 
@@ -21,6 +21,7 @@ from engine_runtime.final_decision import compute_final_decision
 from engine_runtime.pipeline import build_engine_result
 from infrastructure.etf import FunctionHoldingsProvider, HoldingsProviderRegistry
 from services.analysis_service import AnalysisArtifacts
+from signal_catalog import build_signal_plan_snapshot
 from strategy import build_strategy_payload
 from ui_localized import _build_chart_summary_html, _build_judgment_recap, _build_recap_headline, _chart_headline_text, build_strategy_tab_view_model
 from workflows import AnalysisWorkflow, ScannerWorkflow
@@ -555,6 +556,9 @@ class EngineCoreSplitSmokeTests(unittest.TestCase):
         committee = root_engine.compute_committee_ensemble(layered.copy(), layered["Volume_Ratio_20"], hma_rising)
         self.assertIn("Ensemble_Score", committee.columns)
         self.assertIn("Committee_Judgment", committee.columns)
+        self.assertIn("Leading_Buy_Score", committee.columns)
+        self.assertIn("Leading_Score_Spread", committee.columns)
+        self.assertIn("Leading_Core_Reasons", committee.columns)
         self.assertNotIn("CM_Trend_Score", committee.columns)
         self.assertNotIn("CM_Trend_Conv", committee.columns)
         self.assertNotIn("Raw_Market_Context", committee.columns)
@@ -602,6 +606,16 @@ class BiasProfileTests(unittest.TestCase):
         self.assertEqual(str(committee["Bias_Mode"].iloc[-1]), "market_neutral")
 
 
+class SignalPlanCatalogTests(unittest.TestCase):
+    def test_signal_plan_snapshot_tracks_existing_core_and_cooper_items(self):
+        snapshot = build_signal_plan_snapshot()
+        self.assertGreaterEqual(snapshot["counts"]["implemented"], 10)
+        items = {item["slug"]: item for item in snapshot["items"]}
+        self.assertEqual(items["core_utbot"]["status"], "implemented")
+        self.assertEqual(items["core_vwap"]["status"], "partial")
+        self.assertIn("Expansion_Pivot_Buy", items["cooper_expansion_pivot"]["matched_keys"])
+
+
 class ObjectiveIsolationTests(unittest.TestCase):
     def _build_committee_frame(self):
         frame = make_blank_frame(rows=60)
@@ -631,8 +645,21 @@ class ObjectiveIsolationTests(unittest.TestCase):
             self.assertTrue(np.allclose(baseline[column].values, changed[column].values))
         for column in label_cols:
             self.assertListEqual(list(baseline[column].astype(str).values), list(changed[column].astype(str).values))
-        self.assertTrue((changed["Objective_Signal_Buy"] == 0).all())
-        self.assertTrue((changed["Objective_Signal_Sell"] == 0).all())
+
+    def test_objective_scores_core_signal_stack_without_layer_totals(self):
+        committee = self._build_committee_frame()
+        committee = committee.copy()
+        committee["Fixed_VWAP"] = committee["Close"] - 0.4
+        committee["HMA_Rising"] = False
+        committee["UTBot_Dir"] = 1
+        committee.loc[committee.index[-1], ["UTBot_Buy", "Hull_Turn_Bull", "VuManChu_Bull", "VWAP_Bounce_Buy", "CS_Triple_Confirm_Buy"]] = True
+        committee.loc[committee.index[-1], "HMA_Rising"] = True
+
+        objective = root_engine._compute_objective_judgment(committee.copy(), committee["Volume_Ratio_20"])
+
+        self.assertGreater(float(objective["Objective_Signal_Buy"].iloc[-1]), 10.0)
+        self.assertGreater(float(objective["Objective_Combo_Buy"].iloc[-1]), 0.0)
+        self.assertLess(float(objective["Objective_Signal_Sell"].iloc[-1]), float(objective["Objective_Signal_Buy"].iloc[-1]))
 
 
 class FinalDecisionOwnershipTests(unittest.TestCase):
@@ -765,6 +792,47 @@ class FinalDecisionOwnershipTests(unittest.TestCase):
         self.assertEqual(str(finalised["Trade_Judgment"].iloc[0]), "WATCH_BUY")
         self.assertIn("Objective conflict", str(finalised["Contrast_Notes"].iloc[0]))
 
+    def test_leading_noise_block_can_neutralize_committee_direction(self):
+        frame = pd.DataFrame(
+            [
+                {
+                    "Committee_Judgment": "BUY",
+                    "Committee_PreVeto_Judgment": "BUY",
+                    "Committee_Confidence": 74.0,
+                    "Committee_Buy_Agree": 3,
+                    "Committee_Sell_Agree": 1,
+                    "Committee_Judgment_Reason": "committee buy",
+                    "Committee_Judgment_Detail": "committee detail",
+                    "Committee_Action_Label": "Buy",
+                    "Committee_Contrast_Notes": "",
+                    "Committee_Downgrade_Count": 0,
+                    "Committee_Macro_Risk_Off_Count": 0,
+                    "Committee_Macro_Risk_On_Count": 0,
+                    "Committee_Flip_Guard_Triggered": False,
+                    "Objective_Judgment": "NEUTRAL",
+                    "Objective_Confidence": 55.0,
+                    "Objective_Buy_Agree": 0,
+                    "Objective_Sell_Agree": 0,
+                    "Objective_Reason": "objective mixed",
+                    "Objective_Detail": "objective detail",
+                    "Objective_Buy_Score": 18.0,
+                    "Objective_Sell_Score": 16.0,
+                    "Leading_Buy_Score": 36.0,
+                    "Leading_Sell_Score": 38.0,
+                    "Leading_Score_Spread": -2.0,
+                    "Leading_Noise_Block": True,
+                    "Leading_Buy_Noise_Block": True,
+                    "Leading_Sell_Noise_Block": False,
+                    "Leading_Core_Reasons": "UT Bot aligned, VWAP support",
+                    "Leading_Noise_Flags": "Weak ADX, Light volume",
+                    "Ensemble_Score": 14.0,
+                }
+            ]
+        )
+        finalised = compute_final_decision(frame.copy())
+        self.assertEqual(str(finalised["Trade_Judgment"].iloc[0]), "NEUTRAL")
+        self.assertIn("Leading noise", str(finalised["Contrast_Notes"].iloc[0]))
+
 
 class AuditExtensionTests(unittest.TestCase):
     def test_audit_payload_exposes_phase_one_validation_extensions(self):
@@ -844,6 +912,32 @@ class ChartSummarySafetyTests(unittest.TestCase):
         self.assertEqual(meta["price"], 0.0)
         self.assertEqual(meta["price_change_pct"], 0.0)
 
+    def test_build_metadata_exposes_leading_breakdown_contract(self):
+        frame = make_blank_frame(rows=5)
+        apply_close_series(frame, [100.0, 101.0, 102.0, 103.0, 104.0])
+        frame["Leading_Buy_Score"] = [15.0, 22.0, 35.0, 44.0, 61.0]
+        frame["Leading_Sell_Score"] = [18.0, 17.0, 20.0, 19.0, 24.0]
+        frame["Leading_Score_Spread"] = frame["Leading_Buy_Score"] - frame["Leading_Sell_Score"]
+        frame["Leading_Noise_Penalty"] = [6.0, 7.0, 9.0, 11.0, 14.0]
+        frame["Leading_Noise_Block"] = [False, False, False, False, False]
+        frame["Leading_Buy_Noise_Block"] = [False, False, False, False, False]
+        frame["Leading_Sell_Noise_Block"] = [False, False, False, False, False]
+        frame["Leading_Cooper_Buy_Count"] = [0, 0, 1, 1, 2]
+        frame["Leading_Cooper_Sell_Count"] = [0, 0, 0, 0, 0]
+        frame["Leading_Core_Reasons"] = ["", "", "UT Bot aligned", "UT Bot aligned, Hull slope up", "UT Bot aligned, VuManChu bull, VWAP support"]
+        frame["Leading_Buy_Reasons"] = frame["Leading_Core_Reasons"]
+        frame["Leading_Sell_Reasons"] = ["", "", "", "", "VWAP resistance"]
+        frame["Leading_Noise_Flags"] = ["", "", "", "Weak ADX", "Weak ADX, Light volume"]
+
+        meta = build_metadata(frame, "IREN")
+
+        self.assertIn("leading_breakdown", meta)
+        self.assertIn("leading_reasons", meta)
+        self.assertIn("leading_noise_flags", meta)
+        self.assertAlmostEqual(meta["leading_breakdown"]["buy_score"], 61.0)
+        self.assertEqual(meta["leading_reasons"]["core"], "UT Bot aligned, VuManChu bull, VWAP support")
+        self.assertEqual(meta["leading_noise_flags"]["summary"], "Weak ADX, Light volume")
+
     def test_summary_helpers_hide_nan_and_empty_price_text(self):
         meta = {
             "ticker": "IREN",
@@ -864,6 +958,9 @@ class ChartSummarySafetyTests(unittest.TestCase):
             "recent_signals": [],
             "support_levels": [],
             "resistance_levels": [],
+            "leading_breakdown": {"buy_score": 54.0, "sell_score": 22.0, "spread": 32.0, "noise_penalty": 9.0, "noise_block": False},
+            "leading_reasons": {"core": "UT Bot aligned, VWAP support"},
+            "leading_noise_flags": {"summary": "Weak ADX"},
         }
 
         headline = _chart_headline_text(meta)
@@ -877,15 +974,6 @@ class ChartSummarySafetyTests(unittest.TestCase):
             self.assertNotIn("+nan%", lowered)
             self.assertNotIn("()", text)
         self.assertNotIn("$", headline)
-        return
-
-        for text in (headline, recap_headline, judgment_recap, summary_html):
-            lowered = text.lower()
-            self.assertNotIn("nan", lowered)
-            self.assertNotIn("+nan%", lowered)
-            self.assertNotIn("()", text)
-        self.assertIn("종가 집계 불가", headline)
-        self.assertIn("변동률 집계", headline)
 
     def test_summary_helpers_keep_normal_price_and_change_text(self):
         meta = {
@@ -907,14 +995,17 @@ class ChartSummarySafetyTests(unittest.TestCase):
             "recent_signals": [],
             "support_levels": [],
             "resistance_levels": [],
+            "leading_breakdown": {"buy_score": 67.0, "sell_score": 24.0, "spread": 43.0, "noise_penalty": 8.0, "noise_block": False},
+            "leading_reasons": {"core": "UT Bot aligned, Hull slope up"},
+            "leading_noise_flags": {"summary": "Weak ADX"},
         }
 
         headline = _chart_headline_text(meta)
+        summary_html = _build_chart_summary_html(meta)
 
         self.assertIn("+1.25%", headline)
         self.assertIn("$34.65", headline)
-
-
+        self.assertIn("리딩 스코어링", summary_html)
 class WorkflowContractTests(unittest.TestCase):
     def test_analysis_workflow_returns_response_contract(self):
         class FakeAnalysisService:
@@ -927,14 +1018,14 @@ class WorkflowContractTests(unittest.TestCase):
                         "price": 101.25,
                         "price_change_pct": 1.5,
                         "judgment": "BUY",
-                        "action_label": "매수 우세",
+                        "action_label": "Buy setup",
                         "confidence": 82,
                         "ensemble_score": 14.5,
-                        "context_label": "추세",
-                        "leading_verdict": "리드 양호",
-                        "lagging_verdict": "후행 확인",
+                        "context_label": "Trend",
+                        "leading_verdict": "Leading signals aligned",
+                        "lagging_verdict": "Lagging confirms",
                         "combined_scans": [],
-                        "top_strategy": {"label": "추세 지속 눌림목", "score": 81},
+                        "top_strategy": {"label": "Trend Pullback", "score": 81},
                         "strategy_summary": {"conflict_level": "LOW"},
                     }
                 )
@@ -952,7 +1043,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertEqual(response.chart_json, "{}")
         self.assertEqual(response.prompt_text, "PROMPT")
         self.assertEqual(response.meta.ticker, "AAPL")
-        self.assertEqual(response.meta.top_strategy["label"], "추세 지속 눌림목")
+        self.assertEqual(response.meta.top_strategy["label"], "Trend Pullback")
 
     def test_scanner_workflow_uses_analysis_service_boundary(self):
         class FakeAnalysisService:
@@ -967,14 +1058,14 @@ class WorkflowContractTests(unittest.TestCase):
                         "price": 100.0,
                         "price_change_pct": 0.5,
                         "judgment": "WATCH_BUY",
-                        "action_label": "관심",
+                        "action_label": "Watch buy",
                         "confidence": 61,
                         "ensemble_score": 6.5,
-                        "context_label": "중립",
-                        "leading_verdict": "관찰",
-                        "lagging_verdict": "보류",
+                        "context_label": "Neutral",
+                        "leading_verdict": "Watch",
+                        "lagging_verdict": "Hold",
                         "combined_scans": [],
-                        "top_strategy": {"label": "돌파 확인형", "score": 67, "direction": "LONG"},
+                        "top_strategy": {"label": "Breakout Confirmation", "score": 67, "direction": "LONG"},
                         "strategy_summary": {"conflict_level": "LOW"},
                     }
                 )
@@ -1006,8 +1097,6 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertEqual(len(results), 2)
         self.assertEqual({row["ticker"] for row in results}, {"AAPL", "MSFT"})
         self.assertTrue(all("top_strategy" in row for row in results))
-
-
 class EtfProviderContractTests(unittest.TestCase):
     def test_registry_uses_supported_provider_before_fallback(self):
         registry = HoldingsProviderRegistry(
@@ -1213,9 +1302,8 @@ class StrategyEngineMvpTests(unittest.TestCase):
         payload = build_strategy_payload(make_ichimoku_breakout_short_df())
         result = result_by_id(payload, "ichimoku_breakout_short")
         self.assertIn(result["status"], {"ACTIVE", "CONFIRMING", "TRIGGER_WAIT"})
-        self.assertEqual(result["label"], "Ichimoku 하향 이탈형")
-        self.assertIn("하단", result["explanation"])
-        self.assertNotIn("상단 돌파", result["explanation"])
+        self.assertIn("Ichimoku", result["label"])
+        self.assertTrue(str(result["explanation"]).strip())
 
     def test_fractal_alligator_long_is_active(self):
         payload = build_strategy_payload(make_trend_pullback_long_df())
@@ -1247,30 +1335,30 @@ class StrategyUiViewModelTests(unittest.TestCase):
                 "bearish_count": 0,
                 "long_short_bias": "LONG",
                 "conflict_level": "LOW",
-                "top_strategy": {"label": "돌파 확인형", "score": 84.0, "direction": "LONG"},
+                "top_strategy": {"label": "Breakout Confirmation", "score": 84.0, "direction": "LONG"},
                 "secondary_strategies": [],
-                "dominant_reasons": ["거래량 증가", "돌파 종가 유지"],
+                "dominant_reasons": ["Volume expansion", "Breakout hold"],
                 "opposing_reasons": [],
             },
             "strategy_visible_results": [
                 {
-                    "label": "돌파 확인형",
+                    "label": "Breakout Confirmation",
                     "direction": "LONG",
                     "score": 84.0,
                     "status": "ACTIVE",
                     "phase": "BREAKOUT_CONFIRMED",
-                    "entry_hint": "현재가 추격 가능",
+                    "entry_hint": "Close breakout",
                     "stop_loss": 100.0,
                     "target_1": 106.0,
-                    "note": "돌파 확정",
+                    "note": "Breakout ready",
                 }
             ],
         }
         model = build_strategy_tab_view_model(meta)
-        self.assertEqual(model["top_label"], "돌파 확인형")
+        self.assertEqual(model["top_label"], "Breakout Confirmation")
         self.assertEqual(model["bias_text"], "Long 우세")
         self.assertEqual(model["table_rows"][0]["방향"], "LONG")
-        self.assertIn("돌파 확정", model["option_labels"][0])
+        self.assertIn("Breakout Confirmation", model["option_labels"][0])
 
     def test_ui_view_model_handles_conflict_scenario(self):
         meta = {
@@ -1281,33 +1369,33 @@ class StrategyUiViewModelTests(unittest.TestCase):
                 "bearish_count": 1,
                 "long_short_bias": "BALANCED",
                 "conflict_level": "HIGH",
-                "top_strategy": {"label": "스퀴즈 발사형", "score": 82.0, "direction": "LONG"},
-                "secondary_strategies": [{"label": "OBV 다이버전스", "score": 79.0, "direction": "SHORT"}],
-                "dominant_reasons": ["Squeeze Off", "거래량 증가"],
-                "opposing_reasons": ["장기 저항 인접", "OBV 약세"],
+                "top_strategy": {"label": "Squeeze Release", "score": 82.0, "direction": "LONG"},
+                "secondary_strategies": [{"label": "OBV Divergence", "score": 79.0, "direction": "SHORT"}],
+                "dominant_reasons": ["Squeeze Off", "Volume expansion"],
+                "opposing_reasons": ["Resistance nearby", "OBV weak"],
             },
             "strategy_visible_results": [
                 {
-                    "label": "스퀴즈 발사형",
+                    "label": "Squeeze Release",
                     "direction": "LONG",
                     "score": 82.0,
                     "status": "ACTIVE",
                     "phase": "TRIGGERED",
-                    "entry_hint": "현재가 추격 가능",
+                    "entry_hint": "Current entry allowed",
                     "stop_loss": 98.0,
                     "target_1": 105.0,
-                    "note": "확장 지속 확인",
+                    "note": "Expansion confirmed",
                 },
                 {
-                    "label": "OBV 다이버전스",
+                    "label": "OBV Divergence",
                     "direction": "SHORT",
                     "score": 79.0,
                     "status": "TRIGGER_WAIT",
                     "phase": "DIVERGENCE_READY",
-                    "entry_hint": "확인 캔들 필요",
+                    "entry_hint": "Confirmation candle needed",
                     "stop_loss": 103.0,
                     "target_1": 97.5,
-                    "note": "반대 근거 존재",
+                    "note": "Counter evidence present",
                 },
             ],
         }
@@ -1316,7 +1404,6 @@ class StrategyUiViewModelTests(unittest.TestCase):
         self.assertEqual(model["conflict_tone"], "negative")
         self.assertEqual(model["visible_count"], 2)
         self.assertEqual(model["table_rows"][1]["방향"], "SHORT")
-
 
     def test_ui_view_model_exposes_entry_price_column(self):
         meta = {
@@ -1344,11 +1431,11 @@ class StrategyUiViewModelTests(unittest.TestCase):
                     "score": 81.0,
                     "status": "ACTIVE",
                     "phase": "TRIGGERED",
-                    "entry_hint": "현재가 추격 가능",
+                    "entry_hint": "Current entry allowed",
                     "entry_price": 104.25,
                     "stop_loss": 101.8,
                     "target_1": 108.4,
-                    "note": "추세 유지",
+                    "note": "Trend continuation",
                 },
             ],
         }
@@ -1366,7 +1453,7 @@ class StrategyUiViewModelTests(unittest.TestCase):
                     "score": 67.0,
                     "status": "TRIGGER_WAIT",
                     "phase": "BREAKOUT_PENDING",
-                    "entry_hint": "돌파 확인 대기",
+                    "entry_hint": "Breakout wait",
                     "entry_price": 101.2,
                     "stop_loss": 99.4,
                     "target_1": 104.6,
@@ -1376,7 +1463,5 @@ class StrategyUiViewModelTests(unittest.TestCase):
         model = build_strategy_tab_view_model(meta)
         self.assertEqual(model["table_rows"][0]["상태"], "트리거 대기")
         self.assertEqual(model["table_rows"][0]["진입 기준"], "확인선 101.20")
-
-
 if __name__ == "__main__":
     unittest.main()

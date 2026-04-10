@@ -42,6 +42,14 @@ def compute_final_decision(df):
     objective_detail = np.asarray(_series(df, "Objective_Detail", "", idx).astype(str).values, dtype=object)
     objective_buy_score = _series(df, "Objective_Buy_Score", 0.0, idx).astype(float).values
     objective_sell_score = _series(df, "Objective_Sell_Score", 0.0, idx).astype(float).values
+    leading_buy_score = _series(df, "Leading_Buy_Score", 0.0, idx).astype(float).values
+    leading_sell_score = _series(df, "Leading_Sell_Score", 0.0, idx).astype(float).values
+    leading_spread = _series(df, "Leading_Score_Spread", 0.0, idx).astype(float).values
+    leading_noise_block = _series(df, "Leading_Noise_Block", False, idx).astype(bool).values
+    leading_buy_block = _series(df, "Leading_Buy_Noise_Block", False, idx).astype(bool).values
+    leading_sell_block = _series(df, "Leading_Sell_Noise_Block", False, idx).astype(bool).values
+    leading_reason = np.asarray(_series(df, "Leading_Core_Reasons", "", idx).astype(str).values, dtype=object)
+    leading_noise_flags = np.asarray(_series(df, "Leading_Noise_Flags", "", idx).astype(str).values, dtype=object)
 
     final_label = committee_label.copy()
     final_conf = committee_conf.copy()
@@ -60,13 +68,41 @@ def compute_final_decision(df):
         obj_label = str(objective_label[i])
         base_side = judgment_side(base_label)
         obj_side = judgment_side(obj_label)
+        lead_reason_text = str(leading_reason[i] or "").strip()
+        lead_noise_text = str(leading_noise_flags[i] or "").strip()
 
-        if base_side != 0 and obj_side == base_side and abs(gap) >= 20:
+        if lead_reason_text:
+            final_detail[i] = append_note(final_detail[i], f"Leading {lead_reason_text}")
+        if lead_noise_text:
+            final_contrast[i] = append_note(final_contrast[i], f"Leading noise {lead_noise_text}", "; ")
+
+        if base_side > 0 and leading_buy_block[i]:
+            severe = bool((leading_sell_score[i] >= leading_buy_score[i]) or (leading_spread[i] <= 0) or (leading_buy_score[i] < 42.0))
+            next_label = downgrade_buy(base_label, severe=severe)
+            if next_label != final_label[i]:
+                final_label[i] = next_label
+                final_downgrade[i] += 1
+        elif base_side < 0 and leading_sell_block[i]:
+            severe = bool((leading_buy_score[i] >= leading_sell_score[i]) or (leading_spread[i] >= 0) or (leading_sell_score[i] < 42.0))
+            next_label = downgrade_sell(base_label, severe=severe)
+            if next_label != final_label[i]:
+                final_label[i] = next_label
+                final_downgrade[i] += 1
+
+        current_label = str(final_label[i])
+        current_side = judgment_side(current_label)
+
+        if current_side != 0 and obj_side == current_side and abs(gap) >= 20:
             final_detail[i] = append_note(final_detail[i], f"Objective confirms {'buy' if obj_side > 0 else 'sell'} side")
-        elif base_side != 0 and obj_side == -base_side and abs(gap) >= 24:
-            final_label[i] = downgrade_buy(base_label, severe=False) if base_side > 0 else downgrade_sell(base_label, severe=False)
-            final_downgrade[i] += 1
+        elif current_side != 0 and obj_side == -current_side and abs(gap) >= 24:
+            next_label = downgrade_buy(current_label, severe=False) if current_side > 0 else downgrade_sell(current_label, severe=False)
+            if next_label != final_label[i]:
+                final_label[i] = next_label
+                final_downgrade[i] += 1
             final_contrast[i] = append_note(final_contrast[i], f"Objective conflict {gap:+.1f}", "; ")
+
+        if leading_noise_block[i] and judgment_side(str(final_label[i])) == 0:
+            final_contrast[i] = append_note(final_contrast[i], "Leading noise filter neutralized direction", "; ")
 
         if not str(final_reason[i] or "").strip():
             final_reason[i] = str(objective_reason[i])

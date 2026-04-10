@@ -2279,14 +2279,38 @@ def _build_chart_summary_html(meta):
     pattern_text = _chart_pattern_text(meta)
     support_text, resistance_text = _chart_levels_text(meta)
     base_line, position_line, strategy_line, bull_line, bear_line = _chart_scenario_text(meta)
+    leading_breakdown = meta.get("leading_breakdown") if isinstance(meta.get("leading_breakdown"), dict) else {}
+    leading_reasons = meta.get("leading_reasons") if isinstance(meta.get("leading_reasons"), dict) else {}
+    leading_noise = meta.get("leading_noise_flags") if isinstance(meta.get("leading_noise_flags"), dict) else {}
 
     overview_text = f"{summary} {volume_text}".strip()
+    leading_text = ""
+    if leading_breakdown:
+        lead_buy = _safe_float(leading_breakdown.get("buy_score", 0))
+        lead_sell = _safe_float(leading_breakdown.get("sell_score", 0))
+        lead_spread = _safe_float(leading_breakdown.get("spread", lead_buy - lead_sell))
+        dominant = "매수 우세" if lead_spread > 4 else "매도 우세" if lead_spread < -4 else "혼합 구간"
+        noise_state = "노이즈 차단" if leading_noise.get("noise_block") else "노이즈 통과"
+        core_reason = _translate_note_text(leading_reasons.get("core", ""))
+        noise_reason = _translate_note_text(leading_noise.get("summary", ""))
+        leading_text = f"리딩 점수는 매수 {lead_buy:.1f}, 매도 {lead_sell:.1f}, 스프레드 {lead_spread:+.1f}로 {dominant}이며 {noise_state} 상태입니다."
+        if core_reason:
+            leading_text += f" 핵심 근거는 {core_reason}입니다."
+        if noise_reason:
+            leading_text += f" 노이즈 사유는 {noise_reason}입니다."
+    leading_html = (
+        "<div class='sigl-summary' style='margin-bottom:6px'><strong>리딩 스코어링</strong>: "
+        f"{_esc(leading_text)}</div>"
+        if leading_text
+        else ""
+    )
 
     return _html_block(
         "<div class='sigl-note'><strong>차트 요약</strong><br>"
         f"<div class='sigl-summary' style='font-weight:700;margin-bottom:8px'>{_esc(headline)}</div>"
         "<div class='sigl-summary' style='margin-bottom:8px'><strong>내용 요약</strong>: "
         f"{_esc(overview_text)}</div>"
+        f"{leading_html}"
         "<div class='sigl-summary' style='margin-bottom:6px'><strong>패턴 / 시그널 해석</strong>: "
         f"{_esc(pattern_text)}</div>"
         "<div class='sigl-summary' style='margin-bottom:6px'><strong>핵심 지지선</strong>: "
@@ -2798,6 +2822,21 @@ def render_judgment_card(meta):
     ut_gap = max(_safe_float(meta.get("utbot_stop_atr_gap", 0)), 0.0)
     macro_risk_off_count = _safe_int(meta.get("macro_risk_off_count", 0))
     macro_risk_on_count = _safe_int(meta.get("macro_risk_on_count", 0))
+    leading_breakdown = meta.get("leading_breakdown") if isinstance(meta.get("leading_breakdown"), dict) else {}
+    leading_reasons = meta.get("leading_reasons") if isinstance(meta.get("leading_reasons"), dict) else {}
+    leading_noise_flags = meta.get("leading_noise_flags") if isinstance(meta.get("leading_noise_flags"), dict) else {}
+    leading_buy_score = _safe_float(leading_breakdown.get("buy_score", 0))
+    leading_sell_score = _safe_float(leading_breakdown.get("sell_score", 0))
+    leading_spread = _safe_float(leading_breakdown.get("spread", leading_buy_score - leading_sell_score))
+    leading_noise_penalty = _safe_float(leading_breakdown.get("noise_penalty", 0))
+    leading_noise_block = bool(leading_breakdown.get("noise_block", False) or leading_noise_flags.get("noise_block"))
+    leading_side_text = "매수 우세" if leading_spread > 4 else "매도 우세" if leading_spread < -4 else "혼합"
+    leading_tone = "positive" if leading_spread > 4 else "negative" if leading_spread < -4 else "warning"
+    leading_noise_state = "차단" if leading_noise_block else "경고" if leading_noise_penalty >= 18 else "통과"
+    leading_core_reason = _translate_note_text(leading_reasons.get("core", ""))
+    leading_buy_reason = _translate_note_text(leading_reasons.get("buy", ""))
+    leading_sell_reason = _translate_note_text(leading_reasons.get("sell", ""))
+    leading_noise_reason = _translate_note_text(leading_noise_flags.get("summary", ""))
 
     badges = []
     if abs(reversal_synergy) > 5:
@@ -2935,11 +2974,31 @@ def render_judgment_card(meta):
         _mini_stat_card("객관 판단", objective_label or "-", objective_tone),
         _mini_stat_card("객관 신뢰", f"{objective_confidence:.0f}%", objective_tone if objective_confidence >= 55 else "muted"),
     ]
+    leading_summary_cards = [
+        _mini_stat_card("리딩 매수", f"{leading_buy_score:.1f}", "positive" if leading_buy_score >= leading_sell_score else "muted"),
+        _mini_stat_card("리딩 매도", f"{leading_sell_score:.1f}", "negative" if leading_sell_score >= leading_buy_score else "muted"),
+        _mini_stat_card("스프레드", f"{leading_spread:+.1f}", leading_tone),
+        _mini_stat_card("노이즈", leading_noise_state, "negative" if leading_noise_block else "warning" if leading_noise_penalty >= 18 else "positive"),
+        _mini_stat_card("우세축", leading_side_text, leading_tone),
+        _mini_stat_card("페널티", f"{leading_noise_penalty:.1f}", "warning" if leading_noise_penalty >= 18 else "muted"),
+    ]
     objective_meta_badges = "".join(
         badge
         for badge in [
             _badge(f"정렬 {objective_alignment_label}", objective_alignment_tone),
             _badge(f"보정 {objective_adjustment_label}", "accent" if objective_adjustment not in {"NONE", "MIXED"} else "muted"),
+        ]
+        if badge
+    )
+    leading_meta_badges = "".join(
+        badge
+        for badge in [
+            _badge(leading_side_text, leading_tone),
+            _badge(f"노이즈 {leading_noise_state}", "negative" if leading_noise_block else "warning" if leading_noise_penalty >= 18 else "positive"),
+            _badge(
+                f"Cooper {int(_safe_float(leading_breakdown.get('cooper_buy_count', 0)))}:{int(_safe_float(leading_breakdown.get('cooper_sell_count', 0)))}",
+                "accent",
+            ),
         ]
         if badge
     )
@@ -2970,6 +3029,27 @@ def render_judgment_card(meta):
     if recap_text:
         headline_html = f"<div class='sigl-summary' style='font-weight:700;margin-bottom:6px'>{_esc(recap_headline)}</div>" if recap_headline else ""
         summary_html += f"<div class='sigl-note'><strong>한눈에 Recap</strong><br>{headline_html}<span class='sigl-summary'>{_esc(recap_text)}</span></div>"
+    summary_html += (
+        "<div class='sigl-note'><strong>리딩 스코어링</strong>"
+        f"<div class='sigl-grid sigl-grid--4'>{''.join(leading_summary_cards)}</div>"
+        f"<div class='sigl-chip-row'>{leading_meta_badges}</div>"
+        "</div>"
+    )
+    if leading_core_reason or leading_noise_reason or leading_buy_reason or leading_sell_reason:
+        leading_reason_lines = []
+        if leading_core_reason:
+            leading_reason_lines.append(f"<div class='sigl-summary' style='margin-bottom:6px'><strong>핵심 근거</strong>: {_esc(leading_core_reason)}</div>")
+        if leading_buy_reason:
+            leading_reason_lines.append(f"<div class='sigl-summary' style='margin-bottom:6px'><strong>매수 근거</strong>: {_esc(leading_buy_reason)}</div>")
+        if leading_sell_reason:
+            leading_reason_lines.append(f"<div class='sigl-summary' style='margin-bottom:6px'><strong>매도 근거</strong>: {_esc(leading_sell_reason)}</div>")
+        if leading_noise_reason:
+            leading_reason_lines.append(f"<div class='sigl-summary'><strong>차단 사유</strong>: {_esc(leading_noise_reason)}</div>")
+        summary_html += (
+            "<div class='sigl-note'><strong>리딩 메모</strong>"
+            f"{''.join(leading_reason_lines)}"
+            "</div>"
+        )
     summary_html += (
         "<div class='sigl-note'><strong>객관 엔진 요약</strong>"
         f"<div class='sigl-grid sigl-grid--4'>{''.join(objective_summary_cards)}</div>"
