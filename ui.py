@@ -1,6 +1,7 @@
-﻿import streamlit as st
+import streamlit as st
 import streamlit.components.v1 as components
 from collections import Counter
+import base64
 import pandas as pd
 import plotly.graph_objects as go
 import google.generativeai as genai
@@ -19,7 +20,7 @@ try:
 except Exception:
     BeautifulSoup = None
 from config import *
-from chart import build_metadata, build_chart
+from chart import build_metadata, build_chart, load_chart_figure
 from company_details import render_company_details
 from localization import (
     localize_action_label,
@@ -3102,8 +3103,46 @@ def build_us_market_daily_payload():
     }
 
 
+_COMPONENT_SURROGATE_RE = re.compile(r"[\ud800-\udfff]")
+_COMPONENT_JSON_TEXT_TRANSLATION = str.maketrans({
+    "\u2028": " ",
+    "\u2029": " ",
+})
+
+
+def _sanitize_component_text(value):
+    if not isinstance(value, str) or not value:
+        return value
+    value = _COMPONENT_SURROGATE_RE.sub("\uFFFD", value)
+    return value.translate(_COMPONENT_JSON_TEXT_TRANSLATION)
+
+
+def _sanitize_component_payload(value):
+    if isinstance(value, str):
+        return _sanitize_component_text(value)
+    if isinstance(value, list):
+        return [_sanitize_component_payload(item) for item in value]
+    if isinstance(value, tuple):
+        return [_sanitize_component_payload(item) for item in value]
+    if isinstance(value, dict):
+        return {
+            _sanitize_component_text(key) if isinstance(key, str) else key: _sanitize_component_payload(item)
+            for key, item in value.items()
+        }
+    return value
+
+
+def _encode_component_payload(payload):
+    payload_json = json.dumps(
+        _sanitize_component_payload(payload),
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    return base64.b64encode(payload_json.encode("utf-8")).decode("ascii")
+
+
 def _build_us_market_daily_doc(payload):
-    payload_json = json.dumps(payload, ensure_ascii=False).replace("</", "<\\/")
+    payload_b64 = _encode_component_payload(payload)
     template = dedent(
         """
         <!doctype html>
@@ -3550,7 +3589,13 @@ def _build_us_market_daily_doc(payload):
             </div>
           </div>
           <script>
-            const payload = __PAYLOAD__;
+            let payload = { market_date_label: "", cards: [] };
+            try {
+              const payloadBytes = Uint8Array.from(atob("__PAYLOAD_B64__"), (char) => char.charCodeAt(0));
+              payload = JSON.parse(new TextDecoder("utf-8").decode(payloadBytes));
+            } catch (error) {
+              console.error("Failed to decode market daily payload", error);
+            }
             const cards = Array.isArray(payload.cards) ? payload.cards : [];
             const deck = document.getElementById("deck");
             const deckDate = document.getElementById("deckDate");
@@ -3834,7 +3879,7 @@ def _build_us_market_daily_doc(payload):
         </html>
         """
     ).strip()
-    return template.replace("__FONT_IMPORT_URL__", FONT_IMPORT_URL).replace("__FONT_STACK__", FONT_STACK).replace("__PAYLOAD__", payload_json)
+    return template.replace("__FONT_IMPORT_URL__", FONT_IMPORT_URL).replace("__FONT_STACK__", FONT_STACK).replace("__PAYLOAD_B64__", payload_b64)
 
 
 def _render_us_market_daily_deck(payload):
@@ -3846,7 +3891,7 @@ def _render_us_market_daily_deck(payload):
 
 def render_market_home_dashboard():
     with st.spinner("데일리 브리핑 만드는 중입니다. 시장 데이터와 핵심 뉴스를 불러오고 있습니다."):
-        payload = build_us_market_daily_payload()
+        payload = _sanitize_component_payload(build_us_market_daily_payload())
     card_count = len(payload.get("cards") or [])
     headline_copy = html.escape(
         payload.get("headline")
@@ -4315,7 +4360,7 @@ def render_analysis(msg, key_prefix="analysis"):
     if m or fj:
         t0,t1,t2,t3,t4=st.tabs(["차트","판단·리스크","10-Layer","콤보스캔","기업정보"])
         with t0:
-            if fj:fig=go.Figure(json.loads(fj));st.plotly_chart(fig,use_container_width=True,theme=None,config={'displaylogo':False,'modeBarButtonsToRemove':['lasso2d','select2d']}, key=f"{key_prefix}_price_chart");st.caption("*캔들 오버 시 툴팁, 강/약 시그널 캔들 하이라이트, 우측 매물대(VP) 오버레이를 제공합니다. 모바일에서는 판단 카드 확인 후 차트를 열면 더 읽기 쉽습니다.")
+            if fj:fig=load_chart_figure(fj);st.plotly_chart(fig,use_container_width=True,theme=None,config={'displaylogo':False,'modeBarButtonsToRemove':['lasso2d','select2d']}, key=f"{key_prefix}_price_chart");st.caption("*캔들 오버 시 툴팁, 강/약 시그널 캔들 하이라이트, 우측 매물대(VP) 오버레이를 제공합니다. 모바일에서는 판단 카드 확인 후 차트를 열면 더 읽기 쉽습니다.")
         with t1:
             if m:
                 render_judgment_card(m)
@@ -4775,7 +4820,7 @@ def render_analysis(msg, key_prefix="analysis"):
         t0, t1, t2, t3, t4 = st.tabs(["차트", "판단/리스크", "10개 레이어", "콤보 스캔", "기업 정보"])
         with t0:
             if fj:
-                fig = go.Figure(json.loads(fj))
+                fig = load_chart_figure(fj)
                 st.plotly_chart(fig, use_container_width=True, theme=None, config={'displaylogo': False, 'modeBarButtonsToRemove': ['lasso2d', 'select2d']}, key=f"{key_prefix}_price_chart")
                 st.caption("*캔들 툴팁, 거래량 프로파일(VP), 자동 추세선/평행채널, 패턴 오버레이를 제공합니다. 모바일에서는 판단 카드 확인 후 차트를 열면 더 읽기 쉽습니다.")
         with t1:
@@ -4805,7 +4850,7 @@ def render_analysis(msg, key_prefix="analysis"):
         t0,t1,t2,t3,t4=st.tabs(["차트","판단/리스크","10-Layer","콤보스캔","기업정보"])
         with t0:
             if fj:
-                fig=go.Figure(json.loads(fj))
+                fig=load_chart_figure(fj)
                 st.plotly_chart(fig,use_container_width=True,theme=None,config={'displaylogo':False,'modeBarButtonsToRemove':['lasso2d','select2d']}, key=f"{key_prefix}_price_chart")
                 st.caption("*캔들 툴팁, 우측 매물대(VP), 자동 추세선/평행채널, 패턴 오버레이를 제공합니다. 모바일에서는 판단 카드 확인 후 차트를 열면 더 읽기 쉽습니다.")
         with t1:

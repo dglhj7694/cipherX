@@ -1,4 +1,4 @@
-﻿# ══════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════
 #  SIGN — PART 1/4
 #  설정, 레지스트리, 유틸리티, 기술지표
 # ══════════════════════════════════════════════════════════════
@@ -13,6 +13,7 @@ import yfinance as yf
 from app_ui.pages import render_analysis_message, render_market_daily_dashboard
 from sectors import SECTOR_GROUPS
 from bootstrap import build_default_session_state, ensure_session_defaults as _ensure_session_defaults, reset_session_state as _reset_session_state
+from chart import load_chart_figure, serialize_chart_figure
 from config import GEMINI_API_KEY, GEMINI_API_KEY_FROM_SECRETS, COMBINED_SCAN_REGISTRY, CTX_KOR, JT
 from domain import AnalysisRequest
 from infrastructure.etf import FunctionHoldingsProvider, HoldingsProviderRegistry
@@ -77,6 +78,67 @@ MODE_SCANNER = "스캐너"
 _APP_MODE_OPTIONS = [MODE_MARKET_DAILY, MODE_ANALYSIS, MODE_SCANNER]
 _QUICK_ANALYSIS_TICKERS = ["NVDA", "TSLA", "AAPL", "GOOGL", "AMZN", "META", "MSFT", "PLTR", "HIMS", "SNDK", "LITE", "COHR", "IREN", "ORCL", "RKLB", "ASTS"]
 CHAT_INPUT_PLACEHOLDER = "티커 입력: AAPL / 005930"
+
+_SESSION_SURROGATE_RE = re.compile(r"[\ud800-\udfff]")
+_SESSION_UNSAFE_CODEPOINTS = re.compile(
+    "["
+    "\u0000-\u0008"
+    "\u000b\u000c"
+    "\u000e-\u001f"
+    "\u007f"
+    "\u0085"
+    "\u2028\u2029"
+    "\ufeff"
+    "\ufffd"
+    "\ufffe\uffff"
+    "]"
+)
+
+
+def _sanitize_session_text(value):
+    if not isinstance(value, str) or not value:
+        return value
+    value = _SESSION_SURROGATE_RE.sub("", value)
+    value = _SESSION_UNSAFE_CODEPOINTS.sub("", value)
+    return value
+
+
+def _sanitize_session_payload(value):
+    if isinstance(value, str):
+        return _sanitize_session_text(value)
+    if isinstance(value, list):
+        return [_sanitize_session_payload(item) for item in value]
+    if isinstance(value, tuple):
+        return [_sanitize_session_payload(item) for item in value]
+    if isinstance(value, dict):
+        return {
+            _sanitize_session_text(key) if isinstance(key, str) else key: _sanitize_session_payload(item)
+            for key, item in value.items()
+        }
+    return value
+
+
+def _normalize_session_message(message):
+    normalized = _sanitize_session_payload(message)
+    if normalized.get("type") == "analysis" and normalized.get("fig_json"):
+        try:
+            normalized["fig_json"] = serialize_chart_figure(load_chart_figure(normalized["fig_json"]))
+        except Exception:
+            normalized["fig_json"] = None
+    return normalized
+
+
+def _sanitize_session_messages():
+    messages = st.session_state.get("messages") or []
+    normalized_messages = []
+    changed = False
+    for message in messages:
+        normalized = _normalize_session_message(message if isinstance(message, dict) else {"role": "assistant", "type": "text", "content": str(message)})
+        normalized_messages.append(normalized)
+        if normalized != message:
+            changed = True
+    if changed:
+        st.session_state.messages = normalized_messages
 
 
 # ━━━ Constants ━━━
@@ -2366,6 +2428,7 @@ elif current_mode == MODE_MARKET_DAILY:
 # ══════════════════════════════════════════════════════════════
 else:
     _render_brand_board(main_board_payload, compact=True)
+    _sanitize_session_messages()
 
     analysis_indices = [i for i, msg in enumerate(st.session_state.messages) if msg.get("type") == "analysis"]
     report_indices = [i for i, msg in enumerate(st.session_state.messages) if msg.get("type") == "report"]
@@ -2494,7 +2557,7 @@ else:
                 st.toast(f"⚠️ {raw_tv} 티커를 찾을 수 없습니다 · {sample_text}", icon="🔍")
             return
         tv = str(resolved.get("resolved") or raw_tv).strip().upper()
-        st.session_state.messages.append({"role": "user", "type": "text", "content": raw_tv})
+        st.session_state.messages.append(_normalize_session_message({"role": "user", "type": "text", "content": raw_tv}))
         st.session_state.last_ticker = tv
         _set_scan_focus(tv)
         if resolved.get("auto_resolved"):
@@ -2567,18 +2630,18 @@ else:
                         )
                     else:
                         content += "\n🤖 AI: 사용 불가"
-                st.session_state.messages.append({
+                st.session_state.messages.append(_normalize_session_message({
                     "role": "assistant", "type": "analysis",
                     "ticker": tv, "content": content,
                     "analyzed_at": datetime.now().isoformat(timespec="seconds"),
                     "fig_json": fj, "indicator_lab_json": lab_fj, "meta": meta, "prompt": prompt, "audit": audit, "ai_raw": ai_raw,
-                })
+                }))
                 st.rerun()
             else:
-                st.session_state.messages.append({
+                st.session_state.messages.append(_normalize_session_message({
                     "role": "assistant", "type": "text",
                     "content": f"⚠️ **{tv}** 분석 실패: {phist}"
-                })
+                }))
                 st.rerun()
 
     if st.session_state.get('_auto'):

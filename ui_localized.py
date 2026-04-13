@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from company_details import render_company_details
+from chart import load_chart_figure, serialize_chart_figure
 from config import COMMITTEE_NAMES, CONTEXT_WEIGHTS, CTX_LABELS
 from localization import (
     localize_action_label,
@@ -219,6 +220,7 @@ def _render_ensemble_gauge(es, chart_key=None):
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(color="#E2E8F0", family=PLOTLY_FONT_FAMILY),
     )
+    gauge = load_chart_figure(serialize_chart_figure(gauge))
     st.plotly_chart(
         gauge,
         use_container_width=True,
@@ -2722,6 +2724,7 @@ def render_chart_indicator_snapshot(meta, key_prefix="analysis"):
         objective_component_fig.update_layout(barmode="relative")
         component_height = _category_chart_height(len(component_labels), min_height=360, per_item=38, extra=120)
         _base_layout(objective_component_fig, "매수 vs 매도 축 비교", x_range=(-component_range, component_range), height=component_height, left_margin=108)
+        objective_component_fig = load_chart_figure(serialize_chart_figure(objective_component_fig))
         st.plotly_chart(
             objective_component_fig,
             use_container_width=True,
@@ -2741,6 +2744,7 @@ def render_chart_indicator_snapshot(meta, key_prefix="analysis"):
         ))
         system_height = _category_chart_height(len(system_labels), min_height=380, per_item=38, extra=128)
         _base_layout(system_fig, "시장 / 시스템 상태축", height=system_height, left_margin=124)
+        system_fig = load_chart_figure(serialize_chart_figure(system_fig))
         st.plotly_chart(
             system_fig,
             use_container_width=True,
@@ -2762,6 +2766,7 @@ def render_chart_indicator_snapshot(meta, key_prefix="analysis"):
         ))
         raw_height = _category_chart_height(len(raw_indicator_labels), min_height=1180, per_item=28, extra=150)
         _base_layout(raw_indicator_fig, "원시 지표 최신 스냅샷", height=raw_height, left_margin=144)
+        raw_indicator_fig = load_chart_figure(serialize_chart_figure(raw_indicator_fig))
         st.plotly_chart(
             raw_indicator_fig,
             use_container_width=True,
@@ -4156,14 +4161,19 @@ def render_analysis(msg, key_prefix="analysis"):
 
     with tab_chart:
         if fig_json:
-            fig = go.Figure(json.loads(fig_json))
-            st.plotly_chart(
-                fig,
-                use_container_width=True,
-                theme=None,
-                config={"displaylogo": False, "modeBarButtonsToRemove": ["lasso2d", "select2d"]},
-                key=f"{key_prefix}_price_chart",
-            )
+            try:
+                fig = load_chart_figure(fig_json)
+            except Exception:
+                fig = None
+                st.warning("차트 데이터를 안전하게 복원하지 못했습니다. 티커를 다시 분석하면 해결되는 경우가 많습니다.")
+            if fig is not None:
+                st.plotly_chart(
+                    fig,
+                    use_container_width=True,
+                    theme=None,
+                    config={"displaylogo": False, "modeBarButtonsToRemove": ["lasso2d", "select2d"]},
+                    key=f"{key_prefix}_price_chart",
+                )
             if meta:
                 render_chart_indicator_snapshot(meta, key_prefix=f"{key_prefix}_indicator_snapshot")
             if meta:

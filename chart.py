@@ -1,7 +1,10 @@
+import json
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
+import re
 from plotly.subplots import make_subplots
+from plotly.utils import PlotlyJSONEncoder
 from scipy.signal import find_peaks
 from config import *
 from utils import _sf
@@ -28,6 +31,94 @@ SOFT_GREEN_FILL = 'rgba(99,217,162,.8)'
 SOFT_RED = '#FF8F96'
 SOFT_RED_FILL = 'rgba(255,143,150,.8)'
 SOFT_AMBER = '#F6C35E'
+
+_CHART_SURROGATE_RE = re.compile(r"[\ud800-\udfff]")
+# Characters that are valid Unicode but break JSON.parse in browsers or
+# cause rendering glitches in Plotly tooltips.
+_CHART_UNSAFE_CODEPOINTS = re.compile(
+    "["
+    "\u0000-\u0008"    # C0 control chars (NUL, BEL, BS, …)
+    "\u000b\u000c"     # VT, FF
+    "\u000e-\u001f"    # remaining C0 controls (SO … US)
+    "\u007f"           # DEL
+    "\u0085"           # NEL
+    "\u2028\u2029"     # LS / PS  – JSON spec forbids these in strings
+    "\ufeff"           # BOM / ZWNBSP
+    "\ufffd"           # replacement char (may cascade from earlier sanitisation)
+    "\ufffe\uffff"     # non-characters
+    "]"
+)
+# Supplementary-plane characters (U+10000 .. U+10FFFF) are encoded as
+# surrogate pairs in UTF-16 / JavaScript.  Plotly's own to_json() emits
+# them as raw UTF-8, and Streamlit's transport can corrupt the pair into
+# a bad Unicode escape that makes the browser's JSON.parse fail.
+# We map them to BMP-safe visual equivalents so tooltips stay readable.
+_CHART_ASTRAL_MAP = {
+    "\U0001F3AF": "[Target]",   # 🎯
+    "\U0001F4AC": "[Comment]",  # 💬
+    "\U0001F4CA": "[Chart]",    # 📊
+    "\U0001F4CD": "[Pin]",      # 📍
+    "\U0001F52E": "[Predict]",  # 🔮
+    "\U0001F534": "●",          # 🔴
+    "\U0001F6AB": "[X]",        # 🚫
+    "\U0001F7E2": "●",          # 🟢
+    "\U0001F4B0": "[Money]",    # 💰
+    "\U0001F4A5": "[Boom]",     # 💥
+    "\U0001F3C6": "[Trophy]",   # 🏆
+    "\U0001F504": "[Cycle]",    # 🔄
+}
+_CHART_ASTRAL_RE = re.compile("[" + "".join(re.escape(k) for k in _CHART_ASTRAL_MAP) + "]")
+# Catch-all for any remaining supplementary-plane character.
+_CHART_ASTRAL_CATCHALL_RE = re.compile("[\U00010000-\U0010FFFF]")
+
+
+def _sanitize_chart_text(value):
+    if not isinstance(value, str) or not value:
+        return value
+    # 1. Replace lone surrogates (only possible in CPython on narrow builds or
+    #    when data arrives via C-extensions that bypass codec checks).
+    value = _CHART_SURROGATE_RE.sub("", value)
+    # 2. Strip control / invisible chars that break JSON.parse or Plotly.
+    value = _CHART_UNSAFE_CODEPOINTS.sub("", value)
+    # 3. Replace known supplementary-plane emoji with BMP-safe text.
+    value = _CHART_ASTRAL_RE.sub(lambda m: _CHART_ASTRAL_MAP.get(m.group(), ""), value)
+    # 4. Remove any remaining supplementary-plane characters.
+    value = _CHART_ASTRAL_CATCHALL_RE.sub("", value)
+    return value
+
+
+def sanitize_chart_payload(value):
+    if isinstance(value, str):
+        return _sanitize_chart_text(value)
+    if isinstance(value, np.generic):
+        return sanitize_chart_payload(value.item())
+    if isinstance(value, np.ndarray):
+        return [sanitize_chart_payload(item) for item in value.tolist()]
+    if isinstance(value, (pd.Series, pd.Index)):
+        return [sanitize_chart_payload(item) for item in value.tolist()]
+    if isinstance(value, list):
+        return [sanitize_chart_payload(item) for item in value]
+    if isinstance(value, tuple):
+        return [sanitize_chart_payload(item) for item in value]
+    if isinstance(value, dict):
+        return {
+            _sanitize_chart_text(key) if isinstance(key, str) else key: sanitize_chart_payload(item)
+            for key, item in value.items()
+        }
+    return value
+
+
+def serialize_chart_figure(fig):
+    return json.dumps(
+        sanitize_chart_payload(fig.to_plotly_json()),
+        ensure_ascii=True,
+        separators=(",", ":"),
+        cls=PlotlyJSONEncoder,
+    )
+
+
+def load_chart_figure(fig_json):
+    return go.Figure(sanitize_chart_payload(json.loads(fig_json or "{}")))
 
 def _build_candle_hover(dc):
     n=len(dc)

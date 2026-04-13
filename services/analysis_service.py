@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from audit import build_audit_payload
-from chart import build_chart, build_metadata
+from chart import build_chart, build_metadata, serialize_chart_figure
 from domain import AnalysisRequest, AnalysisViewModel
 from strategy import build_strategy_payload
 from utils import compute_and_cache
@@ -41,7 +41,7 @@ class AnalysisService:
             bias_mode=request.bias_mode,
         )
         prompt_text = prompt_builder(dc, meta.to_dict())
-        chart_json = build_chart(dc, request.ticker).to_json()
+        chart_json = serialize_chart_figure(build_chart(dc, request.ticker))
         return AnalysisArtifacts(df, dc, meta, prompt_text, chart_json, audit)
 
     def build_strategy_payload(self, display_frame):
