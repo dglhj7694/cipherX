@@ -249,6 +249,16 @@ def _verdict_badge(color, emoji, text):
 def _metric_row(label, value, value_class="m-value"):
     return f'<div class="m-row"><span class="m-label">{label}</span><span class="{value_class}">{value}</span></div>'
 
+def _source_tag(text):
+    source = _esc(text)
+    if not source:
+        return ""
+    return f'<span class="s-source">{source}</span>'
+
+def _section_title(num, title, source=None):
+    source_html = f" {_source_tag(source)}" if source else ""
+    return f'<div class="s-title"><span class="s-num">{num}</span> {title}{source_html}</div>'
+
 def _gauge_bar(pct, color="#63D9A2", height=8):
     pct = max(0, min(100, pct))
     return (f'<div style="background:rgba(255,255,255,0.1);border-radius:{height}px; height:{height}px;overflow:hidden;margin:6px 0">'
@@ -1139,6 +1149,7 @@ __SIGL_COMPANY_THEME__
 [data-testid="stVerticalBlockBorderWrapper"] > div { padding: 28px 32px !important; }
 .s-title{ font-size:1.18rem;font-weight:800;color:#C7D2FE; margin-bottom:22px;padding-bottom:12px; border-bottom:1px solid rgba(148,163,184,.12); display:flex;align-items:center;gap:12px}
 .s-title .s-num{ background:rgba(99,102,241,.14);border:1px solid rgba(99,102,241,.26);border-radius:999px;padding:4px 10px; font-size:.8rem;color:#C7D2FE;font-weight:900}
+.s-source{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;border:1px solid rgba(148,163,184,.2);background:rgba(148,163,184,.08);font-size:.68rem;color:#94A3B8;font-weight:800;letter-spacing:.03em}
 .m-row{display:flex;justify-content:space-between; padding:12px 0;font-size:.95rem;align-items:center; border-bottom:1px solid rgba(255,255,255,.04); transition:all 0.3s ease;}
 .m-row:hover{background:rgba(255,255,255,0.025); padding-left:8px; padding-right:8px; border-radius:8px;}
 .m-row:last-child{border-bottom:none}
@@ -1180,9 +1191,22 @@ __SIGL_COMPANY_THEME__
 .spotlight-value{color:#F8FAFC;font-size:1.28rem;font-weight:900;line-height:1.15;margin:0}
 .spotlight-sub{color:#CBD5E1;font-size:.78rem;font-weight:600;margin:6px 0 0}
 .section-pill{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font-size:.74rem;font-weight:800;border:1px solid transparent}
+.section-pill-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
 .pill-green{background:rgba(99,217,162,.12);border-color:rgba(99,217,162,.28);color:#B8F1D5}
 .pill-red{background:rgba(255,143,150,.12);border-color:rgba(255,143,150,.28);color:#FFD2D7}
 .pill-amber{background:rgba(246,195,94,.12);border-color:rgba(246,195,94,.28);color:#F8DE9A}
+.stage-bar{display:flex;gap:4px;margin-bottom:24px}
+.stage-step{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:62px;padding:10px 6px;border:1px solid rgba(68,76,86,.75);border-radius:0;background:var(--stage-tone, rgba(0,0,0,.2));opacity:var(--stage-opacity,.35);color:#E5E7EB;font-size:.68rem;font-weight:700;text-align:center}
+.stage-step:first-child{border-radius:10px 0 0 10px}
+.stage-step:last-child{border-radius:0 10px 10px 0}
+.stage-step.is-active{opacity:1;border:2px solid var(--stage-tone,#7AA2FF);box-shadow:0 0 16px rgba(142,164,255,.42);font-weight:900}
+.stage-step__idx{font-size:.72rem;line-height:1}
+.stage-step__label{line-height:1.2}
+.stage-focus{text-align:center;margin:20px 0}
+.stage-focus__badge{display:inline-block;padding:12px 32px;border-radius:24px;font-weight:900;color:#F8FAFC;font-size:1.15rem;background:var(--focus-tone,#6366F1);box-shadow:0 8px 22px rgba(99,102,241,.34)}
+.stage-focus__desc{font-size:.98rem;color:#E6EDF3;font-weight:700;margin-top:16px;line-height:1.7}
+.algo-hint{background:rgba(255,109,0,.06);border:1px solid rgba(255,109,0,.2);border-radius:10px;padding:10px 14px;margin-top:12px;font-size:.8rem;color:#ADBAC7;font-weight:600;line-height:1.6}
+.algo-hint__lead{color:#FFB361;font-weight:900;margin-right:6px}
 .ownership-stack{display:flex;flex-direction:column;gap:10px;margin:6px 0 0}
 .ownership-row{display:flex;justify-content:space-between;align-items:center;padding:11px 12px;border-radius:12px;background:linear-gradient(160deg,rgba(15,23,42,.9),rgba(15,23,42,.72));border:1px solid rgba(148,163,184,.12)}
 .ownership-left{display:flex;align-items:center;gap:10px;color:#E5E7EB;font-weight:700}
@@ -1222,6 +1246,13 @@ __SIGL_COMPANY_THEME__
 .n-title{display:block;color:#F8FAFC !important;font-size:.96rem;font-weight:800;line-height:1.55;text-decoration:none !important}
 .n-title:hover{color:#C7D2FE !important}
 .n-meta{margin-top:8px;color:#94A3B8;font-size:.76rem;font-weight:700}
+.news-feed{display:grid;grid-template-columns:1fr;gap:10px}
+.news-empty{padding:16px 14px;border-radius:14px;border:1px dashed rgba(148,163,184,.24);background:rgba(255,255,255,.02);color:#94A3B8;font-size:.86rem;font-weight:700;text-align:center}
+.max-pain-head{text-align:center;margin:10px 0 20px}
+.max-pain-kicker{font-size:.9rem;color:#ADBAC7;font-weight:700;margin-bottom:8px}
+.max-pain-value{font-size:1.8rem;font-weight:900;color:#F8FAFC}
+.max-pain-note{font-size:1.02rem;color:#F8FAFC;font-weight:700;margin-top:10px;line-height:1.6}
+.option-pair-grid{display:flex;gap:16px;flex-wrap:wrap}
 .hero-bento{display:none}
 .invest-hero{max-width:960px;margin:0 auto 20px;display:grid;grid-template-columns:1.45fr .95fr;gap:14px}
 .invest-card{background:
@@ -1376,7 +1407,12 @@ __SIGL_COMPANY_THEME__
   .consensus-corridor__labels{min-height:50px}
   .consensus-corridor__tag b{font-size:.64rem}
   .consensus-corridor__tag span{font-size:.64rem}
+  .stage-bar{gap:3px}
+  .stage-step{min-height:56px;padding:8px 4px;font-size:.62rem}
+  .stage-focus__badge{padding:10px 18px;font-size:1rem}
+  .stage-focus__desc{font-size:.88rem}
 }
+__SIGL_COMPANY_THEME__
 </style>
 """.replace("__SIGL_COMPANY_THEME__", COMPANY_DETAILS_THEME_OVERRIDES)
 
@@ -1685,7 +1721,14 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     stage_map = {1: "#FF7043", 2: "#FFA726", 3: "#FF9800", 4: "#FF6D00", 5: "#00E676", 6: "#00C853", 7: "#E57373", 8: "#F44336", 9: "#C62828", 10: "#FFC107"}
     stage_lbl = {1: "스타트업", 2: "초기성장", 3: "스케일업", 4: "초고속성장", 5: "성숙성장", 6: "캐시카우", 7: "정체기", 8: "초기쇠퇴", 9: "구조적쇠퇴", 10: "턴어라운드"}
 
-    bar_html = "".join([f'<div style="flex:1;background:{stage_map[i] if i == sn else "rgba(0,0,0,0.2)"};opacity:{"1" if i == sn else (str(0.25 + i * 0.02))};text-align:center;padding:14px 2px;font-size:.7rem;color:#ffffff;border:{"3px solid " + stage_map[i] if i == sn else "1px solid #444c56"};border-radius:{"10px 0 0 10px" if i == 1 else ("0 10px 10px 0" if i == 10 else "0")};font-weight:{"800" if i == sn else "600"};box-shadow:{"0 0 16px " + stage_map[i] + "88" if i == sn else "none"};transition:all .3s">{i}<br>{stage_lbl[i]}</div>' for i in range(1, 11)])
+    bar_html = "".join([
+        (
+            f'<div class="stage-step{" is-active" if i == sn else ""}" '
+            f'style="--stage-tone:{stage_map[i] if i == sn else "rgba(0,0,0,0.2)"};--stage-opacity:{"1" if i == sn else (str(0.25 + i * 0.02))}">'
+            f'<span class="stage-step__idx">{i}</span><span class="stage-step__label">{stage_lbl[i]}</span></div>'
+        )
+        for i in range(1, 11)
+    ])
     
     v1_c = "green" if sn in [5, 6] else ("orange" if sn in [1, 2, 3, 4, 10] else "red")
     v1_map = {
@@ -1711,15 +1754,16 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     if margin_trend != 'flat': _algo_hints.append(f"이익률추세 {'↑' if margin_trend == 'up' else '↓'}")
     if growth_trend != 'flat': _algo_hints.append(f"성장추세 {'가속' if growth_trend == 'accel' else '감속'}")
     if rev_cagr_3y and rev_cagr_3y != rev_g_stage: _algo_hints.append(f"3Y CAGR {rev_cagr_3y*100:.1f}%")
-    algo_hint_html = (f"<div style='background:rgba(255,109,0,0.06);border:1px solid rgba(255,109,0,0.2);border-radius:8px;padding:8px 14px;margin-top:12px;font-size:.8rem;color:#adbac7;font-weight:600'>" +
-                      f"<span style='color:#FF9800;font-weight:800'>⚙️ 알고리즘 판단 근거:</span> " +
-                      " · ".join(_algo_hints) + "</div>") if _algo_hints else ""
+    algo_hint_html = (
+        f"<div class='algo-hint'><span class='algo-hint__lead'>⚙️ 알고리즘 판단 근거</span>{' · '.join(_algo_hints)}</div>"
+        if _algo_hints else ""
+    )
 
     with st.container(border=True):
         html_s1 = (
-            f'<div class="s-title"><span class="s-num">01</span> 이 회사, 지금 어느 단계인가요?</div>'
-            f'<div style="display:flex;gap:3px;margin-bottom:24px">{bar_html}</div>'
-            f'<div style="text-align:center;margin:20px 0"><span style="display:inline-block;padding:12px 32px;border-radius:24px;font-weight:800;background:{scolor};color:#fff;font-size:1.2rem;box-shadow:0 6px 20px {scolor}66">{sname}</span><div style="font-size:1rem;color:#e6edf3;font-weight:700;margin-top:16px;line-height:1.7">{sdesc}</div></div>'
+            f'{_section_title("01", "이 회사, 지금 어느 단계인가요?")}'
+            f'<div class="stage-bar">{bar_html}</div>'
+            f'<div class="stage-focus"><span class="stage-focus__badge" style="--focus-tone:{scolor}">{sname}</span><div class="stage-focus__desc">{sdesc}</div></div>'
             f'{algo_hint_html}'
             f'<div class="divider"></div>'
             f'<div class="two-col"><div>'
@@ -1762,7 +1806,7 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
 
     with st.container(border=True):
         html_s2 = (
-            f'<div class="s-title"><span class="s-num">02</span> 돈을 잘 버는 회사인가요? <span style="font-size:.8rem;color:#768390">SEC 데이터</span></div>'
+            f'{_section_title("02", "돈을 잘 버는 회사인가요?", "SEC 데이터")}'
             f'<div class="two-col"><div>'
             f'{_metric_row("시가총액", _fmt_num(mcap), "m-value m-big")}'
             f'{_metric_row("TTM EPS (주당순이익)", _fmt_price(ttm_eps) if isinstance(ttm_eps, (int, float)) else "N/A")}'
@@ -1814,7 +1858,7 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     with st.container(border=True):
         col1, col2 = st.columns([1.1, 1])
         html_s3_1 = (
-            f'<div class="s-title"><span class="s-num">03</span> 지금까지 성적 <span style="font-size:.8rem;color:#768390">SEC 데이터</span></div>'
+            f'{_section_title("03", "지금까지 성적", "SEC 데이터")}'
             f'{_metric_row("수익 안정성", f"{rev_stab} <span style=\'font-size:.8rem;color:#8b949e;font-weight:600\'>{rev_cv}</span>")}'
             f'{_metric_row("이익 마진 추이", mtrend)}'
             f'{_metric_row("성장 가속화", accel)}'
@@ -1857,7 +1901,7 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
 
     with st.container(border=True):
         html_s4 = (
-            f'<div class="s-title"><span class="s-num">04</span> 성장 가능성 <span style="font-size:.8rem;color:#768390">SEC + Yahoo</span></div>'
+            f'{_section_title("04", "성장 가능성", "SEC + Yahoo")}'
             f'<div class="two-col"><div>'
             f'{_metric_row("분기 이익 성장률 (YoY)", _fmt_pct(eg), eg_cls)}'
             f'{_metric_row("분기 매출 성장률 (YoY)", _fmt_pct(yoy_q_rev_g), rg_cls)}'
@@ -1971,7 +2015,7 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
 
     with st.container(border=True):
         debt_ratio_text = f"{dte:.1f}%" if isinstance(dte, (int, float)) else "N/A"
-        s5_title_html = '<div class="s-title"><span class="s-num">05</span> 회사에 돈이 얼마나 있나요? <span style="font-size:.8rem;color:#768390">SEC + Yahoo</span></div>'
+        s5_title_html = _section_title("05", "회사에 돈이 얼마나 있나요?", "SEC + Yahoo")
         s5_spotlight = (
             f"<div class='spotlight-grid tight'>"
             f"<div class='spotlight-card'><p class='spotlight-label'>보유 현금</p><p class='spotlight-value' style='color:#63D9A2'>{_fmt_num(cash)}</p><p class='spotlight-sub'>현금 및 현금성 자산</p></div>"
@@ -1988,7 +2032,7 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
             f"</div>"
         )
         s5_header_html = (
-            f"<div style='display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px'><span class='section-pill {v5_pill_cls}'>{v5_t}</span><span class='section-pill {dl_pill_cls}'>D/E {dl}</span></div>"
+            f"<div class='section-pill-row'><span class='section-pill {v5_pill_cls}'>{v5_t}</span><span class='section-pill {dl_pill_cls}'>D/E {dl}</span></div>"
             f"{s5_spotlight}"
             f"{s5_chip_row}"
         )
@@ -2058,7 +2102,7 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
 
     with st.container(border=True):
         html_s6 = (
-            f'<div class="s-title"><span class="s-num">06</span> 현재 사람들이 많이 사고 있나요? <span style="font-size:.8rem;color:#768390">Yahoo</span></div>'
+            f'{_section_title("06", "현재 사람들이 많이 사고 있나요?", "Yahoo")}'
             f'<div class="two-col"><div>'
             f'{_metric_row("현재 거래량", f"{_fmt_num(vol, False)} 주")}'
             f'{_metric_row("10일 평균", f"{_fmt_num(avg10, False)} 주")}'
@@ -2089,7 +2133,7 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
 
     with st.container(border=True):
         html_s7 = (
-            f'<div class="s-title"><span class="s-num">07</span> 변동성이 큰가요? <span style="font-size:.8rem;color:#768390">Yahoo</span></div>'
+            f'{_section_title("07", "변동성이 큰가요?", "Yahoo")}'
             f'<div class="two-col"><div>'
             f'{_metric_row("베타 (β)", f"{beta:.2f} ({bl})" if isinstance(beta, (int, float)) else "N/A")}'
             f'{_metric_row("52주 가격 변화율", _fmt_pct(w52c), "m-green" if w52c and w52c > 0 else "m-red")}'
@@ -2138,7 +2182,7 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
 
     with st.container(border=True):
         html_s8 = (
-            f'<div class="s-title"><span class="s-num">08</span> 이 종목 비싼가요? <span style="font-size:.8rem;color:#768390">Yahoo</span></div>'
+            f'{_section_title("08", "이 종목 비싼가요?", "Yahoo")}'
             f'<div class="two-col"><div>'
             f'{_metric_row("Trailing P/E", t_pe_str)}'
             f'{_metric_row("Forward P/E", f_pe_str)}'
@@ -2222,9 +2266,9 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     target_gap_text = _fmt_signed_price(target_gap_abs) if isinstance(target_gap_abs, (int, float)) else "N/A"
 
     with st.container(border=True):
-        st.markdown('<div class="s-title"><span class="s-num">09</span> 전문가들의 의견 <span style="font-size:.8rem;color:#768390">Yahoo</span></div>', unsafe_allow_html=True)
+        st.markdown(_section_title("09", "전문가들의 의견", "Yahoo"), unsafe_allow_html=True)
         s9_spotlight = (
-            f"<div style='display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px'><span class='section-pill {cc_pill_cls}'>{con}</span><span class='section-pill pill-amber'>{rk}</span></div>"
+            f"<div class='section-pill-row'><span class='section-pill {cc_pill_cls}'>{con}</span><span class='section-pill pill-amber'>{rk}</span></div>"
             f"<div class='spotlight-grid tight'>"
             f"<div class='spotlight-card'><p class='spotlight-label'>컨센서스</p><p class='spotlight-value'>{con}</p><p class='spotlight-sub'>평균 의견 {f'{rm:.2f}/5.0' if isinstance(rm, (int, float)) else 'N/A'}</p></div>"
             f"<div class='spotlight-card'><p class='spotlight-label'>목표가 기대여력</p><p class='spotlight-value' style='color:{'#63D9A2' if isinstance(up_pct, (int, float)) and up_pct >= 0 else '#FF8F96'}'>{up_str}</p><p class='spotlight-sub'>중앙값 또는 평균 목표가 기준</p></div>"
@@ -2299,10 +2343,10 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     )
 
     with st.container(border=True):
-        st.markdown('<div class="s-title"><span class="s-num">10</span> 이 회사 누가 들고 있나요? <span style="font-size:.8rem;color:#768390">Yahoo</span></div>', unsafe_allow_html=True)
+        st.markdown(_section_title("10", "이 회사 누가 들고 있나요?", "Yahoo"), unsafe_allow_html=True)
         col1, col2 = st.columns([1.1, 1])
         html_s10_1 = (
-            f"<div style='display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px'><span class='section-pill {v10_pill_cls}'>{v10_t}</span><span class='section-pill pill-amber'>혼합 지분 구조</span></div>"
+            f"<div class='section-pill-row'><span class='section-pill {v10_pill_cls}'>{v10_t}</span><span class='section-pill pill-amber'>혼합 지분 구조</span></div>"
             f'{ownership_cards}'
             f'{ownership_stack}'
             f'<div class="note-box">※ "기관"에는 연기금, 뮤추얼펀드, ETF, 헤지펀드가 포함됩니다.<br>'
@@ -2331,18 +2375,18 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     ch = "".join([f"<li>{_fmt_price(ci['strike'])} <span style='color:#8b949e;font-size:.8rem'>(Vol {int(ci['volume']):,})</span></li>" for ci in (tc or [])]) or "<li>N/A</li>"
     ph = "".join([f"<li>{_fmt_price(pi['strike'])} <span style='color:#8b949e;font-size:.8rem'>(Vol {int(pi['volume']):,})</span></li>" for pi in (tp or [])]) or "<li>N/A</li>"
     mp_val = _fmt_price(mp) if mp else ""
-    mp_html = f"<span style='font-size:1.8rem;font-weight:900;color:#ffffff'>{mp_val}</span>" if mp else "<span style='color:#768390;font-size:1.2rem;font-weight:700'>데이터 없음</span>"
-    exp_html = f"<span style='font-size:.85rem;color:#adbac7;font-weight:700'>(만기: {exp})</span>" if exp else ""
+    exp_text = f"(만기: {exp})" if exp else ""
     vol_warning = "<div style='color:#FFC107; font-size:.85rem; margin-top:12px; font-weight:700;'>⚠️ 미결제약정(OI) 부족으로 임시로 거래량(Volume) 가중치를 사용했습니다.</div>" if is_vol_weight else ""
+    mp_note_html = f'<div class="max-pain-note">{mp_note}</div>' if mp_note else ""
 
     with st.container(border=True):
         html_s11 = (
-            f'<div class="s-title"><span class="s-num">11</span> 시장은 어떤 가격을 보고 있을까요? <span style="font-size:.8rem;color:#768390">Yahoo 옵션</span></div>'
-            f'<div style="text-align:center;margin:10px 0 20px">'
-            f'<div style="font-size:.9rem;color:#adbac7;font-weight:700;margin-bottom:8px">Max Pain 가격 {exp_html}</div>'
-            f'{mp_html}<div style="font-size:1.05rem;color:#ffffff;font-weight:700;margin-top:10px">{mp_note}</div>{vol_warning}</div>'
+            f'{_section_title("11", "시장은 어떤 가격을 보고 있을까요?", "Yahoo 옵션")}'
+            f'<div class="max-pain-head">'
+            f'<div class="max-pain-kicker">Max Pain 가격 {exp_text}</div>'
+            f'<div class="max-pain-value">{mp_val if mp else "데이터 없음"}</div>{mp_note_html}{vol_warning}</div>'
             f'<div class="divider"></div>'
-            f'<div style="display:flex;gap:16px;flex-wrap:wrap">'
+            f'<div class="option-pair-grid">'
             f'<div class="opt-box" style="flex:1;min-width:220px"><b style="color:#63D9A2;font-size:1rem">🟢 Call (상승 베팅) Top 3</b><ul class="opt-list">{ch}</ul></div>'
             f'<div class="opt-box" style="flex:1;min-width:220px"><b style="color:#FF8F96;font-size:1rem">🔴 Put (하락 베팅) Top 3</b><ul class="opt-list">{ph}</ul></div></div>'
             f'<div class="note-box" style="margin-top:20px">💡 <b>Max Pain 이론</b>: 옵션 만기 시 가장 많은 옵션 매수자가 손실을 보는 가격.<br>옵션 매도자(마켓메이커)의 이익이 극대화되는 지점으로, 주가가 만기일에 이 가격 부근으로 수렴하는 경향이 있습니다.</div>'
@@ -2378,7 +2422,7 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
     fig12 = _get_plotly_gauge(sp or 0, gauge_color) if sp else None
 
     with st.container(border=True):
-        st.markdown('<div class="s-title"><span class="s-num">12</span> 공매도 비율 <span style="font-size:.8rem;color:#768390">Yahoo</span></div>', unsafe_allow_html=True)
+        st.markdown(_section_title("12", "공매도 비율", "Yahoo"), unsafe_allow_html=True)
         col1, col2 = st.columns([1.1, 1])
         html_s12_1 = (
             f'{_metric_row("유통주식 대비 공매도", _fmt_pct(sp), "m-red" if sc == "red" else "m-value")}'
@@ -2411,12 +2455,12 @@ def render_company_details(ticker_str: str, key_prefix: str = "company"):
                 else: dt_str = datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M')
                 items += f'<div class="n-item"><a href="{_esc(link)}" target="_blank" class="n-title">{_esc(title)}</a><div class="n-meta">{_esc(pub_name)} · {dt_str}</div></div>'
             with st.container(border=True):
-                st.markdown(f'<div class="s-title"><span class="s-num">13</span> 최신 뉴스 <span style="font-size:.8rem;color:#768390">Yahoo Finance</span></div>{items}', unsafe_allow_html=True)
+                st.markdown(f'{_section_title("13", "최신 뉴스", "Yahoo Finance")}<div class="news-feed">{items}</div>', unsafe_allow_html=True)
         else: raise ValueError("No news")
     except Exception as e:
         logger.warning(f"News fetch failed: {e}")
         with st.container(border=True):
-            st.markdown('<div class="s-title"><span class="s-num">13</span> 최신 뉴스</div><div style="color:#8b949e;padding:10px 0;text-align:center;">뉴스 데이터를 불러올 수 없습니다.</div>', unsafe_allow_html=True)
+            st.markdown(f'{_section_title("13", "최신 뉴스")}<div class="news-empty">뉴스 데이터를 불러올 수 없습니다.</div>', unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════
     # 📋 종합 점수 ([SURGE] 직관적인 100점 만점 스케일로 개편)

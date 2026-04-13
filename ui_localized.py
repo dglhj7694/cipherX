@@ -195,6 +195,102 @@ def _mini_stat_card(label, value, tone="muted", tooltip=""):
     )
 
 
+def _render_sigl_table_card(title, rows, columns, subtitle="", raw_html_columns=None):
+    if not rows:
+        return
+
+    raw_columns = set(raw_html_columns or [])
+    header_html = "".join(f"<th>{_esc(col)}</th>" for col in columns)
+    body_parts = []
+    for row in rows:
+        cells = []
+        for col in columns:
+            raw_value = row.get(col, "-")
+            value_text = str(raw_value if raw_value is not None else "-")
+            if not value_text.strip():
+                value_text = "-"
+            cell_html = value_text if col in raw_columns else _esc(value_text)
+            cells.append(f"<td>{cell_html}</td>")
+        body_parts.append(f"<tr>{''.join(cells)}</tr>")
+
+    subtitle_html = f"<p class='sigl-section-copy'>{_esc(subtitle)}</p>" if subtitle else ""
+    panel_html = (
+        "<div class='sigl-card sigl-table-card'>"
+        "<div class='sigl-section-head'>"
+        "<div>"
+        f"<p class='sigl-section-title'>{_esc(title)}</p>"
+        f"{subtitle_html}"
+        "</div>"
+        "</div>"
+        "<div class='sigl-table-wrap'>"
+        "<table class='sigl-data-table'>"
+        f"<thead><tr>{header_html}</tr></thead>"
+        f"<tbody>{''.join(body_parts)}</tbody>"
+        "</table>"
+        "</div>"
+        "</div>"
+    )
+    st.markdown(_html_block(panel_html), unsafe_allow_html=True)
+
+
+def _table_cell_text(value):
+    if value is None:
+        return "-"
+    try:
+        if pd.isna(value):
+            return "-"
+    except Exception:
+        pass
+    text = str(value).strip()
+    return text if text else "-"
+
+
+def _rows_from_dataframe(dataframe):
+    if dataframe is None or dataframe.empty:
+        return [], []
+    columns = [str(col) for col in dataframe.columns]
+    rows = []
+    for row in dataframe.to_dict("records"):
+        rows.append({col: _table_cell_text(row.get(col)) for col in columns})
+    return rows, columns
+
+
+def _render_sigl_dataframe_table_card(title, dataframe, subtitle=""):
+    rows, columns = _rows_from_dataframe(dataframe)
+    if not rows:
+        return
+    _render_sigl_table_card(title, rows, columns, subtitle=subtitle)
+
+
+def _strategy_direction_badge(value):
+    text = _table_cell_text(value)
+    upper = text.upper()
+    if "LONG" in upper or "매수" in text or "상방" in text:
+        tone = "positive"
+    elif "SHORT" in upper or "매도" in text or "하방" in text:
+        tone = "negative"
+    elif "NEUTRAL" in upper or "중립" in text:
+        tone = "warning"
+    else:
+        tone = "muted"
+    return _badge(text, tone) if text != "-" else "-"
+
+
+def _strategy_status_badge(value):
+    text = _table_cell_text(value)
+    if text == "-":
+        return "-"
+    if any(token in text for token in ("활성", "성립", "확인 중")):
+        tone = "positive"
+    elif any(token in text for token in ("관심", "대기", "준비")):
+        tone = "warning"
+    elif any(token in text for token in ("해제", "실패", "무효")):
+        tone = "negative"
+    else:
+        tone = "accent"
+    return _badge(text, tone)
+
+
 def _render_ensemble_gauge(es, chart_key=None):
     gauge = go.Figure(go.Indicator(
         mode="gauge+number",
@@ -379,7 +475,7 @@ def _join_reason_phrases(parts):
         return cleaned[0]
     if len(cleaned) == 2:
         particle = "과" if _has_final_consonant(cleaned[0]) else "와"
-        return f"{cleaned[0]} {particle} {cleaned[1]}"
+        return f"{cleaned[0]}{particle} {cleaned[1]}"
     return f"{', '.join(cleaned[:-1])}, {cleaned[-1]}"
 
 
@@ -427,6 +523,11 @@ def _translate_note_text(text):
         ("caution", "주의"),
         ("risk-off", "위험회피"),
         ("risk-on", "위험선호"),
+        ("VWAP반등", "VWAP 반등"),
+        ("VWAP반등가", "VWAP 반등이"),
+        ("시장 강세 전환 과", "시장 강세 전환과"),
+        ("이탈를", "이탈을"),
+        ("이탈 이탈", "이탈"),
     ]
     for src, dst in replacements:
         translated = translated.replace(src, dst)
@@ -830,12 +931,23 @@ def _signal_session_date(meta):
     return ""
 
 
+def _normalize_signal_label(label):
+    text = str(label or "").strip()
+    if not text:
+        return ""
+    text = re.sub(r"VWAP\s*반등가?", "VWAP 반등", text, flags=re.IGNORECASE)
+    text = text.replace("VWAP 반등가", "VWAP 반등")
+    text = text.replace("시장 강세 전환 과", "시장 강세 전환과")
+    text = re.sub(r"\s{2,}", " ", text)
+    return text.strip()
+
+
 def _recent_signal_payload(item):
     if isinstance(item, dict):
         return {
             "key": str(item.get("key", "") or "").strip(),
             "icon": str(item.get("icon", "") or "").strip(),
-            "label": str(item.get("label", "") or "").strip(),
+            "label": _normalize_signal_label(item.get("label", "")),
             "date": str(item.get("date", "") or "").strip(),
             "direction": str(item.get("dir", "") or "").strip(),
             "is_combined": bool(item.get("is_combined")),
@@ -846,7 +958,7 @@ def _recent_signal_payload(item):
         return {
             "key": "",
             "icon": str(item[0] or "").strip(),
-            "label": str(item[1] or "").strip(),
+            "label": _normalize_signal_label(item[1]),
             "date": str(item[2] or "").strip(),
             "direction": str(item[3] or "").strip(),
             "is_combined": bool(item[4]),
@@ -856,7 +968,7 @@ def _recent_signal_payload(item):
     return {
         "key": "",
         "icon": "",
-        "label": str(item or "").strip(),
+        "label": _normalize_signal_label(item),
         "date": "",
         "direction": "",
         "is_combined": False,
@@ -925,7 +1037,7 @@ def _signal_explanation_text(payload):
         (["bb_lower_bounce"], "볼린저 하단에서 반등이 나와 단기 지지 확인 가능성을 보여주는 신호입니다."),
         (["bb_lower_break"], "볼린저 하단 이탈로 약세 압력과 변동성 확대를 함께 경계해야 하는 신호입니다."),
         (["bb_upper_touch"], "볼린저 상단에 닿아 단기 과열 또는 저항 테스트를 시사하는 신호입니다."),
-        (["vwap_bounce_buy"], "VWAP 부근에서 수급이 다시 살아나며 단기 평균 가격대를 지지로 바꾸려는 신호입니다."),
+        (["vwap_bounce_buy", "vwap 반등"], "VWAP 부근에서 수급이 다시 살아나며 단기 평균 가격대를 지지로 바꾸려는 신호입니다."),
         (["vwap_reject_sell"], "VWAP 회복에 실패해 단기 평균 가격대가 다시 저항으로 작동할 수 있음을 보여주는 신호입니다."),
         (["fib_618_reclaim"], "61.8% 되돌림을 다시 회복해 하락 압력이 완화되고 반등 시도가 강화되는 신호입니다."),
         (["fib_618_breakdown"], "61.8% 되돌림이 무너지며 단순 조정보다 추세 훼손 가능성이 커졌음을 보여주는 신호입니다."),
@@ -1031,73 +1143,6 @@ def _build_momentum_narrative(meta):
             return "현재 Slow Stochastic과 RSI는 과열권에 가깝고, 주가도 볼린저 상단 부근이라 단기 숨고르기 가능성을 함께 경계해야 합니다."
         return "현재 Slow Stochastic과 RSI는 과열권에 가까워 단기 과열 부담을 함께 반영해야 합니다."
     return ""
-
-
-def _build_recap_headline(meta):
-    ticker = str(meta.get("ticker", "")).upper()
-    signal_items = _recent_signal_items(meta, limit=2)
-    change_pct = _safe_float(meta.get("price_change_pct", 0))
-
-    if signal_items:
-        lead_label, lead_tone = signal_items[0]
-        if lead_tone == "positive":
-            if abs(change_pct) >= 2:
-                return f"{ticker}, {abs(change_pct):.2f}% 움직임 속 {lead_label} 포착"
-            return f"{ticker}, {lead_label} 신호 포착"
-        if lead_tone == "negative":
-            if abs(change_pct) >= 2:
-                return f"{ticker}, {abs(change_pct):.2f}% 움직임 속 {lead_label} 경고"
-            return f"{ticker}, {lead_label} 신호로 약세 경계"
-        return f"{ticker}, {lead_label} 확인된 흐름"
-    if change_pct >= 2:
-        return f"{ticker}, 강한 상승 뒤 추세 판단 구간"
-    if change_pct <= -2:
-        return f"{ticker}, 큰 폭 하락 뒤 반응 확인 구간"
-    return f"{ticker}, 기술적 판단 요약"
-
-
-def _build_judgment_recap(meta, title):
-    ticker = str(meta.get("ticker", "")).upper()
-    date_text = str(meta.get("last_date", "")).strip()
-    change_pct = _safe_float(meta.get("price_change_pct", 0))
-    volume_ratio = _safe_float(meta.get("volume", 0)) / max(_safe_float(meta.get("avg_volume", 1), 1), 1)
-    supports_named, resistances_named = _extract_named_levels(meta)
-    supports, resistances = _extract_price_levels(meta)
-    signal_narrative = _build_signal_narrative(meta)
-    momentum_narrative = _build_momentum_narrative(meta)
-
-    if change_pct >= 0.2:
-        move_text = f"{change_pct:+.2f}% 상승"
-    elif change_pct <= -0.2:
-        move_text = f"{change_pct:+.2f}% 하락"
-    else:
-        move_text = f"{change_pct:+.2f}% 보합권"
-
-    if volume_ratio >= 1.8:
-        volume_text = f"거래량은 평소 대비 {volume_ratio:.1f}배로 크게 늘었습니다."
-    elif volume_ratio >= 1.15:
-        volume_text = f"거래량은 평소 대비 {volume_ratio:.1f}배로 다소 늘었습니다."
-    elif volume_ratio <= 0.7:
-        volume_text = f"거래량은 평소 대비 {volume_ratio:.1f}배로 줄었습니다."
-    else:
-        volume_text = f"거래량은 평소와 비슷한 {volume_ratio:.1f}배 수준이었습니다."
-
-    recap = f"{date_text} {ticker}는 {move_text} 마감했고, {volume_text}"
-    if signal_narrative:
-        recap += f" {signal_narrative}"
-    if supports:
-        support_text = ", ".join(f"{value:.2f}" for value in supports[:3])
-        recap += f" 주요 지지 후보는 {support_text}입니다."
-        if supports_named:
-            recap += f" 가장 가까운 지지 축은 {supports_named[0][0]} {supports_named[0][1]:.2f}입니다."
-    if resistances:
-        resistance_text = ", ".join(f"{value:.2f}" for value in resistances[:3])
-        recap += f" 저항 후보는 {resistance_text}입니다."
-        if resistances_named:
-            recap += f" 가장 먼저 봐야 할 회복 구간은 {resistances_named[0][0]} {resistances_named[0][1]:.2f}입니다."
-    if momentum_narrative:
-        recap += f" {momentum_narrative}"
-    return recap
 
 
 def _build_beginner_explanation(meta, title):
@@ -1925,7 +1970,7 @@ def _build_chart_interpretation_detail_badges(meta):
     elif price < min(x for x in [vwap, vp_poc] if x > 0) if any(x > 0 for x in [vwap, vp_poc]) else False:
         stance_text = "기준선 아래 · 반등보다 회복 확인"
     else:
-        stance_text = "기준선 혼재 · 방향 재정리 구간"
+        stance_text = "기준선 혼재 · 방향성 재확인 구간"
 
     if vp_long_rr > vp_short_rr:
         position_badge = f"롱 우위 · RR {vp_long_rr:.2f} vs {vp_short_rr:.2f}"
@@ -2079,38 +2124,6 @@ def _fmt_chart_price(value):
     return f"${value:.2f}"
 
 
-def _chart_headline_text(meta):
-    ticker = str(meta.get("ticker", "")).upper()
-    date_text = str(meta.get("last_date", "")).strip()
-    change_pct = _safe_float(meta.get("price_change_pct", 0))
-    price = _safe_float(meta.get("price", 0))
-    vwap = _safe_float(meta.get("vwap", 0))
-    percent_b = _safe_float(meta.get("percent_b", 0.5))
-    rsi = _safe_float(meta.get("rsi", 50))
-    rmi = _safe_float(meta.get("rmi", 50))
-    wt1 = _safe_float(meta.get("wt1", 0))
-    macd_hist = _safe_float(meta.get("macd_hist", 0))
-
-    bullish = sum([price >= vwap if vwap else False, rsi >= 55, rmi >= 55, wt1 > 0, macd_hist > 0])
-    bearish = sum([price < vwap if vwap else False, rsi <= 45, rmi <= 45, wt1 < 0, macd_hist < 0])
-
-    if bullish >= 4:
-        core = "추세 우위 유지"
-    elif bearish >= 4:
-        core = "기준선 아래 약세 압력"
-    elif percent_b <= 0.18:
-        core = "하단 눌림 반등 시험"
-    elif percent_b >= 0.82:
-        core = "상단 과열 부담 점검"
-    else:
-        core = "방향성 재정리 구간"
-
-    move = "상승" if change_pct > 0 else ("하락" if change_pct < 0 else "보합")
-    prefix = f"{ticker} 분석" if ticker else "종목 분석"
-    suffix = f" ({date_text})" if date_text else ""
-    return f"{prefix}{suffix}: {change_pct:+.2f}% {move} · {core} · 종가 ({_fmt_chart_price(price)})"
-
-
 def _chart_volume_text(meta):
     volume = _safe_float(meta.get("volume", 0))
     avg_volume = max(_safe_float(meta.get("avg_volume", 1), 1), 1)
@@ -2137,16 +2150,16 @@ def _chart_volume_text(meta):
 def _chart_pattern_text(meta):
     recent_payloads = _recent_signal_payloads(meta, limit=2)
     if recent_payloads:
-        labels = [str(item.get("label") or "").strip() for item in recent_payloads if str(item.get("label") or "").strip()]
+        labels = [_normalize_signal_label(item.get("label")) for item in recent_payloads if _normalize_signal_label(item.get("label"))]
         if labels:
             headline = (
-                f"최근에는 {_join_reason_phrases(labels)}가 함께 나타났고, 단기 방향성은 이 조합이 유지되는지 여부가 핵심입니다."
+                f"최근에는 {_join_reason_phrases(labels)} 조합이 함께 나타났고, 단기 방향성은 이 조합이 유지되는지 여부가 핵심입니다."
                 if len(labels) >= 2
                 else f"최근에는 {labels[0]} 신호가 가장 중요하게 보이며, 이 신호가 후속 추세로 이어지는지 확인하는 구간입니다."
             )
             explain_bits = []
             for payload in recent_payloads[:2]:
-                label = str(payload.get("label") or "").strip()
+                label = _normalize_signal_label(payload.get("label"))
                 if not label:
                     continue
                 meaning = _signal_explanation_text(payload)
@@ -2182,11 +2195,401 @@ def _chart_levels_text(meta):
     return support_text, resistance_text
 
 
+def _swing_indicator_vote_rows(meta):
+    rows = []
+
+    ma50_dist = _safe_float(meta.get("ma50_dist", 0))
+    ma200_dist = _safe_float(meta.get("ma200_dist", 0))
+    adx = _safe_float(meta.get("adx", 0))
+    plus_di = _safe_float(meta.get("plus_di", 0))
+    minus_di = _safe_float(meta.get("minus_di", 0))
+    rsi = _safe_float(meta.get("rsi", 50))
+    rs_ratio = _safe_float(meta.get("rs_ratio", 1))
+
+    rows.append({
+        "indicator": "50 DMA",
+        "score": 1 if ma50_dist >= 1.0 else (-1 if ma50_dist <= -1.0 else 0),
+        "note": f"현재가 vs 50일선 {ma50_dist:+.1f}%",
+    })
+    rows.append({
+        "indicator": "200 DMA",
+        "score": 1 if ma200_dist >= 0.5 else (-1 if ma200_dist <= -0.5 else 0),
+        "note": f"현재가 vs 200일선 {ma200_dist:+.1f}%",
+    })
+
+    adx_score = 0
+    adx_note = f"ADX {adx:.1f}"
+    if adx >= 25:
+        if plus_di >= minus_di + 1.0:
+            adx_score = 1
+            adx_note = f"ADX {adx:.1f} · +DI {plus_di:.1f} > -DI {minus_di:.1f}"
+        elif minus_di >= plus_di + 1.0:
+            adx_score = -1
+            adx_note = f"ADX {adx:.1f} · -DI {minus_di:.1f} > +DI {plus_di:.1f}"
+    rows.append({"indicator": "ADX Trend", "score": adx_score, "note": adx_note})
+
+    rows.append({
+        "indicator": "Overbought/Oversold",
+        "score": 1 if rsi <= 35 else (-1 if rsi >= 65 else 0),
+        "note": f"RSI(14) {rsi:.1f}",
+    })
+    rows.append({
+        "indicator": "Relative Strength",
+        "score": 1 if rs_ratio >= 1.02 else (-1 if rs_ratio <= 0.98 else 0),
+        "note": f"RS Ratio {rs_ratio:.2f}",
+    })
+    return rows
+
+
+def _swing_vote_label(score):
+    if score > 0:
+        return "Bullish"
+    if score < 0:
+        return "Bearish"
+    return "Neutral"
+
+
+def _swing_indicator_snapshot_rows(meta):
+    rsi = _safe_float(meta.get("rsi", 50))
+    mfi = _safe_float(meta.get("mfi", 50))
+    adx = _safe_float(meta.get("adx", 0))
+    plus_di = _safe_float(meta.get("plus_di", 0))
+    minus_di = _safe_float(meta.get("minus_di", 0))
+    macd_hist = _safe_float(meta.get("macd_hist", 0))
+    rs_ratio = _safe_float(meta.get("rs_ratio", 1))
+    atr_pct = _safe_float(meta.get("atr_pct", 0))
+    ma50_dist = _safe_float(meta.get("ma50_dist", 0))
+    ma200_dist = _safe_float(meta.get("ma200_dist", 0))
+    price = _safe_float(meta.get("price", 0))
+    vwap = _safe_float(meta.get("vwap", 0))
+    vp_poc = _safe_float(meta.get("vp_poc", 0))
+
+    def _distance_text(base):
+        if base <= 0 or price <= 0:
+            return "-"
+        return f"{((price - base) / base) * 100:+.1f}%"
+
+    adx_state = "중립"
+    if adx >= 25:
+        if plus_di >= minus_di + 1:
+            adx_state = "상승 추세"
+        elif minus_di >= plus_di + 1:
+            adx_state = "하락 추세"
+        else:
+            adx_state = "추세 강함"
+
+    return [
+        {"지표": "RSI(14)", "값": f"{rsi:.1f}", "해석": "과매도" if rsi <= 35 else ("과열" if rsi >= 65 else "중립")},
+        {"지표": "MFI", "값": f"{mfi:.1f}", "해석": "유입 우위" if mfi >= 55 else ("유출 우위" if mfi <= 45 else "중립")},
+        {"지표": "ADX / DMI", "값": f"{adx:.1f} / +DI {plus_di:.1f} / -DI {minus_di:.1f}", "해석": adx_state},
+        {"지표": "MACD Hist", "값": f"{macd_hist:+.3f}", "해석": "상방 모멘텀" if macd_hist > 0 else ("하방 모멘텀" if macd_hist < 0 else "중립")},
+        {"지표": "RS Ratio", "값": f"{rs_ratio:.3f}", "해석": "시장 대비 강함" if rs_ratio >= 1.02 else ("시장 대비 약함" if rs_ratio <= 0.98 else "시장과 유사")},
+        {"지표": "ATR%", "값": f"{atr_pct:.2f}%", "해석": "고변동" if atr_pct >= 6 else ("보통" if atr_pct >= 3.5 else "저변동")},
+        {"지표": "50일선 거리", "값": f"{ma50_dist:+.1f}%", "해석": "상단 유지" if ma50_dist >= 0 else "하단 체류"},
+        {"지표": "200일선 거리", "값": f"{ma200_dist:+.1f}%", "해석": "상단 유지" if ma200_dist >= 0 else "하단 체류"},
+        {"지표": "VWAP 거리", "값": _distance_text(vwap), "해석": "기준선 위" if price >= vwap > 0 else ("기준선 아래" if vwap > 0 else "-")},
+        {"지표": "POC 거리", "값": _distance_text(vp_poc), "해석": "중심가격 위" if price >= vp_poc > 0 else ("중심가격 아래" if vp_poc > 0 else "-")},
+    ]
+
+
+def _trend_vote_from_threshold(value, up_threshold, down_threshold):
+    numeric = _safe_float(value, 0)
+    if not math.isfinite(numeric) or abs(numeric) < 1e-12:
+        return 0
+    if numeric >= up_threshold:
+        return 1
+    if numeric <= down_threshold:
+        return -1
+    return 0
+
+
+def _trend_vote_label(vote):
+    if vote > 0:
+        return "Up"
+    if vote < 0:
+        return "Down"
+    return "Neutral"
+
+
+def _trend_status_from_votes(votes):
+    up_count = sum(1 for vote in votes if vote > 0)
+    down_count = sum(1 for vote in votes if vote < 0)
+    if up_count >= 2 and up_count > down_count:
+        return "Up"
+    if down_count >= 2 and down_count > up_count:
+        return "Down"
+    return "Weak or Absent"
+
+
+def _trend_status_tone(status):
+    if status == "Up":
+        return "positive"
+    if status == "Down":
+        return "negative"
+    return "warning"
+
+
+def _build_trend_table_rows(meta):
+    adx = _safe_float(meta.get("adx", 0))
+    plus_di = _safe_float(meta.get("plus_di", 0))
+    minus_di = _safe_float(meta.get("minus_di", 0))
+    ma20 = _safe_float(meta.get("ma20", 0))
+    ma50 = _safe_float(meta.get("ma50", 0))
+    ma200 = _safe_float(meta.get("ma200", 0))
+    ma20_dist = _safe_float(meta.get("ma20_dist", 0))
+    ma50_dist = _safe_float(meta.get("ma50_dist", 0))
+    ma200_dist = _safe_float(meta.get("ma200_dist", 0))
+    supertrend_gap = _safe_float(meta.get("supertrend_gap", 0))
+    price_slope_5_pct = _safe_float(meta.get("price_slope_5_pct", 0))
+
+    adx_status = "Weak or Absent"
+    if adx >= 20 and plus_di >= minus_di + 1:
+        adx_status = "Up"
+    elif adx >= 20 and minus_di >= plus_di + 1:
+        adx_status = "Down"
+    adx_row = {
+        "Trend": "ADX",
+        "Status": _badge(adx_status, _trend_status_tone(adx_status)),
+        "Basis": f"ADX {adx:.1f} · +DI {plus_di:.1f} · -DI {minus_di:.1f}",
+    }
+
+    long_stack_vote = 0
+    if ma20 > 0 and ma50 > 0 and ma200 > 0:
+        if ma20 > ma50 > ma200:
+            long_stack_vote = 1
+        elif ma20 < ma50 < ma200:
+            long_stack_vote = -1
+    long_votes = [
+        _trend_vote_from_threshold(ma200_dist, 0.5, -0.5),
+        long_stack_vote,
+        _trend_vote_from_threshold(supertrend_gap, 0.3, -0.3),
+    ]
+    long_status = _trend_status_from_votes(long_votes)
+    long_basis = (
+        f"MA200 Dist {ma200_dist:+.1f}% ({_trend_vote_label(long_votes[0])}) · "
+        f"MA Stack ({_trend_vote_label(long_votes[1])}) · "
+        f"ST Gap {supertrend_gap:+.2f}% ({_trend_vote_label(long_votes[2])})"
+    )
+
+    intermediate_stack_vote = 0
+    if ma20 > 0 and ma50 > 0:
+        if ma20 > ma50:
+            intermediate_stack_vote = 1
+        elif ma20 < ma50:
+            intermediate_stack_vote = -1
+    intermediate_votes = [
+        _trend_vote_from_threshold(ma50_dist, 1.0, -1.0),
+        intermediate_stack_vote,
+        _trend_vote_from_threshold(supertrend_gap, 0.3, -0.3),
+    ]
+    intermediate_status = _trend_status_from_votes(intermediate_votes)
+    intermediate_basis = (
+        f"MA50 Dist {ma50_dist:+.1f}% ({_trend_vote_label(intermediate_votes[0])}) · "
+        f"MA20 vs MA50 ({_trend_vote_label(intermediate_votes[1])}) · "
+        f"ST Gap {supertrend_gap:+.2f}% ({_trend_vote_label(intermediate_votes[2])})"
+    )
+
+    short_votes = [
+        _trend_vote_from_threshold(ma20_dist, 0.4, -0.4),
+        _trend_vote_from_threshold(price_slope_5_pct, 0.5, -0.5),
+        _trend_vote_from_threshold(supertrend_gap, 0.3, -0.3),
+    ]
+    short_status = _trend_status_from_votes(short_votes)
+    short_basis = (
+        f"MA20 Dist {ma20_dist:+.1f}% ({_trend_vote_label(short_votes[0])}) · "
+        f"Slope5d {price_slope_5_pct:+.2f}% ({_trend_vote_label(short_votes[1])}) · "
+        f"ST Gap {supertrend_gap:+.2f}% ({_trend_vote_label(short_votes[2])})"
+    )
+
+    rows = [
+        adx_row,
+        {
+            "Trend": "Long Term",
+            "Status": _badge(long_status, _trend_status_tone(long_status)),
+            "Basis": long_basis,
+        },
+        {
+            "Trend": "Intermediate Term",
+            "Status": _badge(intermediate_status, _trend_status_tone(intermediate_status)),
+            "Basis": intermediate_basis,
+        },
+        {
+            "Trend": "Short Term",
+            "Status": _badge(short_status, _trend_status_tone(short_status)),
+            "Basis": short_basis,
+        },
+    ]
+    status_map = {
+        "adx": adx_status,
+        "long": long_status,
+        "intermediate": intermediate_status,
+        "short": short_status,
+    }
+    values = {"adx": adx, "plus_di": plus_di, "minus_di": minus_di}
+    return rows, status_map, values
+
+
+def _build_trend_explanation_lines(status_map, values):
+    adx_status = str(status_map.get("adx", "Weak or Absent"))
+    long_status = str(status_map.get("long", "Weak or Absent"))
+    intermediate_status = str(status_map.get("intermediate", "Weak or Absent"))
+    short_status = str(status_map.get("short", "Weak or Absent"))
+    adx = _safe_float(values.get("adx", 0))
+    plus_di = _safe_float(values.get("plus_di", 0))
+    minus_di = _safe_float(values.get("minus_di", 0))
+
+    if adx_status == "Up":
+        adx_text = "상승 쪽 DI 우세와 추세 강도(ADX≥20)가 함께 확인됩니다."
+    elif adx_status == "Down":
+        adx_text = "하락 쪽 DI 우세와 추세 강도(ADX≥20)가 함께 확인됩니다."
+    elif plus_di >= minus_di + 1:
+        adx_text = "상승 쪽 DI 우세는 있지만, 추세 강도는 아직 약합니다."
+    elif minus_di >= plus_di + 1:
+        adx_text = "하락 쪽 DI 우세는 있지만, 추세 강도는 아직 약합니다."
+    else:
+        adx_text = "DI 우위와 추세 강도가 모두 뚜렷하지 않습니다."
+
+    if long_status == "Down" and intermediate_status == "Down":
+        big_trend_text = "큰 구조는 아직 하락 쪽입니다."
+        big_direction = "down"
+    elif long_status == "Up" and intermediate_status == "Up":
+        big_trend_text = "큰 구조는 아직 상승 쪽입니다."
+        big_direction = "up"
+    elif long_status == "Down" or intermediate_status == "Down":
+        big_trend_text = "큰 구조는 하락 우위지만, 한 축은 아직 약합니다."
+        big_direction = "down"
+    elif long_status == "Up" or intermediate_status == "Up":
+        big_trend_text = "큰 구조는 상승 우위지만, 한 축은 아직 약합니다."
+        big_direction = "up"
+    else:
+        big_trend_text = "장기·중기 구조는 방향성이 약한 혼조 상태입니다."
+        big_direction = "mixed"
+
+    if short_status == "Up" and big_direction == "down":
+        short_text = "그런데 최근 며칠은 단기 반등/되돌림이 들어온 상태입니다."
+    elif short_status == "Down" and big_direction == "up":
+        short_text = "그런데 최근 며칠은 단기 눌림/조정이 들어온 상태입니다."
+    elif short_status in {"Up", "Down"} and ((short_status == "Up" and big_direction == "up") or (short_status == "Down" and big_direction == "down")):
+        short_text = "단기 흐름도 큰 구조와 같은 방향으로 움직이고 있습니다."
+    elif short_status == "Weak or Absent":
+        short_text = "단기 방향성은 아직 약해 확인 신호가 더 필요합니다."
+    else:
+        short_text = "단기 흐름은 큰 구조와 엇갈려 변동성이 커질 수 있습니다."
+
+    return [
+        f"ADX = {adx_status} (ADX {adx:.1f}) → {adx_text}",
+        f"Long Term = {long_status} / Intermediate Term = {intermediate_status} → {big_trend_text}",
+        f"Short Term = {short_status} → {short_text}",
+    ]
+
+
+def _render_integrated_swing_snapshot(meta):
+    rows = _swing_indicator_vote_rows(meta)
+    bull_count = sum(1 for row in rows if row["score"] > 0)
+    bear_count = sum(1 for row in rows if row["score"] < 0)
+    neutral_count = len(rows) - bull_count - bear_count
+
+    st.markdown("#### 체크리스트 & 인디케이터")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Bullish", bull_count)
+    c2.metric("Neutral", neutral_count)
+    c3.metric("Bearish", bear_count)
+
+    trend_rows, trend_status_map, trend_values = _build_trend_table_rows(meta)
+    _render_sigl_table_card(
+        "Trend Table",
+        trend_rows,
+        ["Trend", "Status", "Basis"],
+        subtitle="ADX와 장·중·단기 구조를 Up / Down / Weak or Absent로 요약합니다.",
+        raw_html_columns={"Status"},
+    )
+    trend_lines = _build_trend_explanation_lines(trend_status_map, trend_values)
+    trend_note_html = (
+        "<div class='sigl-note'>"
+        "<strong>트렌드 연결 해설</strong><br>"
+        f"<span class='sigl-summary'>{'<br>'.join(_esc(line) for line in trend_lines)}</span>"
+        "</div>"
+    )
+    st.markdown(_html_block(trend_note_html), unsafe_allow_html=True)
+
+    vote_rows = []
+    for row in rows:
+        tone = "positive" if row["score"] > 0 else ("negative" if row["score"] < 0 else "warning")
+        vote_rows.append(
+            {
+                "지표": row["indicator"],
+                "판정": _badge(_swing_vote_label(row["score"]), tone),
+                "근거": row["note"],
+            }
+        )
+    indicator_rows = _swing_indicator_snapshot_rows(meta)
+    left_col, right_col = st.columns(2)
+    with left_col:
+        _render_sigl_table_card(
+            "신호 체크",
+            vote_rows,
+            ["지표", "판정", "근거"],
+            subtitle="핵심 방향 필터 5개를 현재 값으로 요약합니다.",
+            raw_html_columns={"판정"},
+        )
+    with right_col:
+        _render_sigl_table_card(
+            "핵심 지표값",
+            indicator_rows,
+            ["지표", "값", "해석"],
+            subtitle="현재 지표값과 상태 해석을 한 번에 확인합니다.",
+        )
+
+    supports_named, resistances_named = _extract_named_levels(meta)
+    level_rows = []
+    for idx, (label, value) in enumerate(supports_named[:3], start=1):
+        level_rows.append({"구분": f"S{idx}", "레벨": label, "가격": f"{value:.2f}"})
+    for idx, (label, value) in enumerate(resistances_named[:3], start=1):
+        level_rows.append({"구분": f"R{idx}", "레벨": label, "가격": f"{value:.2f}"})
+
+    if level_rows:
+        _render_sigl_table_card(
+            "Key Levels",
+            level_rows,
+            ["구분", "레벨", "가격"],
+            subtitle="가까운 지지/저항 레벨을 우선 순서로 정리합니다.",
+        )
+
+    recent_payloads = _recent_signal_payloads(meta, limit=8)
+    signal_rows = []
+    for item in recent_payloads:
+        direction = str(item.get("direction", "")).lower()
+        tone = "positive" if direction == "buy" else ("negative" if direction == "sell" else "warning")
+        label = "Bullish" if direction == "buy" else ("Bearish" if direction == "sell" else "Neutral")
+        signal_rows.append(
+            {
+                "날짜": str(item.get("date", "")),
+                "신호": str(item.get("label", "")),
+                "분류": _badge(label, tone),
+            }
+        )
+    if signal_rows:
+        _render_sigl_table_card(
+            "Recent EOD Signals",
+            signal_rows,
+            ["날짜", "신호", "분류"],
+            subtitle="최근 종가 기준 시그널 흐름입니다.",
+            raw_html_columns={"분류"},
+        )
+
+
 def _named_chart_level(label, value):
     value = _safe_float(value, 0)
     if value <= 0:
         return ""
     return f"{label} ({_fmt_chart_price(value)})"
+
+
+def _chart_level_name(level_text, fallback="핵심 레벨"):
+    text = str(level_text or "").strip()
+    if not text:
+        return fallback
+    return text.split(" (", 1)[0].strip() or fallback
 
 
 def _chart_scenario_text(meta):
@@ -2210,77 +2613,124 @@ def _chart_scenario_text(meta):
 
     bull_markers = sum([price >= vwap if vwap else False, price >= vp_poc if vp_poc else False, rsi >= 55, rmi >= 55, macd_hist > 0, chaikin > 0 or cmf > 0, rs_ratio >= 1.0, vp_long_rr >= vp_short_rr])
     bear_markers = sum([price < vwap if vwap else False, price < vp_poc if vp_poc else False, rsi <= 45, rmi <= 45, macd_hist < 0, chaikin < 0 or cmf < 0, rs_ratio < 1.0, vp_short_rr > vp_long_rr])
+    bull_momentum = sum([rsi >= 55, rmi >= 55, macd_hist > 0])
+    bear_momentum = sum([rsi <= 45, rmi <= 45, macd_hist < 0])
 
     current_price = f"현재 가격 ({_fmt_chart_price(price)})" if price > 0 else "현재 가격"
-    bull_levels = [_named_chart_level("VWAP", vwap), _named_chart_level("POC", vp_poc)]
-    bear_levels = [_named_chart_level("POC", vp_poc), _named_chart_level("Fib 61.8", fib_618)]
-    bull_reference = _join_reason_phrases([level for level in bull_levels if level]) or "핵심 기준선"
-    bear_reference = _join_reason_phrases([level for level in bear_levels if level]) or "핵심 지지선"
-    bullish_condition = f"{_join_reason_phrases([level for level in bull_levels if level])} 위 유지" if any(bull_levels) else "핵심 기준선 위 유지"
-    bearish_condition = f"{_join_reason_phrases([level for level in bear_levels if level])} 이탈" if any(bear_levels) else "핵심 지지 이탈"
-    if vp_vah > 0:
+    vwap_text = _named_chart_level("VWAP", vwap)
+    poc_text = _named_chart_level("POC", vp_poc)
+    val_text = _named_chart_level("VAL", vp_val)
+    vah_text = _named_chart_level("VAH", vp_vah)
+    bull_levels = [level for level in [vwap_text, poc_text] if level]
+    bull_reference = _join_reason_phrases(bull_levels) or "핵심 기준선"
+    bullish_condition = f"{bull_reference} 위 유지"
+    price_below_poc = vp_poc > 0 and price < vp_poc
+    short_rr_dominant = vp_short_rr >= vp_long_rr + 0.15
+    momentum_conflict_short = short_rr_dominant and price_below_poc and bull_momentum >= max(2, bear_momentum + 1)
+
+    if vp_vah > 0 and (price <= 0 or vp_vah >= price):
         bullish_target = f"VAH ({_fmt_chart_price(vp_vah)})"
-    elif fib_382 > 0:
+    elif fib_382 > 0 and (price <= 0 or fib_382 >= price):
         bullish_target = f"Fib 38.2 ({_fmt_chart_price(fib_382)})"
-    elif price_channel_up > 0:
+    elif price_channel_up > 0 and (price <= 0 or price_channel_up >= price):
         bullish_target = f"채널 상단 ({_fmt_chart_price(price_channel_up)})"
     else:
         bullish_target = ""
 
-    if vp_val > 0:
+    if vp_val > 0 and (price <= 0 or vp_val <= price):
         bearish_target = f"VAL ({_fmt_chart_price(vp_val)})"
-    elif fib_618 > 0:
-        bearish_target = f"Fib 61.8 ({_fmt_chart_price(fib_618)})"
-    elif price_channel_low > 0:
+    elif price_channel_low > 0 and (price <= 0 or price_channel_low <= price):
         bearish_target = f"채널 하단 ({_fmt_chart_price(price_channel_low)})"
+    elif fib_618 > 0 and (price <= 0 or fib_618 <= price):
+        bearish_target = f"Fib 61.8 ({_fmt_chart_price(fib_618)})"
     else:
         bearish_target = ""
 
-    if price >= max(vwap, vp_poc, 0):
+    if vp_poc > 0:
+        bearish_condition = f"{poc_text} 이탈" if price >= vp_poc else f"{poc_text} 아래 재약세"
+    elif vwap > 0:
+        bearish_condition = f"{vwap_text} 이탈" if price >= vwap else f"{vwap_text} 아래 재약세"
+    else:
+        bearish_condition = "핵심 지지 재이탈"
+
+    reference_levels = [level for level in [vwap, vp_poc] if level > 0]
+    if reference_levels and price >= max(reference_levels):
         base = f"{current_price}은 {bull_reference} 위에 있어, 기준선 위 추세 유지 시도가 이어지는 베이스 시나리오가 우세합니다."
-    elif price < min(x for x in [vwap, vp_poc] if x > 0) if any(x > 0 for x in [vwap, vp_poc]) else False:
+    elif reference_levels and price < min(reference_levels):
+        bear_reference = _join_reason_phrases([level for level in [poc_text, vwap_text] if level]) or "핵심 지지선"
         base = f"{current_price}은 {bear_reference}보다 약한 위치에 있어, 반등보다 회복 확인이 먼저인 베이스 시나리오입니다."
     else:
         base = f"{current_price}은 주요 기준선 사이에 있어, 방향을 다시 정리하는 베이스 시나리오로 보는 편이 자연스럽습니다."
 
     if bull_markers >= bear_markers + 2 and vp_long_rr >= max(vp_short_rr, 0.1):
-        position_line = f"현재는 매수(롱) 포지션이 더 유리한 편입니다. 상방 가능성이 한 단계 우세하고, VP 기준 손익비도 롱 {vp_long_rr:.2f}배 vs 숏 {vp_short_rr:.2f}배입니다."
-        aggressive_entry = _named_chart_level("POC", vp_poc) or _named_chart_level("VWAP", vwap) or _named_chart_level("Fib 61.8", fib_618)
-        conservative_entry = bullish_target
-        invalidation = _named_chart_level("Fib 61.8", fib_618) or _named_chart_level("VAL", vp_val) or _named_chart_level("POC", vp_poc)
-        strategy_line = f"전략은 {bullish_condition}를 전제로, 공격적으로는 {aggressive_entry or '가까운 지지대'} 지지 확인 후 접근하고 보수적으로는 {conservative_entry or '상단 돌파'} 확인 뒤 추세 추종을 보는 편이 좋습니다. 무효화는 {invalidation or '핵심 지지'} 이탈입니다."
+        support_anchor = poc_text or vwap_text or "핵심 지지"
+        position_line = f"구조상 {support_anchor} 위이고 손익비(롱 {vp_long_rr:.2f}배 > 숏 {vp_short_rr:.2f}배)도 우세해, 모멘텀까지 감안하면 매수(롱) 관점이 유리합니다."
+        breakout_confirm = bullish_target or vah_text or "상단 저항대"
+        strategy_line = (
+            f"현재는 {support_anchor} 위 지지 유지가 핵심입니다. "
+            f"지지가 이어지면 {breakout_confirm} 재도전을 보고, "
+            "이 구간 이탈 시 상방 해석은 보수적으로 재평가합니다."
+        )
     elif bear_markers >= bull_markers + 2 and vp_short_rr >= max(vp_long_rr, 0.1):
-        position_line = f"현재는 매도(숏) 포지션이 더 유리한 편입니다. 하방 가능성이 한 단계 우세하고, VP 기준 손익비도 숏 {vp_short_rr:.2f}배 vs 롱 {vp_long_rr:.2f}배입니다."
-        aggressive_entry = _named_chart_level("POC", vp_poc) or _named_chart_level("VWAP", vwap) or _named_chart_level("VAH", vp_vah)
-        conservative_entry = bearish_target
-        invalidation = _named_chart_level("VWAP", vwap) or _named_chart_level("VAH", vp_vah) or _named_chart_level("POC", vp_poc)
-        strategy_line = f"전략은 {bearish_condition}를 전제로, 공격적으로는 {aggressive_entry or '가까운 저항대'} 반등 실패를 보고 접근하고 보수적으로는 {conservative_entry or '하단 이탈'} 확인 뒤 추세 추종을 보는 편이 좋습니다. 무효화는 {invalidation or '핵심 저항'} 회복입니다."
+        resistance_anchor = poc_text or vwap_text or "핵심 기준선"
+        resistance_anchor_name = _chart_level_name(resistance_anchor, "핵심 기준선")
+        position_line = f"{resistance_anchor} 아래이고 RR(숏 {vp_short_rr:.2f}배 > 롱 {vp_long_rr:.2f}배) 우위라 현재는 숏 관점이 유리합니다."
+        downside_confirm = bearish_target or val_text or "다음 지지대"
+        strategy_line = (
+            f"현재는 {resistance_anchor} 아래에 있어 반등 시 {resistance_anchor_name} 저항 확인이 우선입니다. "
+            "해당 구간 회복 실패가 이어지면 하방 재개 가능성을 보고, "
+            f"{downside_confirm} 이탈 시 약세 추세 추종 해석이 강화됩니다. "
+            "무효화는 핵심 기준선 회복입니다."
+        )
     elif vp_long_rr > vp_short_rr:
-        position_line = f"가능성은 아직 엇갈리지만 손익비만 보면 롱 {vp_long_rr:.2f}배가 숏 {vp_short_rr:.2f}배보다 나아, 눌림 매수 쪽이 조금 더 유리합니다."
-        aggressive_entry = _named_chart_level("POC", vp_poc) or _named_chart_level("Fib 61.8", fib_618)
-        invalidation = _named_chart_level("Fib 61.8", fib_618) or _named_chart_level("POC", vp_poc)
-        strategy_line = f"전략은 성급한 추격보다 {aggressive_entry or '가까운 지지대'} 반응을 보는 쪽이 낫고, {invalidation or '핵심 지지'}가 무너지면 롱 시나리오는 다시 점검해야 합니다."
+        position_line = f"추세 합의는 약하지만 손익비(롱 {vp_long_rr:.2f}배 > 숏 {vp_short_rr:.2f}배) 기준으로는 눌림 매수 우위입니다."
+        support_anchor = poc_text or vwap_text or "핵심 지지"
+        strategy_line = (
+            f"손익비는 롱 쪽이 우위지만 추세 합의는 약합니다. "
+            f"{support_anchor} 지지 반응을 우선 확인하고, "
+            "핵심 지지 이탈 시 롱 시나리오는 보수적으로 재평가합니다."
+        )
     elif vp_short_rr > vp_long_rr:
-        position_line = f"가능성은 아직 엇갈리지만 손익비만 보면 숏 {vp_short_rr:.2f}배가 롱 {vp_long_rr:.2f}배보다 나아, 반등 매도 쪽이 조금 더 유리합니다."
-        aggressive_entry = _named_chart_level("VWAP", vwap) or _named_chart_level("POC", vp_poc) or _named_chart_level("VAH", vp_vah)
-        invalidation = _named_chart_level("VWAP", vwap) or _named_chart_level("VAH", vp_vah)
-        strategy_line = f"전략은 급락 추격보다 {aggressive_entry or '가까운 저항대'} 반등 실패를 보는 쪽이 낫고, {invalidation or '핵심 저항'}를 회복하면 숏 시나리오는 다시 점검해야 합니다."
+        resistance_anchor = poc_text or vwap_text or "핵심 저항"
+        resistance_anchor_name = _chart_level_name(resistance_anchor, "핵심 저항")
+        if momentum_conflict_short:
+            position_line = (
+                f"구조상 {resistance_anchor} 아래이고 손익비(숏 {vp_short_rr:.2f}배 > 롱 {vp_long_rr:.2f}배)는 숏 우위지만, "
+                "단기 모멘텀은 상방이라 현재는 관망·확인 우선이 자연스럽습니다."
+            )
+            downside_confirm = bearish_target or val_text or "다음 지지대"
+            strategy_line = (
+                f"현재는 {resistance_anchor} 아래라 추격 진입은 지양하고 회복/이탈 확인을 우선합니다. "
+                f"{resistance_anchor_name} 회복 실패가 반복되면 숏 우위 해석을 유지하고, "
+                f"{downside_confirm} 이탈 시 하방 추종 해석이 강화됩니다. "
+                "무효화는 핵심 기준선 회복입니다."
+            )
+        else:
+            position_line = f"구조상 {resistance_anchor} 아래이고 손익비(숏 {vp_short_rr:.2f}배 > 롱 {vp_long_rr:.2f}배) 기준으로는 반등 매도 우위입니다."
+            strategy_line = (
+                f"현재는 {resistance_anchor} 아래라 구조 확인이 우선입니다. "
+                f"{resistance_anchor_name} 반등 실패를 우선 확인하고, "
+                "핵심 기준선 회복 시 숏 시나리오는 보수적으로 재평가합니다."
+            )
     else:
         position_line = f"현재는 롱 {vp_long_rr:.2f}배와 숏 {vp_short_rr:.2f}배의 손익비 차이가 크지 않아, 방향 우위보다 확인 신호가 더 중요합니다."
-        strategy_line = f"전략은 {_named_chart_level('VWAP', vwap) or '기준선'}와 {_named_chart_level('POC', vp_poc) or '중심 가격대'} 사이에서 방향이 정리될 때까지 기다렸다가, 상단 안착 또는 하단 이탈 중 한쪽이 확정될 때 대응하는 편이 좋습니다."
+        strategy_line = f"전략은 {vwap_text or '기준선'}와 {poc_text or '중심 가격대'} 사이에서 방향이 정리될 때까지 기다렸다가, 상단 안착 또는 하단 이탈 중 한쪽이 확정될 때 대응하는 편이 좋습니다."
 
     bull_line = f"상방 시나리오는 {bullish_condition} 시 {bullish_target or '상단 저항대'} 재도전입니다."
-    bear_line = f"리스크 시나리오는 {bearish_condition} 이탈 시 {bearish_target or '다음 지지대'} 재확인입니다."
+    bear_line = f"리스크 시나리오는 {bearish_condition}가 이어질 경우 {bearish_target or '다음 지지대'} 재확인입니다."
     return base, position_line, strategy_line, bull_line, bear_line
 
 
-def _build_chart_summary_html(meta):
+def _build_chart_summary_detail_html(meta):
     headline = _chart_headline_text(meta)
     summary = _build_chart_tab_summary(meta)
     volume_text = _chart_volume_text(meta)
     pattern_text = _chart_pattern_text(meta)
     support_text, resistance_text = _chart_levels_text(meta)
     base_line, position_line, strategy_line, bull_line, bear_line = _chart_scenario_text(meta)
+    level_line = _chart_core_level_line(meta)
+    core_position_line = _chart_core_position_line(meta)
+    core_strategy_line = _chart_core_strategy_line(meta)
     leading_breakdown = meta.get("leading_breakdown") if isinstance(meta.get("leading_breakdown"), dict) else {}
     leading_reasons = meta.get("leading_reasons") if isinstance(meta.get("leading_reasons"), dict) else {}
     leading_noise = meta.get("leading_noise_flags") if isinstance(meta.get("leading_noise_flags"), dict) else {}
@@ -2309,7 +2759,11 @@ def _build_chart_summary_html(meta):
 
     return _html_block(
         "<div class='sigl-note'><strong>차트 요약</strong><br>"
-        f"<div class='sigl-summary' style='font-weight:700;margin-bottom:8px'>{_esc(headline)}</div>"
+        f"<div class='sigl-summary' style='margin-bottom:6px'><strong>헤드라인</strong>: {_esc(headline)}</div>"
+        f"<div class='sigl-summary' style='margin-bottom:6px'><strong>매매 관점</strong>: {_esc(core_position_line)}</div>"
+        f"<div class='sigl-summary' style='margin-bottom:6px'><strong>핵심 레벨</strong>: {_esc(level_line)}</div>"
+        f"<div class='sigl-summary' style='margin-bottom:8px'><strong>대응 포인트</strong>: {_esc(core_strategy_line)}</div>"
+        "<div class='sigl-summary' style='margin-bottom:10px'>────────────────</div>"
         "<div class='sigl-summary' style='margin-bottom:8px'><strong>내용 요약</strong>: "
         f"{_esc(overview_text)}</div>"
         f"{leading_html}"
@@ -2319,14 +2773,104 @@ def _build_chart_summary_html(meta):
         f"{_esc(support_text)}</div>"
         "<div class='sigl-summary' style='margin-bottom:6px'><strong>핵심 저항선</strong>: "
         f"{_esc(resistance_text)}</div>"
-        f"<div class='sigl-summary' style='margin-bottom:4px'><strong>포지션 우위</strong>: {_esc(position_line)}</div>"
-        f"<div class='sigl-summary' style='margin-bottom:6px'><strong>전략 포인트</strong>: {_esc(strategy_line)}</div>"
+        f"<div class='sigl-summary' style='margin-bottom:4px'><strong>포지션 근거</strong>: {_esc(position_line)}</div>"
+        f"<div class='sigl-summary' style='margin-bottom:6px'><strong>전략 근거</strong>: {_esc(strategy_line)}</div>"
         "<div class='sigl-summary' style='margin-bottom:4px'><strong>시나리오</strong>: "
         f"{_esc(base_line)}</div>"
         f"<div class='sigl-summary'>• {_esc(bull_line)}</div>"
         f"<div class='sigl-summary'>• {_esc(bear_line)}</div>"
         "</div>"
     )
+
+
+def _chart_core_level_line(meta):
+    supports_named, resistances_named = _extract_named_levels(meta)
+    support_text = "-"
+    resistance_text = "-"
+    if supports_named:
+        support_text = f"{supports_named[0][0]} ({supports_named[0][1]:.2f})"
+    if resistances_named:
+        resistance_text = f"{resistances_named[0][0]} ({resistances_named[0][1]:.2f})"
+    return f"지지 {support_text} / 저항 {resistance_text}"
+
+
+def _chart_core_position_line(meta):
+    price = _safe_float(meta.get("price", 0))
+    vp_poc = _safe_float(meta.get("vp_poc", 0))
+    vp_long_rr = _safe_float(meta.get("vp_long_rr", 0))
+    vp_short_rr = _safe_float(meta.get("vp_short_rr", 0))
+    rsi = _safe_float(meta.get("rsi", 50))
+    rmi = _safe_float(meta.get("rmi", 50))
+    macd_hist = _safe_float(meta.get("macd_hist", 0))
+    wt1 = _safe_float(meta.get("wt1", 0))
+
+    bull_momentum = sum([rsi >= 55, rmi >= 55, macd_hist > 0, wt1 > 0])
+    bear_momentum = sum([rsi <= 45, rmi <= 45, macd_hist < 0, wt1 < 0])
+    price_below_poc = vp_poc > 0 and price < vp_poc
+    price_above_poc = vp_poc > 0 and price >= vp_poc
+    short_rr_dominant = vp_short_rr >= vp_long_rr + 0.15
+    long_rr_dominant = vp_long_rr >= vp_short_rr + 0.15
+    momentum_conflict_short = short_rr_dominant and price_below_poc and bull_momentum >= max(2, bear_momentum)
+
+    if short_rr_dominant:
+        if momentum_conflict_short:
+            return "단기 상방 모멘텀은 남아 있지만 POC 아래라 관망·확인 우선이고, 손익비는 숏 쪽이 소폭 우위입니다."
+        if price_below_poc:
+            return "POC 아래 구간이라 확인 우선이며, 손익비는 숏 쪽이 소폭 우위입니다."
+        return "손익비 기준은 숏 쪽이 조금 우위지만, 기준선 재안착 여부를 함께 확인해야 합니다."
+    if long_rr_dominant:
+        if bear_momentum >= 3 and price_above_poc:
+            return "단기 눌림 신호는 있지만, 구조상 POC 위라 손익비 기준은 롱 우위입니다."
+        if price_above_poc:
+            return "구조상 POC 위이고 손익비도 롱 쪽이 조금 우위입니다."
+        return "손익비 기준은 롱 쪽이 조금 우위지만, 기준선 유지 여부를 함께 확인해야 합니다."
+    return "롱·숏 손익비 차이가 크지 않아 방향 단정보다 확인 신호가 우선입니다."
+
+
+def _chart_core_strategy_line(meta):
+    price = _safe_float(meta.get("price", 0))
+    vwap = _safe_float(meta.get("vwap", 0))
+    vp_poc = _safe_float(meta.get("vp_poc", 0))
+    vp_long_rr = _safe_float(meta.get("vp_long_rr", 0))
+    vp_short_rr = _safe_float(meta.get("vp_short_rr", 0))
+    rsi = _safe_float(meta.get("rsi", 50))
+    rmi = _safe_float(meta.get("rmi", 50))
+    macd_hist = _safe_float(meta.get("macd_hist", 0))
+    wt1 = _safe_float(meta.get("wt1", 0))
+    bull_momentum = sum([rsi >= 55, rmi >= 55, macd_hist > 0, wt1 > 0])
+    bear_momentum = sum([rsi <= 45, rmi <= 45, macd_hist < 0, wt1 < 0])
+    short_rr_dominant = vp_short_rr >= vp_long_rr + 0.15
+    long_rr_dominant = vp_long_rr >= vp_short_rr + 0.15
+    price_below_poc = vp_poc > 0 and price < vp_poc
+    momentum_conflict_short = short_rr_dominant and price_below_poc and bull_momentum >= max(2, bear_momentum)
+
+    if short_rr_dominant:
+        if momentum_conflict_short and vwap > 0 and vp_poc > 0:
+            return "POC 아래 구간이라 추격 진입은 지양하고, VWAP·POC 회복/재이탈 확인 후 대응(손익비는 숏 소폭 우위)"
+        if momentum_conflict_short and vp_poc > 0:
+            return "POC 아래 구간이라 추격 진입은 지양하고, POC 회복/재이탈 확인 후 대응(손익비는 숏 소폭 우위)"
+        if vwap > 0 and vp_poc > 0:
+            return "POC 아래에서는 반등 매도 우위, VWAP·POC 동시 회복 시 재평가"
+        if vp_poc > 0:
+            return "POC 아래에서는 반등 매도 우위, POC 재안착 시 재평가"
+        return "반등 매도 우위 관점, 핵심 저항 회복 전까지 보수 대응"
+    if long_rr_dominant:
+        if vwap > 0 and vp_poc > 0:
+            return "POC 위 눌림 지지 확인 시 분할 매수, VWAP·POC 이탈 시 재평가"
+        if vp_poc > 0:
+            return "POC 위 눌림 지지 확인 시 분할 매수, POC 이탈 시 재평가"
+        return "눌림 지지 확인 후 분할 매수, 핵심 지지 이탈 시 재평가"
+    if vwap > 0 and vp_poc > 0:
+        return "POC·VWAP 사이 공방 구간, 상단 안착/하단 이탈 확인 후 대응"
+    return "방향 혼조 구간, 추격보다 확인 후 대응"
+
+
+def render_chart_summary_section(meta):
+    st.markdown(_build_chart_summary_detail_html(meta), unsafe_allow_html=True)
+
+
+def _build_chart_summary_html(meta):
+    return _build_chart_summary_detail_html(meta)
 
 
 def _build_recap_headline(meta):
@@ -2428,7 +2972,7 @@ def _chart_headline_text(meta):
     elif percent_b >= 0.82:
         core = "\uC0C1\uB2E8 \uACFC\uC5F4 \uBD80\uB2F4 \uAD6C\uAC04"
     else:
-        core = "\uBC29\uD5A5 \uC7AC\uC815\uB9AC \uAD6C\uAC04"
+        core = "\uBC29\uD5A5\uC131 \uC7AC\uD655\uC778 \uAD6C\uAC04"
 
     if has_change:
         move = "\uC0C1\uC2B9" if change_pct > 0 else ("\uD558\uB77D" if change_pct < 0 else "\uBCF4\uD569")
@@ -2786,6 +3330,8 @@ def render_chart_indicator_snapshot(meta, key_prefix="analysis"):
             ),
             unsafe_allow_html=True,
         )
+
+    _render_integrated_swing_snapshot(meta)
 
 
 def render_judgment_card(meta):
@@ -3606,7 +4152,30 @@ def render_combined_scans(meta):
         st.info("현재 표시할 활성 전략이 없습니다. 기존 시그널과 레이어 판단을 먼저 확인해 주세요.")
         return
 
-    st.dataframe(pd.DataFrame(model["table_rows"]), use_container_width=True, hide_index=True)
+    strategy_table_rows = []
+    for row in model["table_rows"]:
+        score_value = _safe_float(row.get("점수"), None)
+        score_text = f"{score_value:.1f}점" if score_value is not None else _table_cell_text(row.get("점수"))
+        strategy_table_rows.append(
+            {
+                "전략명": _table_cell_text(row.get("전략명")),
+                "방향": _strategy_direction_badge(row.get("방향")),
+                "점수": score_text,
+                "상태": _strategy_status_badge(row.get("상태")),
+                "진입 방식": _table_cell_text(row.get("진입 방식")),
+                "진입 기준": _table_cell_text(row.get("진입 기준")),
+                "손절": _table_cell_text(row.get("손절")),
+                "1차 목표가": _table_cell_text(row.get("1차 목표가")),
+                "비고": _table_cell_text(row.get("비고")),
+            }
+        )
+    _render_sigl_table_card(
+        "전략 실행 테이블",
+        strategy_table_rows,
+        ["전략명", "방향", "점수", "상태", "진입 방식", "진입 기준", "손절", "1차 목표가", "비고"],
+        subtitle="현재 노출된 전략을 실행 관점으로 정리한 표입니다.",
+        raw_html_columns={"방향", "상태"},
+    )
 
     selected_option = st.selectbox(
         "전략 상세",
@@ -4043,18 +4612,27 @@ def render_audit_panel(audit):
 
     label_df = _build_audit_frame(audit.get("label_rows", []), horizons, "\uD310\uB2E8")
     if not label_df.empty:
-        st.markdown("#### \uD310\uB2E8\uBCC4 \uC131\uACFC")
-        st.dataframe(label_df, use_container_width=True, hide_index=True)
+        _render_sigl_dataframe_table_card(
+            "\uD310\uB2E8\uBCC4 \uC131\uACFC",
+            label_df,
+            subtitle="\uB77C\uBCA8\uBCC4 \uD45C\uBCF8\u00B7\uC801\uC911\u00B7\uBC29\uD5A5\uC218\uC775\uC744 \uAC19\uC740 \uC2A4\uCF00\uC77C\uB85C \uBE44\uAD50\uD569\uB2C8\uB2E4.",
+        )
 
     group_df = _build_audit_frame(audit.get("group_rows", []), horizons, "\uADF8\uB8F9")
     if not group_df.empty:
-        st.markdown("#### \uBC29\uD5A5 \uADF8\uB8F9\uBCC4 \uC131\uACFC")
-        st.dataframe(group_df, use_container_width=True, hide_index=True)
+        _render_sigl_dataframe_table_card(
+            "\uBC29\uD5A5 \uADF8\uB8F9\uBCC4 \uC131\uACFC",
+            group_df,
+            subtitle="Long/Short/Neutral \uADF8\uB8F9 \uB2E8\uC704 \uC131\uACFC \uCC28\uC774\uB97C \uD655\uC778\uD569\uB2C8\uB2E4.",
+        )
 
     turn_df = _build_audit_frame(audit.get("turn_rows", []), horizons, "\uC804\uD658 \uC2E0\uD638")
     if not turn_df.empty:
-        st.markdown("#### \uC804\uD658 \uC2E0\uD638 \uAC10\uC0AC")
-        st.dataframe(turn_df, use_container_width=True, hide_index=True)
+        _render_sigl_dataframe_table_card(
+            "\uC804\uD658 \uC2E0\uD638 \uAC10\uC0AC",
+            turn_df,
+            subtitle="\uC804\uD658\uD615 \uC2E0\uD638\uC758 \uC801\uC911\uB960\uACFC \uCD08\uACFC\uC218\uC775 \uC720\uC9C0 \uC5EC\uBD80\uB97C \uC810\uAC80\uD569\uB2C8\uB2E4.",
+        )
 
     veto_cards = "".join(
         [
@@ -4111,13 +4689,19 @@ def render_audit_panel(audit):
 
     regime_df = _build_regime_frame(audit.get("regime_rows", []))
     if not regime_df.empty:
-        st.markdown("#### 컨텍스트 / Regime 성과")
-        st.dataframe(regime_df, use_container_width=True, hide_index=True)
+        _render_sigl_dataframe_table_card(
+            "컨텍스트 / Regime 성과",
+            regime_df,
+            subtitle="시장 상태별 성과 편차를 비교해 모델 민감도를 확인합니다.",
+        )
 
     walkforward_df = _build_walkforward_frame(audit.get("walkforward_rows", []))
     if not walkforward_df.empty:
-        st.markdown("#### 63/21 롤링 안정성")
-        st.dataframe(walkforward_df, use_container_width=True, hide_index=True)
+        _render_sigl_dataframe_table_card(
+            "63/21 롤링 안정성",
+            walkforward_df,
+            subtitle="최근 구간 기준으로 성과 일관성이 유지되는지 확인합니다.",
+        )
 
     examples = audit.get("examples", {})
     best_df = _build_example_frame(examples.get("best", []), h_ref)
@@ -4130,13 +4714,21 @@ def render_audit_panel(audit):
             if best_df.empty:
                 st.info("\uD45C\uC2DC\uD560 \uC0AC\uB840\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.")
             else:
-                st.dataframe(best_df, use_container_width=True, hide_index=True)
+                _render_sigl_dataframe_table_card(
+                    "\uC798 \uB9DE\uC740 \uC0AC\uB840",
+                    best_df,
+                    subtitle=f"{h_ref}\uBD09 \uBC29\uD5A5\uC218\uC775 \uAE30\uC900 \uC0C1\uC704 \uCF00\uC774\uC2A4",
+                )
         with col_worst:
             st.caption(f"\uC8FC\uC758\uAC00 \uD544\uC694\uD588\uB358 \uC0AC\uB840 \u00B7 {h_ref}\uBD09 \uBC29\uD5A5\uC218\uC775 \uAE30\uC900")
             if worst_df.empty:
                 st.info("\uD45C\uC2DC\uD560 \uC0AC\uB840\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.")
             else:
-                st.dataframe(worst_df, use_container_width=True, hide_index=True)
+                _render_sigl_dataframe_table_card(
+                    "\uC8FC\uC758\uAC00 \uD544\uC694\uD588\uB358 \uC0AC\uB840",
+                    worst_df,
+                    subtitle=f"{h_ref}\uBD09 \uBC29\uD5A5\uC218\uC775 \uAE30\uC900 \uD558\uC704 \uCF00\uC774\uC2A4",
+                )
 
 
 def render_analysis(msg, key_prefix="analysis"):
@@ -4177,10 +4769,7 @@ def render_analysis(msg, key_prefix="analysis"):
             if meta:
                 render_chart_indicator_snapshot(meta, key_prefix=f"{key_prefix}_indicator_snapshot")
             if meta:
-                st.markdown(
-                    _build_chart_summary_html(meta),
-                    unsafe_allow_html=True,
-                )
+                render_chart_summary_section(meta)
 
     with tab_judgment:
         if meta:

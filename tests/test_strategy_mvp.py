@@ -23,7 +23,16 @@ from infrastructure.etf import FunctionHoldingsProvider, HoldingsProviderRegistr
 from services.analysis_service import AnalysisArtifacts
 from signal_catalog import build_signal_plan_snapshot
 from strategy import build_strategy_payload
-from ui_localized import _build_chart_summary_html, _build_judgment_recap, _build_recap_headline, _chart_headline_text, build_strategy_tab_view_model
+from ui_localized import (
+    _build_chart_summary_html,
+    _build_judgment_recap,
+    _build_recap_headline,
+    _chart_core_position_line,
+    _chart_headline_text,
+    _chart_pattern_text,
+    _recent_signal_payload,
+    build_strategy_tab_view_model,
+)
 from workflows import AnalysisWorkflow, ScannerWorkflow
 
 
@@ -1006,6 +1015,100 @@ class ChartSummarySafetyTests(unittest.TestCase):
         self.assertIn("+1.25%", headline)
         self.assertIn("$34.65", headline)
         self.assertIn("리딩 스코어링", summary_html)
+
+    def test_recent_signal_payload_normalizes_vwap_bounce_labels(self):
+        dict_payload = _recent_signal_payload({"label": "VWAP반등", "date": "04/10", "dir": "buy"})
+        tuple_payload = _recent_signal_payload(("◎", "VWAP반등가", "04/10", "buy", False))
+
+        self.assertEqual(dict_payload["label"], "VWAP 반등")
+        self.assertEqual(tuple_payload["label"], "VWAP 반등")
+
+    def test_chart_pattern_text_avoids_vwap_bounce_typo(self):
+        meta = {
+            "recent_signals": [
+                ("◎", "시장 강세 전환", "04/10", "buy", False),
+                ("◎", "VWAP반등가", "04/10", "buy", False),
+            ],
+            "derived_signal_events": [],
+            "last_date": "2026-04-10",
+            "vwap": 38.69,
+        }
+
+        text = _chart_pattern_text(meta)
+        self.assertIn("VWAP 반등", text)
+        self.assertNotIn("VWAP 반등가", text)
+
+    def test_chart_core_position_line_uses_watch_tone_on_short_rr_momentum_conflict(self):
+        meta = {
+            "price": 39.32,
+            "vp_poc": 40.73,
+            "vp_long_rr": 0.87,
+            "vp_short_rr": 2.06,
+            "rsi": 61.0,
+            "rmi": 59.0,
+            "macd_hist": 0.32,
+            "wt1": 14.0,
+        }
+
+        line = _chart_core_position_line(meta)
+        self.assertIn("관망", line)
+        self.assertIn("숏", line)
+
+    def test_chart_summary_html_uses_natural_top_labels(self):
+        meta = {
+            "ticker": "IREN",
+            "summary_date": "2026-04-10",
+            "last_date": "2026-04-10",
+            "price": 39.32,
+            "price_change_pct": 6.10,
+            "summary_price_available": True,
+            "summary_change_available": True,
+            "vwap": 38.69,
+            "fixed_vwap": 29.34,
+            "vp_poc": 40.73,
+            "vp_val": 34.65,
+            "vp_vah": 43.40,
+            "vp_long_rr": 0.87,
+            "vp_short_rr": 2.06,
+            "rsi": 61.0,
+            "rmi": 59.0,
+            "wt1": 14.0,
+            "macd_hist": 0.32,
+            "volume": 1100000.0,
+            "avg_volume": 1000000.0,
+            "recent_signals": [("◎", "VWAP반등가", "04/10", "buy", False)],
+            "support_levels": [],
+            "resistance_levels": [],
+            "leading_breakdown": {"buy_score": 72.0, "sell_score": 0.0, "spread": 72.0, "noise_penalty": 0.0, "noise_block": False},
+            "leading_reasons": {"core": "UT Bot aligned, VWAP support"},
+            "leading_noise_flags": {"summary": ""},
+        }
+
+        summary_html = _build_chart_summary_html(meta)
+        self.assertIn("매매 관점", summary_html)
+        self.assertIn("대응 포인트", summary_html)
+        self.assertIn("VWAP 반등", summary_html)
+
+    def test_chart_headline_uses_recheck_wording_for_neutral_structure(self):
+        meta = {
+            "ticker": "IREN",
+            "summary_date": "2026-04-10",
+            "last_date": "2026-04-10",
+            "price": 39.32,
+            "price_change_pct": 0.2,
+            "summary_price_available": True,
+            "summary_change_available": True,
+            "vwap": 39.31,
+            "rsi": 52.0,
+            "rmi": 51.0,
+            "wt1": 0.0,
+            "macd_hist": 0.0,
+            "percent_b": 0.52,
+        }
+
+        headline = _chart_headline_text(meta)
+        self.assertIn("방향성 재확인 구간", headline)
+
 class WorkflowContractTests(unittest.TestCase):
     def test_analysis_workflow_returns_response_contract(self):
         class FakeAnalysisService:

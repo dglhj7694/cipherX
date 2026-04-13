@@ -1525,6 +1525,63 @@ div[data-testid="stMetricValue"]{{
   font-size:.86rem;
   line-height:1.65;
 }}
+.sigl-table-card{{
+  padding:14px 14px;
+}}
+.sigl-table-card .sigl-section-head{{
+  margin:0 0 10px;
+}}
+.sigl-table-wrap{{
+  width:100%;
+  overflow-x:auto;
+  border:1px solid rgba(148,163,184,.18);
+  border-radius:12px;
+  background:rgba(11,16,32,.58);
+}}
+.sigl-data-table{{
+  width:100%;
+  min-width:520px;
+  border-collapse:separate;
+  border-spacing:0;
+  font-size:.82rem;
+  line-height:1.45;
+}}
+.sigl-data-table thead th{{
+  padding:10px 12px;
+  text-align:left;
+  font-size:.73rem;
+  font-weight:800;
+  letter-spacing:.02em;
+  color:var(--sigl-text-muted);
+  background:rgba(148,163,184,.10);
+  border-bottom:1px solid rgba(148,163,184,.22);
+  white-space:nowrap;
+}}
+.sigl-data-table tbody td{{
+  padding:10px 12px;
+  color:var(--sigl-text);
+  border-bottom:1px solid rgba(148,163,184,.14);
+  vertical-align:top;
+}}
+.sigl-data-table tbody tr:nth-child(odd) td{{
+  background:rgba(148,163,184,.04);
+}}
+.sigl-data-table tbody tr:last-child td{{
+  border-bottom:none;
+}}
+.sigl-data-table td:first-child,
+.sigl-data-table th:first-child{{
+  padding-left:14px;
+}}
+.sigl-data-table td:last-child,
+.sigl-data-table th:last-child{{
+  padding-right:14px;
+}}
+.sigl-data-table .sigl-badge{{
+  padding:4px 9px;
+  font-size:.69rem;
+  font-weight:800;
+}}
 .sigl-price-header{{
   display:grid;
   gap:14px;
@@ -2187,6 +2244,10 @@ p[data-testid="stCaption"]{{
   .sigl-layer-track{{height:26px}}
   .sigl-layer-label{{font-size:.64rem;padding:2px 6px}}
   .sigl-card{{padding:13px 13px}}
+  .sigl-table-card{{padding:12px 12px}}
+  .sigl-data-table{{min-width:460px;font-size:.8rem}}
+  .sigl-data-table thead th,
+  .sigl-data-table tbody td{{padding:9px 10px}}
   .sigl-metric-card,
   .sigl-committee-card{{padding:13px 13px}}
   div[data-testid="stChatMessage"]{{
@@ -2884,6 +2945,11 @@ html, body, [class*="css"] {{
   border-color:rgba(142,164,255,.24) !important;
   color:#D6DFFF !important;
 }}
+.s-source {{
+  color:var(--sigl-text-muted) !important;
+  border-color:var(--sigl-border-soft) !important;
+  background:rgba(148,163,184,.10) !important;
+}}
 .note-box,
 .spotlight-card,
 .hero-card,
@@ -2911,6 +2977,10 @@ html, body, [class*="css"] {{
   border:1px solid var(--sigl-border-soft) !important;
   border-radius:16px !important;
   box-shadow:none !important;
+}}
+.news-empty {{
+  color:var(--sigl-text-muted) !important;
+  border-color:rgba(148,163,184,.24) !important;
 }}
 .note-box,
 .hero-card,
@@ -3173,5 +3243,28 @@ div[data-testid="stVerticalBlock"]:has(.sigl-market-dashboard-anchor) iframe{{
   [data-testid="stVerticalBlockBorderWrapper"] > div {{
     padding:18px 18px !important;
   }}
+}}
+/* Company Details tab tone alignment */
+[data-testid="stVerticalBlockBorderWrapper"]:hover {{
+  transform:none !important;
+  border-color:var(--sigl-border-soft) !important;
+  box-shadow:var(--sigl-shadow-sm) !important;
+}}
+.header-wrap,
+.cd-summary,
+.hero-bento,
+.coverage-wrap,
+.invest-hero,
+.story-board {{
+  max-width:960px;
+  margin-left:auto;
+  margin-right:auto;
+}}
+.note-box {{
+  border-left:1px solid var(--sigl-border-soft) !important;
+}}
+.s-title {{
+  font-size:1.08rem !important;
+  letter-spacing:0 !important;
 }}
 """
