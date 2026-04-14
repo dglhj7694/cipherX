@@ -7,7 +7,7 @@ import streamlit as st
 import time, math, html
 import re
 import textwrap
-from datetime import datetime
+from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import yfinance as yf
 from app_ui.pages import render_analysis_message, render_market_daily_dashboard
@@ -87,7 +87,7 @@ MODE_SCANNER = "스캐너"
 _APP_MODE_OPTIONS = [MODE_MARKET_DAILY, MODE_ANALYSIS, MODE_SCANNER]
 _QUICK_ANALYSIS_TICKERS = ["NVDA", "TSLA", "AAPL", "GOOGL", "AMZN", "META", "MSFT", "PLTR", "HIMS", "SNDK", "LITE", "COHR", "IREN", "ORCL", "RKLB", "ASTS"]
 CHAT_INPUT_PLACEHOLDER = "티커 입력: AAPL / 005930"
-SCAN_FILTER_PRESETS = ["전체", "최근 추세전환", "최근 강세 발굴", "거래량 동반 강세"]
+SCAN_FILTER_PRESETS = ["전체", "최근 추세전환", "최근 강세 발굴", "거래량 동반 강세", "오늘 UTBot 전환", "오늘 HULL 전환"]
 WATCH_BUY_PLUS = {"WATCH_BUY", "BUY", "STRONG_BUY"}
 
 SCANNER_TRANSITION_CFG = {
@@ -698,6 +698,41 @@ def _is_bull_discovery_candidate(row):
     )
 
 
+def _is_today_or_prev_iso_date(value):
+    text = str(value or "").strip()
+    if not text or text in {"-", "N/A", "없음"}:
+        return False
+    try:
+        parsed = datetime.strptime(text, "%Y-%m-%d").date()
+    except Exception:
+        return False
+    today = datetime.now().date()
+    prev_day = today - timedelta(days=1)
+    return parsed in {today, prev_day}
+
+
+def _has_today_transition(row, target_keys, date_fields):
+    today = datetime.now().date()
+    prev_day = today - timedelta(days=1)
+    allowed_iso = {today.strftime("%Y-%m-%d"), prev_day.strftime("%Y-%m-%d")}
+    allowed_md = {today.strftime("%m/%d"), prev_day.strftime("%m/%d")}
+
+    for field in date_fields:
+        if _is_today_or_prev_iso_date(row.get(field)):
+            return True
+
+    keys = {str(key) for key in (target_keys or [])}
+    for item in (row.get("transitions") or []):
+        key = str(item.get("key", "")).strip()
+        if key and key not in keys:
+            continue
+        date_iso = str(item.get("date_iso") or "").strip()
+        date_short = str(item.get("date") or "").strip()
+        if date_iso in allowed_iso or date_short in allowed_md:
+            return True
+    return False
+
+
 def _apply_scan_filter(results, preset):
     rows = list(results or [])
     if preset == "최근 추세전환":
@@ -706,6 +741,26 @@ def _apply_scan_filter(results, preset):
         return [row for row in rows if _is_bull_discovery_candidate(row)]
     if preset == "거래량 동반 강세":
         return [row for row in rows if bool(row.get("volume_bullish", False))]
+    if preset == "오늘 UTBot 전환":
+        return [
+            row
+            for row in rows
+            if _has_today_transition(
+                row,
+                target_keys={"UTBot_Buy", "UTBot_Sell"},
+                date_fields=("utbot_buy_last_date", "utbot_sell_last_date"),
+            )
+        ]
+    if preset == "오늘 HULL 전환":
+        return [
+            row
+            for row in rows
+            if _has_today_transition(
+                row,
+                target_keys={"Hull_Turn_Bull", "Hull_Turn_Bear"},
+                date_fields=("hull_turn_bull_last_date", "hull_turn_bear_last_date"),
+            )
+        ]
     return rows
 
 

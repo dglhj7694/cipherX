@@ -4740,11 +4740,10 @@ def render_analysis(msg, key_prefix="analysis"):
     if not (meta or fig_json):
         return
 
-    tab_chart, tab_judgment, tab_audit, tab_layers, tab_strategies, tab_company = st.tabs(
+    tab_chart, tab_judgment, tab_layers, tab_strategies, tab_company = st.tabs(
         [
             "\uCC28\uD2B8",
             "\uD310\uB2E8/\uB9AC\uC2A4\uD06C",
-            "\uBC31\uD14C\uC2A4\uD2B8/\uAC10\uC0AC",
             "10\uAC1C \uB808\uC774\uC5B4",
             "\uB9E4\uB9E4\uC804\uB7B5",
             "\uAE30\uC5C5 \uC815\uBCF4",
@@ -4781,9 +4780,6 @@ def render_analysis(msg, key_prefix="analysis"):
             st.markdown("<div class='sigl-stack-gap sigl-stack-gap--lg'></div>", unsafe_allow_html=True)
             render_leading_lagging(meta)
             render_indicator_help()
-
-    with tab_audit:
-        render_audit_panel(audit)
 
     with tab_layers:
         if meta:
