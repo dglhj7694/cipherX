@@ -24,6 +24,15 @@ from localization import (
     localize_combo,
     localize_context_label,
     localize_judgment_label,
+    localize_signal,
+)
+from scanner_csv import (
+    CORE_SIGNAL_GROUP as SCANNER_CORE_SIGNAL_CFG,
+    build_detected_signal_payload,
+    scanner_csv_dictionary_to_csv_bytes,
+    scanner_csv_field_specs,
+    scanner_csv_help_lines,
+    scanner_rows_to_csv_bytes,
 )
 from services.ai_signal_service import (
     build_ai_client,
@@ -728,44 +737,11 @@ def _build_scan_snapshot(*, universe_payload, filter_preset, results, filtered_r
 
 
 def _scanner_rows_to_csv_bytes(rows):
-    import csv
-    import io
+    return scanner_rows_to_csv_bytes(rows)
 
-    field_names = [
-        "ticker",
-        "scan_score",
-        "strength",
-        "jg_key",
-        "jg",
-        "es",
-        "cf",
-        "price",
-        "chg",
-        "latest_sig",
-        "volume_ratio_20",
-        "volume_ratio_50",
-        "volume_oscillator",
-        "dollar_volume_20",
-        "volume_surge",
-        "volume_abnormal",
-        "volume_bullish",
-        "thin_trade_risk",
-        "bull_turn_recent",
-        "uptrend_or_pullback",
-        "pullback_ready",
-        "strategy_active_count",
-        "multi_buy",
-        "multi_sell",
-    ]
-    out = io.StringIO()
-    writer = csv.DictWriter(out, fieldnames=field_names, extrasaction="ignore")
-    writer.writeheader()
-    for row in rows or []:
-        normalized = dict(row)
-        for key in ("volume_surge", "volume_abnormal", "volume_bullish", "thin_trade_risk", "bull_turn_recent", "uptrend_or_pullback", "pullback_ready"):
-            normalized[key] = "Y" if bool(normalized.get(key)) else "N"
-        writer.writerow(normalized)
-    return out.getvalue().encode("utf-8-sig")
+
+def _scanner_csv_dictionary_to_csv_bytes():
+    return scanner_csv_dictionary_to_csv_bytes()
 
 
 def _scanner_snapshot_to_json_bytes(snapshot):
@@ -792,7 +768,6 @@ def _build_scanner_row_cached(ticker, cache_bucket):
 
     try:
         dc_ = frame.tail(63)
-        recent_5 = dc_.tail(5)
         lt = dc_.iloc[-1]
         prev_close = _sf(dc_.iloc[-2].get('Close', lt.get('Close', 0))) if len(dc_) >= 2 else _sf(lt.get('Close', 0))
         current_close = _sf(lt.get('Close', 0))
@@ -802,44 +777,41 @@ def _build_scanner_row_cached(ticker, cache_bucket):
         strategy_results = list(strategy_payload.get('visible_results') or [])
         top_strategy = strategy_summary.get('top_strategy')
 
-        acs = []
-        lsd = None
-        for combo_name, combo_cfg in COMBINED_SCAN_REGISTRY.items():
-            if combo_name not in recent_5.columns:
-                continue
-            recent_values = recent_5[combo_name].fillna(False).astype(bool)
-            if not recent_values.any():
-                continue
-            ld = recent_values[recent_values].index[-1]
-            combo_kor, _ = localize_combo(combo_name, combo_cfg.get('kor'), combo_cfg.get('desc'))
-            acs.append(
-                {
-                    'icon': combo_cfg['icon'],
-                    'kor': combo_kor,
-                    'dir': combo_cfg['dir'],
-                    'tier': combo_cfg['tier'],
-                    'date': ld.strftime('%m/%d'),
-                    'days_ago': int((dc_.index[-1] - ld).days),
-                }
-            )
-            lsd = ld if lsd is None or ld > lsd else lsd
+        detected_payload = build_detected_signal_payload(
+            frame=dc_,
+            recent_window=5,
+            combo_registry=COMBINED_SCAN_REGISTRY,
+            transition_cfg=SCANNER_TRANSITION_CFG,
+            core_signal_cfg=SCANNER_CORE_SIGNAL_CFG,
+            localize_combo_fn=localize_combo,
+            localize_signal_fn=localize_signal,
+            summary_limit=8,
+        )
 
-        transitions = []
-        for signal_name, cfg in SCANNER_TRANSITION_CFG.items():
-            if signal_name not in recent_5.columns:
-                continue
-            recent_values = recent_5[signal_name].fillna(False).astype(bool)
-            if not recent_values.any():
-                continue
-            td = recent_values[recent_values].index[-1]
-            transitions.append(
-                {
-                    'icon': cfg['icon'],
-                    'label': cfg['label'],
-                    'dir': cfg['dir'],
-                    'date': td.strftime('%m/%d'),
-                }
-            )
+        acs = [
+            {
+                "icon": str(item.get("icon", "")),
+                "kor": str(item.get("label", "")),
+                "dir": str(item.get("dir", "neutral")),
+                "tier": int(item.get("tier", 9) or 9),
+                "date": str(item.get("date_short", "")),
+                "days_ago": int(item.get("days_ago", 99) or 99),
+            }
+            for item in detected_payload.get("combo_items", [])
+        ]
+        lsd = detected_payload.get("latest_combo_ts")
+        transitions = [
+            {
+                "icon": str(item.get("icon", "")),
+                "label": str(item.get("label", "")),
+                "dir": str(item.get("dir", "neutral")),
+                "date": str(item.get("date_short", "")),
+                "date_iso": str(item.get("date", "")),
+                "days_ago": int(item.get("days_ago", 99) or 99),
+                "key": str(item.get("key", "")),
+            }
+            for item in detected_payload.get("transition_items", [])
+        ]
 
         chv = _sf(current_close - prev_close)
         ch = _sf((current_close - prev_close) / prev_close * 100) if prev_close else 0.0
@@ -996,6 +968,23 @@ def _build_scanner_row_cached(ticker, cache_bucket):
             'uptrend_or_pullback': uptrend_or_pullback,
             'pullback_ready': pullback_ready,
             'bull_strength_recent': bull_strength_recent,
+            'utbot_buy_recent': bool(detected_payload.get('utbot_buy_recent', False)),
+            'utbot_buy_last_date': str(detected_payload.get('utbot_buy_last_date', '없음')),
+            'utbot_sell_recent': bool(detected_payload.get('utbot_sell_recent', False)),
+            'utbot_sell_last_date': str(detected_payload.get('utbot_sell_last_date', '없음')),
+            'hull_turn_bull_recent': bool(detected_payload.get('hull_turn_bull_recent', False)),
+            'hull_turn_bull_last_date': str(detected_payload.get('hull_turn_bull_last_date', '없음')),
+            'hull_turn_bear_recent': bool(detected_payload.get('hull_turn_bear_recent', False)),
+            'hull_turn_bear_last_date': str(detected_payload.get('hull_turn_bear_last_date', '없음')),
+            'detected_combo_count': int(detected_payload.get('detected_combo_count', 0) or 0),
+            'detected_combo_summary': str(detected_payload.get('detected_combo_summary', '없음')),
+            'detected_transition_count': int(detected_payload.get('detected_transition_count', 0) or 0),
+            'detected_transition_summary': str(detected_payload.get('detected_transition_summary', '없음')),
+            'detected_core_count': int(detected_payload.get('detected_core_count', 0) or 0),
+            'detected_core_summary': str(detected_payload.get('detected_core_summary', '없음')),
+            'detected_signal_total_count': int(detected_payload.get('detected_signal_total_count', 0) or 0),
+            'detected_signal_latest_date': str(detected_payload.get('detected_signal_latest_date', '없음')),
+            'detected_signals': list(detected_payload.get('all_items', [])),
             'watch_buy_plus': watch_buy_plus,
             'buy_combo_present': buy_combo_present,
         }
@@ -2700,7 +2689,7 @@ if current_mode == MODE_SCANNER:
                 perf_stats=perf_stats,
                 skip_reasons=skip_reasons,
             )
-        csv_col, json_col = st.columns(2)
+        csv_col, json_col, dict_col = st.columns(3)
         with csv_col:
             st.download_button(
                 "CSV 다운로드 (현재 필터)",
@@ -2719,6 +2708,37 @@ if current_mode == MODE_SCANNER:
                 use_container_width=True,
                 key="scanner_json_download",
             )
+        with dict_col:
+            st.download_button(
+                "CSV 컬럼사전 다운로드",
+                data=_scanner_csv_dictionary_to_csv_bytes(),
+                file_name=f"scanner_csv_dictionary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                use_container_width=True,
+                key="scanner_csv_dictionary_download",
+            )
+
+        with st.expander("CSV 도움말", expanded=False):
+            for line in scanner_csv_help_lines():
+                st.caption(line)
+            st.caption("전체 컬럼 상세는 `CSV 컬럼사전 다운로드` 파일에서 확인할 수 있습니다.")
+            spec_map = {str(spec.get("key")): spec for spec in scanner_csv_field_specs()}
+            preview_keys = [
+                "scan_score",
+                "bull_turn_recent",
+                "volume_bullish",
+                "detected_transition_summary",
+                "detected_core_summary",
+                "detected_signal_total_count",
+            ]
+            for key in preview_keys:
+                spec = spec_map.get(key)
+                if not spec:
+                    continue
+                header = f"{spec.get('label')}({spec.get('key')})"
+                description = str(spec.get("description", ""))
+                rule = str(spec.get("rule", ""))
+                st.caption(f"{header}: {description}" + (f" · 기준: {rule}" if rule else ""))
 
         for rk, r in enumerate(filtered_results, start=1):
             _render_scanner_result_card(rk, r)
