@@ -883,7 +883,8 @@ div[data-testid="stTabs"] [role="tabpanel"]{{
   animation:sigl-tab-panel-in .24s ease;
 }}
 div.stButton>button,
-div[data-testid="stFormSubmitButton"] button{{
+div[data-testid="stFormSubmitButton"] button,
+div[data-testid="stDownloadButton"] button{{
   position:relative!important;
   overflow:hidden!important;
   border-radius:16px!important;
@@ -905,7 +906,8 @@ div[data-testid="stFormSubmitButton"] button{{
     background .18s ease!important;
 }}
 div.stButton>button::before,
-div[data-testid="stFormSubmitButton"] button::before{{
+div[data-testid="stFormSubmitButton"] button::before,
+div[data-testid="stDownloadButton"] button::before{{
   content:"";
   position:absolute;
   inset:0;
@@ -915,7 +917,8 @@ div[data-testid="stFormSubmitButton"] button::before{{
   opacity:.65;
 }}
 div.stButton>button:hover,
-div[data-testid="stFormSubmitButton"] button:hover{{
+div[data-testid="stFormSubmitButton"] button:hover,
+div[data-testid="stDownloadButton"] button:hover{{
   transform:translateY(-1px);
   border-color:rgba(142,164,255,.26)!important;
   box-shadow:
@@ -923,14 +926,16 @@ div[data-testid="stFormSubmitButton"] button:hover{{
     inset 0 1px 0 rgba(255,255,255,.06)!important;
 }}
 div.stButton>button:active,
-div[data-testid="stFormSubmitButton"] button:active{{
+div[data-testid="stFormSubmitButton"] button:active,
+div[data-testid="stDownloadButton"] button:active{{
   transform:translateY(0) scale(.988)!important;
   box-shadow:
     0 8px 16px rgba(2,6,23,.16),
     inset 0 1px 0 rgba(255,255,255,.04)!important;
 }}
 div.stButton>button[kind="primary"],
-div[data-testid="stFormSubmitButton"] button[kind="primary"]{{
+div[data-testid="stFormSubmitButton"] button[kind="primary"],
+div[data-testid="stDownloadButton"] button[kind="primary"]{{
   background:
     linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,0) 34%),
     linear-gradient(135deg, #7C93FF, #5D7BFF)!important;
@@ -941,7 +946,8 @@ div[data-testid="stFormSubmitButton"] button[kind="primary"]{{
     inset 0 1px 0 rgba(255,255,255,.08)!important;
 }}
 div.stButton>button[kind="primary"]:hover,
-div[data-testid="stFormSubmitButton"] button[kind="primary"]:hover{{
+div[data-testid="stFormSubmitButton"] button[kind="primary"]:hover,
+div[data-testid="stDownloadButton"] button[kind="primary"]:hover{{
   border-color:rgba(166,183,255,.40)!important;
   box-shadow:
     0 18px 34px rgba(93,123,255,.24),
@@ -949,8 +955,10 @@ div[data-testid="stFormSubmitButton"] button[kind="primary"]:hover{{
 }}
 div.stButton>button[kind="secondary"],
 div[data-testid="stFormSubmitButton"] button[kind="secondary"],
+div[data-testid="stDownloadButton"] button[kind="secondary"],
 div.stButton>button:not([kind="primary"]),
-div[data-testid="stFormSubmitButton"] button:not([kind="primary"]){{
+div[data-testid="stFormSubmitButton"] button:not([kind="primary"]),
+div[data-testid="stDownloadButton"] button:not([kind="primary"]){{
   background:
     linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,0) 24%),
     linear-gradient(180deg, rgba(19,28,45,.96), rgba(15,23,42,.90))!important;
@@ -2290,6 +2298,7 @@ p[data-testid="stCaption"]{{
   textarea,
   div.stButton>button,
   div[data-testid="stFormSubmitButton"] button,
+  div[data-testid="stDownloadButton"] button,
   div[data-testid="stChatInput"] button,
   div[data-testid="stMultiSelect"] [data-baseweb="tag"],
   .sigl-page-banner,
@@ -2321,7 +2330,8 @@ p[data-testid="stCaption"]{{
     transition:none!important;
   }}
   div.stButton>button::before,
-  div[data-testid="stFormSubmitButton"] button::before{{
+  div[data-testid="stFormSubmitButton"] button::before,
+  div[data-testid="stDownloadButton"] button::before{{
     opacity:.35!important;
     transition:none!important;
   }}

@@ -17,7 +17,7 @@ from chart import load_chart_figure, serialize_chart_figure
 from config import GEMINI_API_KEY, GEMINI_API_KEY_FROM_SECRETS, COMBINED_SCAN_REGISTRY, CTX_KOR, JT
 from domain import AnalysisRequest
 from infrastructure.etf import FunctionHoldingsProvider, HoldingsProviderRegistry
-from utils import _valid_fmt, _sf, resolve_analysis_ticker, compute_and_cache, _compute_cached
+from utils import _valid_fmt, _sf, resolve_analysis_ticker, _compute_cached
 from ai_agent import build_prompt_text, build_ai_prompt, parse_ai_signal_assisted_response
 from localization import (
     localize_action_label,
@@ -78,6 +78,15 @@ MODE_SCANNER = "스캐너"
 _APP_MODE_OPTIONS = [MODE_MARKET_DAILY, MODE_ANALYSIS, MODE_SCANNER]
 _QUICK_ANALYSIS_TICKERS = ["NVDA", "TSLA", "AAPL", "GOOGL", "AMZN", "META", "MSFT", "PLTR", "HIMS", "SNDK", "LITE", "COHR", "IREN", "ORCL", "RKLB", "ASTS"]
 CHAT_INPUT_PLACEHOLDER = "티커 입력: AAPL / 005930"
+SCAN_FILTER_PRESETS = ["전체", "최근 추세전환", "최근 강세 발굴", "거래량 동반 강세"]
+WATCH_BUY_PLUS = {"WATCH_BUY", "BUY", "STRONG_BUY"}
+
+SCANNER_TRANSITION_CFG = {
+    'UTBot_Buy': {'label': 'UTBot 전환▲', 'icon': '🟢', 'dir': 'buy'},
+    'UTBot_Sell': {'label': 'UTBot 전환▼', 'icon': '🔴', 'dir': 'sell'},
+    'Hull_Turn_Bull': {'label': 'HULL 전환▲', 'icon': '🟢', 'dir': 'buy'},
+    'Hull_Turn_Bear': {'label': 'HULL 전환▼', 'icon': '🔴', 'dir': 'sell'},
+}
 
 _SESSION_SURROGATE_RE = re.compile(r"[\ud800-\udfff]")
 _SESSION_UNSAFE_CODEPOINTS = re.compile(
@@ -545,6 +554,461 @@ def _render_sector_button_picker(sector_names, selected_sectors):
 def _parse_ticker_input(raw_text):
     raw = str(raw_text or "").upper()
     return list(dict.fromkeys(_SCAN_SYMBOL_PATTERN.findall(raw)))
+
+
+def _recent_frame_flag(frame, column, window=5):
+    if frame is None or column not in frame.columns:
+        return False
+    series = frame[column].tail(window)
+    try:
+        return bool(series.fillna(False).astype(bool).any())
+    except Exception:
+        return bool(series.any())
+
+
+def _build_scan_universe_payload(selected_sectors, sector_tickers, etf_items, etf_tickers, manual_tickers):
+    sector_unique = list(dict.fromkeys([str(t).strip().upper() for t in (sector_tickers or []) if str(t).strip()]))
+    etf_unique = list(dict.fromkeys([str(t).strip().upper() for t in (etf_tickers or []) if str(t).strip()]))
+    manual_unique = list(dict.fromkeys([str(t).strip().upper() for t in (manual_tickers or []) if str(t).strip()]))
+    combined = list(dict.fromkeys([*sector_unique, *etf_unique, *manual_unique]))
+    raw_total = len(sector_unique) + len(etf_unique) + len(manual_unique)
+    dedup_removed = max(0, raw_total - len(combined))
+
+    source_labels = []
+    if sector_unique:
+        source_labels.append("섹터")
+    if etf_unique:
+        source_labels.append("ETF")
+    if manual_unique:
+        source_labels.append("직접입력")
+    source_label = "+".join(source_labels) if source_labels else "직접"
+
+    return {
+        "tickers": combined,
+        "source_label": source_label,
+        "selected_sectors": _normalized_selected_sectors(selected_sectors),
+        "etf_items": list(etf_items or []),
+        "sector_count": len(sector_unique),
+        "etf_count": len(etf_unique),
+        "manual_count": len(manual_unique),
+        "raw_total": raw_total,
+        "dedup_removed": dedup_removed,
+        "final_count": len(combined),
+    }
+
+
+def _render_universe_builder_panel(universe_payload):
+    if not universe_payload:
+        return
+    tickers = list(universe_payload.get("tickers") or [])
+    preview_limit = 120
+    preview = tickers[:preview_limit]
+    hidden_count = max(0, len(tickers) - len(preview))
+
+    source_badges = "".join(
+        [
+            _sigl_badge(f"섹터 {universe_payload.get('sector_count', 0)}", "accent"),
+            _sigl_badge(f"ETF {universe_payload.get('etf_count', 0)}", "warning"),
+            _sigl_badge(f"직접입력 {universe_payload.get('manual_count', 0)}", "muted"),
+            _sigl_badge(f"중복제거 {universe_payload.get('dedup_removed', 0)}", "muted"),
+            _sigl_badge(f"최종 {universe_payload.get('final_count', 0)}", "positive"),
+        ]
+    )
+    sector_chips = "".join(
+        _sigl_badge(name, "accent" if name == "🌐 전체" else "muted")
+        for name in universe_payload.get("selected_sectors", [])
+    ) or _sigl_badge("섹터 선택 없음", "muted")
+    etf_chips = "".join(
+        _sigl_badge(
+            item["resolved"] if item.get("requested", "").upper() == item.get("resolved", "") else f"{item['requested']}→{item['resolved']}",
+            "warning" if item.get("requested", "").upper() != item.get("resolved", "") else "muted",
+        )
+        for item in universe_payload.get("etf_items", [])
+    ) or _sigl_badge("ETF 선택 없음", "muted")
+    ticker_chips = "".join(
+        f"<span class='sigl-code-chip'>{html.escape(str(t))}</span>"
+        for t in preview
+    ) or "<span class='sigl-empty'>현재 유니버스에 티커가 없습니다.</span>"
+    footer = f"미리보기 {len(preview)}개 / 전체 {len(tickers)}개"
+    if hidden_count:
+        footer += f" (추가 {hidden_count}개 숨김)"
+    panel_html = f"""
+        <div class="sigl-card sigl-card--accent sigl-scanner-scope">
+            <div class="sigl-page-head">
+                <div>
+                    <p class="sigl-page-head__eyebrow">Universe Builder</p>
+                    <p class="sigl-page-head__title">{html.escape(str(universe_payload.get('source_label') or '직접'))}</p>
+                    <p class="sigl-page-head__copy">섹터 + ETF + 직접입력을 합집합으로 결합해 스캔 대상을 구성합니다.</p>
+                </div>
+                <div class="sigl-inline sigl-scanner-scope__meta">{source_badges}</div>
+            </div>
+            <div class="sigl-chip-row sigl-scanner-scope__sectors">{sector_chips}</div>
+            <div class="sigl-chip-row sigl-scanner-scope__sectors">{etf_chips}</div>
+            <div class="sigl-code-list sigl-scanner-scope__codes">{ticker_chips}</div>
+            <p class="sigl-note"><span class="sigl-summary">{html.escape(footer)}</span></p>
+        </div>
+    """
+    _render_surface_html(panel_html, 0)
+
+
+def _volume_badges_from_row(row):
+    badges = []
+    if bool(row.get("volume_abnormal", False)):
+        badges.append(("비정상", "negative"))
+    if bool(row.get("volume_surge", False)):
+        badges.append(("급증", "warning"))
+    elif float(row.get("volume_ratio_20", 0) or 0) >= 1.2:
+        badges.append(("증가", "positive"))
+    if bool(row.get("thin_trade_risk", False)):
+        badges.append(("유동성주의", "warning"))
+    if not badges:
+        badges.append(("보통", "muted"))
+    return badges
+
+
+def _is_watch_buy_plus(row):
+    return str(row.get("jg_key", "")).upper() in WATCH_BUY_PLUS
+
+
+def _has_buy_combo(row):
+    return any(str(item.get("dir", "")).lower() == "buy" for item in (row.get("scans") or []))
+
+
+def _has_active_strategy(row):
+    if int(row.get("strategy_active_count", 0) or 0) > 0:
+        return True
+    return bool(row.get("strategies"))
+
+
+def _is_bull_discovery_candidate(row):
+    return bool(
+        _is_watch_buy_plus(row)
+        and (bool(row.get("bull_turn_recent", False)) or bool(row.get("uptrend_or_pullback", False)))
+        and (_has_active_strategy(row) or _has_buy_combo(row))
+        and bool(row.get("volume_bullish", False))
+    )
+
+
+def _apply_scan_filter(results, preset):
+    rows = list(results or [])
+    if preset == "최근 추세전환":
+        return [row for row in rows if bool(row.get("bull_turn_recent", False))]
+    if preset == "최근 강세 발굴":
+        return [row for row in rows if _is_bull_discovery_candidate(row)]
+    if preset == "거래량 동반 강세":
+        return [row for row in rows if bool(row.get("volume_bullish", False))]
+    return rows
+
+
+def _build_scan_snapshot(*, universe_payload, filter_preset, results, filtered_results, perf_stats, skip_reasons):
+    return {
+        "captured_at": datetime.now().isoformat(timespec="seconds"),
+        "source": universe_payload.get("source_label", ""),
+        "filter_preset": filter_preset,
+        "universe": {
+            "selected_sectors": list(universe_payload.get("selected_sectors") or []),
+            "etf_items": list(universe_payload.get("etf_items") or []),
+            "sector_count": int(universe_payload.get("sector_count", 0) or 0),
+            "etf_count": int(universe_payload.get("etf_count", 0) or 0),
+            "manual_count": int(universe_payload.get("manual_count", 0) or 0),
+            "raw_total": int(universe_payload.get("raw_total", 0) or 0),
+            "dedup_removed": int(universe_payload.get("dedup_removed", 0) or 0),
+            "final_count": int(universe_payload.get("final_count", 0) or 0),
+            "tickers": list(universe_payload.get("tickers") or []),
+        },
+        "result_counts": {
+            "raw": len(results or []),
+            "filtered": len(filtered_results or []),
+            "skipped": len(skip_reasons or []),
+        },
+        "performance": dict(perf_stats or {}),
+        "skips": list(skip_reasons or []),
+        "rows": list(results or []),
+    }
+
+
+def _scanner_rows_to_csv_bytes(rows):
+    import csv
+    import io
+
+    field_names = [
+        "ticker",
+        "scan_score",
+        "strength",
+        "jg_key",
+        "jg",
+        "es",
+        "cf",
+        "price",
+        "chg",
+        "latest_sig",
+        "volume_ratio_20",
+        "volume_ratio_50",
+        "volume_oscillator",
+        "dollar_volume_20",
+        "volume_surge",
+        "volume_abnormal",
+        "volume_bullish",
+        "thin_trade_risk",
+        "bull_turn_recent",
+        "uptrend_or_pullback",
+        "pullback_ready",
+        "strategy_active_count",
+        "multi_buy",
+        "multi_sell",
+    ]
+    out = io.StringIO()
+    writer = csv.DictWriter(out, fieldnames=field_names, extrasaction="ignore")
+    writer.writeheader()
+    for row in rows or []:
+        normalized = dict(row)
+        for key in ("volume_surge", "volume_abnormal", "volume_bullish", "thin_trade_risk", "bull_turn_recent", "uptrend_or_pullback", "pullback_ready"):
+            normalized[key] = "Y" if bool(normalized.get(key)) else "N"
+        writer.writerow(normalized)
+    return out.getvalue().encode("utf-8-sig")
+
+
+def _scanner_snapshot_to_json_bytes(snapshot):
+    import json
+
+    return json.dumps(snapshot or {}, ensure_ascii=False, indent=2).encode("utf-8")
+
+
+@st.cache_data(ttl=300, max_entries=1200, show_spinner=False)
+def _build_scanner_row_cached(ticker, cache_bucket):
+    ticker = str(ticker or "").strip().upper()
+    if not ticker:
+        return {"ok": False, "ticker": "", "skip_reason": "invalid_ticker", "detail": "empty ticker"}
+
+    try:
+        frame = _compute_cached(ticker, f"{ticker}_{cache_bucket}")
+    except Exception as exc:
+        return {"ok": False, "ticker": ticker, "skip_reason": "compute_error", "detail": str(exc)[:220]}
+
+    if frame is None:
+        return {"ok": False, "ticker": ticker, "skip_reason": "missing_frame", "detail": "no frame returned"}
+    if len(frame) < 50:
+        return {"ok": False, "ticker": ticker, "skip_reason": "insufficient_history", "detail": f"bars={len(frame)}"}
+
+    try:
+        dc_ = frame.tail(63)
+        recent_5 = dc_.tail(5)
+        lt = dc_.iloc[-1]
+        prev_close = _sf(dc_.iloc[-2].get('Close', lt.get('Close', 0))) if len(dc_) >= 2 else _sf(lt.get('Close', 0))
+        current_close = _sf(lt.get('Close', 0))
+
+        strategy_payload = build_strategy_payload(dc_)
+        strategy_summary = strategy_payload.get('summary', {})
+        strategy_results = list(strategy_payload.get('visible_results') or [])
+        top_strategy = strategy_summary.get('top_strategy')
+
+        acs = []
+        lsd = None
+        for combo_name, combo_cfg in COMBINED_SCAN_REGISTRY.items():
+            if combo_name not in recent_5.columns:
+                continue
+            recent_values = recent_5[combo_name].fillna(False).astype(bool)
+            if not recent_values.any():
+                continue
+            ld = recent_values[recent_values].index[-1]
+            combo_kor, _ = localize_combo(combo_name, combo_cfg.get('kor'), combo_cfg.get('desc'))
+            acs.append(
+                {
+                    'icon': combo_cfg['icon'],
+                    'kor': combo_kor,
+                    'dir': combo_cfg['dir'],
+                    'tier': combo_cfg['tier'],
+                    'date': ld.strftime('%m/%d'),
+                    'days_ago': int((dc_.index[-1] - ld).days),
+                }
+            )
+            lsd = ld if lsd is None or ld > lsd else lsd
+
+        transitions = []
+        for signal_name, cfg in SCANNER_TRANSITION_CFG.items():
+            if signal_name not in recent_5.columns:
+                continue
+            recent_values = recent_5[signal_name].fillna(False).astype(bool)
+            if not recent_values.any():
+                continue
+            td = recent_values[recent_values].index[-1]
+            transitions.append(
+                {
+                    'icon': cfg['icon'],
+                    'label': cfg['label'],
+                    'dir': cfg['dir'],
+                    'date': td.strftime('%m/%d'),
+                }
+            )
+
+        chv = _sf(current_close - prev_close)
+        ch = _sf((current_close - prev_close) / prev_close * 100) if prev_close else 0.0
+        bt = _sf(lt.get('Buy_Total', 0))
+        stt = _sf(lt.get('Sell_Total', 0))
+        ba = int(_sf(lt.get('Buy_Agree', 0)))
+        sa = int(_sf(lt.get('Sell_Agree', 0)))
+        es = _sf(lt.get('Ensemble_Score', 0))
+        cf = _sf(lt.get('Judgment_Confidence', 0))
+        market_bias = _sf(lt.get('Market_Filter_Bias', 0))
+        downgrade_count = _sf(lt.get('Downgrade_Count', 0))
+        flip_guard_triggered = bool(lt.get('Flip_Guard_Triggered', False))
+        continuation_buy = _sf(lt.get('Continuation_Buy_Score', 0))
+        continuation_sell = _sf(lt.get('Continuation_Sell_Score', 0))
+        thin_trade_risk = bool(lt.get('Thin_Trade_Risk', False))
+        bullish_gap_reversal = bool(lt.get('Bullish_Gap_Reversal', False))
+        bearish_gap_failure = bool(lt.get('Bearish_Gap_Failure', False))
+        raw_jg = str(lt.get('Trade_Judgment', 'N/A'))
+
+        t1b = sum(1 for item in acs if item['tier'] == 1 and item['dir'] == 'buy')
+        t1s = sum(1 for item in acs if item['tier'] == 1 and item['dir'] == 'sell')
+        t2b = sum(1 for item in acs if item['tier'] == 2 and item['dir'] == 'buy')
+        t2s = sum(1 for item in acs if item['tier'] == 2 and item['dir'] == 'sell')
+        scan_score = (
+            es
+            + (bt - stt) * 0.55
+            + (ba - sa) * 2.5
+            + t1b * 4.0 - t1s * 4.0
+            + t2b * 1.6 - t2s * 1.6
+            + cf * 0.04
+            + market_bias * 0.55
+            + continuation_buy * 0.9
+            - continuation_sell * 0.9
+        )
+        scan_score -= downgrade_count * 2.2
+        if thin_trade_risk:
+            scan_score -= 4.0
+        if bullish_gap_reversal:
+            scan_score += 1.8
+        if bearish_gap_failure:
+            scan_score -= 2.2
+        judgment_bias = {
+            'STRONG_BUY': 10.0,
+            'BUY': 5.0,
+            'WATCH_BUY': JT.WATCH_BUY_SCAN_BIAS,
+            'WATCH_SELL': JT.WATCH_SELL_SCAN_BIAS,
+            'SELL': JT.SELL_SCAN_BIAS,
+            'STRONG_SELL': JT.STRONG_SELL_SCAN_BIAS,
+        }.get(raw_jg, 0.0)
+        scan_score += judgment_bias
+        if raw_jg in ('NEUTRAL', 'MIXED'):
+            scan_score *= 0.7
+        if flip_guard_triggered:
+            scan_score *= 0.82
+
+        strength = (
+            abs(es)
+            + (bt + stt) * 0.35
+            + abs(ba - sa) * 1.8
+            + (t1b + t1s) * 3.0
+            + cf * 0.02
+        )
+
+        mbc = sum(1 for item in acs if item['dir'] == 'buy')
+        msc = sum(1 for item in acs if item['dir'] == 'sell')
+        mnc = sum(1 for item in acs if item['dir'] == 'neutral')
+        mcnt = len(acs)
+        mimb = mbc - msc
+        has_t1 = any(item['tier'] == 1 for item in acs)
+        mflag = (mcnt >= 3) or (has_t1 and mcnt >= 2)
+
+        recent_hits = sorted(
+            [item for item in acs if item.get('days_ago', 99) <= 3],
+            key=lambda item: (item.get('tier', 9), item.get('days_ago', 99)),
+        )
+        mhits = [{'icon': h['icon'], 'label': h['kor'], 'dir': h['dir'], 'date': h['date']} for h in recent_hits]
+        if not mhits:
+            fallback_hits = sorted(acs, key=lambda item: (item.get('tier', 9), item.get('days_ago', 99)))[:6]
+            mhits = [{'icon': h['icon'], 'label': h['kor'], 'dir': h['dir'], 'date': h['date']} for h in fallback_hits]
+
+        volume_ratio_20 = _sf(lt.get("Volume_Ratio_20", 0))
+        volume_ratio_50 = _sf(lt.get("Volume_Ratio_50", 0))
+        volume_oscillator = _sf(lt.get("Volume_Oscillator", 0))
+        dollar_volume_20 = _sf(lt.get("Dollar_Volume_20", 0))
+        volume_surge = bool(lt.get("Volume_Surge", False))
+        volume_climax_buy = bool(lt.get("Volume_Climax_Buy", False))
+        volume_abnormal = bool(volume_surge or volume_ratio_20 >= 2.0)
+        volume_bullish = bool((volume_ratio_20 >= 1.2) and (volume_surge or volume_climax_buy or volume_oscillator > 0))
+
+        system_turn_bull = _recent_frame_flag(dc_, "System_Turn_Bull", 5)
+        trend_inflect_bull = _recent_frame_flag(dc_, "Trend_Inflection_Bull", 5)
+        ut_turn_bull = _recent_frame_flag(dc_, "UTBot_Buy", 5)
+        hull_turn_bull = _recent_frame_flag(dc_, "Hull_Turn_Bull", 5)
+        bull_turn_recent = bool(system_turn_bull or trend_inflect_bull or ut_turn_bull or hull_turn_bull)
+
+        ma20 = _sf(lt.get("MA20", 0))
+        ma50 = _sf(lt.get("MA50", 0))
+        uptrend_ready = bool(current_close > ma20 > ma50) if ma20 and ma50 else False
+        pullback_ready = _recent_frame_flag(dc_, "EMA_Pullback_Buy", 5)
+        uptrend_or_pullback = bool(uptrend_ready or pullback_ready)
+        strategy_active_count = int(strategy_summary.get('active_count', 0) or 0)
+        buy_combo_present = any(item['dir'] == 'buy' for item in acs)
+        watch_buy_plus = raw_jg in WATCH_BUY_PLUS
+        bull_strength_recent = bool(
+            watch_buy_plus
+            and (bull_turn_recent or uptrend_or_pullback)
+            and (strategy_active_count > 0 or buy_combo_present)
+            and volume_bullish
+        )
+
+        row = {
+            'ticker': ticker,
+            'price': _sf(current_close),
+            'chg_value': chv,
+            'chg': ch,
+            'scans': sorted(acs, key=lambda item: item['tier']),
+            'transitions': transitions,
+            'multi_sig': mflag,
+            'multi_cnt': mcnt,
+            'multi_buy': mbc,
+            'multi_sell': msc,
+            'multi_neutral': mnc,
+            'multi_imb': mimb,
+            'multi_hits': mhits,
+            'jg_key': raw_jg,
+            'jg': localize_judgment_label(raw_jg),
+            'cf': cf,
+            'es': es,
+            'strategies': strategy_results,
+            'top_strategy': top_strategy,
+            'strategy_conflict_level': str(strategy_summary.get('conflict_level', 'LOW')),
+            'strategy_bias': str(strategy_summary.get('long_short_bias', 'BALANCED')),
+            'strategy_active_count': strategy_active_count,
+            'ctx': localize_context_label(int(_sf(lt.get('Market_Context', 0)))),
+            'ba': ba,
+            'sa': sa,
+            'buy_total': bt,
+            'sell_total': stt,
+            'scan_score': _sf(scan_score),
+            'strength': _sf(strength),
+            'latest_sig': lsd.strftime('%Y-%m-%d') if lsd else '9999-99-99',
+            'latest_sig_ts': lsd.timestamp() if lsd else 0.0,
+            'reason': str(lt.get('Judgment_Reason', '')),
+            'action': localize_action_label(str(lt.get('Action_Label', ''))),
+            'volume_ratio_20': volume_ratio_20,
+            'volume_ratio_50': volume_ratio_50,
+            'volume_oscillator': volume_oscillator,
+            'dollar_volume_20': dollar_volume_20,
+            'volume_surge': volume_surge,
+            'volume_abnormal': volume_abnormal,
+            'volume_bullish': volume_bullish,
+            'thin_trade_risk': thin_trade_risk,
+            'bull_turn_recent': bull_turn_recent,
+            'uptrend_or_pullback': uptrend_or_pullback,
+            'pullback_ready': pullback_ready,
+            'bull_strength_recent': bull_strength_recent,
+            'watch_buy_plus': watch_buy_plus,
+            'buy_combo_present': buy_combo_present,
+        }
+        return {"ok": True, "ticker": ticker, "row": row, "skip_reason": "", "detail": ""}
+    except Exception as exc:
+        return {"ok": False, "ticker": ticker, "skip_reason": "row_build_error", "detail": str(exc)[:220]}
+
+
+def _scan_ticker_worker(ticker, cache_bucket):
+    started = time.perf_counter()
+    payload = dict(_build_scanner_row_cached(ticker, cache_bucket))
+    payload["elapsed_sec"] = _sf(time.perf_counter() - started)
+    return payload
 
 
 def _parse_analysis_ticker_input(raw_text):
@@ -1122,75 +1586,6 @@ def _render_etf_button_picker(selected_keys):
                     st.rerun()
 
 
-def _render_scanner_selection_panel(selected_sectors, selected_list):
-    selected_sectors = _normalized_selected_sectors(selected_sectors)
-    if not selected_sectors:
-        return
-    count = len(selected_list)
-    title = _sector_selection_title(selected_sectors) or "선택 없음"
-    sector_chips = "".join(
-        _sigl_badge(name, 'accent' if name == '🌐 전체' else 'muted')
-        for name in selected_sectors
-    )
-    chips = "".join(
-        f"<span class='sigl-code-chip'>{html.escape(str(t))}</span>"
-        for t in selected_list
-    ) or "<span class='sigl-empty'>선택된 종목이 없습니다.</span>"
-    panel_html = f"""
-        <div class="sigl-card sigl-card--accent sigl-scanner-scope">
-            <div class="sigl-page-head">
-                <div>
-                    <p class="sigl-page-head__eyebrow">Scanner Scope</p>
-                    <p class="sigl-page-head__title">{html.escape(str(title))}</p>
-                    <p class="sigl-page-head__copy">여러 섹터를 묶어 하나의 스캔 유니버스로 사용할 수 있습니다.</p>
-                </div>
-                <div class="sigl-inline sigl-scanner-scope__meta">
-                    {_sigl_badge(f'{count} 종목', 'accent')}
-                    {_sigl_badge('점수 높은 순 정렬', 'muted')}
-                </div>
-            </div>
-            <div class="sigl-chip-row sigl-scanner-scope__sectors">{sector_chips}</div>
-            <div class="sigl-code-list sigl-scanner-scope__codes">{chips}</div>
-        </div>
-        """
-    _render_surface_html(panel_html, 0)
-
-
-def _render_etf_universe_panel(etf_items, selected_list, note=""):
-    if not etf_items:
-        return
-    count = len(selected_list)
-    title = _short_collection_title([item.get("resolved") for item in etf_items]) or "ETF"
-    etf_chips = "".join(
-        _sigl_badge(
-            item["resolved"] if item.get("requested", "").upper() == item.get("resolved", "") else f"{item['requested']}→{item['resolved']}",
-            'warning' if item.get("requested", "").upper() != item.get("resolved", "") else 'muted'
-        )
-        for item in etf_items
-    )
-    chips = "".join(
-        f"<span class='sigl-code-chip'>{html.escape(str(t))}</span>"
-        for t in selected_list
-    ) or "<span class='sigl-empty'>선택된 종목이 없습니다.</span>"
-    panel_html = f"""
-        <div class="sigl-card sigl-card--accent sigl-scanner-scope">
-            <div class="sigl-page-head">
-                <div>
-                    <p class="sigl-page-head__eyebrow">ETF 구성종목</p>
-                    <p class="sigl-page-head__title">{html.escape(str(title))}</p>
-                    <p class="sigl-page-head__copy">{html.escape(note or 'ETF 또는 지수 입력으로 임시 스캔 유니버스를 구성했습니다.')}</p>
-                </div>
-                <div class="sigl-inline sigl-scanner-scope__meta">
-                    {_sigl_badge(f'{count} 종목', 'warning')}
-                </div>
-            </div>
-            <div class="sigl-chip-row sigl-scanner-scope__sectors">{etf_chips}</div>
-            <div class="sigl-code-list sigl-scanner-scope__codes">{chips}</div>
-        </div>
-        """
-    _render_surface_html(panel_html, 0)
-
-
 def _render_scanner_summary(results, total_count):
     buy_count = len([r for r in results if 'BUY' in str(r.get('jg_key', ''))])
     sell_count = len([r for r in results if 'SELL' in str(r.get('jg_key', ''))])
@@ -1239,6 +1634,20 @@ def _render_scanner_result_card(rank, row):
         )
         for item in (row.get('strategies') or [])[:3]
     ) or _sigl_badge("활성 전략 없음", 'muted')
+    volume_hits = "".join(
+        _sigl_badge(
+            f"거래량 {label} (R20 {float(row.get('volume_ratio_20', 0) or 0):.2f})",
+            tone_name,
+        )
+        for label, tone_name in _volume_badges_from_row(row)
+    )
+    trend_hits = "".join(
+        [
+            _sigl_badge("최근 추세전환", "positive") if bool(row.get("bull_turn_recent", False)) else "",
+            _sigl_badge("우상향/눌림", "accent") if bool(row.get("uptrend_or_pullback", False)) else "",
+            _sigl_badge("강세 발굴 조건", "positive") if bool(row.get("bull_strength_recent", False)) else "",
+        ]
+    ) or _sigl_badge("추세 특이사항 없음", "muted")
     top_strategy_text = ""
     if isinstance(top_strategy, dict) and top_strategy.get('label'):
         entry_reference_text = _format_strategy_entry_reference(top_strategy)
@@ -1278,6 +1687,8 @@ def _render_scanner_result_card(rank, row):
                 </div>
             </div>
             <div class="sigl-chip-row">{transitions}</div>
+            <div class="sigl-chip-row">{volume_hits}</div>
+            <div class="sigl-chip-row">{trend_hits}</div>
             <div class="sigl-chip-row">{strategy_hits}</div>
             <div class="sigl-chip-row">{combo_hits}</div>
             {top_strategy_text}
@@ -2024,15 +2435,27 @@ if current_mode == MODE_SCANNER:
         st.session_state['scan_focus_idx'] = None
         st.session_state['scan_focus_ticker'] = None
         st.session_state['scan_nav_select_idx'] = None
+        st.session_state['scan_filter_preset'] = SCAN_FILTER_PRESETS[0]
+        st.session_state['scan_filtered_results'] = []
+        st.session_state['scan_snapshots'] = []
+        st.session_state['scan_perf_stats'] = {}
+        st.session_state['scan_skip_reasons'] = []
         st.session_state.pop('scan_in', None)
         st.session_state['scan_sector_picker'] = []
         current_sector_selection = []
     _apply_sector_selection(current_sector_selection)
-    selected_sector = st.session_state.get('selected_sector', None)
     manual_preview = _parse_ticker_input(st.session_state.get('scan_in'))
     current_etf_selection = _normalized_selected_etf_presets(st.session_state.get('scan_etf_picker'))
     active_etf_items = st.session_state.get('scan_etf_items') or []
     active_etf_tickers = st.session_state.get('scan_etf_tickers_override') or []
+    sector_preview = st.session_state.get('scan_tickers_override') or _sector_selection_tickers(current_sector_selection) or []
+    preview_universe = _build_scan_universe_payload(
+        current_sector_selection,
+        sector_preview,
+        active_etf_items,
+        active_etf_tickers,
+        manual_preview,
+    )
 
     _render_page_intro(
         "Scanner",
@@ -2042,6 +2465,7 @@ if current_mode == MODE_SCANNER:
             (f"선택 섹터 {len(current_sector_selection)}", "accent"),
             (f"ETF 선택 {len(current_etf_selection)}", "warning"),
             (f"직접 입력 {len(manual_preview)}개", "warning"),
+            (f"합집합 유니버스 {preview_universe.get('final_count', 0)}개", "positive"),
             (f"전체 후보 {len(all_universe)}개", "muted"),
         ],
     )
@@ -2051,7 +2475,7 @@ if current_mode == MODE_SCANNER:
         badges=[
             ("멀티 섹터 선택", "accent"),
             ("ETF 임시 유니버스", "warning"),
-            ("직접 입력 우선 적용", "muted"),
+            ("3개 소스 합집합 결합", "positive"),
         ],
         eyebrow="스캔 대상 구성",
     )
@@ -2062,12 +2486,6 @@ if current_mode == MODE_SCANNER:
     selected_sectors = _normalized_selected_sectors(
         st.session_state.get('selected_sectors') or current_sector_selection
     )
-    selected_sector = st.session_state.get('selected_sector', None)
-
-    if selected_sectors:
-        sel_list = st.session_state.get('scan_tickers_override') or _sector_selection_tickers(selected_sectors) or []
-        sel_list = list(dict.fromkeys([str(t).strip().upper() for t in sel_list if str(t).strip()]))
-        _render_scanner_selection_panel(selected_sectors, sel_list)
 
     _render_section_heading(
         "ETF 또는 지수를 선택하여 스캔 대상을 구성할 수 있습니다.",
@@ -2090,12 +2508,8 @@ if current_mode == MODE_SCANNER:
     current_etf_selection = _normalized_selected_etf_presets(st.session_state.get('scan_etf_picker'))
     active_etf_items = st.session_state.get('scan_etf_items') or []
     active_etf_tickers = st.session_state.get('scan_etf_tickers_override') or []
-    if active_etf_tickers:
-        _render_etf_universe_panel(active_etf_items, active_etf_tickers, st.session_state.get('scan_etf_note', ''))
     if st.session_state.get('scan_etf_errors'):
         st.caption("일부 ETF는 불러오지 못했습니다: " + " | ".join(st.session_state['scan_etf_errors']))
-
-    active_preview = manual_preview or active_etf_tickers or st.session_state.get('scan_tickers_override') or []
 
     with st.form("scanner_direct_input", clear_on_submit=False):
         ci = st.text_input(
@@ -2115,281 +2529,207 @@ if current_mode == MODE_SCANNER:
         st.rerun()
 
     manual_tickers = _parse_ticker_input(ci)
-    if manual_tickers:
-        tickers = manual_tickers
-        scan_source = "직접 입력"
-    elif active_etf_tickers:
-        tickers = active_etf_tickers
-        scan_source = _short_collection_title([item.get("resolved") for item in active_etf_items]) or "ETF"
-    elif st.session_state.get('scan_tickers_override'):
-        tickers = st.session_state['scan_tickers_override']
-        scan_source = selected_sector or ("섹터" if selected_sectors else "직접")
-    else:
-        tickers = []
-        scan_source = "직접"
-    tickers = list(dict.fromkeys([t for t in tickers if t]))
+    selected_sectors = _normalized_selected_sectors(st.session_state.get('selected_sectors') or current_sector_selection)
+    sector_tickers = st.session_state.get('scan_tickers_override') or _sector_selection_tickers(selected_sectors) or []
+    active_etf_items = st.session_state.get('scan_etf_items') or []
+    active_etf_tickers = st.session_state.get('scan_etf_tickers_override') or []
+    universe_payload = _build_scan_universe_payload(
+        selected_sectors,
+        sector_tickers,
+        active_etf_items,
+        active_etf_tickers,
+        manual_tickers,
+    )
+    tickers = list(universe_payload.get("tickers") or [])
+    scan_source = str(universe_payload.get("source_label") or "직접")
+    _render_universe_builder_panel(universe_payload)
 
     if scan_btn and not tickers:
         st.warning("스캔할 티커가 없습니다. 섹터를 고르거나 ETF 종목을 불러오거나 직접 티커를 입력해 주세요.")
 
     if scan_btn and tickers:
+        run_started = time.perf_counter()
+        setup_started = time.perf_counter()
         pb = st.progress(0)
         scan_note = st.empty()
         results = []
-        sts = math.floor(time.time() / 300)
+        skip_reasons = []
+        ticker_latencies = []
+        cache_bucket = math.floor(time.time() / 300)
+        max_workers = min(12, max(4, len(tickers) // 10), len(tickers))
 
         # 런타임 콤보 레지스트리 등록 보장
         try:
             from engine import _ensure_runtime_combo_registry
             _ensure_runtime_combo_registry()
-        except Exception:
-            pass
+        except Exception as exc:
+            skip_reasons.append({"ticker": "-", "reason": "registry_error", "detail": str(exc)[:220]})
+        setup_seconds = _sf(time.perf_counter() - setup_started)
 
-        # UT/Hull 전환 시그널 표시용 설정
-        trans_cfg = {
-            'UTBot_Buy':      {'label': 'UTBot 전환▲', 'icon': '🟢', 'dir': 'buy'},
-            'UTBot_Sell':     {'label': 'UTBot 전환▼', 'icon': '🔴', 'dir': 'sell'},
-            'Hull_Turn_Bull': {'label': 'HULL 전환▲',  'icon': '🟢', 'dir': 'buy'},
-            'Hull_Turn_Bear': {'label': 'HULL 전환▼',  'icon': '🔴', 'dir': 'sell'},
-        }
-
-        def _so(t):
-            """
-            스캐너 단일 종목 분석.
-
-            [설계 원칙]
-            - acs 루프: 최근 5일 이내 발화 콤보 수집 → 카드 날짜·표시 전용
-            - multi-signal badge 수치(ON/OFF, 개수, B/S/N 분류):
-              engine.py detect_combined_scans()가 미리 계산한 컬럼을 단독 사용.
-              스캐너에서 재계산하지 않으므로 이중 계산 없음.
-            - scan_score의 t1b/t2b 가중치: 5일 윈도우 acs 기반 유지
-              (최근 활동도를 랭킹에 반영하는 의도적 설계)
-            """
-            try:
-                df_ = _compute_cached(t, f"{t}_{sts}")
-                if df_ is None or len(df_) < 50:
-                    return None
-
-                dc_ = df_.tail(63)
-                lt = dc_.iloc[-1]   # 마지막 행 (오늘)
-                strategy_payload = build_strategy_payload(dc_)
-                strategy_summary = strategy_payload.get('summary', {})
-                strategy_results = list(strategy_payload.get('visible_results') or [])
-                top_strategy = strategy_summary.get('top_strategy')
-
-                # ── 1. 표시용: 최근 5일 발화 콤보 카드 수집 ──────────────────
-                acs = []
-                lsd = None  # 가장 최근 발화일
-                for cn, ccfg in COMBINED_SCAN_REGISTRY.items():
-                    if cn in dc_.columns and dc_[cn].tail(5).any():
-                        ld = dc_[cn].tail(5)[dc_[cn].tail(5)].index[-1]
-                        combo_kor, _ = localize_combo(cn, ccfg.get('kor'), ccfg.get('desc'))
-                        acs.append({
-                            'icon':     ccfg['icon'],
-                            'kor':      combo_kor,
-                            'dir':      ccfg['dir'],
-                            'tier':     ccfg['tier'],
-                            'date':     ld.strftime('%m/%d'),
-                            'days_ago': int((dc_.index[-1] - ld).days),
-                        })
-                        lsd = ld if lsd is None or ld > lsd else lsd
-
-                # ── 2. 표시용: UT/Hull 전환 수집 ──────────────────────────────
-                trs = []
-                for sn, cfg in trans_cfg.items():
-                    if sn in dc_.columns and dc_[sn].tail(5).any():
-                        td = dc_[sn].tail(5)[dc_[sn].tail(5)].index[-1]
-                        trs.append({
-                            'icon':  cfg['icon'],
-                            'label': cfg['label'],
-                            'dir':   cfg['dir'],
-                            'date':  td.strftime('%m/%d'),
-                        })
-
-                # ── 3. 기본 지표 수치 ──────────────────────────────────────────
-                chv = _sf(lt['Close'] - dc_.iloc[-2]['Close']) if len(dc_) >= 2 else 0
-                ch  = _sf((lt['Close'] - dc_.iloc[-2]['Close']) / dc_.iloc[-2]['Close'] * 100) if len(dc_) >= 2 else 0
-                bt  = _sf(lt.get('Buy_Total', 0))
-                stt = _sf(lt.get('Sell_Total', 0))
-                ba  = int(_sf(lt.get('Buy_Agree', 0)))
-                sa  = int(_sf(lt.get('Sell_Agree', 0)))
-                es  = _sf(lt.get('Ensemble_Score', 0))
-                cf  = _sf(lt.get('Judgment_Confidence', 0))
-                market_bias = _sf(lt.get('Market_Filter_Bias', 0))
-                downgrade_count = _sf(lt.get('Downgrade_Count', 0))
-                flip_guard_triggered = bool(lt.get('Flip_Guard_Triggered', False))
-                continuation_buy = _sf(lt.get('Continuation_Buy_Score', 0))
-                continuation_sell = _sf(lt.get('Continuation_Sell_Score', 0))
-                thin_trade_risk = bool(lt.get('Thin_Trade_Risk', False))
-                bullish_gap_reversal = bool(lt.get('Bullish_Gap_Reversal', False))
-                bearish_gap_failure = bool(lt.get('Bearish_Gap_Failure', False))
-
-                raw_jg = str(lt.get('Trade_Judgment', 'N/A'))
-
-                # ── 4. scan_score: acs 기반 tier 가중치 유지 (5일 활동도 반영) ─
-                t1b = sum(1 for s in acs if s['tier'] == 1 and s['dir'] == 'buy')
-                t1s = sum(1 for s in acs if s['tier'] == 1 and s['dir'] == 'sell')
-                t2b = sum(1 for s in acs if s['tier'] == 2 and s['dir'] == 'buy')
-                t2s = sum(1 for s in acs if s['tier'] == 2 and s['dir'] == 'sell')
-                scan_score = (
-                    es
-                    + (bt - stt) * 0.55
-                    + (ba - sa)  * 2.5
-                    + t1b * 4.0  - t1s * 4.0
-                    + t2b * 1.6  - t2s * 1.6
-                    + cf  * 0.04
-                    + market_bias * 0.55
-                    + continuation_buy * 0.9
-                    - continuation_sell * 0.9
-                )
-                scan_score -= downgrade_count * 2.2
-                if thin_trade_risk:
-                    scan_score -= 4.0
-                if bullish_gap_reversal:
-                    scan_score += 1.8
-                if bearish_gap_failure:
-                    scan_score -= 2.2
-                judgment_bias = {
-                    'STRONG_BUY': 10.0,
-                    'BUY': 5.0,
-                    'WATCH_BUY': JT.WATCH_BUY_SCAN_BIAS,
-                    'WATCH_SELL': JT.WATCH_SELL_SCAN_BIAS,
-                    'SELL': JT.SELL_SCAN_BIAS,
-                    'STRONG_SELL': JT.STRONG_SELL_SCAN_BIAS,
-                }.get(raw_jg, 0.0)
-                scan_score += judgment_bias
-                if raw_jg in ('NEUTRAL', 'MIXED'):
-                    scan_score *= 0.7
-                if flip_guard_triggered:
-                    scan_score *= 0.82
-                strength = (
-                    abs(es)
-                    + (bt + stt) * 0.35
-                    + abs(ba - sa) * 1.8
-                    + (t1b + t1s)  * 3.0
-                    + cf * 0.02
-                )
-
-                # ── 5. Multi-Signal badge: acs 기반 (5일 윈도우) ──────────────
-                #   엔진의 CS_Multi_Count 는 오늘 하루 기준이므로
-                #   표시 중인 acs (최근 5일) 와 숫자가 불일치함.
-                #   화면에 보이는 시그널 목록과 배지 카운트를 일치시키기 위해
-                #   acs 를 직접 집계하는 것으로 통일.
-                mbc   = sum(1 for s in acs if s['dir'] == 'buy')
-                msc   = sum(1 for s in acs if s['dir'] == 'sell')
-                mnc   = sum(1 for s in acs if s['dir'] == 'neutral')
-                mcnt  = len(acs)
-                mimb  = mbc - msc
-                # ON 조건: tier-1 이상 1개 이상이면서 총 2개↑, 또는 총 3개↑
-                has_t1 = any(s['tier'] == 1 for s in acs)
-                mflag  = (mcnt >= 3) or (has_t1 and mcnt >= 2)
-
-                # ── 6. multi_hits: 최근 3일 이내 발화 콤보 (표시용, acs 기반) ──
-                recent = sorted(
-                    [x for x in acs if x.get('days_ago', 99) <= 3],
-                    key=lambda x: (x.get('tier', 9), x.get('days_ago', 99))
-                )
-                mhits = [{'icon': h['icon'], 'label': h['kor'], 'dir': h['dir'], 'date': h['date']} for h in recent]
-                # 최근 3일 없으면 전체 acs 상위 6개로 폴백
-                if not mhits:
-                    fallback = sorted(acs, key=lambda x: (x.get('tier', 9), x.get('days_ago', 99)))[:6]
-                    mhits = [{'icon': h['icon'], 'label': h['kor'], 'dir': h['dir'], 'date': h['date']} for h in fallback]
-
-                return {
-                    'ticker':       t,
-                    'price':        _sf(lt['Close']),
-                    'chg_value':    chv,
-                    'chg':          ch,
-                    'scans':        sorted(acs, key=lambda x: x['tier']),
-                    'transitions':  trs,
-                    # badge (엔진 단독)
-                    'multi_sig':    mflag,
-                    'multi_cnt':    mcnt,
-                    'multi_buy':    mbc,
-                    'multi_sell':   msc,
-                    'multi_neutral': mnc,
-                    'multi_imb':    mimb,
-                    # 표시용 최근 콤보
-                    'multi_hits':   mhits,
-                    # 판단
-                    'jg_key':       raw_jg,
-                    'jg':           localize_judgment_label(raw_jg),
-                    'cf':           cf,
-                    'es':           es,
-                    'strategies':   strategy_results,
-                    'top_strategy': top_strategy,
-                    'strategy_conflict_level': str(strategy_summary.get('conflict_level', 'LOW')),
-                    'strategy_bias': str(strategy_summary.get('long_short_bias', 'BALANCED')),
-                    'strategy_active_count': int(strategy_summary.get('active_count', 0)),
-                    'ctx':          localize_context_label(int(_sf(lt.get('Market_Context', 0)))),
-                    'ba':           ba,
-                    'sa':           sa,
-                    'buy_total':    bt,
-                    'sell_total':   stt,
-                    'scan_score':   _sf(scan_score),
-                    'strength':     _sf(strength),
-                    'latest_sig':   lsd.strftime('%Y-%m-%d') if lsd else '9999-99-99',
-                    'latest_sig_ts': lsd.timestamp() if lsd else 0.0,
-                    'reason':       str(lt.get('Judgment_Reason', '')),
-                    'action':       localize_action_label(str(lt.get('Action_Label', ''))),
-                }
-            except Exception:
-                return None
-
+        # TODO(scanner-architecture): ScannerWorkflow와 app.py 인라인 스캐너 경로를 단일 경계로 통합.
         with st.status(f"MARKET SWEEP ACTIVE · {len(tickers)} TICKERS", expanded=True) as scan_status:
-            scan_note.caption("1/3 시그널 레지스트리와 캐시 상태를 확인했습니다.")
+            scan_note.caption(f"1/3 런타임 확인 완료 · 워커 {max_workers}개")
+            scan_seconds_started = time.perf_counter()
 
-            # 병렬 스캔 실행
             scan_note.caption("2/3 병렬 스캔을 시작합니다. 최근 완료 종목이 아래에 표시됩니다.")
-            with ThreadPoolExecutor(max_workers=min(16, max(4, len(tickers) // 8), len(tickers))) as ex:
-                futs = {ex.submit(_so, t): t for t in tickers}
-                for idx_f, f in enumerate(as_completed(futs)):
-                    done_ticker = futs[f]
+            with ThreadPoolExecutor(max_workers=max_workers) as ex:
+                futs = {ex.submit(_scan_ticker_worker, ticker, cache_bucket): ticker for ticker in tickers}
+                for idx_f, future in enumerate(as_completed(futs)):
+                    done_ticker = futs[future]
                     pb.progress((idx_f + 1) / len(tickers))
                     scan_note.caption(f"READING THE TAPE · {done_ticker} · {idx_f + 1}/{len(tickers)}")
-                    r = f.result()
-                    if r:
-                        results.append(r)
+                    payload = future.result()
+                    if payload.get("ok") and isinstance(payload.get("row"), dict):
+                        row = dict(payload["row"])
+                        row["scan_source"] = scan_source
+                        row["scan_latency_sec"] = _sf(payload.get("elapsed_sec", 0))
+                        results.append(row)
+                        ticker_latencies.append(float(payload.get("elapsed_sec", 0) or 0))
+                    else:
+                        skip_reasons.append(
+                            {
+                                "ticker": payload.get("ticker") or done_ticker,
+                                "reason": payload.get("skip_reason") or "unknown",
+                                "detail": str(payload.get("detail") or "")[:220],
+                            }
+                        )
+            scan_seconds = _sf(time.perf_counter() - scan_seconds_started)
+
             scan_note.caption("3/3 결과를 정렬하고 스캐너 카드를 준비합니다.")
+            sort_started = time.perf_counter()
+            results.sort(key=lambda row: (-row['scan_score'], -row['strength'], -row['latest_sig_ts'], row['ticker']))
+            sort_seconds = _sf(time.perf_counter() - sort_started)
             scan_status.update(label=f"SCAN BOOK READY · {len(results)} MATCHES", state="complete", expanded=False)
         pb.empty()
         scan_note.empty()
 
-        results.sort(key=lambda x: (-x['scan_score'], -x['strength'], -x['latest_sig_ts'], x['ticker']))
+        perf_stats = {
+            "workers": max_workers,
+            "setup_seconds": setup_seconds,
+            "scan_seconds": scan_seconds,
+            "sort_seconds": sort_seconds,
+            "total_seconds": _sf(time.perf_counter() - run_started),
+            "ticker_count": len(tickers),
+            "match_count": len(results),
+            "skip_count": len(skip_reasons),
+            "avg_row_seconds": _sf(sum(ticker_latencies) / len(ticker_latencies)) if ticker_latencies else 0.0,
+        }
+        filter_preset = str(st.session_state.get("scan_filter_preset") or SCAN_FILTER_PRESETS[0])
+        filtered_results = _apply_scan_filter(results, filter_preset)
+        snapshot = _build_scan_snapshot(
+            universe_payload=universe_payload,
+            filter_preset=filter_preset,
+            results=results,
+            filtered_results=filtered_results,
+            perf_stats=perf_stats,
+            skip_reasons=skip_reasons,
+        )
+        snapshots = list(st.session_state.get("scan_snapshots") or [])
+        snapshots.append(snapshot)
+        snapshots = snapshots[-20:]
+
         st.session_state['scan_results'] = results
-        st.session_state['scan_source']  = scan_source
-        st.session_state['scan_total']   = len(tickers)
+        st.session_state['scan_filtered_results'] = filtered_results
+        st.session_state['scan_source'] = scan_source
+        st.session_state['scan_total'] = len(tickers)
+        st.session_state['scan_perf_stats'] = perf_stats
+        st.session_state['scan_skip_reasons'] = skip_reasons
+        st.session_state['scan_snapshots'] = snapshots
         st.session_state['scan_focus_idx'] = 0 if results else None
         st.session_state['scan_focus_ticker'] = results[0]['ticker'] if results else None
         st.session_state['scan_nav_select_idx'] = 0 if results else None
 
     # ── 결과 렌더링 ──────────────────────────────────────────────────────────
     results = st.session_state.get('scan_results', [])
+    filter_preset = st.radio(
+        "결과 필터",
+        options=SCAN_FILTER_PRESETS,
+        horizontal=True,
+        key="scan_filter_preset",
+    )
+    filtered_results = _apply_scan_filter(results, filter_preset)
+    st.session_state["scan_filtered_results"] = filtered_results
     if results:
         scan_total = st.session_state.get('scan_total', 0)
+        perf_stats = st.session_state.get("scan_perf_stats") or {}
+        skip_reasons = st.session_state.get("scan_skip_reasons") or []
         _render_section_heading(
             "스캔 결과",
             "현재 유니버스에서 조건과 점수가 높은 종목을 우선순위대로 정렬했습니다.",
             badges=[
-                (f"매치 {len(results)}개", "accent"),
+                (f"원본 {len(results)}개", "accent"),
+                (f"필터 {len(filtered_results)}개", "positive"),
                 (f"전체 대상 {scan_total}개", "muted"),
             ],
             eyebrow="Result Board",
             tight=True,
         )
         st.caption("정렬 기준: 스캔 점수 → 강도 → 최근 시그널 순서입니다.")
-        _render_scanner_summary(results, scan_total)
+        _render_scanner_summary(filtered_results, scan_total)
+        if perf_stats:
+            st.caption(
+                "성능: "
+                f"총 {float(perf_stats.get('total_seconds', 0)):.2f}s · "
+                f"설정 {float(perf_stats.get('setup_seconds', 0)):.2f}s · "
+                f"스캔 {float(perf_stats.get('scan_seconds', 0)):.2f}s · "
+                f"정렬 {float(perf_stats.get('sort_seconds', 0)):.2f}s · "
+                f"평균행 {float(perf_stats.get('avg_row_seconds', 0)):.3f}s"
+            )
+        if skip_reasons:
+            with st.expander(f"제외된 종목 {len(skip_reasons)}개 보기", expanded=False):
+                reason_labels = {
+                    "insufficient_history": "히스토리 부족",
+                    "missing_frame": "데이터 미수신",
+                    "compute_error": "계산 오류",
+                    "row_build_error": "행 생성 오류",
+                    "registry_error": "레지스트리 오류",
+                    "invalid_ticker": "티커 형식 오류",
+                }
+                for item in skip_reasons[:30]:
+                    label = reason_labels.get(str(item.get("reason")), str(item.get("reason")))
+                    detail = str(item.get("detail") or "")
+                    st.caption(f"{item.get('ticker', '-')} · {label}" + (f" · {detail}" if detail else ""))
 
-        for rk, r in enumerate(results, start=1):
+        snapshot_for_download = (st.session_state.get("scan_snapshots") or [None])[-1]
+        if snapshot_for_download is None:
+            snapshot_for_download = _build_scan_snapshot(
+                universe_payload=universe_payload,
+                filter_preset=filter_preset,
+                results=results,
+                filtered_results=filtered_results,
+                perf_stats=perf_stats,
+                skip_reasons=skip_reasons,
+            )
+        csv_col, json_col = st.columns(2)
+        with csv_col:
+            st.download_button(
+                "CSV 다운로드 (현재 필터)",
+                data=_scanner_rows_to_csv_bytes(filtered_results),
+                file_name=f"scanner_filtered_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                use_container_width=True,
+                key="scanner_csv_download",
+            )
+        with json_col:
+            st.download_button(
+                "JSON 스냅샷 다운로드",
+                data=_scanner_snapshot_to_json_bytes(snapshot_for_download),
+                file_name=f"scanner_snapshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                mime="application/json",
+                use_container_width=True,
+                key="scanner_json_download",
+            )
+
+        for rk, r in enumerate(filtered_results, start=1):
             _render_scanner_result_card(rk, r)
 
             if st.button(f"{r['ticker']} 분석", key=f"sc_{r['ticker']}", use_container_width=True):
-                _set_scan_focus(r['ticker'], rk - 1)
+                _set_scan_focus(r['ticker'])
                 _queue_analysis_target(r['ticker'])
     else:
         _render_empty_state(
             "아직 스캔 결과가 없습니다",
-            "섹터를 선택하거나 직접 티커를 입력한 뒤 `스캔 실행`을 누르면 결과 카드가 정렬되어 표시됩니다.",
+            "섹터/ETF/직접입력을 구성한 뒤 `스캔 실행`을 누르면 결과 카드가 정렬되어 표시됩니다.",
             badges=[
                 ("유니버스 선택 필요", "warning"),
                 ("직접 입력 가능", "muted"),
