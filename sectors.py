@@ -339,4 +339,21 @@ SECTOR_GROUPS = {
         'MARA', 'IREN', 'CLSK', 'WULF', 'BTMW',
     ],
 
+    '모건스탠리 Space 60': [
+        # 원자재 / 소재 / 가스
+        'MP', 'FCX', 'AA', 'TECK', 'CRS', 'ATI', 'MTRN', 'GLW', 'HXL', 'PKE',
+        'LIN', 'APD', 'NEU',
+
+        # 반도체 / RF / 광학 / 네트워크
+        'ADI', 'STM', 'MCHP', 'QRVO', 'MRCY', 'TTMI', 'AVGO', 'COHR', 'LITE', 'NVDA', 'TDY',
+
+        # 부품 / 센서 / 연결 / 추진 하위부품
+        'RBC', 'PH', 'AME', 'APH', 'APTV', 'MOG.A', 'GHM', 'KRMN', 'HON',
+
+        # 우주 / 항공 / 발사 / 플랫폼
+        'RDW', 'RKLB', 'BA', 'NOC', 'LMT', 'KTOS', 'VOYG', 'LUNR', 'RTX',
+
+        # 위성통신 / 지상시스템 / 지구관측
+        'GILT', 'VSAT', 'ASTS', 'IRDM', 'AMZN', 'GSAT', 'PL', 'BKSY', 'SPIR', 'TSAT',
+    ],
 }
