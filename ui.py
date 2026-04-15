@@ -50,6 +50,7 @@ _US_MARKET_HISTORY_PERIOD = "6mo"
 _US_MARKET_MOVER_HISTORY_PERIOD = "3mo"
 _US_MARKET_DOWNLOAD_CHUNK_SIZE = 200
 _US_MARKET_TOP_MOVER_CARD_COUNT = 9
+_US_MARKET_TOP_MOVER_DETAIL_COUNT = 30
 _US_MARKET_NEWS_LOOKBACK_HOURS = 36
 _US_MARKET_NEWS_MAX_ITEMS = 5
 _US_MARKET_NEWS_SECTION_MAX_ITEMS = 3
@@ -245,6 +246,34 @@ def _format_change_pct(change_pct):
     if change_pct is None or pd.isna(change_pct):
         return "N/A"
     return f"{change_pct:+.2f}%"
+
+
+def _safe_market_float(value):
+    if value is None:
+        return None
+    try:
+        if pd.isna(value):
+            return None
+    except Exception:
+        pass
+    try:
+        return float(value)
+    except Exception:
+        return None
+
+
+def _format_mover_price_summary(snapshot, change_pct=None):
+    snapshot = snapshot or {}
+    price = _safe_market_float(snapshot.get("price"))
+    prev_close = _safe_market_float(snapshot.get("prev_close"))
+    pct = _safe_market_float(change_pct if change_pct is not None else snapshot.get("change_pct"))
+    delta = (price - prev_close) if (price is not None and prev_close is not None) else None
+
+    price_text = f"${price:,.2f}" if price is not None else "N/A"
+    pct_text = _format_change_pct(pct)
+    if delta is None:
+        return price_text if pct is None else f"{price_text} ({pct_text})"
+    return f"{price_text} ({delta:+,.2f}, {pct_text})"
 
 
 def _tone_from_change(change_pct, inverse=False, neutral_band=0.12):
@@ -1293,11 +1322,33 @@ def _build_mover_detail_bullet(row):
     change_pct = row.get("change_pct")
     snapshot = row.get("snapshot") or {}
     tone = "positive" if (change_pct or 0) >= 0 else "negative"
-    base = f"{symbol} {_format_change_pct(change_pct)} / {_mover_reason(snapshot)}"
+    price_summary = _format_mover_price_summary(snapshot, change_pct=change_pct)
+    base = f"{symbol} {price_summary} / {_mover_reason(snapshot)}"
     context = _build_mover_context(snapshot)
     if context:
         base += f" · {context}"
     return _build_market_bullet(base, tone)
+
+
+def _build_mover_detail_row(row):
+    row = row or {}
+    symbol = str(row.get("symbol") or "").strip()
+    snapshot = row.get("snapshot") or {}
+    price = _safe_market_float(snapshot.get("price"))
+    prev_close = _safe_market_float(snapshot.get("prev_close"))
+    change_value = (price - prev_close) if (price is not None and prev_close is not None) else None
+    return {
+        "symbol": symbol,
+        "price": price,
+        "prev_close": prev_close,
+        "change_value": change_value,
+        "change_pct": row.get("change_pct"),
+        "price_summary": _format_mover_price_summary(snapshot, change_pct=row.get("change_pct")),
+        "volume_ratio": snapshot.get("volume_ratio"),
+        "five_day_change": snapshot.get("five_day_change"),
+        "month_change": snapshot.get("month_change"),
+        "reason": _mover_reason(snapshot),
+    }
 
 
 def _extract_json_object(text):
@@ -2843,6 +2894,9 @@ def build_us_market_daily_payload():
     movers_sorted = sorted(movers, key=lambda row: row["change_pct"], reverse=True)
     gainers = movers_sorted[:_US_MARKET_TOP_MOVER_CARD_COUNT]
     losers = list(reversed(movers_sorted[-_US_MARKET_TOP_MOVER_CARD_COUNT:])) if movers_sorted else []
+    gainers_detail = [_build_mover_detail_row(row) for row in movers_sorted[:_US_MARKET_TOP_MOVER_DETAIL_COUNT]]
+    losers_detail_source = list(reversed(movers_sorted[-_US_MARKET_TOP_MOVER_DETAIL_COUNT:])) if movers_sorted else []
+    losers_detail = [_build_mover_detail_row(row) for row in losers_detail_source]
     snapshot_lookup = dict(benchmark_snapshots)
     snapshot_lookup["^VIX"] = benchmark_snapshots.get("VIX", {})
     snapshot_lookup.update(macro_snapshot_lookup)
@@ -3149,6 +3203,10 @@ def build_us_market_daily_payload():
         "market_date_label": _format_market_date(market_dt),
         "headline": headline,
         "cards": cards,
+        "mover_universe_count": len(movers_sorted),
+        "mover_detail_limit": _US_MARKET_TOP_MOVER_DETAIL_COUNT,
+        "gainers_detail": gainers_detail,
+        "losers_detail": losers_detail,
     }
 
 
@@ -3970,6 +4028,107 @@ def render_market_home_dashboard():
         unsafe_allow_html=True,
     )
     _render_us_market_daily_deck(payload)
+
+    mover_universe_count = int(payload.get("mover_universe_count", 0) or 0)
+    mover_detail_limit = int(payload.get("mover_detail_limit", _US_MARKET_TOP_MOVER_DETAIL_COUNT) or _US_MARKET_TOP_MOVER_DETAIL_COUNT)
+    gainers_detail = list(payload.get("gainers_detail") or [])
+    losers_detail = list(payload.get("losers_detail") or [])
+
+    def _mover_change_badge(value):
+        if value is None or pd.isna(value):
+            return _market_badge("N/A", "muted")
+        number = float(value)
+        tone = "positive" if number > 0 else "negative" if number < 0 else "warning"
+        return _market_badge(_format_change_pct(number), tone)
+
+    def _mover_volume_badge(value):
+        if value is None or pd.isna(value):
+            return _market_badge("N/A", "muted")
+        number = float(value)
+        tone = "positive" if number >= 1.2 else "warning" if number >= 0.8 else "negative"
+        return _market_badge(f"{number:.2f}x", tone)
+
+    def _build_mover_detail_table_html(rows, title, tone, empty_copy):
+        safe_title = html.escape(str(title or "").strip() or "상세 목록")
+        if not rows:
+            safe_empty_copy = html.escape(str(empty_copy or "").strip() or "표시할 데이터가 없습니다.")
+            return (
+                f"<div class='sigl-card sigl-table-card sigl-card--{tone}'>"
+                "<div class='sigl-section-head'>"
+                "<div>"
+                f"<p class='sigl-section-title'>{safe_title}</p>"
+                "<p class='sigl-section-copy'>표시 0개</p>"
+                "</div>"
+                f"<div class='sigl-inline'>{_market_badge('N/A', 'muted')}</div>"
+                "</div>"
+                f"<p class='sigl-summary'>{safe_empty_copy}</p>"
+                "</div>"
+            )
+
+        row_html = []
+        for row in rows:
+            row = row or {}
+            symbol = html.escape(str(row.get("symbol") or "").strip() or "-")
+            price_summary = html.escape(str(row.get("price_summary") or "N/A"))
+            reason = html.escape(str(row.get("reason") or "데이터 부족"))
+            row_html.append(
+                "".join(
+                    [
+                        "<tr>",
+                        "<td>"
+                        f"<div class='sigl-inline'>{_market_badge(symbol, 'accent')}</div>"
+                        f"<span class='sigl-summary'>{price_summary}</span>"
+                        "</td>",
+                        f"<td>{_mover_volume_badge(row.get('volume_ratio'))}</td>",
+                        f"<td>{_mover_change_badge(row.get('five_day_change'))}</td>",
+                        f"<td>{_mover_change_badge(row.get('month_change'))}</td>",
+                        f"<td><span class='sigl-summary'>{reason}</span></td>",
+                        "</tr>",
+                    ]
+                )
+            )
+
+        return (
+            f"<div class='sigl-card sigl-table-card sigl-card--{tone}'>"
+            "<div class='sigl-section-head'>"
+            "<div>"
+            f"<p class='sigl-section-title'>{safe_title}</p>"
+            f"<p class='sigl-section-copy'>표시 {len(rows)}개</p>"
+            "</div>"
+            f"<div class='sigl-inline'>{_market_badge(f'상위 {mover_detail_limit}', 'warning')}</div>"
+            "</div>"
+            "<div class='sigl-table-wrap'>"
+            "<table class='sigl-data-table'>"
+            "<thead><tr>"
+            "<th>종목 / 현재가(전일대비)</th><th>거래량</th><th>5일</th><th>1개월</th><th>사유</th>"
+            "</tr></thead>"
+            f"<tbody>{''.join(row_html)}</tbody>"
+            "</table>"
+            "</div>"
+            "</div>"
+        )
+
+    with st.expander("주요 등락주 더보기", expanded=False):
+        summary_html = (
+            "<div class='sigl-section-shell sigl-section-shell--tight'>"
+            "<div class='sigl-section-head'>"
+            "<div>"
+            "<p class='sigl-section-title'>주요 등락주 상세 추적</p>"
+            f"<p class='sigl-section-copy'>추적 유니버스 {mover_universe_count}개 기준 · 상위 {mover_detail_limit}개 표시</p>"
+            "</div>"
+            "<div class='sigl-inline'>"
+            f"{_market_badge('상승 상세', 'positive')}"
+            f"{_market_badge('하락 상세', 'negative')}"
+            f"{_market_badge(f'상위 {mover_detail_limit}', 'warning')}"
+            "</div>"
+            "</div>"
+            "<div class='sigl-grid sigl-grid--2'>"
+            f"{_build_mover_detail_table_html(gainers_detail, '상승 더보기', 'positive', '표시할 상승 종목이 없습니다.')}"
+            f"{_build_mover_detail_table_html(losers_detail, '하락 더보기', 'negative', '표시할 하락 종목이 없습니다.')}"
+            "</div>"
+            "</div>"
+        )
+        st.markdown(summary_html, unsafe_allow_html=True)
 
 def _mini_stat_card(label, value, color, tooltip):
     return (

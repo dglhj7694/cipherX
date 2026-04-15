@@ -160,6 +160,36 @@ class MarketDailyMoverUniverseTests(unittest.TestCase):
         self.assertEqual(len(top_mover_card.get("metrics") or []), expected_count)
         self.assertEqual(len(top_mover_card.get("bullets") or []), expected_count)
 
+        gainers_detail = list(payload.get("gainers_detail") or [])
+        losers_detail = list(payload.get("losers_detail") or [])
+        self.assertEqual(payload.get("mover_detail_limit"), ui._US_MARKET_TOP_MOVER_DETAIL_COUNT)
+        self.assertEqual(payload.get("mover_universe_count"), len(mover_universe))
+        self.assertEqual(len(gainers_detail), ui._US_MARKET_TOP_MOVER_DETAIL_COUNT)
+        self.assertEqual(len(losers_detail), ui._US_MARKET_TOP_MOVER_DETAIL_COUNT)
+
+        required_keys = {
+            "symbol",
+            "price",
+            "prev_close",
+            "change_value",
+            "change_pct",
+            "price_summary",
+            "volume_ratio",
+            "five_day_change",
+            "month_change",
+            "reason",
+        }
+        self.assertTrue(required_keys.issubset(set(gainers_detail[0].keys())))
+        self.assertTrue(required_keys.issubset(set(losers_detail[0].keys())))
+        self.assertIn("$", str(gainers_detail[0].get("price_summary", "")))
+        self.assertIn("(", str(gainers_detail[0].get("price_summary", "")))
+        self.assertIn("%", str(gainers_detail[0].get("price_summary", "")))
+
+        gainers_changes = [float(row["change_pct"]) for row in gainers_detail if row.get("change_pct") is not None]
+        losers_changes = [float(row["change_pct"]) for row in losers_detail if row.get("change_pct") is not None]
+        self.assertEqual(gainers_changes, sorted(gainers_changes, reverse=True))
+        self.assertEqual(losers_changes, sorted(losers_changes))
+
 
 if __name__ == "__main__":
     unittest.main()
