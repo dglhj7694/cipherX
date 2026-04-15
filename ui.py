@@ -4076,7 +4076,7 @@ def render_market_home_dashboard():
                     [
                         "<tr>",
                         "<td>"
-                        f"<div class='sigl-inline'>{_market_badge(symbol, 'accent')}</div>"
+                        f"<div>{_market_badge(symbol, 'accent')}</div>"
                         f"<span class='sigl-summary'>{price_summary}</span>"
                         "</td>",
                         f"<td>{_mover_volume_badge(row.get('volume_ratio'))}</td>",
