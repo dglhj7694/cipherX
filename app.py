@@ -17,6 +17,7 @@ from chart import load_chart_figure, serialize_chart_figure
 from config import GEMINI_API_KEY, GEMINI_API_KEY_FROM_SECRETS, COMBINED_SCAN_REGISTRY, CTX_KOR, JT
 from domain import AnalysisRequest
 from infrastructure.etf import FunctionHoldingsProvider, HoldingsProviderRegistry
+from etf_sources import resolve_etf_universe as resolve_shared_etf_universe
 from utils import _valid_fmt, _sf, resolve_analysis_ticker, _compute_cached
 from ai_agent import build_prompt_text, build_ai_prompt, parse_ai_signal_assisted_response
 from localization import (
@@ -1573,42 +1574,7 @@ def _fetch_yahoo_holdings_payload(symbol):
 
 
 def _resolve_etf_universe(etf_items):
-    resolved_items, combined, alias_notes, errors, date_notes = [], [], [], [], []
-    for item in etf_items or []:
-        requested = str(item.get("requested") or "").strip()
-        resolved = str(item.get("resolved") or "").strip().upper()
-        if not resolved:
-            continue
-        payload = _fetch_etf_holdings_preview(resolved)
-        if payload.get("tickers"):
-            resolved_items.append({
-                "requested": requested or resolved,
-                "resolved": resolved,
-                "note": payload.get("note", ""),
-                "as_of": payload.get("as_of", ""),
-            })
-            combined.extend(payload["tickers"])
-            if requested and requested.upper() != resolved:
-                alias_notes.append(f"{requested} -> {resolved}")
-            date_notes.append(f"{resolved} {payload.get('as_of') or '기준일 표기 없음'}")
-        else:
-            errors.append(f"{requested or resolved}: {payload.get('error') or '불러오기 실패'}")
-
-    combined = list(dict.fromkeys([str(t).strip().upper() for t in combined if str(t).strip()]))
-    summary = ""
-    if resolved_items and combined:
-        summary = ""
-    if date_notes:
-        summary = f"{summary} 데이터 기준일: {' / '.join(date_notes)}".strip()
-    if alias_notes:
-        summary = f"{summary} 매핑: {' / '.join(alias_notes)}".strip()
-
-    return {
-        "items": resolved_items,
-        "tickers": combined,
-        "note": summary,
-        "errors": errors,
-    }
+    return resolve_shared_etf_universe(etf_items)
 
 
 def _apply_etf_selection(selected_keys):

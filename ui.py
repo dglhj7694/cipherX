@@ -30,6 +30,7 @@ from localization import (
     localize_regime_label,
     translate_chart_text,
 )
+from etf_sources import resolve_etf_universe
 from sectors import SECTOR_GROUPS
 from theme import FONT_IMPORT_URL, FONT_STACK
 
@@ -46,7 +47,8 @@ _US_MARKET_DEFAULT_DURATION = 7000
 _US_MARKET_TEXT_HEAVY_DURATION = 10000
 _US_MARKET_DAILY_PAYLOAD_TTL_SEC = 900
 _US_MARKET_HISTORY_PERIOD = "6mo"
-_US_MARKET_MOVER_LIMIT = 96
+_US_MARKET_MOVER_HISTORY_PERIOD = "3mo"
+_US_MARKET_DOWNLOAD_CHUNK_SIZE = 200
 _US_MARKET_TOP_MOVER_CARD_COUNT = 9
 _US_MARKET_NEWS_LOOKBACK_HOURS = 36
 _US_MARKET_NEWS_MAX_ITEMS = 5
@@ -1192,18 +1194,36 @@ def _fallback_market_insight(benchmarks, macro, sector_rows, news_context=None, 
     }
 
 
-def _market_mover_universe(limit=_US_MARKET_MOVER_LIMIT):
-    raw = list(_US_MARKET_MEGA_CAPS)
+def _resolve_market_mover_etf_payload():
+    try:
+        return resolve_etf_universe(
+            [
+                {"requested": "S&P500", "resolved": "SPY"},
+                {"requested": "MSCI(USA)", "resolved": "EUSA"},
+            ]
+        )
+    except Exception as exc:
+        return {
+            "items": [],
+            "tickers": [],
+            "note": "",
+            "errors": [str(exc)],
+        }
+
+
+def _market_mover_universe(etf_payload=None):
+    payload = etf_payload if isinstance(etf_payload, dict) else _resolve_market_mover_etf_payload()
+    raw = []
     for tickers in SECTOR_GROUPS.values():
         if isinstance(tickers, (list, tuple, set)):
             raw.extend(str(ticker or "").strip() for ticker in tickers)
+    raw.extend(str(ticker or "").strip() for ticker in (payload.get("tickers") or []))
+
     filtered = []
     for ticker in _ordered_unique(_normalize_market_symbol(ticker) for ticker in raw):
         if not re.fullmatch(r"[A-Z0-9\-=]+", ticker):
             continue
         filtered.append(ticker)
-        if len(filtered) >= limit:
-            break
     return tuple(filtered)
 
 
@@ -2690,19 +2710,43 @@ def _download_market_history(tickers, period=_US_MARKET_HISTORY_PERIOD):
     symbols = tuple(_ordered_unique(symbol for symbol in expanded if symbol))
     if not symbols:
         return pd.DataFrame()
-    try:
-        history = yf.download(
-            tickers=list(symbols),
-            period=period,
-            interval="1d",
-            group_by="ticker",
-            auto_adjust=False,
-            progress=False,
-            threads=True,
-        )
-    except Exception:
+
+    chunk_size = max(1, int(_US_MARKET_DOWNLOAD_CHUNK_SIZE or 1))
+    chunks = [symbols[idx:idx + chunk_size] for idx in range(0, len(symbols), chunk_size)]
+    downloaded_frames = []
+    for chunk in chunks:
+        try:
+            history = yf.download(
+                tickers=list(chunk),
+                period=period,
+                interval="1d",
+                group_by="ticker",
+                auto_adjust=False,
+                progress=False,
+                threads=True,
+            )
+        except Exception:
+            continue
+
+        if not isinstance(history, pd.DataFrame) or history.empty:
+            continue
+
+        chunk_frame = history.sort_index()
+        if not isinstance(chunk_frame.columns, pd.MultiIndex) and len(chunk) == 1:
+            symbol = str(chunk[0]).strip().upper()
+            if symbol:
+                chunk_frame.columns = pd.MultiIndex.from_product([[symbol], list(chunk_frame.columns)])
+        downloaded_frames.append(chunk_frame)
+
+    if not downloaded_frames:
         return pd.DataFrame()
-    return history.sort_index() if isinstance(history, pd.DataFrame) else pd.DataFrame()
+
+    merged = pd.concat(downloaded_frames, axis=1)
+    if isinstance(merged.columns, pd.MultiIndex):
+        merged = merged.loc[:, ~merged.columns.duplicated()]
+    else:
+        merged = merged.loc[:, ~merged.columns.duplicated()]
+    return merged.sort_index()
 
 
 @st.cache_data(ttl=21600, show_spinner=False)
@@ -2756,8 +2800,13 @@ def build_us_market_daily_payload():
     benchmark_symbols = tuple(symbol for symbol, _ in _US_MARKET_BENCHMARKS)
     macro_symbols = tuple(symbol for symbol, _ in _US_MARKET_MACRO)
     sector_symbols = tuple(symbol for symbol, _ in _US_SECTOR_ETFS)
+    mover_etf_payload = _resolve_market_mover_etf_payload()
+    mover_universe = _market_mover_universe(mover_etf_payload)
+    if mover_etf_payload.get("errors"):
+        print(f"[MARKET-MOVER-ETF] {' | '.join(str(item) for item in mover_etf_payload.get('errors', []))}")
+
     benchmark_history = _download_market_history(benchmark_symbols + macro_symbols + sector_symbols)
-    mover_history = _download_market_history(_market_mover_universe())
+    mover_history = _download_market_history(mover_universe, period=_US_MARKET_MOVER_HISTORY_PERIOD)
 
     benchmark_snapshots = {}
     for symbol, _ in _US_MARKET_BENCHMARKS:
@@ -2786,7 +2835,7 @@ def build_us_market_daily_payload():
     sector_snapshot_lookup = {row["symbol"]: row["snapshot"] for row in sector_rows}
 
     movers = []
-    for symbol in _market_mover_universe():
+    for symbol in mover_universe:
         snapshot = _build_snapshot(_extract_symbol_frame(mover_history, symbol))
         if not snapshot or snapshot.get("change_pct") is None:
             continue
@@ -2998,7 +3047,7 @@ def build_us_market_daily_payload():
                 "negative",
             )
         )
-    mover_subtitle = "메가캡과 핵심 유니버스에서 수급이 몰린 종목입니다."
+    mover_subtitle = "섹터 전체 + S&P500 + MSCI(USA) 합집합 유니버스에서 수급이 몰린 종목입니다."
     if avg_gainer_change is not None and avg_loser_change is not None:
         mover_subtitle = (
             f"상승 상위 평균 {_format_change_pct(avg_gainer_change)} / 하락 상위 평균 {_format_change_pct(avg_loser_change)}. "
