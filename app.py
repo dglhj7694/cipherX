@@ -84,6 +84,7 @@ _ETF_UNIVERSE_PRESETS = [
     {"key": "ARKF", "label": "ARKF", "symbol": "ARKF"},
     {"key": "NASDAQ100", "label": "나스닥100", "symbol": "QQQ"},
     {"key": "SP500", "label": "S&P500", "symbol": "SPY"},
+    {"key": "MSCIUSA", "label": "MSCI(USA)", "symbol": "EUSA"},
     {"key": "RUSSELL1000", "label": "러셀1000", "symbol": "IWB"},
     {"key": "RUSSELL2000", "label": "러셀2000", "symbol": "IWM"},
     {"key": "IGV", "label": "IGV", "symbol": "IGV"},
@@ -1223,6 +1224,7 @@ def _fetch_ishares_holdings(symbol):
 
     page_map = {
         "IGV": "https://www.ishares.com/us/products/239771/ishares-north-american-techsoftware-etf",
+        "EUSA": "https://www.ishares.com/us/products/239693/ishares-msci-usa-etf",
         "IWB": "https://www.ishares.com/us/products/239707/ishares-russell-1000-etf",
         "IWM": "https://www.ishares.com/us/products/239710/ishares-russell-2000-etf",
     }
@@ -1510,7 +1512,7 @@ def _fetch_etf_holdings_preview(symbol):
                 fetcher=lambda ticker: _safe_fetch_etf_payload(_fetch_first_trust_holdings, ticker, "[ETF-OFFICIAL]"),
             ),
             FunctionHoldingsProvider(
-                supported_symbols={"IGV", "IWB", "IWM"},
+                supported_symbols={"IGV", "EUSA", "IWB", "IWM"},
                 fetcher=lambda ticker: _safe_fetch_etf_payload(_fetch_ishares_holdings, ticker, "[ETF-OFFICIAL]"),
             ),
             FunctionHoldingsProvider(
