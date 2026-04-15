@@ -34,6 +34,14 @@ from scanner_csv import (
     scanner_csv_help_lines,
     scanner_rows_to_csv_bytes,
 )
+from scanner_filters import (
+    SCAN_FILTER_PRESETS as SCAN_FILTER_PRESET_ORDER,
+    WATCH_BUY_PLUS as WATCH_BUY_PLUS_SET,
+    apply_scan_filter as apply_scanner_filter,
+    compute_scanner_profile_flags,
+    has_long_pullback_strategy,
+    has_pullback_combo,
+)
 from services.ai_signal_service import (
     build_ai_client,
     generate_ai_signal_assisted,
@@ -76,6 +84,8 @@ _ETF_UNIVERSE_PRESETS = [
     {"key": "ARKF", "label": "ARKF", "symbol": "ARKF"},
     {"key": "NASDAQ100", "label": "나스닥100", "symbol": "QQQ"},
     {"key": "SP500", "label": "S&P500", "symbol": "SPY"},
+    {"key": "RUSSELL1000", "label": "러셀1000", "symbol": "IWB"},
+    {"key": "RUSSELL2000", "label": "러셀2000", "symbol": "IWM"},
     {"key": "IGV", "label": "IGV", "symbol": "IGV"},
     {"key": "SKYY", "label": "SKYY", "symbol": "SKYY"},
     {"key": "WCBR", "label": "WCBR", "symbol": "WCBR"},
@@ -87,8 +97,8 @@ MODE_SCANNER = "스캐너"
 _APP_MODE_OPTIONS = [MODE_MARKET_DAILY, MODE_ANALYSIS, MODE_SCANNER]
 _QUICK_ANALYSIS_TICKERS = ["NVDA", "TSLA", "AAPL", "GOOGL", "AMZN", "META", "MSFT", "PLTR", "HIMS", "SNDK", "LITE", "COHR", "IREN", "ORCL", "RKLB", "ASTS"]
 CHAT_INPUT_PLACEHOLDER = "티커 입력: AAPL / 005930"
-SCAN_FILTER_PRESETS = ["전체", "최근 추세전환", "최근 강세 발굴", "거래량 동반 강세", "오늘 UTBot 전환", "오늘 HULL 전환"]
-WATCH_BUY_PLUS = {"WATCH_BUY", "BUY", "STRONG_BUY"}
+SCAN_FILTER_PRESETS = list(SCAN_FILTER_PRESET_ORDER)
+WATCH_BUY_PLUS = set(WATCH_BUY_PLUS_SET)
 
 SCANNER_TRANSITION_CFG = {
     'UTBot_Buy': {'label': 'UTBot 전환▲', 'icon': '🟢', 'dir': 'buy'},
@@ -734,34 +744,7 @@ def _has_today_transition(row, target_keys, date_fields):
 
 
 def _apply_scan_filter(results, preset):
-    rows = list(results or [])
-    if preset == "최근 추세전환":
-        return [row for row in rows if bool(row.get("bull_turn_recent", False))]
-    if preset == "최근 강세 발굴":
-        return [row for row in rows if _is_bull_discovery_candidate(row)]
-    if preset == "거래량 동반 강세":
-        return [row for row in rows if bool(row.get("volume_bullish", False))]
-    if preset == "오늘 UTBot 전환":
-        return [
-            row
-            for row in rows
-            if _has_today_transition(
-                row,
-                target_keys={"UTBot_Buy", "UTBot_Sell"},
-                date_fields=("utbot_buy_last_date", "utbot_sell_last_date"),
-            )
-        ]
-    if preset == "오늘 HULL 전환":
-        return [
-            row
-            for row in rows
-            if _has_today_transition(
-                row,
-                target_keys={"Hull_Turn_Bull", "Hull_Turn_Bear"},
-                date_fields=("hull_turn_bull_last_date", "hull_turn_bear_last_date"),
-            )
-        ]
-    return rows
+    return apply_scanner_filter(results, preset)
 
 
 def _build_scan_snapshot(*, universe_payload, filter_preset, results, filtered_results, perf_stats, skip_reasons):
@@ -964,11 +947,19 @@ def _build_scanner_row_cached(ticker, cache_bucket):
 
         ma20 = _sf(lt.get("MA20", 0))
         ma50 = _sf(lt.get("MA50", 0))
+        ma20_prev = _sf(dc_.iloc[-2].get("MA20", ma20)) if len(dc_) >= 2 else ma20
+        ma50_prev = _sf(dc_.iloc[-2].get("MA50", ma50)) if len(dc_) >= 2 else ma50
         uptrend_ready = bool(current_close > ma20 > ma50) if ma20 and ma50 else False
         pullback_ready = _recent_frame_flag(dc_, "EMA_Pullback_Buy", 5)
         uptrend_or_pullback = bool(uptrend_ready or pullback_ready)
+        recent_utbot_sell = _recent_frame_flag(dc_, "UTBot_Sell", 5)
+        recent_hull_bear = _recent_frame_flag(dc_, "Hull_Turn_Bear", 5)
+        strategy_conflict_level = str(strategy_summary.get("conflict_level", "LOW"))
+        strategy_bias = str(strategy_summary.get("long_short_bias", "BALANCED"))
         strategy_active_count = int(strategy_summary.get('active_count', 0) or 0)
         buy_combo_present = any(item['dir'] == 'buy' for item in acs)
+        pullback_combo_present = has_pullback_combo(detected_payload.get("combo_items", []))
+        long_pullback_strategy_visible = has_long_pullback_strategy(strategy_results)
         watch_buy_plus = raw_jg in WATCH_BUY_PLUS
         bull_strength_recent = bool(
             watch_buy_plus
@@ -976,6 +967,32 @@ def _build_scanner_row_cached(ticker, cache_bucket):
             and (strategy_active_count > 0 or buy_combo_present)
             and volume_bullish
         )
+        profile_flags = compute_scanner_profile_flags(
+            current_close=current_close,
+            ma20=ma20,
+            ma50=ma50,
+            ma20_prev=ma20_prev,
+            ma50_prev=ma50_prev,
+            watch_buy_plus=watch_buy_plus,
+            strategy_bias=strategy_bias,
+            recent_utbot_sell=recent_utbot_sell,
+            recent_hull_bear=recent_hull_bear,
+            adx=_sf(lt.get("ADX", 0)),
+            es=es,
+            cf=cf,
+            volume_bullish=volume_bullish,
+            strategy_conflict_level=strategy_conflict_level,
+            pullback_ready=pullback_ready,
+            pullback_combo_present=pullback_combo_present,
+            long_pullback_strategy_visible=long_pullback_strategy_visible,
+            multi_sell=msc,
+            thin_trade_risk=thin_trade_risk,
+            flip_guard_triggered=flip_guard_triggered,
+        )
+        uptrend_persistent = bool(profile_flags.get("uptrend_persistent", False))
+        strong_trend_persistent = bool(profile_flags.get("strong_trend_persistent", False))
+        pullback_reentry = bool(profile_flags.get("pullback_reentry", False))
+        low_conflict_bullish = bool(profile_flags.get("low_conflict_bullish", False))
 
         row = {
             'ticker': ticker,
@@ -997,8 +1014,8 @@ def _build_scanner_row_cached(ticker, cache_bucket):
             'es': es,
             'strategies': strategy_results,
             'top_strategy': top_strategy,
-            'strategy_conflict_level': str(strategy_summary.get('conflict_level', 'LOW')),
-            'strategy_bias': str(strategy_summary.get('long_short_bias', 'BALANCED')),
+            'strategy_conflict_level': strategy_conflict_level,
+            'strategy_bias': strategy_bias,
             'strategy_active_count': strategy_active_count,
             'ctx': localize_context_label(int(_sf(lt.get('Market_Context', 0)))),
             'ba': ba,
@@ -1023,6 +1040,10 @@ def _build_scanner_row_cached(ticker, cache_bucket):
             'uptrend_or_pullback': uptrend_or_pullback,
             'pullback_ready': pullback_ready,
             'bull_strength_recent': bull_strength_recent,
+            'uptrend_persistent': uptrend_persistent,
+            'strong_trend_persistent': strong_trend_persistent,
+            'pullback_reentry': pullback_reentry,
+            'low_conflict_bullish': low_conflict_bullish,
             'utbot_buy_recent': bool(detected_payload.get('utbot_buy_recent', False)),
             'utbot_buy_last_date': str(detected_payload.get('utbot_buy_last_date', '없음')),
             'utbot_sell_recent': bool(detected_payload.get('utbot_sell_recent', False)),
@@ -1202,6 +1223,8 @@ def _fetch_ishares_holdings(symbol):
 
     page_map = {
         "IGV": "https://www.ishares.com/us/products/239771/ishares-north-american-techsoftware-etf",
+        "IWB": "https://www.ishares.com/us/products/239707/ishares-russell-1000-etf",
+        "IWM": "https://www.ishares.com/us/products/239710/ishares-russell-2000-etf",
     }
     page_url = page_map.get(symbol)
     if not page_url:
@@ -1221,7 +1244,15 @@ def _fetch_ishares_holdings(symbol):
     csv_text = raw_csv.decode("utf-8-sig", errors="ignore")
     as_of_match = re.search(r'Fund Holdings as of,\s*"?([^"\n]+)"?', csv_text, flags=re.I)
     as_of = as_of_match.group(1).strip() if as_of_match else ""
-    reader = csv.DictReader(io.StringIO(csv_text))
+    lines = [line for line in csv_text.splitlines() if line.strip()]
+    data_start = None
+    for idx, line in enumerate(lines):
+        if line.startswith("Ticker,"):
+            data_start = idx
+            break
+    if data_start is None:
+        return {"symbol": symbol, "tickers": [], "note": "", "error": "iShares CSV 헤더를 찾지 못했습니다.", "as_of": as_of}
+    reader = csv.DictReader(io.StringIO("\n".join(lines[data_start:])))
 
     tickers = []
     for row in reader:
@@ -1479,7 +1510,7 @@ def _fetch_etf_holdings_preview(symbol):
                 fetcher=lambda ticker: _safe_fetch_etf_payload(_fetch_first_trust_holdings, ticker, "[ETF-OFFICIAL]"),
             ),
             FunctionHoldingsProvider(
-                supported_symbols={"IGV"},
+                supported_symbols={"IGV", "IWB", "IWM"},
                 fetcher=lambda ticker: _safe_fetch_etf_payload(_fetch_ishares_holdings, ticker, "[ETF-OFFICIAL]"),
             ),
             FunctionHoldingsProvider(
@@ -1690,6 +1721,10 @@ def _render_scanner_result_card(rank, row):
             _sigl_badge("최근 추세전환", "positive") if bool(row.get("bull_turn_recent", False)) else "",
             _sigl_badge("우상향/눌림", "accent") if bool(row.get("uptrend_or_pullback", False)) else "",
             _sigl_badge("강세 발굴 조건", "positive") if bool(row.get("bull_strength_recent", False)) else "",
+            _sigl_badge("우상향 지속", "positive") if bool(row.get("uptrend_persistent", False)) else "",
+            _sigl_badge("강한 추세 지속", "positive") if bool(row.get("strong_trend_persistent", False)) else "",
+            _sigl_badge("눌림목 재진입", "accent") if bool(row.get("pullback_reentry", False)) else "",
+            _sigl_badge("저충돌 강세", "accent") if bool(row.get("low_conflict_bullish", False)) else "",
         ]
     ) or _sigl_badge("추세 특이사항 없음", "muted")
     top_strategy_text = ""
@@ -2781,6 +2816,8 @@ if current_mode == MODE_SCANNER:
             preview_keys = [
                 "scan_score",
                 "bull_turn_recent",
+                "uptrend_persistent",
+                "strong_trend_persistent",
                 "volume_bullish",
                 "detected_transition_summary",
                 "detected_core_summary",

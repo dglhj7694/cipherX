@@ -138,6 +138,10 @@ class ScannerCsvExportTests(unittest.TestCase):
             "uptrend_or_pullback": True,
             "pullback_ready": False,
             "bull_strength_recent": True,
+            "uptrend_persistent": True,
+            "strong_trend_persistent": True,
+            "pullback_reentry": False,
+            "low_conflict_bullish": True,
             "utbot_buy_recent": True,
             "utbot_buy_last_date": "2026-04-17",
             "utbot_sell_recent": False,
@@ -164,11 +168,15 @@ class ScannerCsvExportTests(unittest.TestCase):
         self.assertIn("티커(ticker)", header)
         self.assertIn("탐지전환요약(detected_transition_summary)", header)
         self.assertIn("UTBot매수전환(utbot_buy_recent)", header)
+        self.assertIn("우상향지속(uptrend_persistent)", header)
+        self.assertIn("강한추세지속(strong_trend_persistent)", header)
 
         data = parsed[1]
         h_index = {name: idx for idx, name in enumerate(header)}
         self.assertEqual(data[h_index["UTBot매수전환(utbot_buy_recent)"]], "Y")
         self.assertEqual(data[h_index["유동성주의(thin_trade_risk)"]], "N")
+        self.assertEqual(data[h_index["강한추세지속(strong_trend_persistent)"]], "Y")
+        self.assertEqual(data[h_index["눌림목재진입(pullback_reentry)"]], "N")
 
     def test_dictionary_csv_is_synced_with_field_specs(self):
         specs = scanner_csv_field_specs()
