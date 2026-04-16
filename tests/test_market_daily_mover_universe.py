@@ -156,6 +156,7 @@ class MarketDailyMoverUniverseTests(unittest.TestCase):
 
         cards = list(payload.get("cards") or [])
         top_mover_card = next(card for card in cards if card.get("id") == "top_movers")
+        insight_card = next(card for card in cards if card.get("id") == "daily_insight")
         expected_count = ui._US_MARKET_TOP_MOVER_CARD_COUNT * 2
         self.assertEqual(len(top_mover_card.get("metrics") or []), expected_count)
         self.assertEqual(len(top_mover_card.get("bullets") or []), expected_count)
@@ -189,6 +190,46 @@ class MarketDailyMoverUniverseTests(unittest.TestCase):
         losers_changes = [float(row["change_pct"]) for row in losers_detail if row.get("change_pct") is not None]
         self.assertEqual(gainers_changes, sorted(gainers_changes, reverse=True))
         self.assertEqual(losers_changes, sorted(losers_changes))
+
+        analysis_actions = list(payload.get("analysis_actions") or [])
+        self.assertEqual(len(analysis_actions), ui._US_MARKET_ANALYSIS_ACTION_COUNT)
+        expected_analysis_symbols = [f"M{i:02d}" for i in range(ui._US_MARKET_ANALYSIS_ACTION_COUNT)]
+        self.assertEqual([row.get("symbol") for row in analysis_actions], expected_analysis_symbols)
+        self.assertEqual([row.get("rank") for row in analysis_actions], list(range(1, len(analysis_actions) + 1)))
+        self.assertTrue(all(str(row.get("source")) == "gainers_today" for row in analysis_actions))
+        self.assertTrue(all(float(row.get("change_pct") or 0) > 0 for row in analysis_actions))
+
+        self.assertIn("오늘 행동:", str(insight_card.get("subtitle") or ""))
+        insight_texts = [str((row or {}).get("text") or "") for row in list(insight_card.get("bullets") or [])]
+        self.assertTrue(any(text.startswith("오늘 행동:") for text in insight_texts))
+        self.assertTrue(any(text.startswith("개장 체크:") for text in insight_texts))
+
+    def test_analysis_actions_keeps_available_rows_when_under_limit(self):
+        movers_sorted = [
+            {"symbol": "AAA", "change_pct": 5.0},
+            {"symbol": "BBB", "change_pct": 4.0},
+            {"symbol": "CCC", "change_pct": 3.0},
+        ]
+        actions = ui._build_market_analysis_actions(movers_sorted, limit=12)
+
+        self.assertEqual(len(actions), 3)
+        self.assertEqual([row.get("symbol") for row in actions], ["AAA", "BBB", "CCC"])
+        self.assertEqual([row.get("rank") for row in actions], [1, 2, 3])
+
+    def test_analysis_actions_dedupes_and_filters_invalid_symbols(self):
+        movers_sorted = [
+            {"symbol": "AAA", "change_pct": 7.0},
+            {"symbol": "AAA", "change_pct": 6.5},
+            {"symbol": "BAD$", "change_pct": 5.0},
+            {"symbol": "BBB", "change_pct": 4.0},
+            {"symbol": "CCC", "change_pct": -2.0},
+            {"symbol": "BRK.B", "change_pct": 1.5},
+        ]
+        actions = ui._build_market_analysis_actions(movers_sorted, limit=12)
+
+        self.assertEqual([row.get("symbol") for row in actions], ["AAA", "BBB", "BRK-B"])
+        self.assertEqual([row.get("rank") for row in actions], [1, 2, 3])
+        self.assertTrue(all(float(row.get("change_pct") or 0) > 0 for row in actions))
 
 
 if __name__ == "__main__":

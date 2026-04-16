@@ -51,6 +51,7 @@ _US_MARKET_MOVER_HISTORY_PERIOD = "3mo"
 _US_MARKET_DOWNLOAD_CHUNK_SIZE = 200
 _US_MARKET_TOP_MOVER_CARD_COUNT = 9
 _US_MARKET_TOP_MOVER_DETAIL_COUNT = 30
+_US_MARKET_ANALYSIS_ACTION_COUNT = 12
 _US_MARKET_NEWS_LOOKBACK_HOURS = 36
 _US_MARKET_NEWS_MAX_ITEMS = 5
 _US_MARKET_NEWS_SECTION_MAX_ITEMS = 3
@@ -830,6 +831,27 @@ def _join_market_phrases(parts):
     return ", ".join(values[:-1]) + f"와 {values[-1]}"
 
 
+def _normalize_market_action_text(text):
+    sample = str(text or "").strip()
+    if not sample:
+        return ""
+    sample = re.sub(r"\s+", " ", sample)
+    return sample.rstrip(". ")
+
+
+def _build_actionable_insight_subtitle(short_view, watchlist):
+    base = _normalize_market_action_text(short_view)
+    checks = _coerce_market_text_list(watchlist, max_items=1)
+    if checks:
+        follow = _normalize_market_action_text(checks[0])
+        if base:
+            return f"{base} · 오늘 행동: {follow}"
+        return f"오늘 행동: {follow}"
+    if base:
+        return f"{base} · 오늘 행동: 개장 30분 내 리더십과 금리·달러 반응을 먼저 확인"
+    return "오늘 행동: 개장 30분 내 리더십과 금리·달러 반응을 먼저 확인"
+
+
 def _build_market_insight_news_context(news_bundle):
     ranked_items = list((news_bundle or {}).get("ranked_items") or (news_bundle or {}).get("items") or [])
     high_signal_items = [
@@ -1349,6 +1371,44 @@ def _build_mover_detail_row(row):
         "month_change": snapshot.get("month_change"),
         "reason": _mover_reason(snapshot),
     }
+
+
+def _build_market_analysis_actions(movers_sorted, limit=_US_MARKET_ANALYSIS_ACTION_COUNT):
+    max_items = max(0, int(limit or 0))
+    if max_items <= 0:
+        return []
+
+    actions = []
+    seen = set()
+    for row in list(movers_sorted or []):
+        change_pct = row.get("change_pct")
+        if change_pct is None or pd.isna(change_pct):
+            continue
+        try:
+            change_pct = float(change_pct)
+        except Exception:
+            continue
+        if change_pct <= 0:
+            continue
+
+        symbol = _normalize_market_symbol(row.get("symbol"))
+        if not symbol or symbol in seen:
+            continue
+        if not re.fullmatch(r"[A-Z0-9\-=]+", symbol):
+            continue
+
+        seen.add(symbol)
+        actions.append(
+            {
+                "symbol": symbol,
+                "change_pct": change_pct,
+                "rank": len(actions) + 1,
+                "source": "gainers_today",
+            }
+        )
+        if len(actions) >= max_items:
+            break
+    return actions
 
 
 def _extract_json_object(text):
@@ -2816,9 +2876,10 @@ def _generate_us_market_ai_copy(market_date_key, summary_json):
             "- drivers: three to four short bullets that explain what moved the market and why it mattered.\n"
             "- insight_short_view: one sharp line that explains what the market cared about most today.\n"
             "- insight_deep_dive: two to three short lines that explain the narrative, divergence, or hidden context behind the move.\n"
-            "- insight_strategy: two to three short lines that explain how to frame the next session.\n"
-            "- watchlist: three to four specific checkpoints for the next session.\n"
+            "- insight_strategy: two to three action-oriented lines for next-session execution (what to do first).\n"
+            "- watchlist: three to four actionable checkpoints, written as concrete checks/triggers.\n"
             "- Prefer explanation over slogans; mention cause and implication together.\n"
+            "- Use decisive, behavior-oriented Korean phrasing instead of abstract commentary when possible.\n"
             "- If the JSON includes news_context or divergence notes, use them to explain what mattered beneath the index move.\n"
             "- Do not invent historical statistics that are not present in the data.\n"
             "- Do not mention unverified news or events.\n"
@@ -2892,6 +2953,7 @@ def build_us_market_daily_payload():
             continue
         movers.append({"symbol": symbol, "snapshot": snapshot, "change_pct": snapshot.get("change_pct")})
     movers_sorted = sorted(movers, key=lambda row: row["change_pct"], reverse=True)
+    analysis_actions = _build_market_analysis_actions(movers_sorted, limit=_US_MARKET_ANALYSIS_ACTION_COUNT)
     gainers = movers_sorted[:_US_MARKET_TOP_MOVER_CARD_COUNT]
     losers = list(reversed(movers_sorted[-_US_MARKET_TOP_MOVER_CARD_COUNT:])) if movers_sorted else []
     gainers_detail = [_build_mover_detail_row(row) for row in movers_sorted[:_US_MARKET_TOP_MOVER_DETAIL_COUNT]]
@@ -2974,10 +3036,11 @@ def build_us_market_daily_payload():
 
     headline = ai_copy.get("headline") or _fallback_market_headline(benchmark_snapshots, macro_snapshots, sector_sorted)
     drivers = ai_copy.get("drivers") or driver_candidates or ["시장 방향성은 유지됐지만 거시 변수의 압박도 여전히 크게 작용했습니다."]
-    insight_short_view = ai_copy.get("insight_short_view") or ai_copy.get("insight") or fallback_insight["short_view"]
+    raw_insight_short_view = ai_copy.get("insight_short_view") or ai_copy.get("insight") or fallback_insight["short_view"]
     insight_deep_dive = ai_copy.get("insight_deep_dive") or fallback_insight["deep_dive"]
     insight_strategy = ai_copy.get("insight_strategy") or fallback_insight["strategy"]
     watchlist = ai_copy.get("watchlist") or fallback_insight["watchlist"]
+    insight_short_view = _build_actionable_insight_subtitle(raw_insight_short_view, watchlist)
 
     sector_breadth = sum(1 for row in sector_sorted if (row.get("change_pct") or 0) > 0)
     sector_total = len(sector_sorted) or len(_US_SECTOR_ETFS)
@@ -3109,21 +3172,21 @@ def build_us_market_daily_payload():
         )
     insight_bullets = [
         _build_market_bullet(
-            f"맥락: {text}",
+            f"판단 근거: {text}",
             _infer_market_text_tone(text),
         )
         for text in _coerce_market_text_list(insight_deep_dive, max_items=3)
     ]
     insight_bullets += [
         _build_market_bullet(
-            f"대응: {text}",
+            f"오늘 행동: {_normalize_market_action_text(text)}",
             _infer_market_text_tone(text),
         )
         for text in _coerce_market_text_list(insight_strategy, max_items=3)
     ]
     insight_bullets += [
         _build_market_bullet(
-            f"체크: {text}",
+            f"개장 체크: {_normalize_market_action_text(text)}",
             _infer_market_text_tone(text),
         )
         for text in _coerce_market_text_list(watchlist, max_items=3)
@@ -3131,7 +3194,7 @@ def build_us_market_daily_payload():
     if not insight_bullets:
         insight_bullets = [
             _build_market_bullet(
-                f"맥락: {market_structure['label']} · {market_structure['note']} / 리스크 상태 {market_regime['state_display']}",
+                f"판단 근거: {market_structure['label']} · {market_structure['note']} / 리스크 상태 {market_regime['state_display']}",
                 _resolve_market_tone(market_structure["tone"], market_regime["tone"]),
             )
         ]
@@ -3194,7 +3257,7 @@ def build_us_market_daily_payload():
             "metrics": insight_metrics,
             "bullets": insight_bullets,
             "tone": _tone_from_change(benchmark_snapshots.get("QQQ", {}).get("change_pct")),
-            "chart_hint": "리스크 상태 / 공포·탐욕 / 상대강도",
+            "chart_hint": "오늘 행동 / 개장 체크 / 리스크 상태",
             "duration_ms": _US_MARKET_TEXT_HEAVY_DURATION,
         },
     ]
@@ -3207,6 +3270,7 @@ def build_us_market_daily_payload():
         "mover_detail_limit": _US_MARKET_TOP_MOVER_DETAIL_COUNT,
         "gainers_detail": gainers_detail,
         "losers_detail": losers_detail,
+        "analysis_actions": analysis_actions,
     }
 
 
@@ -4028,6 +4092,48 @@ def render_market_home_dashboard():
         unsafe_allow_html=True,
     )
     _render_us_market_daily_deck(payload)
+    st.markdown(
+        """
+        <style>
+        .sigl-mover-detail-table td.sigl-mover-cell-symbol,
+        .sigl-mover-detail-table th.sigl-mover-cell-symbol{
+          min-width:156px;
+        }
+        .sigl-mover-symbol-line{
+          display:flex;
+          align-items:center;
+          gap:6px;
+          flex-wrap:wrap;
+          min-width:0;
+        }
+        .sigl-mover-symbol-text{
+          display:none;
+          font-weight:800;
+          color:var(--sigl-text-strong);
+        }
+        @media (max-width: 640px){
+          .sigl-mover-detail-table td.sigl-mover-cell-symbol,
+          .sigl-mover-detail-table th.sigl-mover-cell-symbol{
+            position:sticky;
+            left:0;
+            z-index:2;
+            background:rgba(15,23,42,.98)!important;
+            box-shadow:8px 0 12px rgba(2,6,23,.22);
+          }
+          .sigl-mover-detail-table td.sigl-mover-cell-symbol .sigl-badge{
+            display:inline-flex!important;
+            padding:4px 8px!important;
+            font-size:.68rem!important;
+            line-height:1!important;
+          }
+          .sigl-mover-symbol-text{
+            display:inline-block;
+          }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
     mover_universe_count = int(payload.get("mover_universe_count", 0) or 0)
     mover_detail_limit = int(payload.get("mover_detail_limit", _US_MARKET_TOP_MOVER_DETAIL_COUNT) or _US_MARKET_TOP_MOVER_DETAIL_COUNT)
@@ -4075,8 +4181,11 @@ def render_market_home_dashboard():
                 "".join(
                     [
                         "<tr>",
-                        "<td>"
-                        f"<div>{_market_badge(symbol, 'accent')}</div>"
+                        "<td class='sigl-mover-cell-symbol'>"
+                        "<div class='sigl-mover-symbol-line'>"
+                        f"<span class='sigl-mover-symbol-text'>{symbol}</span>"
+                        f"{_market_badge(symbol, 'accent')}"
+                        "</div>"
                         f"<span class='sigl-summary'>{price_summary}</span>"
                         "</td>",
                         f"<td>{_mover_volume_badge(row.get('volume_ratio'))}</td>",
@@ -4098,9 +4207,9 @@ def render_market_home_dashboard():
             f"<div class='sigl-inline'>{_market_badge(f'상위 {mover_detail_limit}', 'warning')}</div>"
             "</div>"
             "<div class='sigl-table-wrap'>"
-            "<table class='sigl-data-table'>"
+            "<table class='sigl-data-table sigl-mover-detail-table'>"
             "<thead><tr>"
-            "<th>종목 / 현재가(전일대비)</th><th>거래량</th><th>5일</th><th>1개월</th><th>사유</th>"
+            "<th class='sigl-mover-cell-symbol'>종목 / 현재가(전일대비)</th><th>거래량</th><th>5일</th><th>1개월</th><th>사유</th>"
             "</tr></thead>"
             f"<tbody>{''.join(row_html)}</tbody>"
             "</table>"
@@ -4129,6 +4238,7 @@ def render_market_home_dashboard():
             "</div>"
         )
         st.markdown(summary_html, unsafe_allow_html=True)
+    return payload
 
 def _mini_stat_card(label, value, color, tooltip):
     return (

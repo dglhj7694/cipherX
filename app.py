@@ -343,6 +343,71 @@ def _render_quick_analysis_grid(key_prefix="quick"):
                 if st.button(ticker, use_container_width=True, key=f"{key_prefix}_{ticker}"):
                     _queue_analysis_target(ticker)
 
+
+def _render_market_daily_action_grid(payload, key_prefix="market_daily_action"):
+    action_rows = list((payload or {}).get("analysis_actions") or [])
+    symbols = []
+    seen = set()
+    for row in action_rows:
+        row = row or {}
+        symbol = str(row.get("symbol") or "").strip().upper()
+        if not symbol or symbol in seen:
+            continue
+        seen.add(symbol)
+        symbols.append(symbol)
+
+    if not symbols:
+        st.caption("오늘 강한 종목이 아직 집계되지 않았습니다.")
+        return
+
+    for start in range(0, len(symbols), 2):
+        cols = st.columns(2)
+        for idx, symbol in enumerate(symbols[start:start + 2]):
+            with cols[idx]:
+                button_key = f"{key_prefix}_{start + idx}_{symbol}"
+                if st.button(symbol, use_container_width=True, key=button_key):
+                    _queue_analysis_target(symbol)
+
+
+def _render_scan_filter_picker(options, state_key="scan_filter_preset", label="결과 필터", columns_per_row=4):
+    items = [str(option) for option in options if str(option).strip()]
+    if not items:
+        return ""
+
+    fallback = items[0]
+    current = str(st.session_state.get(state_key, fallback))
+    if current not in items:
+        current = fallback
+        st.session_state[state_key] = current
+
+    with st.container():
+        st.markdown("<div class='sigl-sector-picker-anchor'></div>", unsafe_allow_html=True)
+        st.markdown(
+            f"<div class='sigl-sidebar-control-label'>{html.escape(str(label))}</div>",
+            unsafe_allow_html=True,
+        )
+        for start in range(0, len(items), columns_per_row):
+            row_items = items[start:start + columns_per_row]
+            cols = st.columns(columns_per_row)
+            for idx, col in enumerate(cols):
+                with col:
+                    if idx >= len(row_items):
+                        st.markdown("<div class='sigl-sidebar-control-spacer'></div>", unsafe_allow_html=True)
+                        continue
+                    option = row_items[idx]
+                    if st.button(
+                        option,
+                        key=f"{state_key}_pick_{start + idx}",
+                        use_container_width=True,
+                        type="primary" if option == current else "secondary",
+                    ):
+                        if option != current:
+                            st.session_state[state_key] = option
+                            st.rerun()
+
+    return str(st.session_state.get(state_key, current))
+
+
 def _build_scan_nav_labels(results):
     return [f"{i + 1}. {r['ticker']} · {r.get('jg', 'N/A')} · ES {r.get('es', 0):+.0f}" for i, r in enumerate(results)]
 
@@ -2688,11 +2753,11 @@ if current_mode == MODE_SCANNER:
 
     # ── 결과 렌더링 ──────────────────────────────────────────────────────────
     results = st.session_state.get('scan_results', [])
-    filter_preset = st.radio(
-        "결과 필터",
-        options=SCAN_FILTER_PRESETS,
-        horizontal=True,
-        key="scan_filter_preset",
+    filter_preset = _render_scan_filter_picker(
+        SCAN_FILTER_PRESETS,
+        state_key="scan_filter_preset",
+        label="결과 필터",
+        columns_per_row=4,
     )
     filtered_results = _apply_scan_filter(results, filter_preset)
     st.session_state["scan_filtered_results"] = filtered_results
@@ -2822,10 +2887,10 @@ if current_mode == MODE_SCANNER:
 # ══════════════════════════════════════════════════════════════
 elif current_mode == MODE_MARKET_DAILY:
     _render_brand_board(main_board_payload)
-    render_market_daily_dashboard()
+    market_daily_payload = render_market_daily_dashboard()
     _render_section_heading(
-        "브리핑에서 바로 분석",
-        "티커를 입력하거나 빠른 시작에서 선택하면 분석 모드로 전환되어 상세 분석을 이어갑니다.",
+        "오늘 먼저 볼 강한 종목",
+        "버튼 클릭 즉시 상세 분석으로 전환됩니다.",
         badges=[
             ("오늘 미국장", "accent"),
             ("즉시 분석 전환", "warning"),
@@ -2833,7 +2898,7 @@ elif current_mode == MODE_MARKET_DAILY:
         eyebrow="Daily To Analysis",
         tight=True,
     )
-    _render_quick_analysis_grid(key_prefix="briefing_quick")
+    _render_market_daily_action_grid(market_daily_payload, key_prefix="briefing_dynamic")
     if ti := st.chat_input(CHAT_INPUT_PLACEHOLDER):
         parsed = _parse_analysis_ticker_input(ti)
         if not parsed:
