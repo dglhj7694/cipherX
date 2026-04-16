@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import os
@@ -51,7 +52,6 @@ _SCAN_SYMBOL_PATTERN = re.compile(r"\b[A-Z]{1,6}(?:[.-][A-Z0-9]{1,4})?\b")
 
 ETF_UNIVERSE_ITEMS: tuple[dict[str, str], ...] = (
     {"requested": "러셀1000", "resolved": "IWB"},
-    {"requested": "러셀2000", "resolved": "IWM"},
     {"requested": "MSCI(USA)", "resolved": "EUSA"},
     {"requested": "나스닥100", "resolved": "QQQ"},
     {"requested": "S&P500", "resolved": "SPY"},
@@ -94,6 +94,49 @@ def _ordered_unique(values: Iterable[Any]) -> list[str]:
         seen.add(text)
         ordered.append(text)
     return ordered
+
+
+def _stable_shard_index(symbol: str, shard_count: int) -> int:
+    if shard_count <= 0:
+        raise ValueError("shard_count must be > 0")
+    digest = hashlib.sha1(str(symbol or "").strip().upper().encode("utf-8")).hexdigest()
+    return int(digest[:12], 16) % shard_count
+
+
+def split_tickers_for_shard(tickers: Iterable[str], shard_count: int, shard_index: int) -> list[str]:
+    if shard_count <= 0:
+        raise ValueError("shard_count must be > 0")
+    if shard_index < 0 or shard_index >= shard_count:
+        raise ValueError("shard_index out of range")
+    normalized = _ordered_unique(tickers or [])
+    return [ticker for ticker in normalized if _stable_shard_index(ticker, shard_count) == shard_index]
+
+
+def _row_sort_key(row: Mapping[str, Any]) -> tuple[float, float, float, str]:
+    return (
+        -_safe_float(row.get("scan_score", 0)),
+        -_safe_float(row.get("strength", 0)),
+        -_safe_float(row.get("latest_sig_ts", 0)),
+        str(row.get("ticker", "")),
+    )
+
+
+def _dedupe_rows_by_ticker(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    best_by_ticker: dict[str, dict[str, Any]] = {}
+    for row in rows or []:
+        row_dict = dict(row or {})
+        ticker = str(row_dict.get("ticker") or "").strip().upper()
+        if not ticker:
+            continue
+        current = best_by_ticker.get(ticker)
+        if current is None:
+            best_by_ticker[ticker] = row_dict
+            continue
+        if _row_sort_key(row_dict) < _row_sort_key(current):
+            best_by_ticker[ticker] = row_dict
+    deduped = list(best_by_ticker.values())
+    deduped.sort(key=_row_sort_key)
+    return deduped
 
 
 def _recent_frame_flag(frame: Any, column: str, window: int = 5) -> bool:
@@ -472,7 +515,7 @@ def scan_universe(tickers: list[str], *, max_workers: int, bias_mode: str) -> Sc
     scan_seconds = _safe_float(time.perf_counter() - scan_started)
 
     sort_started = time.perf_counter()
-    results.sort(key=lambda row: (-row["scan_score"], -row["strength"], -row["latest_sig_ts"], row["ticker"]))
+    results.sort(key=_row_sort_key)
     sort_seconds = _safe_float(time.perf_counter() - sort_started)
 
     perf_stats = {
@@ -489,9 +532,9 @@ def scan_universe(tickers: list[str], *, max_workers: int, bias_mode: str) -> Sc
     return ScanRunResult(rows=results, skips=skip_reasons, perf=perf_stats)
 
 
-def write_scan_csv(rows: list[dict[str, Any]], *, out_dir: Path, stamp: str) -> Path:
+def write_scan_csv(rows: list[dict[str, Any]], *, out_dir: Path, run_label: str) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
-    output_path = out_dir / f"scanner_full_{stamp}.csv"
+    output_path = out_dir / f"scanner_full_{run_label}.csv"
     output_path.write_bytes(scanner_rows_to_csv_bytes(rows))
     return output_path
 
@@ -501,6 +544,75 @@ def write_json(payload: Mapping[str, Any], *, out_dir: Path, filename: str) -> P
     output_path = out_dir / filename
     output_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     return output_path
+
+
+def write_scan_rows_json(rows: list[dict[str, Any]], *, out_dir: Path, run_label: str) -> Path:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    output_path = out_dir / f"scan_rows_{run_label}.json"
+    output_path.write_text(json.dumps(list(rows or []), ensure_ascii=False, indent=2), encoding="utf-8")
+    return output_path
+
+
+def _load_json_file(path: Path) -> Any:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def merge_shard_scan_rows(merge_dir: Path) -> dict[str, Any]:
+    files = sorted(Path(merge_dir).glob("**/scan_rows_*.json"))
+    if not files:
+        raise RuntimeError(f"No shard row files found in {merge_dir}")
+
+    all_rows: list[dict[str, Any]] = []
+    for file_path in files:
+        payload = _load_json_file(file_path)
+        if isinstance(payload, dict):
+            rows = payload.get("rows") or []
+        elif isinstance(payload, list):
+            rows = payload
+        else:
+            rows = []
+        for row in rows:
+            if isinstance(row, dict):
+                all_rows.append(dict(row))
+
+    merged_rows = _dedupe_rows_by_ticker(all_rows)
+
+    meta_files = sorted(Path(merge_dir).glob("**/run_meta_*.json"))
+    shard_universe_sum = 0
+    full_universe_max = 0
+    skip_count_sum = 0
+    result_count_sum = 0
+    shard_meta_count = 0
+    shard_errors: list[str] = []
+    for meta_file in meta_files:
+        payload = _load_json_file(meta_file)
+        if not isinstance(payload, dict):
+            continue
+        shard_meta_count += 1
+        shard_universe_sum += int(_safe_float(payload.get("shard_ticker_count", 0)))
+        full_universe_max = max(full_universe_max, int(_safe_float(payload.get("full_universe_count", 0))))
+        performance = payload.get("performance") or {}
+        skip_count_sum += int(_safe_float(performance.get("skip_count", 0)))
+        result_count_sum += int(_safe_float(payload.get("result_count", 0)))
+        for err in payload.get("etf_errors", []) or []:
+            shard_errors.append(str(err))
+
+    universe_count = full_universe_max or shard_universe_sum
+    return {
+        "rows": merged_rows,
+        "row_files": [str(path) for path in files],
+        "meta_files": [str(path) for path in meta_files],
+        "source_row_count": len(all_rows),
+        "merged_row_count": len(merged_rows),
+        "source_result_count_sum": result_count_sum,
+        "skip_count_sum": skip_count_sum,
+        "universe_count": universe_count,
+        "shard_meta_count": shard_meta_count,
+        "etf_errors": _ordered_unique(shard_errors),
+    }
 
 
 def select_recent_trend_turn_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -583,6 +695,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--bias-mode", default=DEFAULT_BIAS_MODE, help="Engine bias mode")
     parser.add_argument("--skip-telegram", action="store_true", help="Skip Telegram notification")
     parser.add_argument("--dry-run", action="store_true", help="Run scan and write files only")
+    parser.add_argument("--shard-count", type=int, default=1, help="Total number of shards")
+    parser.add_argument("--shard-index", type=int, default=0, help="Current shard index")
+    parser.add_argument("--merge-dir", default="", help="Directory that contains shard artifacts to merge")
     return parser.parse_args()
 
 
@@ -591,54 +706,114 @@ def main() -> int:
     run_at_kst = datetime.now(KST)
     stamp = run_at_kst.strftime("%Y%m%d_%H%M%S")
     out_dir = Path(args.out_dir)
+    shard_count = int(args.shard_count or 1)
+    shard_index = int(args.shard_index or 0)
+    merge_dir_arg = str(args.merge_dir or "").strip()
+    merge_dir = Path(merge_dir_arg).expanduser().resolve() if merge_dir_arg else None
+    if shard_count <= 0:
+        raise RuntimeError("--shard-count must be > 0")
+    if shard_index < 0 or shard_index >= shard_count:
+        raise RuntimeError("--shard-index out of range")
 
-    print("[SCAN] Building universe...")
-    universe_payload = build_scan_universe()
-    tickers = list(universe_payload.get("tickers") or [])
-    print(
-        f"[SCAN] Universe ready: {len(tickers)} "
-        f"(sector={universe_payload.get('sector_count', 0)}, etf={universe_payload.get('etf_count', 0)})"
-    )
-    if universe_payload.get("etf_errors"):
-        print("[SCAN] ETF resolve errors:", " | ".join(universe_payload["etf_errors"]))
+    if merge_dir:
+        run_label = f"{stamp}_merged"
+        print(f"[MERGE] Loading shard artifacts from {merge_dir}")
+        merged_payload = merge_shard_scan_rows(merge_dir)
+        merged_rows = list(merged_payload.get("rows") or [])
+        print(
+            f"[MERGE] Completed: merged={len(merged_rows)} "
+            f"source_rows={int(merged_payload.get('source_row_count', 0))} "
+            f"source_sum={int(merged_payload.get('source_result_count_sum', 0))}"
+        )
+        csv_path = write_scan_csv(merged_rows, out_dir=out_dir, run_label=run_label)
+        rows_path = write_scan_rows_json(merged_rows, out_dir=out_dir, run_label=run_label)
 
-    scan_result = scan_universe(tickers, max_workers=int(args.max_workers), bias_mode=str(args.bias_mode))
-    print(
-        f"[SCAN] Completed: results={len(scan_result.rows)} "
-        f"skips={len(scan_result.skips)} total_sec={_safe_float(scan_result.perf.get('total_seconds', 0)):.1f}"
-    )
+        turn_rows = select_recent_trend_turn_rows(merged_rows)
+        summary_text = build_transition_summary(
+            turn_rows,
+            run_at_kst=run_at_kst,
+            universe_count=int(_safe_float(merged_payload.get("universe_count", 0))),
+            result_count=len(merged_rows),
+            skip_count=int(_safe_float(merged_payload.get("skip_count_sum", 0))),
+            summary_limit=max(1, int(args.summary_limit)),
+        )
+        summary_path = out_dir / f"trend_turn_summary_{run_label}.txt"
+        summary_path.write_text(summary_text, encoding="utf-8")
 
-    csv_path = write_scan_csv(scan_result.rows, out_dir=out_dir, stamp=stamp)
-    turn_rows = select_recent_trend_turn_rows(scan_result.rows)
-    summary_text = build_transition_summary(
-        turn_rows,
-        run_at_kst=run_at_kst,
-        universe_count=len(tickers),
-        result_count=len(scan_result.rows),
-        skip_count=len(scan_result.skips),
-        summary_limit=max(1, int(args.summary_limit)),
-    )
+        write_json(
+            {
+                "run_at_kst": run_at_kst.isoformat(),
+                "mode": "merge",
+                "merged_payload": merged_payload,
+                "result_count": len(merged_rows),
+                "trend_turn_count": len(turn_rows),
+                "csv_path": str(csv_path),
+                "rows_path": str(rows_path),
+                "summary_path": str(summary_path),
+            },
+            out_dir=out_dir,
+            filename=f"run_meta_{run_label}.json",
+        )
+        print(f"[MERGE] CSV saved: {csv_path}")
+        print(f"[MERGE] Summary saved: {summary_path}")
+    else:
+        run_label = f"{stamp}_shard{shard_index}of{shard_count}"
+        print("[SCAN] Building universe...")
+        universe_payload = build_scan_universe()
+        full_tickers = list(universe_payload.get("tickers") or [])
+        tickers = split_tickers_for_shard(full_tickers, shard_count, shard_index)
+        print(
+            f"[SCAN] Universe ready: full={len(full_tickers)} shard={len(tickers)} "
+            f"(shard={shard_index}/{shard_count - 1}, "
+            f"sector={universe_payload.get('sector_count', 0)}, etf={universe_payload.get('etf_count', 0)})"
+        )
+        if universe_payload.get("etf_errors"):
+            print("[SCAN] ETF resolve errors:", " | ".join(universe_payload["etf_errors"]))
 
-    summary_path = out_dir / f"trend_turn_summary_{stamp}.txt"
-    summary_path.write_text(summary_text, encoding="utf-8")
+        scan_result = scan_universe(tickers, max_workers=int(args.max_workers), bias_mode=str(args.bias_mode))
+        print(
+            f"[SCAN] Completed: results={len(scan_result.rows)} "
+            f"skips={len(scan_result.skips)} total_sec={_safe_float(scan_result.perf.get('total_seconds', 0)):.1f}"
+        )
 
-    write_json(
-        {
-            "run_at_kst": run_at_kst.isoformat(),
-            "universe": universe_payload,
-            "performance": scan_result.perf,
-            "skip_reasons": scan_result.skips,
-            "result_count": len(scan_result.rows),
-            "trend_turn_count": len(turn_rows),
-            "csv_path": str(csv_path),
-            "summary_path": str(summary_path),
-        },
-        out_dir=out_dir,
-        filename=f"run_meta_{stamp}.json",
-    )
+        csv_path = write_scan_csv(scan_result.rows, out_dir=out_dir, run_label=run_label)
+        rows_path = write_scan_rows_json(scan_result.rows, out_dir=out_dir, run_label=run_label)
+        turn_rows = select_recent_trend_turn_rows(scan_result.rows)
+        summary_text = build_transition_summary(
+            turn_rows,
+            run_at_kst=run_at_kst,
+            universe_count=len(tickers),
+            result_count=len(scan_result.rows),
+            skip_count=len(scan_result.skips),
+            summary_limit=max(1, int(args.summary_limit)),
+        )
+        summary_path = out_dir / f"trend_turn_summary_{run_label}.txt"
+        summary_path.write_text(summary_text, encoding="utf-8")
 
-    print(f"[SCAN] CSV saved: {csv_path}")
-    print(f"[SCAN] Summary saved: {summary_path}")
+        write_json(
+            {
+                "run_at_kst": run_at_kst.isoformat(),
+                "mode": "scan",
+                "full_universe_count": len(full_tickers),
+                "shard_ticker_count": len(tickers),
+                "shard_count": shard_count,
+                "shard_index": shard_index,
+                "universe": universe_payload,
+                "etf_errors": list(universe_payload.get("etf_errors") or []),
+                "performance": scan_result.perf,
+                "skip_reasons": scan_result.skips,
+                "result_count": len(scan_result.rows),
+                "trend_turn_count": len(turn_rows),
+                "csv_path": str(csv_path),
+                "rows_path": str(rows_path),
+                "summary_path": str(summary_path),
+            },
+            out_dir=out_dir,
+            filename=f"run_meta_{run_label}.json",
+        )
+
+        print(f"[SCAN] CSV saved: {csv_path}")
+        print(f"[SCAN] Summary saved: {summary_path}")
 
     if args.dry_run or args.skip_telegram:
         print("[SCAN] Telegram send skipped by option.")

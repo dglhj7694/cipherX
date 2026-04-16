@@ -10,9 +10,51 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  scan_and_notify:
+  scan_shard:
+    name: scan-shard-${{ matrix.shard_index }}
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard_index: [0, 1, 2]
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run shard scan
+        run: |
+          python -m scripts.daily_scan_and_notify \
+            --out-dir artifacts/daily_scan/shard_${{ matrix.shard_index }} \
+            --skip-telegram \
+            --shard-count 3 \
+            --shard-index ${{ matrix.shard_index }}
+
+      - name: Upload shard artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-scan-shard-${{ matrix.shard_index }}-${{ github.run_id }}
+          path: artifacts/daily_scan/shard_${{ matrix.shard_index }}/*
+          if-no-files-found: error
+
+  merge_and_notify:
+    name: merge-and-notify
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: scan_shard
     env:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -31,14 +73,23 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run daily scan and notify
-        run: |
-          python -m scripts.daily_scan_and_notify --out-dir artifacts/daily_scan
+      - name: Download shard artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: daily-scan-shard-*-${{ github.run_id }}
+          path: artifacts/daily_scan/merge_inputs
+          merge-multiple: true
 
-      - name: Upload scan artifacts
+      - name: Merge and notify
+        run: |
+          python -m scripts.daily_scan_and_notify \
+            --out-dir artifacts/daily_scan/final \
+            --merge-dir artifacts/daily_scan/merge_inputs
+
+      - name: Upload merged artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: daily-scan-${{ github.run_id }}
-          path: artifacts/daily_scan/*
+          name: daily-scan-final-${{ github.run_id }}
+          path: artifacts/daily_scan/final/*
           if-no-files-found: ignore
