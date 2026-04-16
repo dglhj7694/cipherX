@@ -3279,9 +3279,121 @@ def build_us_market_daily_payload():
             "volume_ratio": snapshot.get("volume_ratio"),
         }
 
+    def _build_breadth_summary(up_count, total_count):
+        total = int(total_count or 0)
+        up = int(up_count or 0)
+        if total <= 0:
+            return "상승 섹터 0/0, 확산 데이터 없음"
+        ratio = up / total
+        if ratio >= 0.64:
+            state = "확산 강함"
+        elif ratio <= 0.36:
+            state = "확산 약함"
+        else:
+            state = "확산 중립"
+        return f"상승 섹터 {up}/{total}, {state}"
+
+    def _collect_theme_clusters(rows, max_items=6):
+        theme_map = [
+            ("양자", "양자"),
+            ("ai", "AI"),
+            ("반도체", "반도체"),
+            ("원전", "원전"),
+            ("우주", "우주"),
+            ("클라우드", "클라우드"),
+            ("바이오", "바이오"),
+            ("에너지", "에너지"),
+            ("금융", "금융"),
+        ]
+        clusters = {}
+        for raw_row in list(rows or []):
+            row = dict(raw_row or {})
+            symbol = str(row.get("symbol") or "").strip()
+            if not symbol:
+                continue
+            reason = str(row.get("reason") or "").strip()
+            reason_lower = reason.lower()
+            theme = "기타"
+            for keyword, label in theme_map:
+                if keyword in reason_lower:
+                    theme = label
+                    break
+            node = clusters.setdefault(theme, {"theme": theme, "count": 0, "sample_symbols": []})
+            node["count"] += 1
+            if symbol not in node["sample_symbols"] and len(node["sample_symbols"]) < 4:
+                node["sample_symbols"].append(symbol)
+        ranked = sorted(clusters.values(), key=lambda item: (-int(item.get("count") or 0), str(item.get("theme") or "")))
+        return ranked[: max(1, int(max_items or 1))]
+
+    breadth_summary = _build_breadth_summary(sector_breadth, sector_total)
+    leadership_summary = (
+        f"QQQ-SPY {_format_pct_point(qqq_vs_spy)} / "
+        f"IWM-SPY {_format_pct_point(iwm_vs_spy)} / "
+        f"섹터 확산도 {sector_breadth}/{sector_total}"
+    )
+
+    premarket_flow = str(drivers[0]).strip() if drivers else str(market_driver_summary).strip()
+    regular_flow = str(drivers[1]).strip() if len(drivers) > 1 else str(market_structure.get("note") or insight_short_view).strip()
+    close_flow = str(insight_short_view).strip() or (str(drivers[2]).strip() if len(drivers) > 2 else "")
+    session_flow = {
+        "premarket": premarket_flow or "거시 변수와 뉴스 흐름이 방향성을 만들었습니다.",
+        "regular": regular_flow or "장중에는 주도주와 확산도 흐름이 핵심이었습니다.",
+        "close": close_flow or "마감 기준으로는 다음 세션 확인형 대응이 유효합니다.",
+    }
+
+    favorable_points = [str(item).strip() for item in _coerce_market_text_list(insight_strategy, max_items=3) if str(item).strip()]
+    avoid_candidates = [str(item).strip() for item in divergence_notes[:3] if str(item).strip()]
+    avoid_candidates += [str(item).strip() for item in _coerce_market_text_list(watchlist, max_items=3) if str(item).strip()]
+    avoid_points = _ordered_unique(avoid_candidates)[:3]
+    checkpoints = [str(item).strip() for item in _coerce_market_text_list(watchlist, max_items=3) if str(item).strip()]
+
+    reason_by_symbol = {}
+    for detail_row in gainers_detail + losers_detail:
+        symbol = str((detail_row or {}).get("symbol") or "").strip()
+        if symbol and symbol not in reason_by_symbol:
+            reason_by_symbol[symbol] = str((detail_row or {}).get("reason") or "").strip()
+
+    quick_targets = []
+    for action in analysis_actions[:8]:
+        symbol = str((action or {}).get("symbol") or "").strip()
+        if not symbol:
+            continue
+        quick_targets.append(
+            {
+                "symbol": symbol,
+                "change_pct": (action or {}).get("change_pct"),
+                "rank": (action or {}).get("rank"),
+                "source": str((action or {}).get("source") or "gainers_today"),
+                "reason": reason_by_symbol.get(symbol, ""),
+            }
+        )
+
+    theme_clusters = _collect_theme_clusters(gainers_detail + losers_detail, max_items=6)
+
     briefing_report = {
         "market_date_label": _format_market_date(market_dt),
         "headline": headline,
+        "one_liner": insight_short_view,
+        "breadth_summary": breadth_summary,
+        "session_flow": session_flow,
+        "market_structure": {
+            "label": market_structure.get("label"),
+            "note": market_structure.get("note"),
+            "breadth_summary": breadth_summary,
+            "leadership_summary": leadership_summary,
+        },
+        "sector_summary": {
+            "strong": [str(row.get("symbol")) for row in sector_sorted[:3] if str(row.get("symbol") or "").strip()],
+            "weak": [str(row.get("symbol")) for row in reversed(sector_sorted[-3:]) if str(row.get("symbol") or "").strip()],
+            "interpretation": str(market_structure.get("note") or insight_short_view),
+        },
+        "theme_clusters": theme_clusters,
+        "response_guidance": {
+            "favorable": favorable_points,
+            "avoid": avoid_points,
+        },
+        "checkpoints": checkpoints,
+        "quick_targets": quick_targets,
         "executive_summary": {
             "risk_state": market_regime.get("state"),
             "risk_state_display": market_regime.get("state_display"),
@@ -3324,6 +3436,10 @@ def build_us_market_daily_payload():
         "movers": {
             "gainers": [dict(row or {}) for row in gainers_detail[:_US_MARKET_TOP_MOVER_DETAIL_COUNT]],
             "losers": [dict(row or {}) for row in losers_detail[:_US_MARKET_TOP_MOVER_DETAIL_COUNT]],
+        },
+        "core_movers": {
+            "gainers": [dict(row or {}) for row in gainers_detail[:10]],
+            "losers": [dict(row or {}) for row in losers_detail[:10]],
         },
         "action_points": {
             "insight_short_view": insight_short_view,

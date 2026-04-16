@@ -1,9 +1,10 @@
-import unittest
+﻿import unittest
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 from scripts.market_daily_briefing_notify import (
     build_market_daily_briefing_failure_text,
+    build_market_daily_briefing_messages,
     build_market_daily_briefing_text,
     send_telegram_message,
     split_telegram_message_text,
@@ -22,7 +23,7 @@ class MarketDailyBriefingNotifyTests(unittest.TestCase):
                     "change_value": 1.5 + idx * 0.1,
                     "change_pct": 2.0 + idx * 0.05,
                     "volume_ratio": 1.2 + idx * 0.01,
-                    "reason": "up momentum",
+                    "reason": "AI trend extension",
                 }
             )
             losers.append(
@@ -32,13 +33,50 @@ class MarketDailyBriefingNotifyTests(unittest.TestCase):
                     "change_value": -(1.0 + idx * 0.1),
                     "change_pct": -(1.5 + idx * 0.05),
                     "volume_ratio": 1.1 + idx * 0.02,
-                    "reason": "down pressure",
+                    "reason": "profit taking",
                 }
             )
+
         return {
             "briefing_report": {
                 "market_date_label": "2026-04-15 (US)",
                 "headline": "US equities closed higher led by tech",
+                "one_liner": "지수는 반등했지만 확산은 약해 메가캡 중심 흐름이었습니다.",
+                "breadth_summary": "상승 섹터 4/11, 확산 약함",
+                "session_flow": {
+                    "premarket": "장전에는 금리 부담 완화 기대가 우위를 만들었습니다.",
+                    "regular": "정규장에서는 메가캡 중심 쏠림이 이어졌습니다.",
+                    "close": "마감에서는 확산 약세가 유지돼 선별 대응이 유효했습니다.",
+                },
+                "market_structure": {
+                    "label": "Narrow Risk-On",
+                    "note": "지수 상승 대비 확산이 약한 구조",
+                    "breadth_summary": "상승 섹터 4/11, 확산 약함",
+                    "leadership_summary": "QQQ 우위 / IWM 열세",
+                },
+                "sector_summary": {
+                    "strong": ["XLK", "XLY", "XLF"],
+                    "weak": ["XLU", "XLB", "XLI"],
+                    "interpretation": "반등은 있었지만 광범위 확산형 강세는 아니었습니다.",
+                },
+                "theme_clusters": [
+                    {"theme": "AI", "count": 9, "sample_symbols": ["G000", "G001", "G002"]},
+                    {"theme": "반도체", "count": 6, "sample_symbols": ["G003", "G004", "G005"]},
+                ],
+                "response_guidance": {
+                    "favorable": ["리더주 눌림 대응 우선", "거래량 동반 강세만 선별"],
+                    "avoid": ["확산 약한 날 지수 추격 자제", "거래량 부족 급등주 후행 추격 자제"],
+                },
+                "checkpoints": [
+                    "10Y·DXY·WTI 동조 방향 확인",
+                    "IWM 상대강도 회복 여부 확인",
+                    "VIX 재상승 여부 확인",
+                ],
+                "quick_targets": [
+                    {"symbol": "G000", "reason": "AI 리더"},
+                    {"symbol": "G001", "reason": "거래량 강세"},
+                    {"symbol": "G002", "reason": "추세 연장"},
+                ],
                 "executive_summary": {
                     "risk_state_display": "RISK_ON",
                     "fear_greed_score": 72,
@@ -68,6 +106,7 @@ class MarketDailyBriefingNotifyTests(unittest.TestCase):
                     {"rank": 3, "symbol": "XLU", "label": "Utilities", "change_pct": -1.2},
                 ],
                 "movers": {"gainers": gainers, "losers": losers},
+                "core_movers": {"gainers": gainers[:10], "losers": losers[:10]},
                 "action_points": {
                     "insight_bullets": ["follow leaders", "watch volume confirmation"],
                     "analysis_actions": [{"symbol": "NVDA"}, {"symbol": "AAPL"}, {"symbol": "MSFT"}],
@@ -81,42 +120,59 @@ class MarketDailyBriefingNotifyTests(unittest.TestCase):
             "losers_detail": losers,
         }
 
-    def test_report_text_contains_sections_and_requested_metric_labels(self):
+    def test_report_messages_split_into_core_and_detail(self):
         payload = self._build_report_payload()
-        text = build_market_daily_briefing_text(payload, run_at_kst=datetime(2026, 4, 16, 6, 15, 0), detail_limit=30)
-        self.assertIn("1) Executive Summary", text)
-        self.assertIn("2) Index Snapshot", text)
-        self.assertIn("3) Macro Snapshot", text)
-        self.assertIn("4) Relative Strength", text)
-        self.assertIn("5) Sector Strength (강->약)", text)
-        self.assertIn("6) Top Movers +30 / -30", text)
-        self.assertIn("7) Action Checklist", text)
-        self.assertIn("NASDAQ100", text)
-        self.assertIn("S&P500", text)
-        self.assertIn("DOW", text)
-        self.assertIn("RUSSELL2000", text)
-        self.assertIn("VIX", text)
-        self.assertIn("10Y", text)
-        self.assertIn("DXY", text)
-        self.assertIn("USD/KRW", text)
-        self.assertIn("Gold", text)
-        self.assertIn("WTI", text)
-        self.assertIn("BTC", text)
+        messages = build_market_daily_briefing_messages(
+            payload,
+            run_at_kst=datetime(2026, 4, 16, 6, 15, 0),
+            detail_limit=30,
+            core_mover_limit=10,
+            quick_target_limit=8,
+        )
 
-    def test_report_text_contains_fear_greed_and_relative_strength(self):
-        payload = self._build_report_payload()
-        text = build_market_daily_briefing_text(payload, run_at_kst=datetime(2026, 4, 16, 6, 15, 0), detail_limit=30)
-        self.assertIn("공탐지수(Fear/Greed): 72/100 (탐욕)", text)
-        self.assertIn("QQQ-SPY: +0.71%p", text)
-        self.assertIn("IWM-SPY: -0.22%p", text)
+        self.assertEqual(len(messages), 2)
+        core, detail = messages
 
-    def test_report_text_limits_gainers_and_losers_to_30(self):
+        self.assertIn("[오늘 미국장 핵심 브리핑]", core)
+        self.assertIn("1) 한줄 결론", core)
+        self.assertIn("3) Session Flow", core)
+        self.assertIn("6) Market Structure", core)
+        self.assertIn("Breadth: 상승 섹터 4/11, 확산 약함", core)
+        self.assertIn("8) Top Movers +10 / -10", core)
+        self.assertIn("10. G009", core)
+        self.assertNotIn("11. G010", core)
+
+        self.assertIn("[오늘 미국장 상세 브리핑]", detail)
+        self.assertIn("3) Top Movers +30 / -30", detail)
+        self.assertIn("30. G029", detail)
+        self.assertNotIn("31. G030", detail)
+
+    def test_detail_section_order_is_sector_theme_movers_insight_trigger(self):
         payload = self._build_report_payload()
-        text = build_market_daily_briefing_text(payload, run_at_kst=datetime(2026, 4, 16, 6, 15, 0), detail_limit=30)
-        self.assertIn("30. G029", text)
-        self.assertNotIn("31. G030", text)
-        self.assertIn("30. L029", text)
-        self.assertNotIn("31. L030", text)
+        detail = build_market_daily_briefing_messages(
+            payload,
+            run_at_kst=datetime(2026, 4, 16, 6, 15, 0),
+            detail_limit=30,
+            core_mover_limit=10,
+            quick_target_limit=8,
+        )[1]
+
+        p1 = detail.index("1) 전체 섹터 순위")
+        p2 = detail.index("2) 테마 묶음 요약")
+        p3 = detail.index("3) Top Movers +30 / -30")
+        p4 = detail.index("4) 추가 인사이트")
+        p5 = detail.index("5) 다음 세션 트리거")
+        self.assertTrue(p1 < p2 < p3 < p4 < p5)
+
+    def test_build_market_daily_briefing_text_keeps_single_string_contract(self):
+        payload = self._build_report_payload()
+        text = build_market_daily_briefing_text(
+            payload,
+            run_at_kst=datetime(2026, 4, 16, 6, 15, 0),
+            detail_limit=30,
+        )
+        self.assertIn("[오늘 미국장 핵심 브리핑]", text)
+        self.assertIn("[오늘 미국장 상세 브리핑]", text)
 
     def test_fallback_without_briefing_report_uses_legacy_format(self):
         payload = {
@@ -129,10 +185,16 @@ class MarketDailyBriefingNotifyTests(unittest.TestCase):
             "gainers_detail": [{"symbol": "AAA", "price": 100, "change_value": 1, "change_pct": 1, "volume_ratio": 1.2, "reason": "legacy"}],
             "losers_detail": [{"symbol": "BBB", "price": 90, "change_value": -1, "change_pct": -1, "volume_ratio": 1.1, "reason": "legacy"}],
         }
-        text = build_market_daily_briefing_text(payload, run_at_kst=datetime(2026, 4, 16, 6, 15, 0), detail_limit=30)
-        self.assertIn("핵심 인사이트:", text)
-        self.assertIn("섹터 강약도 (강->약):", text)
-        self.assertIn("주요 등락주 상승 1개", text)
+        messages = build_market_daily_briefing_messages(
+            payload,
+            run_at_kst=datetime(2026, 4, 16, 6, 15, 0),
+            detail_limit=30,
+            core_mover_limit=10,
+            quick_target_limit=8,
+        )
+        self.assertEqual(len(messages), 1)
+        self.assertIn("핵심 인사이트", messages[0])
+        self.assertIn("섹터 강약도", messages[0])
 
     def test_split_telegram_message_text_chunks_long_text(self):
         raw = "\n".join([f"line-{idx:03d}-abcdefghijklmnopqrstuvwxyz" for idx in range(100)])
@@ -162,7 +224,7 @@ class MarketDailyBriefingNotifyTests(unittest.TestCase):
             reason="payload_build_error",
         )
         self.assertIn("브리핑 생성 실패", text)
-        self.assertIn("스캐너 전환 알림과 전체 CSV 전송은 계속 진행됩니다.", text)
+        self.assertIn("전체 CSV 전송은 계속 진행", text)
 
 
 if __name__ == "__main__":

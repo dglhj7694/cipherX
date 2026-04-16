@@ -189,6 +189,16 @@ class MarketDailyMoverUniverseTests(unittest.TestCase):
 
         briefing_report = dict(payload.get("briefing_report") or {})
         self.assertTrue(briefing_report)
+        self.assertIn("one_liner", briefing_report)
+        self.assertIn("breadth_summary", briefing_report)
+        self.assertIn("session_flow", briefing_report)
+        self.assertIn("market_structure", briefing_report)
+        self.assertIn("theme_clusters", briefing_report)
+        self.assertIn("response_guidance", briefing_report)
+        self.assertIn("checkpoints", briefing_report)
+        self.assertIn("quick_targets", briefing_report)
+        self.assertIn("core_movers", briefing_report)
+        self.assertIn("상승 섹터", str(briefing_report.get("breadth_summary")))
         self.assertEqual(
             set(dict(briefing_report.get("benchmarks") or {}).keys()),
             {"NASDAQ100", "S&P500", "DOW", "RUSSELL2000", "VIX"},
