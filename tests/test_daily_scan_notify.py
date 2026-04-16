@@ -9,7 +9,7 @@ from scripts.daily_scan_and_notify import (
     build_scan_universe,
     build_transition_summary,
     merge_shard_scan_rows,
-    select_recent_trend_turn_rows,
+    select_us_session_turn_rows,
     split_tickers_for_shard,
 )
 
@@ -46,20 +46,40 @@ class DailyScanNotifyTests(unittest.TestCase):
         self.assertEqual(payload["tickers"], ["AAA", "BBB", "CCC", "DDD", "EEE", "FFF"])
         self.assertEqual(payload["etf_note"], "ok")
 
-    def test_select_recent_trend_turn_rows_filters_and_sorts_by_score(self):
+    def test_select_us_session_turn_rows_filters_by_previous_us_session(self):
         rows = [
-            {"ticker": "AAA", "bull_turn_recent": True, "scan_score": 3.2},
-            {"ticker": "BBB", "bull_turn_recent": False, "scan_score": 9.0},
-            {"ticker": "CCC", "bull_turn_recent": True, "scan_score": 7.1},
+            {"ticker": "AAA", "scan_score": 3.2, "utbot_buy_last_date": "2026-04-15", "hull_turn_bull_last_date": "없음"},
+            {"ticker": "BBB", "scan_score": 9.0, "utbot_buy_last_date": "2026-04-14", "hull_turn_bull_last_date": "없음"},
+            {"ticker": "CCC", "scan_score": 7.1, "utbot_buy_last_date": "없음", "hull_turn_bull_last_date": "2026-04-15"},
         ]
-        selected = select_recent_trend_turn_rows(rows)
+        selected = select_us_session_turn_rows(rows, run_at_kst=datetime(2026, 4, 16, 6, 15, 0))
         self.assertEqual([row["ticker"] for row in selected], ["CCC", "AAA"])
+        self.assertEqual(selected[0]["transition_signals"], ["HULL 매수전환"])
+        self.assertEqual(selected[1]["transition_signals"], ["UTBot 매수전환"])
 
     def test_build_transition_summary_contains_counts_and_rows(self):
         summary = build_transition_summary(
             [
-                {"ticker": "NVDA", "jg_key": "BUY", "es": 10.0, "scan_score": 22.5, "latest_sig": "2026-04-16"},
-                {"ticker": "AAPL", "jg_key": "WATCH_BUY", "es": 6.5, "scan_score": 15.1, "latest_sig": "2026-04-16"},
+                {
+                    "ticker": "NVDA",
+                    "chg_value": 4.25,
+                    "chg": 2.4,
+                    "volume_ratio_20": 1.8,
+                    "jg_key": "BUY",
+                    "es": 10.0,
+                    "scan_score": 22.5,
+                    "transition_signals": ["UTBot 매수전환"],
+                },
+                {
+                    "ticker": "AAPL",
+                    "chg_value": -1.12,
+                    "chg": -0.7,
+                    "volume_ratio_20": 0.9,
+                    "jg_key": "WATCH_BUY",
+                    "es": 6.5,
+                    "scan_score": 15.1,
+                    "transition_signals": ["HULL 매수전환"],
+                },
             ],
             run_at_kst=datetime(2026, 4, 16, 6, 15, 0),
             universe_count=1200,
@@ -67,10 +87,13 @@ class DailyScanNotifyTests(unittest.TestCase):
             skip_count=220,
             summary_limit=10,
         )
-        self.assertIn("1200", summary)
-        self.assertIn("2", summary)
+        self.assertIn("전일 미국장 전환일: 2026-04-15", summary)
         self.assertIn("1. NVDA", summary)
         self.assertIn("2. AAPL", summary)
+        self.assertIn("변동폭 +4.25", summary)
+        self.assertIn("변동률 +2.40%", summary)
+        self.assertIn("거래량 1.80x", summary)
+        self.assertIn("전환 UTBot 매수전환", summary)
 
     def test_split_tickers_for_shard_union_and_no_overlap(self):
         tickers = [self._alpha_symbol(i) for i in range(300)]

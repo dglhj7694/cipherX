@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import argparse
 import hashlib
@@ -10,7 +10,7 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime, time as dt_time, timedelta
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 from zoneinfo import ZoneInfo
@@ -48,6 +48,7 @@ from strategy import build_strategy_payload
 from etf_sources import resolve_etf_universe
 
 KST = ZoneInfo("Asia/Seoul")
+US_EASTERN = ZoneInfo("America/New_York")
 _SCAN_SYMBOL_PATTERN = re.compile(r"\b[A-Z]{1,6}(?:[.-][A-Z0-9]{1,4})?\b")
 
 ETF_UNIVERSE_ITEMS: tuple[dict[str, str], ...] = (
@@ -615,10 +616,63 @@ def merge_shard_scan_rows(merge_dir: Path) -> dict[str, Any]:
     }
 
 
-def select_recent_trend_turn_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    selected = [dict(row) for row in (rows or []) if bool(row.get("bull_turn_recent", False))]
-    selected.sort(key=lambda row: (-_safe_float(row.get("scan_score", 0)), str(row.get("ticker", ""))))
+def _parse_iso_date(value: Any) -> date | None:
+    text = str(value or "").strip()
+    if not text or text in {"없음", "-", "N/A"}:
+        return None
+    try:
+        return datetime.strptime(text, "%Y-%m-%d").date()
+    except Exception:
+        return None
+
+
+def _last_us_market_session_date(run_at_kst: datetime) -> date:
+    us_now = run_at_kst.astimezone(US_EASTERN)
+    session_date = us_now.date()
+    if us_now.weekday() >= 5 or us_now.time() < dt_time(16, 0):
+        session_date -= timedelta(days=1)
+    while session_date.weekday() >= 5:
+        session_date -= timedelta(days=1)
+    return session_date
+
+
+def _transition_signals_on_date(row: Mapping[str, Any], target_date: date) -> list[str]:
+    signals: list[str] = []
+    utbot_buy_date = _parse_iso_date(row.get("utbot_buy_last_date"))
+    hull_buy_date = _parse_iso_date(row.get("hull_turn_bull_last_date"))
+    if utbot_buy_date == target_date:
+        signals.append("UTBot 매수전환")
+    if hull_buy_date == target_date:
+        signals.append("HULL 매수전환")
+    return signals
+
+
+def select_us_session_turn_rows(rows: Iterable[Mapping[str, Any]], *, run_at_kst: datetime) -> list[dict[str, Any]]:
+    target_date = _last_us_market_session_date(run_at_kst)
+    selected: list[dict[str, Any]] = []
+    for row in rows or []:
+        row_dict = dict(row or {})
+        signals = _transition_signals_on_date(row_dict, target_date)
+        if not signals:
+            continue
+        row_dict["transition_signals"] = signals
+        selected.append(row_dict)
+    selected.sort(key=lambda row: (-_safe_float(row.get("scan_score", 0)), -_safe_float(row.get("es", 0)), str(row.get("ticker", ""))))
     return selected
+
+
+def _fmt_signed_number(value: Any, decimals: int = 2) -> str:
+    try:
+        return f"{float(value):+.{decimals}f}"
+    except Exception:
+        return "--"
+
+
+def _fmt_ratio(value: Any, decimals: int = 2) -> str:
+    try:
+        return f"{float(value):.{decimals}f}x"
+    except Exception:
+        return "--"
 
 
 def build_transition_summary(
@@ -631,25 +685,32 @@ def build_transition_summary(
     summary_limit: int = 40,
 ) -> str:
     rows = list(turn_rows or [])
+    target_us_session_date = _last_us_market_session_date(run_at_kst)
     lines = [
         f"[자동 스캔] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
+        f"- 전일 미국장 전환일: {target_us_session_date.isoformat()} (US/Eastern)",
         f"- 유니버스: {universe_count}개",
-        f"- 스캔 결과: {result_count}개 (제외 {skip_count}개)",
-        f"- 최근 추세전환: {len(rows)}개",
+        f"- 전체 스캔 결과: {result_count}개 (제외 {skip_count}개)",
+        f"- 당일 전환 종목: {len(rows)}개",
         "",
-        "최근 추세전환 상위 목록:",
+        "당일 전환 목록:",
     ]
     if not rows:
         lines.append("- 해당 없음")
         return "\n".join(lines)
 
     for idx, row in enumerate(rows[:summary_limit], start=1):
+        signals = list(row.get("transition_signals") or [])
+        signal_text = ", ".join(signals) if signals else "-"
         lines.append(
             f"{idx}. {row.get('ticker', '-')}"
-            f" | {row.get('jg_key', '-')}"
-            f" | ES {_safe_float(row.get('es', 0)):+.1f}"
-            f" | Score {_safe_float(row.get('scan_score', 0)):+.1f}"
-            f" | Sig {row.get('latest_sig', '-')}"
+            f" | 변동폭 {_fmt_signed_number(row.get('chg_value', 0), 2)}"
+            f" | 변동률 {_fmt_signed_number(row.get('chg', 0), 2)}%"
+            f" | 거래량 {_fmt_ratio(row.get('volume_ratio_20', 0), 2)}"
+            f" | 판단 {row.get('jg_key', '-')}"
+            f" | ES {_fmt_signed_number(row.get('es', 0), 1)}"
+            f" | Score {_fmt_signed_number(row.get('scan_score', 0), 1)}"
+            f" | 전환 {signal_text}"
         )
     remain = len(rows) - min(len(rows), summary_limit)
     if remain > 0:
@@ -728,7 +789,7 @@ def main() -> int:
         csv_path = write_scan_csv(merged_rows, out_dir=out_dir, run_label=run_label)
         rows_path = write_scan_rows_json(merged_rows, out_dir=out_dir, run_label=run_label)
 
-        turn_rows = select_recent_trend_turn_rows(merged_rows)
+        turn_rows = select_us_session_turn_rows(merged_rows, run_at_kst=run_at_kst)
         summary_text = build_transition_summary(
             turn_rows,
             run_at_kst=run_at_kst,
@@ -778,7 +839,7 @@ def main() -> int:
 
         csv_path = write_scan_csv(scan_result.rows, out_dir=out_dir, run_label=run_label)
         rows_path = write_scan_rows_json(scan_result.rows, out_dir=out_dir, run_label=run_label)
-        turn_rows = select_recent_trend_turn_rows(scan_result.rows)
+        turn_rows = select_us_session_turn_rows(scan_result.rows, run_at_kst=run_at_kst)
         summary_text = build_transition_summary(
             turn_rows,
             run_at_kst=run_at_kst,
