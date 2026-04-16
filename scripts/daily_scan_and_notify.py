@@ -641,9 +641,9 @@ def _transition_signals_on_date(row: Mapping[str, Any], target_date: date) -> li
     utbot_buy_date = _parse_iso_date(row.get("utbot_buy_last_date"))
     hull_buy_date = _parse_iso_date(row.get("hull_turn_bull_last_date"))
     if utbot_buy_date == target_date:
-        signals.append("UTBot 매수전환")
+        signals.append("UTBot 매수")
     if hull_buy_date == target_date:
-        signals.append("HULL 매수전환")
+        signals.append("HULL 매수")
     return signals
 
 
@@ -659,6 +659,22 @@ def select_us_session_turn_rows(rows: Iterable[Mapping[str, Any]], *, run_at_kst
         selected.append(row_dict)
     selected.sort(key=lambda row: (-_safe_float(row.get("scan_score", 0)), -_safe_float(row.get("es", 0)), str(row.get("ticker", ""))))
     return selected
+
+
+def filter_turn_rows_for_telegram(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    min_volume_ratio_20_exclusive: float = 1.0,
+) -> list[dict[str, Any]]:
+    filtered: list[dict[str, Any]] = []
+    for row in rows or []:
+        row_dict = dict(row or {})
+        volume_ratio = _safe_float(row_dict.get("volume_ratio_20", 0))
+        if volume_ratio <= float(min_volume_ratio_20_exclusive):
+            continue
+        filtered.append(row_dict)
+    filtered.sort(key=lambda row: (-_safe_float(row.get("scan_score", 0)), -_safe_float(row.get("es", 0)), str(row.get("ticker", ""))))
+    return filtered
 
 
 def _fmt_signed_number(value: Any, decimals: int = 2) -> str:
@@ -682,16 +698,20 @@ def build_transition_summary(
     universe_count: int,
     result_count: int,
     skip_count: int,
-    summary_limit: int = 40,
+    detected_turn_count: int | None = None,
+    summary_limit: int = 0,
 ) -> str:
     rows = list(turn_rows or [])
+    detected_count = len(rows) if detected_turn_count is None else max(0, int(detected_turn_count))
     target_us_session_date = _last_us_market_session_date(run_at_kst)
     lines = [
         f"[자동 스캔] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
         f"- 전일 미국장 전환일: {target_us_session_date.isoformat()} (US/Eastern)",
+        "- 필터 기준: 전일 미국장(US/Eastern)에서 UTBot/HULL 매수 신호 발생",
+        "- 추가 필터: 20일 평균대비 거래량 > 1.0x",
         f"- 유니버스: {universe_count}개",
         f"- 전체 스캔 결과: {result_count}개 (제외 {skip_count}개)",
-        f"- 당일 전환 종목: {len(rows)}개",
+        f"- 전환 감지 {detected_count}개 -> 필터 통과 {len(rows)}개",
         "",
         "당일 전환 목록:",
     ]
@@ -699,20 +719,18 @@ def build_transition_summary(
         lines.append("- 해당 없음")
         return "\n".join(lines)
 
-    for idx, row in enumerate(rows[:summary_limit], start=1):
+    limited_rows = rows if int(summary_limit) <= 0 else rows[: int(summary_limit)]
+    for idx, row in enumerate(limited_rows, start=1):
         signals = list(row.get("transition_signals") or [])
         signal_text = ", ".join(signals) if signals else "-"
         lines.append(
             f"{idx}. {row.get('ticker', '-')}"
-            f" | 변동폭 {_fmt_signed_number(row.get('chg_value', 0), 2)}"
-            f" | 변동률 {_fmt_signed_number(row.get('chg', 0), 2)}%"
+            f" | ({_fmt_signed_number(row.get('chg_value', 0), 2)}, {_fmt_signed_number(row.get('chg', 0), 2)}%)"
             f" | 거래량 {_fmt_ratio(row.get('volume_ratio_20', 0), 2)}"
-            f" | 판단 {row.get('jg_key', '-')}"
-            f" | ES {_fmt_signed_number(row.get('es', 0), 1)}"
-            f" | Score {_fmt_signed_number(row.get('scan_score', 0), 1)}"
-            f" | 전환 {signal_text}"
+            f" | {row.get('jg_key', '-')}"
+            f" | {signal_text}"
         )
-    remain = len(rows) - min(len(rows), summary_limit)
+    remain = len(rows) - len(limited_rows)
     if remain > 0:
         lines.append(f"... 외 {remain}개")
     return "\n".join(lines)
@@ -722,16 +740,54 @@ def _telegram_api(token: str, method: str) -> str:
     return f"https://api.telegram.org/bot{token}/{method}"
 
 
-def send_telegram_message(token: str, chat_id: str, text: str) -> None:
-    response = requests.post(
-        _telegram_api(token, "sendMessage"),
-        json={"chat_id": chat_id, "text": text},
-        timeout=30,
-    )
-    response.raise_for_status()
-    payload = response.json()
-    if not payload.get("ok"):
-        raise RuntimeError(f"Telegram sendMessage failed: {payload}")
+def split_telegram_message_text(text: str, *, chunk_size: int = 3500) -> list[str]:
+    raw = str(text or "")
+    limit = max(1, int(chunk_size))
+    if len(raw) <= limit:
+        return [raw]
+    chunks: list[str] = []
+    current: list[str] = []
+    current_len = 0
+    for line in raw.splitlines():
+        line_text = str(line)
+        line_len = len(line_text) + 1
+        if line_len > limit:
+            if current:
+                chunks.append("\n".join(current))
+                current = []
+                current_len = 0
+            start = 0
+            while start < len(line_text):
+                end = min(start + limit, len(line_text))
+                chunks.append(line_text[start:end])
+                start = end
+            continue
+        if current and (current_len + line_len > limit):
+            chunks.append("\n".join(current))
+            current = [line_text]
+            current_len = line_len
+        else:
+            current.append(line_text)
+            current_len += line_len
+    if current:
+        chunks.append("\n".join(current))
+    return chunks or [raw]
+
+
+def send_telegram_message(token: str, chat_id: str, text: str, *, chunk_size: int = 3500) -> None:
+    chunks = split_telegram_message_text(text, chunk_size=chunk_size)
+    for chunk in chunks:
+        if not str(chunk or "").strip():
+            continue
+        response = requests.post(
+            _telegram_api(token, "sendMessage"),
+            json={"chat_id": chat_id, "text": chunk},
+            timeout=30,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if not payload.get("ok"):
+            raise RuntimeError(f"Telegram sendMessage failed: {payload}")
 
 
 def send_telegram_document(token: str, chat_id: str, file_path: Path, caption: str = "") -> None:
@@ -752,7 +808,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Daily scanner batch + Telegram notification")
     parser.add_argument("--out-dir", default="artifacts/daily_scan", help="Output directory for CSV and metadata")
     parser.add_argument("--max-workers", type=int, default=12, help="Maximum concurrent workers")
-    parser.add_argument("--summary-limit", type=int, default=40, help="Maximum rows in trend-turn summary message")
+    parser.add_argument("--summary-limit", type=int, default=0, help="Maximum rows in trend-turn summary message (<=0 means all)")
     parser.add_argument("--bias-mode", default=DEFAULT_BIAS_MODE, help="Engine bias mode")
     parser.add_argument("--skip-telegram", action="store_true", help="Skip Telegram notification")
     parser.add_argument("--dry-run", action="store_true", help="Run scan and write files only")
@@ -789,14 +845,16 @@ def main() -> int:
         csv_path = write_scan_csv(merged_rows, out_dir=out_dir, run_label=run_label)
         rows_path = write_scan_rows_json(merged_rows, out_dir=out_dir, run_label=run_label)
 
-        turn_rows = select_us_session_turn_rows(merged_rows, run_at_kst=run_at_kst)
+        detected_turn_rows = select_us_session_turn_rows(merged_rows, run_at_kst=run_at_kst)
+        turn_rows = filter_turn_rows_for_telegram(detected_turn_rows, min_volume_ratio_20_exclusive=1.0)
         summary_text = build_transition_summary(
             turn_rows,
             run_at_kst=run_at_kst,
             universe_count=int(_safe_float(merged_payload.get("universe_count", 0))),
             result_count=len(merged_rows),
             skip_count=int(_safe_float(merged_payload.get("skip_count_sum", 0))),
-            summary_limit=max(1, int(args.summary_limit)),
+            detected_turn_count=len(detected_turn_rows),
+            summary_limit=int(args.summary_limit),
         )
         summary_path = out_dir / f"trend_turn_summary_{run_label}.txt"
         summary_path.write_text(summary_text, encoding="utf-8")
@@ -807,6 +865,7 @@ def main() -> int:
                 "mode": "merge",
                 "merged_payload": merged_payload,
                 "result_count": len(merged_rows),
+                "detected_turn_count": len(detected_turn_rows),
                 "trend_turn_count": len(turn_rows),
                 "csv_path": str(csv_path),
                 "rows_path": str(rows_path),
@@ -839,14 +898,16 @@ def main() -> int:
 
         csv_path = write_scan_csv(scan_result.rows, out_dir=out_dir, run_label=run_label)
         rows_path = write_scan_rows_json(scan_result.rows, out_dir=out_dir, run_label=run_label)
-        turn_rows = select_us_session_turn_rows(scan_result.rows, run_at_kst=run_at_kst)
+        detected_turn_rows = select_us_session_turn_rows(scan_result.rows, run_at_kst=run_at_kst)
+        turn_rows = filter_turn_rows_for_telegram(detected_turn_rows, min_volume_ratio_20_exclusive=1.0)
         summary_text = build_transition_summary(
             turn_rows,
             run_at_kst=run_at_kst,
             universe_count=len(tickers),
             result_count=len(scan_result.rows),
             skip_count=len(scan_result.skips),
-            summary_limit=max(1, int(args.summary_limit)),
+            detected_turn_count=len(detected_turn_rows),
+            summary_limit=int(args.summary_limit),
         )
         summary_path = out_dir / f"trend_turn_summary_{run_label}.txt"
         summary_path.write_text(summary_text, encoding="utf-8")
@@ -864,6 +925,7 @@ def main() -> int:
                 "performance": scan_result.perf,
                 "skip_reasons": scan_result.skips,
                 "result_count": len(scan_result.rows),
+                "detected_turn_count": len(detected_turn_rows),
                 "trend_turn_count": len(turn_rows),
                 "csv_path": str(csv_path),
                 "rows_path": str(rows_path),

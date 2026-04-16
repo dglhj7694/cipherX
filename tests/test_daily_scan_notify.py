@@ -8,8 +8,10 @@ from unittest.mock import patch
 from scripts.daily_scan_and_notify import (
     build_scan_universe,
     build_transition_summary,
+    filter_turn_rows_for_telegram,
     merge_shard_scan_rows,
     select_us_session_turn_rows,
+    split_telegram_message_text,
     split_tickers_for_shard,
 )
 
@@ -54,10 +56,19 @@ class DailyScanNotifyTests(unittest.TestCase):
         ]
         selected = select_us_session_turn_rows(rows, run_at_kst=datetime(2026, 4, 16, 6, 15, 0))
         self.assertEqual([row["ticker"] for row in selected], ["CCC", "AAA"])
-        self.assertEqual(selected[0]["transition_signals"], ["HULL 매수전환"])
-        self.assertEqual(selected[1]["transition_signals"], ["UTBot 매수전환"])
+        self.assertEqual(selected[0]["transition_signals"], ["HULL 매수"])
+        self.assertEqual(selected[1]["transition_signals"], ["UTBot 매수"])
 
-    def test_build_transition_summary_contains_counts_and_rows(self):
+    def test_filter_turn_rows_for_telegram_uses_volume_ratio_gt_one(self):
+        rows = [
+            {"ticker": "AAA", "scan_score": 5.0, "volume_ratio_20": 1.0},
+            {"ticker": "BBB", "scan_score": 8.0, "volume_ratio_20": 1.01},
+            {"ticker": "CCC", "scan_score": 4.0, "volume_ratio_20": 2.5},
+        ]
+        filtered = filter_turn_rows_for_telegram(rows, min_volume_ratio_20_exclusive=1.0)
+        self.assertEqual([row["ticker"] for row in filtered], ["BBB", "CCC"])
+
+    def test_build_transition_summary_contains_new_header_and_row_format(self):
         summary = build_transition_summary(
             [
                 {
@@ -66,34 +77,62 @@ class DailyScanNotifyTests(unittest.TestCase):
                     "chg": 2.4,
                     "volume_ratio_20": 1.8,
                     "jg_key": "BUY",
-                    "es": 10.0,
-                    "scan_score": 22.5,
-                    "transition_signals": ["UTBot 매수전환"],
+                    "transition_signals": ["HULL 매수"],
                 },
                 {
                     "ticker": "AAPL",
                     "chg_value": -1.12,
                     "chg": -0.7,
-                    "volume_ratio_20": 0.9,
+                    "volume_ratio_20": 1.4,
                     "jg_key": "WATCH_BUY",
-                    "es": 6.5,
-                    "scan_score": 15.1,
-                    "transition_signals": ["HULL 매수전환"],
+                    "transition_signals": ["UTBot 매수"],
                 },
             ],
             run_at_kst=datetime(2026, 4, 16, 6, 15, 0),
             universe_count=1200,
             result_count=980,
             skip_count=220,
+            detected_turn_count=4,
             summary_limit=10,
         )
-        self.assertIn("전일 미국장 전환일: 2026-04-15", summary)
-        self.assertIn("1. NVDA", summary)
-        self.assertIn("2. AAPL", summary)
-        self.assertIn("변동폭 +4.25", summary)
-        self.assertIn("변동률 +2.40%", summary)
-        self.assertIn("거래량 1.80x", summary)
-        self.assertIn("전환 UTBot 매수전환", summary)
+        self.assertIn("필터 기준: 전일 미국장(US/Eastern)에서 UTBot/HULL 매수 신호 발생", summary)
+        self.assertIn("추가 필터: 20일 평균대비 거래량 > 1.0x", summary)
+        self.assertIn("전환 감지 4개 -> 필터 통과 2개", summary)
+        self.assertIn("1. NVDA | (+4.25, +2.40%) | 거래량 1.80x | BUY | HULL 매수", summary)
+        self.assertNotIn("매수전환", summary)
+        self.assertNotIn("| 판단", summary)
+        self.assertNotIn("| 전환", summary)
+
+    def test_build_transition_summary_does_not_truncate_when_summary_limit_is_zero(self):
+        rows = [
+            {
+                "ticker": f"T{i:03d}",
+                "chg_value": 1.0,
+                "chg": 1.0,
+                "volume_ratio_20": 1.5,
+                "jg_key": "BUY",
+                "transition_signals": ["HULL 매수"],
+            }
+            for i in range(45)
+        ]
+        summary = build_transition_summary(
+            rows,
+            run_at_kst=datetime(2026, 4, 16, 6, 15, 0),
+            universe_count=1200,
+            result_count=980,
+            skip_count=220,
+            detected_turn_count=45,
+            summary_limit=0,
+        )
+        self.assertIn("45. T044", summary)
+        self.assertNotIn("... 외", summary)
+
+    def test_split_telegram_message_text_chunks_long_message(self):
+        text = "\n".join([f"line-{idx:03d}-abcdefghijklmnopqrstuvwxyz" for idx in range(120)])
+        chunks = split_telegram_message_text(text, chunk_size=220)
+        self.assertGreater(len(chunks), 1)
+        self.assertEqual("\n".join(chunks), text)
+        self.assertTrue(all(len(chunk) <= 220 for chunk in chunks))
 
     def test_split_tickers_for_shard_union_and_no_overlap(self):
         tickers = [self._alpha_symbol(i) for i in range(300)]
