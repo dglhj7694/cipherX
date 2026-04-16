@@ -57,6 +57,13 @@ ETF_UNIVERSE_ITEMS: tuple[dict[str, str], ...] = (
     {"requested": "나스닥100", "resolved": "QQQ"},
     {"requested": "S&P500", "resolved": "SPY"},
 )
+RUSSELL2000_UNIVERSE_ITEMS: tuple[dict[str, str], ...] = (
+    {"requested": "러셀2000", "resolved": "IWM"},
+)
+UNIVERSE_PROFILE_ITEMS: dict[str, tuple[dict[str, str], ...]] = {
+    "default": ETF_UNIVERSE_ITEMS,
+    "russell2000": RUSSELL2000_UNIVERSE_ITEMS,
+}
 
 SCANNER_TRANSITION_CFG = {
     "UTBot_Buy": {"label": "UTBot 전환↑", "icon": "🟢", "dir": "buy"},
@@ -158,13 +165,34 @@ def _build_sector_universe() -> list[str]:
     )
 
 
-def build_scan_universe(etf_items: Iterable[Mapping[str, str]] | None = None) -> dict[str, Any]:
+def _normalize_universe_profile(value: Any) -> str:
+    profile = str(value or "default").strip().lower()
+    if profile not in UNIVERSE_PROFILE_ITEMS:
+        return "default"
+    return profile
+
+
+def _scan_label_for_profile(profile: str) -> str:
+    normalized = _normalize_universe_profile(profile)
+    if normalized == "russell2000":
+        return "Extended Scan:RUSSELL2000"
+    return "자동 스캔"
+
+
+def build_scan_universe(
+    etf_items: Iterable[Mapping[str, str]] | None = None,
+    *,
+    universe_profile: str = "default",
+) -> dict[str, Any]:
+    profile = _normalize_universe_profile(universe_profile)
+    selected_items = list(etf_items or UNIVERSE_PROFILE_ITEMS.get(profile, ETF_UNIVERSE_ITEMS))
     sector_tickers = _build_sector_universe()
-    resolver_payload = resolve_etf_universe(list(etf_items or ETF_UNIVERSE_ITEMS))
+    resolver_payload = resolve_etf_universe(selected_items)
     etf_tickers = _ordered_unique(resolver_payload.get("tickers") or [])
     combined = _ordered_unique([*sector_tickers, *etf_tickers])
     return {
         "tickers": combined,
+        "universe_profile": profile,
         "sector_count": len(sector_tickers),
         "etf_count": len(etf_tickers),
         "etf_items": list(resolver_payload.get("items") or []),
@@ -588,6 +616,7 @@ def merge_shard_scan_rows(merge_dir: Path) -> dict[str, Any]:
     result_count_sum = 0
     shard_meta_count = 0
     shard_errors: list[str] = []
+    shard_profiles: list[str] = []
     for meta_file in meta_files:
         payload = _load_json_file(meta_file)
         if not isinstance(payload, dict):
@@ -600,6 +629,8 @@ def merge_shard_scan_rows(merge_dir: Path) -> dict[str, Any]:
         result_count_sum += int(_safe_float(payload.get("result_count", 0)))
         for err in payload.get("etf_errors", []) or []:
             shard_errors.append(str(err))
+        profile = _normalize_universe_profile(payload.get("universe_profile"))
+        shard_profiles.append(profile)
 
     universe_count = full_universe_max or shard_universe_sum
     return {
@@ -613,6 +644,7 @@ def merge_shard_scan_rows(merge_dir: Path) -> dict[str, Any]:
         "universe_count": universe_count,
         "shard_meta_count": shard_meta_count,
         "etf_errors": _ordered_unique(shard_errors),
+        "universe_profiles": _ordered_unique(shard_profiles),
     }
 
 
@@ -698,6 +730,7 @@ def build_transition_summary(
     universe_count: int,
     result_count: int,
     skip_count: int,
+    scan_label: str = "자동 스캔",
     detected_turn_count: int | None = None,
     summary_limit: int = 0,
 ) -> str:
@@ -705,7 +738,7 @@ def build_transition_summary(
     detected_count = len(rows) if detected_turn_count is None else max(0, int(detected_turn_count))
     target_us_session_date = _last_us_market_session_date(run_at_kst)
     lines = [
-        f"[자동 스캔] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
+        f"[{str(scan_label or '자동 스캔')}] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
         f"- 전일 미국장 전환일: {target_us_session_date.isoformat()} (US/Eastern)",
         "- 필터 기준: 전일 미국장(US/Eastern)에서 UTBot/HULL 매수 신호 발생",
         "- 추가 필터: 20일 평균대비 거래량 > 1.0x",
@@ -815,6 +848,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--shard-count", type=int, default=1, help="Total number of shards")
     parser.add_argument("--shard-index", type=int, default=0, help="Current shard index")
     parser.add_argument("--merge-dir", default="", help="Directory that contains shard artifacts to merge")
+    parser.add_argument(
+        "--universe-profile",
+        default="default",
+        choices=sorted(UNIVERSE_PROFILE_ITEMS.keys()),
+        help="Universe profile (default or russell2000)",
+    )
     return parser.parse_args()
 
 
@@ -827,6 +866,8 @@ def main() -> int:
     shard_index = int(args.shard_index or 0)
     merge_dir_arg = str(args.merge_dir or "").strip()
     merge_dir = Path(merge_dir_arg).expanduser().resolve() if merge_dir_arg else None
+    universe_profile = _normalize_universe_profile(args.universe_profile)
+    scan_label = _scan_label_for_profile(universe_profile)
     if shard_count <= 0:
         raise RuntimeError("--shard-count must be > 0")
     if shard_index < 0 or shard_index >= shard_count:
@@ -837,6 +878,10 @@ def main() -> int:
         print(f"[MERGE] Loading shard artifacts from {merge_dir}")
         merged_payload = merge_shard_scan_rows(merge_dir)
         merged_rows = list(merged_payload.get("rows") or [])
+        profile_candidates = list(merged_payload.get("universe_profiles") or [])
+        if universe_profile == "default" and len(profile_candidates) == 1:
+            universe_profile = _normalize_universe_profile(profile_candidates[0])
+            scan_label = _scan_label_for_profile(universe_profile)
         print(
             f"[MERGE] Completed: merged={len(merged_rows)} "
             f"source_rows={int(merged_payload.get('source_row_count', 0))} "
@@ -853,6 +898,7 @@ def main() -> int:
             universe_count=int(_safe_float(merged_payload.get("universe_count", 0))),
             result_count=len(merged_rows),
             skip_count=int(_safe_float(merged_payload.get("skip_count_sum", 0))),
+            scan_label=scan_label,
             detected_turn_count=len(detected_turn_rows),
             summary_limit=int(args.summary_limit),
         )
@@ -863,6 +909,7 @@ def main() -> int:
             {
                 "run_at_kst": run_at_kst.isoformat(),
                 "mode": "merge",
+                "universe_profile": universe_profile,
                 "merged_payload": merged_payload,
                 "result_count": len(merged_rows),
                 "detected_turn_count": len(detected_turn_rows),
@@ -879,7 +926,7 @@ def main() -> int:
     else:
         run_label = f"{stamp}_shard{shard_index}of{shard_count}"
         print("[SCAN] Building universe...")
-        universe_payload = build_scan_universe()
+        universe_payload = build_scan_universe(universe_profile=universe_profile)
         full_tickers = list(universe_payload.get("tickers") or [])
         tickers = split_tickers_for_shard(full_tickers, shard_count, shard_index)
         print(
@@ -906,6 +953,7 @@ def main() -> int:
             universe_count=len(tickers),
             result_count=len(scan_result.rows),
             skip_count=len(scan_result.skips),
+            scan_label=scan_label,
             detected_turn_count=len(detected_turn_rows),
             summary_limit=int(args.summary_limit),
         )
@@ -916,6 +964,7 @@ def main() -> int:
             {
                 "run_at_kst": run_at_kst.isoformat(),
                 "mode": "scan",
+                "universe_profile": universe_profile,
                 "full_universe_count": len(full_tickers),
                 "shard_ticker_count": len(tickers),
                 "shard_count": shard_count,
@@ -954,7 +1003,7 @@ def main() -> int:
         token,
         chat_id,
         csv_path,
-        caption=f"전체 스캔 CSV ({run_at_kst.strftime('%Y-%m-%d %H:%M')} KST)",
+        caption=f"{scan_label} CSV ({run_at_kst.strftime('%Y-%m-%d %H:%M')} KST)",
     )
     print("[SCAN] Telegram notification completed.")
     return 0

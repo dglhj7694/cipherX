@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scripts.daily_scan_and_notify import (
+    RUSSELL2000_UNIVERSE_ITEMS,
     build_scan_universe,
     build_transition_summary,
     filter_turn_rows_for_telegram,
@@ -47,6 +48,24 @@ class DailyScanNotifyTests(unittest.TestCase):
         self.assertEqual(payload["etf_count"], 3)
         self.assertEqual(payload["tickers"], ["AAA", "BBB", "CCC", "DDD", "EEE", "FFF"])
         self.assertEqual(payload["etf_note"], "ok")
+
+    def test_build_scan_universe_russell2000_profile_uses_iwm_items(self):
+        fake_sectors = {"A": ["AAA"]}
+        captured = {}
+
+        def _fake_resolve(items):
+            captured["items"] = list(items)
+            return {"items": [], "tickers": ["IWMA", "IWMB"], "note": "ok", "errors": []}
+
+        with patch("scripts.daily_scan_and_notify.SECTOR_GROUPS", fake_sectors), patch(
+            "scripts.daily_scan_and_notify.resolve_etf_universe",
+            side_effect=_fake_resolve,
+        ):
+            payload = build_scan_universe(universe_profile="russell2000")
+
+        self.assertEqual(payload["universe_profile"], "russell2000")
+        self.assertEqual(captured["items"], list(RUSSELL2000_UNIVERSE_ITEMS))
+        self.assertEqual(payload["tickers"], ["AAA", "IWMA", "IWMB"])
 
     def test_select_us_session_turn_rows_filters_by_previous_us_session(self):
         rows = [
@@ -147,6 +166,23 @@ class DailyScanNotifyTests(unittest.TestCase):
         self.assertEqual(set(shard1).intersection(set(shard3)), set())
         self.assertEqual(set(shard2).intersection(set(shard3)), set())
         self.assertEqual(set(shard0).union(set(shard1)).union(set(shard2)).union(set(shard3)), set(tickers))
+
+    def test_split_tickers_for_shard_union_and_no_overlap_for_six_shards(self):
+        tickers = [self._alpha_symbol(i) for i in range(420)]
+        shards = [set(split_tickers_for_shard(tickers, shard_count=6, shard_index=idx)) for idx in range(6)]
+        for idx in range(6):
+            for jdx in range(idx + 1, 6):
+                self.assertEqual(shards[idx].intersection(shards[jdx]), set())
+        merged = set()
+        for shard in shards:
+            merged = merged.union(shard)
+        self.assertEqual(merged, set(tickers))
+
+    def test_split_tickers_for_shard_is_stable_for_six_shards(self):
+        tickers = [self._alpha_symbol(i) for i in range(120)]
+        first = split_tickers_for_shard(tickers, shard_count=6, shard_index=2)
+        second = split_tickers_for_shard(tickers, shard_count=6, shard_index=2)
+        self.assertEqual(first, second)
 
     def test_split_tickers_for_shard_is_stable(self):
         tickers = [self._alpha_symbol(i) for i in range(80)]
