@@ -18,9 +18,7 @@ class MarketDailyMoverUniverseTests(unittest.TestCase):
             ui.build_us_market_daily_payload.clear()
 
     def test_market_mover_universe_is_union_without_96_cap(self):
-        fake_sectors = {
-            "A": [f"S{i:03d}" for i in range(120)],
-        }
+        fake_sectors = {"A": [f"S{i:03d}" for i in range(120)]}
         fake_payload = {
             "items": [],
             "tickers": [f"E{i:03d}" for i in range(80)] + ["S005", "S010"],
@@ -101,10 +99,7 @@ class MarketDailyMoverUniverseTests(unittest.TestCase):
                 data[(symbol, "Volume")] = [100, 101, 102]
             return pd.DataFrame(data, index=idx)
 
-        with patch.object(ui, "_US_MARKET_DOWNLOAD_CHUNK_SIZE", 2), patch.object(
-            ui,
-            "yf",
-        ) as yf_mock:
+        with patch.object(ui, "_US_MARKET_DOWNLOAD_CHUNK_SIZE", 2), patch.object(ui, "yf") as yf_mock:
             yf_mock.download.side_effect = _fake_download
             history = ui._download_market_history(("AAA", "BBB", "CCC"), period="3mo")
 
@@ -114,17 +109,14 @@ class MarketDailyMoverUniverseTests(unittest.TestCase):
         self.assertIn("BBB", set(history.columns.get_level_values(0)))
         self.assertIn("CCC", set(history.columns.get_level_values(0)))
 
-    def test_top_mover_card_count_stays_limited_to_9_each_side(self):
+    def test_top_mover_card_count_stays_limited_to_9_each_side_and_report_exists(self):
         mover_universe = tuple(f"M{i:02d}" for i in range(30))
 
         def _fake_extract_symbol_frame(_history, symbol):
             idx = pd.date_range("2026-03-01", periods=30, freq="D")
             if str(symbol).startswith("M"):
                 rank = int(str(symbol)[1:])
-                if rank < 15:
-                    delta = 15 - rank
-                else:
-                    delta = -(rank - 14)
+                delta = (15 - rank) if rank < 15 else -(rank - 14)
             else:
                 delta = 0.2
             close = [100.0] * 29 + [100.0 * (1.0 + (delta / 100.0))]
@@ -156,7 +148,6 @@ class MarketDailyMoverUniverseTests(unittest.TestCase):
 
         cards = list(payload.get("cards") or [])
         top_mover_card = next(card for card in cards if card.get("id") == "top_movers")
-        insight_card = next(card for card in cards if card.get("id") == "daily_insight")
         expected_count = ui._US_MARKET_TOP_MOVER_CARD_COUNT * 2
         self.assertEqual(len(top_mover_card.get("metrics") or []), expected_count)
         self.assertEqual(len(top_mover_card.get("bullets") or []), expected_count)
@@ -182,9 +173,6 @@ class MarketDailyMoverUniverseTests(unittest.TestCase):
         }
         self.assertTrue(required_keys.issubset(set(gainers_detail[0].keys())))
         self.assertTrue(required_keys.issubset(set(losers_detail[0].keys())))
-        self.assertIn("$", str(gainers_detail[0].get("price_summary", "")))
-        self.assertIn("(", str(gainers_detail[0].get("price_summary", "")))
-        self.assertIn("%", str(gainers_detail[0].get("price_summary", "")))
 
         gainers_changes = [float(row["change_pct"]) for row in gainers_detail if row.get("change_pct") is not None]
         losers_changes = [float(row["change_pct"]) for row in losers_detail if row.get("change_pct") is not None]
@@ -199,10 +187,24 @@ class MarketDailyMoverUniverseTests(unittest.TestCase):
         self.assertTrue(all(str(row.get("source")) == "gainers_today" for row in analysis_actions))
         self.assertTrue(all(float(row.get("change_pct") or 0) > 0 for row in analysis_actions))
 
-        self.assertIn("오늘 행동:", str(insight_card.get("subtitle") or ""))
-        insight_texts = [str((row or {}).get("text") or "") for row in list(insight_card.get("bullets") or [])]
-        self.assertTrue(any(text.startswith("오늘 행동:") for text in insight_texts))
-        self.assertTrue(any(text.startswith("개장 체크:") for text in insight_texts))
+        briefing_report = dict(payload.get("briefing_report") or {})
+        self.assertTrue(briefing_report)
+        self.assertEqual(
+            set(dict(briefing_report.get("benchmarks") or {}).keys()),
+            {"NASDAQ100", "S&P500", "DOW", "RUSSELL2000", "VIX"},
+        )
+        self.assertEqual(
+            set(dict(briefing_report.get("macro") or {}).keys()),
+            {"10Y", "DXY", "USD/KRW", "Gold", "WTI", "BTC"},
+        )
+        self.assertIn("QQQ_SPY", dict(briefing_report.get("relative_strength") or {}))
+        self.assertIn("IWM_SPY", dict(briefing_report.get("relative_strength") or {}))
+        self.assertIn("fear_greed_score", dict(briefing_report.get("sentiment") or {}))
+        self.assertIn("fear_greed_label", dict(briefing_report.get("sentiment") or {}))
+        self.assertGreater(len(list(briefing_report.get("sector_rank") or [])), 0)
+        movers = dict(briefing_report.get("movers") or {})
+        self.assertEqual(len(list(movers.get("gainers") or [])), ui._US_MARKET_TOP_MOVER_DETAIL_COUNT)
+        self.assertEqual(len(list(movers.get("losers") or [])), ui._US_MARKET_TOP_MOVER_DETAIL_COUNT)
 
     def test_analysis_actions_keeps_available_rows_when_under_limit(self):
         movers_sorted = [

@@ -3262,6 +3262,77 @@ def build_us_market_daily_payload():
         },
     ]
 
+    def _snapshot_report_entry(symbol, label, snapshot):
+        snapshot = snapshot or {}
+        price = _safe_market_float(snapshot.get("price"))
+        prev_close = _safe_market_float(snapshot.get("prev_close"))
+        change_value = (price - prev_close) if (price is not None and prev_close is not None) else None
+        return {
+            "symbol": str(symbol or ""),
+            "label": str(label or ""),
+            "price": price,
+            "prev_close": prev_close,
+            "change_value": change_value,
+            "change_pct": snapshot.get("change_pct"),
+            "five_day_change": snapshot.get("five_day_change"),
+            "month_change": snapshot.get("month_change"),
+            "volume_ratio": snapshot.get("volume_ratio"),
+        }
+
+    briefing_report = {
+        "market_date_label": _format_market_date(market_dt),
+        "headline": headline,
+        "executive_summary": {
+            "risk_state": market_regime.get("state"),
+            "risk_state_display": market_regime.get("state_display"),
+            "fear_greed_score": market_regime.get("fear_greed_score"),
+            "fear_greed_label": market_regime.get("fear_greed_label"),
+            "short_view": insight_short_view,
+        },
+        "benchmarks": {
+            "NASDAQ100": _snapshot_report_entry("QQQ", "NASDAQ100", benchmark_snapshots.get("QQQ", {})),
+            "S&P500": _snapshot_report_entry("SPY", "S&P500", benchmark_snapshots.get("SPY", {})),
+            "DOW": _snapshot_report_entry("DIA", "DOW", benchmark_snapshots.get("DIA", {})),
+            "RUSSELL2000": _snapshot_report_entry("IWM", "RUSSELL2000", benchmark_snapshots.get("IWM", {})),
+            "VIX": _snapshot_report_entry("VIX", "VIX", benchmark_snapshots.get("VIX", {})),
+        },
+        "macro": {
+            "10Y": _snapshot_report_entry("10Y", "10Y", macro_snapshots.get("10Y", {})),
+            "DXY": _snapshot_report_entry("DXY", "DXY", macro_snapshots.get("DXY", {})),
+            "USD/KRW": _snapshot_report_entry("USD/KRW", "USD/KRW", macro_snapshots.get("USDKRW", {})),
+            "Gold": _snapshot_report_entry("Gold", "Gold", macro_snapshots.get("Gold", {})),
+            "WTI": _snapshot_report_entry("WTI", "WTI", macro_snapshots.get("WTI", {})),
+            "BTC": _snapshot_report_entry("BTC", "BTC", macro_snapshots.get("BTC", {})),
+        },
+        "relative_strength": {
+            "QQQ_SPY": qqq_vs_spy,
+            "IWM_SPY": iwm_vs_spy,
+        },
+        "sentiment": {
+            "risk_state": market_regime.get("state"),
+            "risk_state_display": market_regime.get("state_display"),
+            "fear_greed_score": market_regime.get("fear_greed_score"),
+            "fear_greed_label": market_regime.get("fear_greed_label"),
+        },
+        "sector_rank": [
+            {
+                "rank": idx,
+                **_snapshot_report_entry(row.get("symbol"), row.get("label"), row.get("snapshot") or {}),
+            }
+            for idx, row in enumerate(sector_sorted, start=1)
+        ],
+        "movers": {
+            "gainers": [dict(row or {}) for row in gainers_detail[:_US_MARKET_TOP_MOVER_DETAIL_COUNT]],
+            "losers": [dict(row or {}) for row in losers_detail[:_US_MARKET_TOP_MOVER_DETAIL_COUNT]],
+        },
+        "action_points": {
+            "insight_short_view": insight_short_view,
+            "insight_bullets": [str((item or {}).get("text") or "") for item in insight_bullets if str((item or {}).get("text") or "").strip()],
+            "analysis_actions": [dict(item or {}) for item in analysis_actions[:_US_MARKET_ANALYSIS_ACTION_COUNT]],
+            "watchlist": [str(item) for item in _coerce_market_text_list(watchlist, max_items=4)],
+        },
+    }
+
     return {
         "market_date_label": _format_market_date(market_dt),
         "headline": headline,
@@ -3271,6 +3342,7 @@ def build_us_market_daily_payload():
         "gainers_detail": gainers_detail,
         "losers_detail": losers_detail,
         "analysis_actions": analysis_actions,
+        "briefing_report": briefing_report,
     }
 
 
