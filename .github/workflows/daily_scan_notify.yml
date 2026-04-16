@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard_index: [0, 1, 2]
+        shard_index: [0, 1, 2, 3]
     env:
       PYTHONPATH: ${{ github.workspace }}
     steps:
@@ -39,7 +39,7 @@ jobs:
           python -m scripts.daily_scan_and_notify \
             --out-dir artifacts/daily_scan/shard_${{ matrix.shard_index }} \
             --skip-telegram \
-            --shard-count 3 \
+            --shard-count 4 \
             --shard-index ${{ matrix.shard_index }}
 
       - name: Upload shard artifacts

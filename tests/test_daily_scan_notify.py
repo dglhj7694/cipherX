@@ -97,18 +97,22 @@ class DailyScanNotifyTests(unittest.TestCase):
 
     def test_split_tickers_for_shard_union_and_no_overlap(self):
         tickers = [self._alpha_symbol(i) for i in range(300)]
-        shard0 = split_tickers_for_shard(tickers, shard_count=3, shard_index=0)
-        shard1 = split_tickers_for_shard(tickers, shard_count=3, shard_index=1)
-        shard2 = split_tickers_for_shard(tickers, shard_count=3, shard_index=2)
+        shard0 = split_tickers_for_shard(tickers, shard_count=4, shard_index=0)
+        shard1 = split_tickers_for_shard(tickers, shard_count=4, shard_index=1)
+        shard2 = split_tickers_for_shard(tickers, shard_count=4, shard_index=2)
+        shard3 = split_tickers_for_shard(tickers, shard_count=4, shard_index=3)
         self.assertEqual(set(shard0).intersection(set(shard1)), set())
         self.assertEqual(set(shard0).intersection(set(shard2)), set())
+        self.assertEqual(set(shard0).intersection(set(shard3)), set())
         self.assertEqual(set(shard1).intersection(set(shard2)), set())
-        self.assertEqual(set(shard0).union(set(shard1)).union(set(shard2)), set(tickers))
+        self.assertEqual(set(shard1).intersection(set(shard3)), set())
+        self.assertEqual(set(shard2).intersection(set(shard3)), set())
+        self.assertEqual(set(shard0).union(set(shard1)).union(set(shard2)).union(set(shard3)), set(tickers))
 
     def test_split_tickers_for_shard_is_stable(self):
         tickers = [self._alpha_symbol(i) for i in range(80)]
-        first = split_tickers_for_shard(tickers, shard_count=3, shard_index=0)
-        second = split_tickers_for_shard(tickers, shard_count=3, shard_index=0)
+        first = split_tickers_for_shard(tickers, shard_count=4, shard_index=0)
+        second = split_tickers_for_shard(tickers, shard_count=4, shard_index=0)
         self.assertEqual(first, second)
 
     def test_merge_shard_scan_rows_dedupes_and_sorts(self):
