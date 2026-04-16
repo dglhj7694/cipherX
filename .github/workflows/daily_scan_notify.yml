@@ -32,7 +32,7 @@ jobs:
 
       - name: Run daily scan and notify
         run: |
-          python scripts/daily_scan_and_notify.py --out-dir artifacts/daily_scan
+          python -m scripts.daily_scan_and_notify --out-dir artifacts/daily_scan
 
       - name: Upload scan artifacts
         if: always()
@@ -41,4 +41,3 @@ jobs:
           name: daily-scan-${{ github.run_id }}
           path: artifacts/daily_scan/*
           if-no-files-found: ignore
-

@@ -5,6 +5,7 @@ import json
 import math
 import os
 import re
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -15,6 +16,10 @@ from zoneinfo import ZoneInfo
 
 import requests
 import yfinance as yf
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from config import COMBINED_SCAN_REGISTRY, DEFAULT_BIAS_MODE, JT, resolve_bias_mode
 from engine import detect_all_signals
@@ -659,4 +664,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
