@@ -192,6 +192,38 @@ _US_MARKET_MEGA_CAPS = [
     "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "AVGO", "TSLA",
     "AMD", "NFLX", "JPM", "BRK-B", "XOM", "LLY", "UNH", "COST",
 ]
+_MARKET_THEME_RULES = [
+    {
+        "label": "AI/반도체",
+        "symbols": {"NVDA", "AMD", "AVGO", "TSM", "MU", "ARM", "SMCI", "SOXX", "SOXL", "INTC", "AEHR", "AAOI"},
+        "keywords": ("ai", "gpu", "semiconductor", "chip", "반도체", "데이터센터", "클라우드"),
+    },
+    {
+        "label": "양자",
+        "symbols": {"IONQ", "QBTS", "RGTI", "QUBT"},
+        "keywords": ("quantum", "양자"),
+    },
+    {
+        "label": "우주/위성",
+        "symbols": {"RKLB", "LUNR", "IRDM", "PL", "BKSY", "SIDU", "ASTS", "SPCE"},
+        "keywords": ("space", "satellite", "우주", "위성", "launch"),
+    },
+    {
+        "label": "리튬/원자재",
+        "symbols": {"ALB", "SQM", "SGML", "NMG", "LAC", "LIT"},
+        "keywords": ("lithium", "리튬", "광물", "원자재"),
+    },
+    {
+        "label": "에너지",
+        "symbols": {"XOM", "CVX", "COP", "SLB", "HAL", "OXY", "XLE"},
+        "keywords": ("oil", "wti", "energy", "원유", "에너지"),
+    },
+    {
+        "label": "금융",
+        "symbols": {"JPM", "GS", "MS", "BAC", "C", "WFC", "SCHW", "XLF"},
+        "keywords": ("bank", "financial", "금융", "금리"),
+    },
+]
 
 
 def _market_badge(label, tone="muted"):
@@ -1295,25 +1327,48 @@ def _build_market_news_universe(gainers, losers):
     )
 
 
-def _mover_reason(snapshot):
-    change_pct = snapshot.get("change_pct")
-    volume_ratio = snapshot.get("volume_ratio")
-    five_day_change = snapshot.get("five_day_change")
-    month_change = snapshot.get("month_change")
+def _market_theme_label(symbol, reason=""):
+    ticker = _normalize_market_symbol(symbol)
+    sample = str(reason or "").lower()
+    for rule in _MARKET_THEME_RULES:
+        if ticker in rule["symbols"]:
+            return rule["label"]
+        if any(keyword in sample for keyword in rule["keywords"]):
+            return rule["label"]
+    return ""
+
+
+def _mover_reason(snapshot, direction=None):
+    snapshot = snapshot or {}
+    change_pct = _safe_market_float(snapshot.get("change_pct"))
     if change_pct is None:
         return "데이터 부족"
-    direction = "상승 탄력 확대" if change_pct > 0 else "급한 조정"
-    if volume_ratio is not None and volume_ratio >= 1.7:
-        return f"거래량 {volume_ratio:.1f}배와 함께 {direction}"
-    if five_day_change is not None and change_pct > 0 and five_day_change < 0:
-        return "최근 약세 이후 기술적 반등"
-    if five_day_change is not None and change_pct < 0 and five_day_change > 0:
-        return "단기 급등 뒤 차익실현"
-    if month_change is not None and month_change > 8:
-        return "월간 강세 흐름 속 추세 연장"
-    if month_change is not None and month_change < -8:
-        return "월간 약세 흐름 속 추가 하락"
-    return "단기 수급이 빠르게 이동"
+
+    volume_ratio = _safe_market_float(snapshot.get("volume_ratio"))
+    five_day_change = _safe_market_float(snapshot.get("five_day_change"))
+    month_change = _safe_market_float(snapshot.get("month_change"))
+    side = direction or ("up" if change_pct >= 0 else "down")
+
+    if side == "up":
+        if volume_ratio is not None and volume_ratio >= 1.6:
+            return "거래량강세"
+        if five_day_change is not None and five_day_change < 0 and change_pct > 0:
+            return "기술적반등"
+        if month_change is not None and month_change >= 6:
+            return "추세연장"
+        if abs(change_pct) >= 3:
+            return "테마강세"
+        return "추세연장"
+
+    if volume_ratio is not None and volume_ratio >= 1.4 and change_pct <= -2.0:
+        return "거래량동반하락"
+    if five_day_change is not None and five_day_change > 0 and change_pct < 0:
+        return "차익실현"
+    if month_change is not None and month_change <= -6:
+        return "약세확인"
+    if change_pct <= -3:
+        return "약세확인"
+    return "급한조정"
 
 
 def _average_market_change(rows):
@@ -1345,7 +1400,8 @@ def _build_mover_detail_bullet(row):
     snapshot = row.get("snapshot") or {}
     tone = "positive" if (change_pct or 0) >= 0 else "negative"
     price_summary = _format_mover_price_summary(snapshot, change_pct=change_pct)
-    base = f"{symbol} {price_summary} / {_mover_reason(snapshot)}"
+    direction = "up" if (change_pct or 0) >= 0 else "down"
+    base = f"{symbol} {price_summary} / {_mover_reason(snapshot, direction=direction)}"
     context = _build_mover_context(snapshot)
     if context:
         base += f" · {context}"
@@ -1356,6 +1412,9 @@ def _build_mover_detail_row(row):
     row = row or {}
     symbol = str(row.get("symbol") or "").strip()
     snapshot = row.get("snapshot") or {}
+    change_pct = row.get("change_pct")
+    direction = "up" if (_safe_market_float(change_pct) or 0) >= 0 else "down"
+    reason = _mover_reason(snapshot, direction=direction)
     price = _safe_market_float(snapshot.get("price"))
     prev_close = _safe_market_float(snapshot.get("prev_close"))
     change_value = (price - prev_close) if (price is not None and prev_close is not None) else None
@@ -1364,12 +1423,13 @@ def _build_mover_detail_row(row):
         "price": price,
         "prev_close": prev_close,
         "change_value": change_value,
-        "change_pct": row.get("change_pct"),
-        "price_summary": _format_mover_price_summary(snapshot, change_pct=row.get("change_pct")),
+        "change_pct": change_pct,
+        "price_summary": _format_mover_price_summary(snapshot, change_pct=change_pct),
         "volume_ratio": snapshot.get("volume_ratio"),
         "five_day_change": snapshot.get("five_day_change"),
         "month_change": snapshot.get("month_change"),
-        "reason": _mover_reason(snapshot),
+        "reason": reason,
+        "theme": _market_theme_label(symbol, reason),
     }
 
 
@@ -3294,17 +3354,6 @@ def build_us_market_daily_payload():
         return f"상승 섹터 {up}/{total}, {state}"
 
     def _collect_theme_clusters(rows, max_items=6):
-        theme_map = [
-            ("양자", "양자"),
-            ("ai", "AI"),
-            ("반도체", "반도체"),
-            ("원전", "원전"),
-            ("우주", "우주"),
-            ("클라우드", "클라우드"),
-            ("바이오", "바이오"),
-            ("에너지", "에너지"),
-            ("금융", "금융"),
-        ]
         clusters = {}
         for raw_row in list(rows or []):
             row = dict(raw_row or {})
@@ -3312,18 +3361,19 @@ def build_us_market_daily_payload():
             if not symbol:
                 continue
             reason = str(row.get("reason") or "").strip()
-            reason_lower = reason.lower()
-            theme = "기타"
-            for keyword, label in theme_map:
-                if keyword in reason_lower:
-                    theme = label
-                    break
+            theme = _market_theme_label(symbol, reason=reason)
+            if not theme:
+                continue
             node = clusters.setdefault(theme, {"theme": theme, "count": 0, "sample_symbols": []})
             node["count"] += 1
             if symbol not in node["sample_symbols"] and len(node["sample_symbols"]) < 4:
                 node["sample_symbols"].append(symbol)
         ranked = sorted(clusters.values(), key=lambda item: (-int(item.get("count") or 0), str(item.get("theme") or "")))
+        ranked = [row for row in ranked if int(row.get("count") or 0) >= 2]
         return ranked[: max(1, int(max_items or 1))]
+
+    def _normalize_for_compare(text):
+        return re.sub(r"[\s\.\,\-\|]+", "", str(text or "").strip().lower())
 
     breadth_summary = _build_breadth_summary(sector_breadth, sector_total)
     leadership_summary = (
@@ -3332,50 +3382,148 @@ def build_us_market_daily_payload():
         f"섹터 확산도 {sector_breadth}/{sector_total}"
     )
 
-    premarket_flow = str(drivers[0]).strip() if drivers else str(market_driver_summary).strip()
-    regular_flow = str(drivers[1]).strip() if len(drivers) > 1 else str(market_structure.get("note") or insight_short_view).strip()
-    close_flow = str(insight_short_view).strip() or (str(drivers[2]).strip() if len(drivers) > 2 else "")
+    spy_change = _safe_market_float(benchmark_snapshots.get("SPY", {}).get("change_pct"))
+    qqq_change = _safe_market_float(benchmark_snapshots.get("QQQ", {}).get("change_pct"))
+    iwm_change = _safe_market_float(benchmark_snapshots.get("IWM", {}).get("change_pct"))
+    strongest_symbol = str((strongest_sector or {}).get("symbol") or "").strip()
+    weakest_symbol = str((weakest_sector or {}).get("symbol") or "").strip()
+    leadership_bias = "메가캡 우위" if (qqq_vs_spy or 0) > 0 else "광범위 업종 우위"
+    breadth_tone = "전면 확산형 강세" if sector_breadth >= max(7, sector_total - 2) else "선별 장세"
+    index_tone = "상승" if (spy_change or 0) > 0 else "하락" if (spy_change or 0) < 0 else "보합"
+    one_liner = (
+        f"지수는 {index_tone}했지만 주도력은 {leadership_bias}에 집중됐고, "
+        f"{breadth_summary} 흐름이라 {breadth_tone} 해석이 유효했습니다."
+    )
+    for card in cards:
+        if str(card.get("id") or "") == "daily_insight":
+            card["subtitle"] = one_liner
+            break
+
+    premarket_flow = (
+        f"달러·금리·원자재 변화가 장전 심리를 만들었고, {leadership_bias} 기대가 우세했습니다."
+        if drivers
+        else "거시 변수와 뉴스 흐름이 장전 방향성을 만들었습니다."
+    )
+    regular_flow = (
+        f"정규장에서는 {strongest_symbol or '상위 섹터'} 강세와 {weakest_symbol or '하위 섹터'} 약세가 갈리며 "
+        f"QQQ {_format_change_pct(qqq_change)} / IWM {_format_change_pct(iwm_change)}의 상대강도 차이가 확인됐습니다."
+    )
+    close_flow = (
+        f"종가 기준으로는 {leadership_bias}와 {breadth_summary} 조합이 유지돼 지수 추격보다 리더주 선별이 더 유리했습니다."
+    )
+    if _normalize_for_compare(one_liner) == _normalize_for_compare(close_flow):
+        close_flow = (
+            f"마감에서는 {breadth_summary}를 감안한 선택적 대응이 적절했고, 다음 세션은 리더십 유지 여부가 핵심입니다."
+        )
     session_flow = {
-        "premarket": premarket_flow or "거시 변수와 뉴스 흐름이 방향성을 만들었습니다.",
-        "regular": regular_flow or "장중에는 주도주와 확산도 흐름이 핵심이었습니다.",
-        "close": close_flow or "마감 기준으로는 다음 세션 확인형 대응이 유효합니다.",
+        "premarket": premarket_flow,
+        "regular": regular_flow,
+        "close": close_flow,
     }
 
-    favorable_points = [str(item).strip() for item in _coerce_market_text_list(insight_strategy, max_items=3) if str(item).strip()]
-    avoid_candidates = [str(item).strip() for item in divergence_notes[:3] if str(item).strip()]
-    avoid_candidates += [str(item).strip() for item in _coerce_market_text_list(watchlist, max_items=3) if str(item).strip()]
-    avoid_points = _ordered_unique(avoid_candidates)[:3]
-    checkpoints = [str(item).strip() for item in _coerce_market_text_list(watchlist, max_items=3) if str(item).strip()]
+    favorable_points = []
+    if (qqq_vs_spy or 0) >= 0:
+        favorable_points.append("빅테크·리더주 중심으로 눌림 구간만 선별 대응")
+    else:
+        favorable_points.append("지수 추격보다 상대강도 회복 종목 중심으로 압축 대응")
+    favorable_points.append("거래량 1배 이상 동반 종목만 우선 관찰")
+    if sector_breadth <= max(4, sector_total // 2):
+        favorable_points.append("섹터 확산 확인 전까지는 소수 리더주 집중 대응")
+    else:
+        favorable_points.append("확산 개선 시 섹터 순환 후보를 분할로 확장 대응")
 
-    reason_by_symbol = {}
+    avoid_points = [
+        "breadth가 완전히 강하지 않은 구간에서 지수 추격 매수",
+        "거래량 1배 미만 급등주를 후행 추격",
+    ]
+    if (iwm_vs_spy or 0) < 0:
+        avoid_points.append("IWM 확산 신호 없이 중소형주를 광범위하게 베팅")
+    else:
+        avoid_points.append("개별 재료만 보고 리스크 관리 없이 과도한 포지션 확대")
+    favorable_points = _ordered_unique(favorable_points)[:3]
+    avoid_points = _ordered_unique(avoid_points)[:3]
+    checkpoints = [str(item).strip() for item in _coerce_market_text_list(watchlist, max_items=3) if str(item).strip()]
+    if not checkpoints:
+        checkpoints = [
+            "10Y·DXY·WTI의 장초반 동조 방향 확인",
+            "QQQ-SPY / IWM-SPY 상대강도 변화 확인",
+            "VIX·Gold·BTC로 방어 심리 재확대 여부 점검",
+        ]
+
+    detail_by_symbol = {}
     for detail_row in gainers_detail + losers_detail:
         symbol = str((detail_row or {}).get("symbol") or "").strip()
-        if symbol and symbol not in reason_by_symbol:
-            reason_by_symbol[symbol] = str((detail_row or {}).get("reason") or "").strip()
+        if symbol and symbol not in detail_by_symbol:
+            detail_by_symbol[symbol] = dict(detail_row or {})
 
     quick_targets = []
-    for action in analysis_actions[:8]:
+    seen_quick_symbols = set()
+    used_themes = set()
+
+    for action in analysis_actions:
         symbol = str((action or {}).get("symbol") or "").strip()
-        if not symbol:
+        if not symbol or symbol in seen_quick_symbols:
             continue
+        detail = detail_by_symbol.get(symbol, {})
+        reason = str(detail.get("reason") or "")
+        theme = str(detail.get("theme") or _market_theme_label(symbol, reason=reason))
+        if theme and theme in used_themes:
+            continue
+        volume_ratio = _safe_market_float(detail.get("volume_ratio"))
+        if volume_ratio is None or volume_ratio < 1.0:
+            continue
+        used_themes.add(theme)
+        seen_quick_symbols.add(symbol)
         quick_targets.append(
             {
                 "symbol": symbol,
                 "change_pct": (action or {}).get("change_pct"),
                 "rank": (action or {}).get("rank"),
                 "source": str((action or {}).get("source") or "gainers_today"),
-                "reason": reason_by_symbol.get(symbol, ""),
+                "reason": f"{theme} 리더 후보, 거래량 {volume_ratio:.2f}x" if theme else f"{reason or '리더십 후보'} / 거래량 {volume_ratio:.2f}x",
             }
         )
+        if len(quick_targets) >= 8:
+            break
+
+    if len(quick_targets) < 8:
+        for action in analysis_actions:
+            symbol = str((action or {}).get("symbol") or "").strip()
+            if not symbol or symbol in seen_quick_symbols:
+                continue
+            detail = detail_by_symbol.get(symbol, {})
+            volume_ratio = _safe_market_float(detail.get("volume_ratio"))
+            if volume_ratio is None or volume_ratio < 1.0:
+                continue
+            reason = str(detail.get("reason") or "")
+            theme = str(detail.get("theme") or _market_theme_label(symbol, reason=reason))
+            seen_quick_symbols.add(symbol)
+            quick_targets.append(
+                {
+                    "symbol": symbol,
+                    "change_pct": (action or {}).get("change_pct"),
+                    "rank": (action or {}).get("rank"),
+                    "source": str((action or {}).get("source") or "gainers_today"),
+                    "reason": f"{theme} 후속 확인, 거래량 {volume_ratio:.2f}x" if theme else f"{reason or '후속 확인'} / 거래량 {volume_ratio:.2f}x",
+                }
+            )
+            if len(quick_targets) >= 8:
+                break
 
     theme_clusters = _collect_theme_clusters(gainers_detail + losers_detail, max_items=6)
+    market_structure_text = (
+        f"리더십은 QQQ-SPY {_format_pct_point(qqq_vs_spy)}로 {leadership_bias} 성격이 유지됐고, "
+        f"IWM-SPY {_format_pct_point(iwm_vs_spy)} 흐름에서 소형주 확산 강도는 제한됐습니다. "
+        f"{breadth_summary} 구간이라 지수 추격보다 거래량 동반 리더주 선별이 유리합니다."
+    )
 
     briefing_report = {
         "market_date_label": _format_market_date(market_dt),
         "headline": headline,
-        "one_liner": insight_short_view,
+        "one_liner": one_liner,
         "breadth_summary": breadth_summary,
         "session_flow": session_flow,
+        "market_structure_text": market_structure_text,
         "market_structure": {
             "label": market_structure.get("label"),
             "note": market_structure.get("note"),
@@ -3385,10 +3533,13 @@ def build_us_market_daily_payload():
         "sector_summary": {
             "strong": [str(row.get("symbol")) for row in sector_sorted[:3] if str(row.get("symbol") or "").strip()],
             "weak": [str(row.get("symbol")) for row in reversed(sector_sorted[-3:]) if str(row.get("symbol") or "").strip()],
-            "interpretation": str(market_structure.get("note") or insight_short_view),
+            "interpretation": str(market_structure.get("note") or one_liner),
         },
         "theme_clusters": theme_clusters,
         "response_guidance": {
+            "favorable_actions": favorable_points,
+            "avoid_actions": avoid_points,
+            "checkpoints": checkpoints,
             "favorable": favorable_points,
             "avoid": avoid_points,
         },
@@ -3442,7 +3593,7 @@ def build_us_market_daily_payload():
             "losers": [dict(row or {}) for row in losers_detail[:10]],
         },
         "action_points": {
-            "insight_short_view": insight_short_view,
+            "insight_short_view": one_liner,
             "insight_bullets": [str((item or {}).get("text") or "") for item in insight_bullets if str((item or {}).get("text") or "").strip()],
             "analysis_actions": [dict(item or {}) for item in analysis_actions[:_US_MARKET_ANALYSIS_ACTION_COUNT]],
             "watchlist": [str(item) for item in _coerce_market_text_list(watchlist, max_items=4)],

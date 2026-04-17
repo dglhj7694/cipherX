@@ -54,6 +54,7 @@ class MarketDailyBriefingNotifyTests(unittest.TestCase):
                     "breadth_summary": "상승 섹터 4/11, 확산 약함",
                     "leadership_summary": "QQQ 우위 / IWM 열세",
                 },
+                "market_structure_text": "리더십은 QQQ 우위였지만 IWM 열세와 breadth 약세가 겹쳐 선별 장세 해석이 유효했습니다.",
                 "sector_summary": {
                     "strong": ["XLK", "XLY", "XLF"],
                     "weak": ["XLU", "XLB", "XLI"],
@@ -64,6 +65,9 @@ class MarketDailyBriefingNotifyTests(unittest.TestCase):
                     {"theme": "반도체", "count": 6, "sample_symbols": ["G003", "G004", "G005"]},
                 ],
                 "response_guidance": {
+                    "favorable_actions": ["리더주 눌림 대응 우선", "거래량 동반 강세만 선별"],
+                    "avoid_actions": ["확산 약한 날 지수 추격 매수", "거래량 부족 급등주 후행 추격"],
+                    "checkpoints": ["10Y·DXY·WTI 동조 방향 점검", "IWM 상대강도 변화 점검"],
                     "favorable": ["리더주 눌림 대응 우선", "거래량 동반 강세만 선별"],
                     "avoid": ["확산 약한 날 지수 추격 자제", "거래량 부족 급등주 후행 추격 자제"],
                 },
@@ -138,11 +142,14 @@ class MarketDailyBriefingNotifyTests(unittest.TestCase):
         self.assertIn("3) Session Flow", core)
         self.assertIn("6) Market Structure", core)
         self.assertIn("Breadth: 상승 섹터 4/11, 확산 약함", core)
+        self.assertIn("해석: 리더십은 QQQ 우위였지만 IWM 열세와 breadth 약세가 겹쳐 선별 장세 해석이 유효했습니다.", core)
         self.assertIn("8) Top Movers +10 / -10", core)
         self.assertIn("10. G009", core)
         self.assertNotIn("11. G010", core)
+        self.assertNotIn("확인", core.split("10) 오늘 피해야 할 대응", 1)[1].split("11) 체크포인트", 1)[0])
 
         self.assertIn("[오늘 미국장 상세 브리핑]", detail)
+        self.assertIn("breadth 요약: 상승 섹터 4/11, 확산 약함", detail)
         self.assertIn("3) Top Movers +30 / -30", detail)
         self.assertIn("30. G029", detail)
         self.assertNotIn("31. G030", detail)
@@ -163,6 +170,36 @@ class MarketDailyBriefingNotifyTests(unittest.TestCase):
         p4 = detail.index("4) 추가 인사이트")
         p5 = detail.index("5) 다음 세션 트리거")
         self.assertTrue(p1 < p2 < p3 < p4 < p5)
+
+    def test_core_avoids_duplicate_close_sentence(self):
+        payload = self._build_report_payload()
+        report = dict(payload["briefing_report"])
+        report["session_flow"] = dict(report["session_flow"])
+        report["session_flow"]["close"] = report["one_liner"]
+        payload["briefing_report"] = report
+        core = build_market_daily_briefing_messages(
+            payload,
+            run_at_kst=datetime(2026, 4, 16, 6, 15, 0),
+            detail_limit=30,
+            core_mover_limit=10,
+            quick_target_limit=8,
+        )[0]
+        self.assertNotIn(f"- 마감: {report['one_liner']}", core)
+
+    def test_detail_theme_section_shows_haedang_eopsum_when_empty(self):
+        payload = self._build_report_payload()
+        report = dict(payload["briefing_report"])
+        report["theme_clusters"] = []
+        payload["briefing_report"] = report
+        detail = build_market_daily_briefing_messages(
+            payload,
+            run_at_kst=datetime(2026, 4, 16, 6, 15, 0),
+            detail_limit=30,
+            core_mover_limit=10,
+            quick_target_limit=8,
+        )[1]
+        self.assertIn("2) 테마 묶음 요약", detail)
+        self.assertIn("- 해당 없음", detail)
 
     def test_build_market_daily_briefing_text_keeps_single_string_contract(self):
         payload = self._build_report_payload()
@@ -202,6 +239,26 @@ class MarketDailyBriefingNotifyTests(unittest.TestCase):
         self.assertGreater(len(chunks), 1)
         self.assertEqual("\n".join(chunks), raw)
         self.assertTrue(all(len(chunk) <= 180 for chunk in chunks))
+
+    def test_split_telegram_message_text_prefers_section_boundaries(self):
+        raw = "\n".join(
+            [
+                "1) Section One",
+                "A" * 50,
+                "",
+                "2) Section Two",
+                "B" * 50,
+                "",
+                "3) Section Three",
+                "C" * 50,
+            ]
+        )
+        chunks = split_telegram_message_text(raw, chunk_size=95)
+        self.assertGreaterEqual(len(chunks), 3)
+        self.assertTrue(chunks[0].startswith("1) Section One"))
+        self.assertTrue(any(chunk.startswith("2) Section Two") for chunk in chunks))
+        self.assertTrue(any(chunk.startswith("3) Section Three") for chunk in chunks))
+        self.assertEqual("\n".join(chunks), raw)
 
     @patch("scripts.market_daily_briefing_notify.requests.post")
     def test_send_telegram_message_sends_all_chunks_in_order(self, mock_post: MagicMock):

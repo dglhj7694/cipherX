@@ -170,6 +170,7 @@ class MarketDailyMoverUniverseTests(unittest.TestCase):
             "five_day_change",
             "month_change",
             "reason",
+            "theme",
         }
         self.assertTrue(required_keys.issubset(set(gainers_detail[0].keys())))
         self.assertTrue(required_keys.issubset(set(losers_detail[0].keys())))
@@ -178,6 +179,8 @@ class MarketDailyMoverUniverseTests(unittest.TestCase):
         losers_changes = [float(row["change_pct"]) for row in losers_detail if row.get("change_pct") is not None]
         self.assertEqual(gainers_changes, sorted(gainers_changes, reverse=True))
         self.assertEqual(losers_changes, sorted(losers_changes))
+        negative_losers = [row for row in losers_detail if float(row.get("change_pct") or 0) < 0]
+        self.assertTrue(all(str(row.get("reason") or "") not in {"거래량강세", "테마강세", "기술적반등", "추세연장"} for row in negative_losers))
 
         analysis_actions = list(payload.get("analysis_actions") or [])
         self.assertEqual(len(analysis_actions), ui._US_MARKET_ANALYSIS_ACTION_COUNT)
@@ -193,11 +196,15 @@ class MarketDailyMoverUniverseTests(unittest.TestCase):
         self.assertIn("breadth_summary", briefing_report)
         self.assertIn("session_flow", briefing_report)
         self.assertIn("market_structure", briefing_report)
+        self.assertIn("market_structure_text", briefing_report)
         self.assertIn("theme_clusters", briefing_report)
         self.assertIn("response_guidance", briefing_report)
         self.assertIn("checkpoints", briefing_report)
         self.assertIn("quick_targets", briefing_report)
         self.assertIn("core_movers", briefing_report)
+        self.assertIn("favorable_actions", dict(briefing_report.get("response_guidance") or {}))
+        self.assertIn("avoid_actions", dict(briefing_report.get("response_guidance") or {}))
+        self.assertIn("checkpoints", dict(briefing_report.get("response_guidance") or {}))
         self.assertIn("상승 섹터", str(briefing_report.get("breadth_summary")))
         self.assertEqual(
             set(dict(briefing_report.get("benchmarks") or {}).keys()),
@@ -215,6 +222,10 @@ class MarketDailyMoverUniverseTests(unittest.TestCase):
         movers = dict(briefing_report.get("movers") or {})
         self.assertEqual(len(list(movers.get("gainers") or [])), ui._US_MARKET_TOP_MOVER_DETAIL_COUNT)
         self.assertEqual(len(list(movers.get("losers") or [])), ui._US_MARKET_TOP_MOVER_DETAIL_COUNT)
+        quick_targets = list(briefing_report.get("quick_targets") or [])
+        self.assertGreater(len(quick_targets), 0)
+        self.assertLessEqual(len(quick_targets), 8)
+        self.assertTrue(any("거래량" in str(row.get("reason") or "") for row in quick_targets))
 
     def test_analysis_actions_keeps_available_rows_when_under_limit(self):
         movers_sorted = [

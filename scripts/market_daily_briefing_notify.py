@@ -3,6 +3,7 @@
 import argparse
 import math
 import os
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -171,6 +172,21 @@ def _build_report_core_briefing_text(
     headline = _coerce_text(report.get("headline")) or "오늘 미국장 핵심 흐름"
     one_liner = _coerce_text(report.get("one_liner")) or headline
 
+    def _normalize_for_compare(text: str) -> str:
+        return re.sub(r"[\s\.\,\-\|]+", "", str(text or "").lower())
+
+    def _coerce_action_lines(values: list[str], *, allow_check_words: bool = True) -> list[str]:
+        lines: list[str] = []
+        blocked = ("확인", "점검", "체크")
+        for raw in values:
+            text = _coerce_text(raw)
+            if not text:
+                continue
+            if not allow_check_words and any(word in text for word in blocked):
+                continue
+            lines.append(text.rstrip(". "))
+        return lines
+
     executive = dict(report.get("executive_summary") or {})
     sentiment = dict(report.get("sentiment") or {})
     risk_state_display = _coerce_text(executive.get("risk_state_display")) or _coerce_text(sentiment.get("risk_state_display")) or _coerce_text(sentiment.get("risk_state")) or "N/A"
@@ -182,6 +198,7 @@ def _build_report_core_briefing_text(
     relative_strength = dict(report.get("relative_strength") or {})
     sector_rank = [item for item in list(report.get("sector_rank") or []) if isinstance(item, dict)]
     market_structure = dict(report.get("market_structure") or {})
+    market_structure_text = _coerce_text(report.get("market_structure_text"))
     session_flow = dict(report.get("session_flow") or {})
     sector_summary = dict(report.get("sector_summary") or {})
     response_guidance = dict(report.get("response_guidance") or {})
@@ -199,24 +216,48 @@ def _build_report_core_briefing_text(
     watchlist = [_coerce_text(item) for item in list(action_points.get("watchlist") or []) if _coerce_text(item)]
     analysis_actions = [dict(item or {}) for item in list(action_points.get("analysis_actions") or []) if isinstance(item, dict)]
 
-    favorable = [_coerce_text(item) for item in list(response_guidance.get("favorable") or []) if _coerce_text(item)]
-    avoid = [_coerce_text(item) for item in list(response_guidance.get("avoid") or []) if _coerce_text(item)]
-    checkpoints = [_coerce_text(item) for item in list(report.get("checkpoints") or []) if _coerce_text(item)]
+    favorable_source = list(response_guidance.get("favorable_actions") or response_guidance.get("favorable") or [])
+    avoid_source = list(response_guidance.get("avoid_actions") or response_guidance.get("avoid") or [])
+    checkpoints_source = list(report.get("checkpoints") or response_guidance.get("checkpoints") or [])
+    favorable = _coerce_action_lines([_coerce_text(item) for item in favorable_source], allow_check_words=True)
+    avoid = _coerce_action_lines([_coerce_text(item) for item in avoid_source], allow_check_words=False)
+    checkpoints = _coerce_action_lines([_coerce_text(item) for item in checkpoints_source], allow_check_words=True)
     quick_targets = [dict(item or {}) for item in list(report.get("quick_targets") or []) if isinstance(item, dict)]
 
     if not favorable:
-        favorable = insight_bullets[:3]
+        favorable = [
+            "빅테크·리더주 중심으로 눌림 구간만 선별 대응",
+            "거래량 1배 이상 종목만 압축 관찰",
+            "확산 확인 전까지는 지수보다 리더주 우선 대응",
+        ]
     if not avoid:
-        avoid = watchlist[:3]
+        avoid = [
+            "breadth 약한 구간에서 지수 추격 매수",
+            "거래량 1배 미만 급등주 후행 추격",
+            "IWM 확산 확인 전 중소형주 광범위 베팅",
+        ]
     if not checkpoints:
-        checkpoints = watchlist[:3]
+        checkpoints = watchlist[:3] or [
+            "10Y·DXY·WTI 장초반 동조 방향 확인",
+            "QQQ-SPY / IWM-SPY 상대강도 변화 확인",
+            "VIX·Gold·BTC로 방어 심리 재확대 여부 점검",
+        ]
     if not quick_targets:
         quick_targets = [{"symbol": _coerce_text(item.get("symbol"))} for item in analysis_actions[:quick_cap] if _coerce_text(item.get("symbol"))]
 
     breadth_summary = _coerce_text(report.get("breadth_summary")) or _coerce_text(market_structure.get("breadth_summary")) or "상승 섹터 정보 없음"
+    if not market_structure_text:
+        market_structure_text = (
+            f"QQQ-SPY {_fmt_pct_point(relative_strength.get('QQQ_SPY'))}, "
+            f"IWM-SPY {_fmt_pct_point(relative_strength.get('IWM_SPY'))}, {breadth_summary}를 고려하면 "
+            "지수 추격보다 리더주 선별 대응이 유리합니다."
+        )
 
     strong_sectors = [_coerce_text(item.get("symbol")) for item in sector_rank[:3] if _coerce_text(item.get("symbol"))]
     weak_sectors = [_coerce_text(item.get("symbol")) for item in list(reversed(sector_rank[-3:])) if _coerce_text(item.get("symbol"))]
+    close_text = _coerce_text(session_flow.get("close")) or one_liner
+    if _normalize_for_compare(close_text) == _normalize_for_compare(one_liner):
+        close_text = "종가 기준으로는 지수 방향보다 리더십 유지 여부가 더 중요한 세션이었습니다."
 
     lines = [
         f"[오늘 미국장 핵심 브리핑] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
@@ -233,7 +274,7 @@ def _build_report_core_briefing_text(
         "3) Session Flow",
         f"- 장전: {_coerce_text(session_flow.get('premarket')) or (insight_bullets[0] if insight_bullets else headline)}",
         f"- 정규장: {_coerce_text(session_flow.get('regular')) or one_liner}",
-        f"- 마감: {_coerce_text(session_flow.get('close')) or one_liner}",
+        f"- 마감: {close_text}",
         "",
         "4) Index Snapshot",
         _format_snapshot_line("NASDAQ100", dict(benchmarks.get("NASDAQ100") or {})),
@@ -257,9 +298,10 @@ def _build_report_core_briefing_text(
     lines += [
         "",
         "6) Market Structure",
-        f"- Relative Strength: QQQ-SPY {_fmt_pct_point(relative_strength.get('QQQ_SPY'))} / IWM-SPY {_fmt_pct_point(relative_strength.get('IWM_SPY'))}",
         f"- Breadth: {breadth_summary}",
-        f"- Leadership: {_coerce_text(market_structure.get('leadership_summary')) or one_liner}",
+        f"- Relative Strength: QQQ-SPY {_fmt_pct_point(relative_strength.get('QQQ_SPY'))} / IWM-SPY {_fmt_pct_point(relative_strength.get('IWM_SPY'))}",
+        f"- Leadership: {_coerce_text(market_structure.get('leadership_summary')) or _coerce_text(market_structure.get('label')) or '혼조'}",
+        f"- 해석: {market_structure_text}",
         "",
         "7) Sector Summary",
         f"- 강한 섹터: {', '.join(strong_sectors) if strong_sectors else 'N/A'}",
@@ -280,13 +322,13 @@ def _build_report_core_briefing_text(
         lines.append("- 표시할 하락 종목이 없습니다.")
 
     lines += ["", "9) 오늘 유리한 대응"]
-    if favorable:
+    if favorable[:3]:
         lines.extend([f"- {text}" for text in favorable[:3]])
     else:
         lines.append("- 리더주 선별 대응 우선")
 
     lines += ["", "10) 오늘 피해야 할 대응"]
-    if avoid:
+    if avoid[:3]:
         lines.extend([f"- {text}" for text in avoid[:3]])
     else:
         lines.append("- 확산 확인 전 무리한 추격 자제")
@@ -302,7 +344,7 @@ def _build_report_core_briefing_text(
         for target in quick_targets[:quick_cap]:
             symbol = _coerce_text(target.get("symbol")) or "-"
             reason = _coerce_text(target.get("reason")) or _coerce_text(target.get("source")) or "주도 후보"
-            lines.append(f"- {symbol} - {reason}")
+            lines.append(f"- {symbol} — {reason}")
     else:
         lines.append("- 오늘 빠른 분석 대상이 아직 집계되지 않았습니다.")
 
@@ -317,6 +359,7 @@ def _build_report_detail_briefing_text(
 ) -> str:
     limit = max(1, int(detail_limit or DEFAULT_DETAIL_LIMIT))
     market_date_label = _coerce_text(report.get("market_date_label")) or "Latest session"
+    breadth_summary = _coerce_text(report.get("breadth_summary"))
     sector_rank = [item for item in list(report.get("sector_rank") or []) if isinstance(item, dict)]
     theme_clusters = [item for item in list(report.get("theme_clusters") or []) if isinstance(item, dict)]
     movers = dict(report.get("movers") or {})
@@ -329,6 +372,7 @@ def _build_report_detail_briefing_text(
     lines = [
         f"[오늘 미국장 상세 브리핑] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
         f"- 기준 세션: {market_date_label}",
+        f"- breadth 요약: {breadth_summary or '상승 섹터 정보 없음'}",
         "",
         "1) 전체 섹터 순위",
     ]
@@ -351,7 +395,7 @@ def _build_report_detail_briefing_text(
             symbols = [str(item) for item in list(row.get("sample_symbols") or []) if _coerce_text(item)]
             lines.append(f"{idx}. {theme} | {count}개 | {', '.join(symbols[:4]) if symbols else '-'}")
     else:
-        lines.append("- 테마 클러스터가 아직 집계되지 않았습니다.")
+        lines.append("- 해당 없음")
 
     lines += [
         "",
@@ -492,15 +536,15 @@ def build_market_daily_briefing_failure_text(*, run_at_kst: datetime, reason: st
     )
 
 
-def split_telegram_message_text(text: str, *, chunk_size: int = DEFAULT_CHUNK_SIZE) -> list[str]:
-    raw = str(text or "")
-    limit = max(1, int(chunk_size))
-    if len(raw) <= limit:
-        return [raw]
+def _is_section_header_line(line: str) -> bool:
+    return bool(re.match(r"^\d+\)\s+\S+", str(line or "").strip()))
+
+
+def _chunk_lines_with_limit(lines: list[str], *, limit: int) -> list[str]:
     chunks: list[str] = []
     current: list[str] = []
     current_len = 0
-    for line in raw.splitlines():
+    for line in lines:
         line_text = str(line)
         line_len = len(line_text) + 1
         if line_len > limit:
@@ -523,6 +567,56 @@ def split_telegram_message_text(text: str, *, chunk_size: int = DEFAULT_CHUNK_SI
             current_len += line_len
     if current:
         chunks.append("\n".join(current))
+    return chunks
+
+
+def split_telegram_message_text(text: str, *, chunk_size: int = DEFAULT_CHUNK_SIZE) -> list[str]:
+    raw = str(text or "")
+    limit = max(1, int(chunk_size))
+    if len(raw) <= limit:
+        return [raw]
+    lines = raw.splitlines()
+    if not lines:
+        return [raw]
+
+    # Prefer section-boundary splitting first, then line-level split for very large sections.
+    blocks: list[list[str]] = []
+    current_block: list[str] = []
+    for line in lines:
+        if _is_section_header_line(line) and current_block:
+            blocks.append(current_block)
+            current_block = [line]
+        else:
+            current_block.append(line)
+    if current_block:
+        blocks.append(current_block)
+
+    chunks: list[str] = []
+    current_chunk_lines: list[str] = []
+    current_chunk_len = 0
+
+    for block_lines in blocks:
+        block_text = "\n".join(block_lines)
+        block_len = len(block_text)
+        if block_len <= limit:
+            extra_len = block_len + (1 if current_chunk_lines else 0)
+            if current_chunk_lines and (current_chunk_len + extra_len > limit):
+                chunks.append("\n".join(current_chunk_lines))
+                current_chunk_lines = list(block_lines)
+                current_chunk_len = block_len
+            else:
+                current_chunk_lines.extend(block_lines)
+                current_chunk_len = len("\n".join(current_chunk_lines))
+            continue
+
+        if current_chunk_lines:
+            chunks.append("\n".join(current_chunk_lines))
+            current_chunk_lines = []
+            current_chunk_len = 0
+        chunks.extend(_chunk_lines_with_limit(block_lines, limit=limit))
+
+    if current_chunk_lines:
+        chunks.append("\n".join(current_chunk_lines))
     return chunks or [raw]
 
 
