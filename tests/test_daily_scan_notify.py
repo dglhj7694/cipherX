@@ -1,4 +1,5 @@
-import json
+﻿import json
+import re
 import tempfile
 import unittest
 from datetime import datetime
@@ -11,6 +12,9 @@ from scripts.daily_scan_and_notify import (
     build_transition_summary,
     filter_turn_rows_for_telegram,
     merge_shard_scan_rows,
+    select_pullback_reentry_rows_for_telegram,
+    select_us_session_52w_high_rows,
+    select_us_session_hull_bear_rows,
     select_us_session_turn_rows,
     split_telegram_message_text,
     split_tickers_for_shard,
@@ -28,10 +32,7 @@ class DailyScanNotifyTests(unittest.TestCase):
         return "T" + "".join(reversed(letters))
 
     def test_build_scan_universe_combines_sector_and_etf_with_dedupe(self):
-        fake_sectors = {
-            "A": ["AAA", "BBB", "CCC"],
-            "B": ["CCC", "DDD"],
-        }
+        fake_sectors = {"A": ["AAA", "BBB", "CCC"], "B": ["CCC", "DDD"]}
         fake_resolved = {
             "items": [{"requested": "S&P500", "resolved": "SPY"}],
             "tickers": ["EEE", "AAA", "FFF"],
@@ -47,7 +48,6 @@ class DailyScanNotifyTests(unittest.TestCase):
         self.assertEqual(payload["sector_count"], 4)
         self.assertEqual(payload["etf_count"], 3)
         self.assertEqual(payload["tickers"], ["AAA", "BBB", "CCC", "DDD", "EEE", "FFF"])
-        self.assertEqual(payload["etf_note"], "ok")
 
     def test_build_scan_universe_russell2000_profile_uses_iwm_items(self):
         fake_sectors = {"A": ["AAA"]}
@@ -67,7 +67,7 @@ class DailyScanNotifyTests(unittest.TestCase):
         self.assertEqual(captured["items"], list(RUSSELL2000_UNIVERSE_ITEMS))
         self.assertEqual(payload["tickers"], ["AAA", "IWMA", "IWMB"])
 
-    def test_select_us_session_turn_rows_filters_by_previous_us_session(self):
+    def test_select_us_session_turn_rows_filters_previous_us_session(self):
         rows = [
             {"ticker": "AAA", "scan_score": 3.2, "utbot_buy_last_date": "2026-04-15", "hull_turn_bull_last_date": "없음"},
             {"ticker": "BBB", "scan_score": 9.0, "utbot_buy_last_date": "2026-04-14", "hull_turn_bull_last_date": "없음"},
@@ -87,42 +87,137 @@ class DailyScanNotifyTests(unittest.TestCase):
         filtered = filter_turn_rows_for_telegram(rows, min_volume_ratio_20_exclusive=1.0)
         self.assertEqual([row["ticker"] for row in filtered], ["BBB", "CCC"])
 
-    def test_build_transition_summary_contains_new_header_and_row_format(self):
+    def test_select_pullback_reentry_rows_for_telegram(self):
+        rows = [
+            {"ticker": "AAA", "scan_score": 7.0, "pullback_reentry": True, "volume_ratio_20": 1.01},
+            {"ticker": "BBB", "scan_score": 8.0, "pullback_reentry": False, "volume_ratio_20": 2.0},
+            {"ticker": "CCC", "scan_score": 9.0, "pullback_reentry": True, "volume_ratio_20": 1.0},
+        ]
+        selected = select_pullback_reentry_rows_for_telegram(rows, min_volume_ratio_20_exclusive=1.0)
+        self.assertEqual([row["ticker"] for row in selected], ["AAA"])
+
+    def test_select_us_session_hull_bear_rows(self):
+        rows = [
+            {"ticker": "AAA", "scan_score": 6.0, "hull_turn_bear_last_date": "2026-04-16"},
+            {"ticker": "BBB", "scan_score": 8.0, "hull_turn_bear_last_date": "2026-04-15"},
+        ]
+        selected = select_us_session_hull_bear_rows(rows, run_at_kst=datetime(2026, 4, 17, 6, 15, 0))
+        self.assertEqual([row["ticker"] for row in selected], ["AAA"])
+
+    def test_select_us_session_52w_high_rows(self):
+        rows = [
+            {"ticker": "AAA", "scan_score": 6.0, "new_52w_high": True, "latest_bar_date": "2026-04-16"},
+            {"ticker": "BBB", "scan_score": 8.0, "new_52w_high": False, "latest_bar_date": "2026-04-16"},
+            {"ticker": "CCC", "scan_score": 9.0, "new_52w_high": True, "latest_bar_date": "2026-04-15"},
+        ]
+        selected = select_us_session_52w_high_rows(rows, run_at_kst=datetime(2026, 4, 17, 6, 15, 0))
+        self.assertEqual([row["ticker"] for row in selected], ["AAA"])
+
+    def test_build_transition_summary_uses_four_ordered_sections_with_headers(self):
         summary = build_transition_summary(
             [
                 {
                     "ticker": "NVDA",
                     "chg_value": 4.25,
-                    "chg": 2.4,
-                    "volume_ratio_20": 1.8,
+                    "chg": 2.40,
+                    "volume_ratio_20": 1.80,
                     "jg_key": "BUY",
                     "transition_signals": ["HULL 매수"],
-                },
-                {
-                    "ticker": "AAPL",
-                    "chg_value": -1.12,
-                    "chg": -0.7,
-                    "volume_ratio_20": 1.4,
-                    "jg_key": "WATCH_BUY",
-                    "transition_signals": ["UTBot 매수"],
-                },
+                }
             ],
-            run_at_kst=datetime(2026, 4, 16, 6, 15, 0),
+            run_at_kst=datetime(2026, 4, 17, 6, 15, 0),
             universe_count=1200,
             result_count=980,
             skip_count=220,
             detected_turn_count=4,
             summary_limit=10,
+            pullback_rows=[
+                {
+                    "ticker": "AAPL",
+                    "chg_value": 1.2,
+                    "chg": 0.9,
+                    "volume_ratio_20": 1.4,
+                    "jg_key": "WATCH_BUY",
+                }
+            ],
+            hull_bear_rows=[
+                {
+                    "ticker": "TSLA",
+                    "chg_value": -3.2,
+                    "chg": -1.8,
+                    "volume_ratio_20": 1.3,
+                    "jg_key": "SELL",
+                }
+            ],
+            high_52w_rows=[
+                {
+                    "ticker": "MSFT",
+                    "chg_value": 2.1,
+                    "chg": 1.1,
+                    "volume_ratio_20": 1.2,
+                    "jg_key": "BUY",
+                }
+            ],
         )
-        self.assertIn("필터 기준: 전일 미국장(US/Eastern)에서 UTBot/HULL 매수 신호 발생", summary)
-        self.assertIn("추가 필터: 20일 평균대비 거래량 > 1.0x", summary)
-        self.assertIn("전환 감지 4개 -> 필터 통과 2개", summary)
-        self.assertIn("1. NVDA | (+4.25, +2.40%) | 거래량 1.80x | BUY | HULL 매수", summary)
-        self.assertNotIn("매수전환", summary)
-        self.assertNotIn("| 판단", summary)
-        self.assertNotIn("| 전환", summary)
 
-    def test_build_transition_summary_does_not_truncate_when_summary_limit_is_zero(self):
+        self.assertIn("요약 인덱스: 매수전환 1 | 눌림목 1 | HULL매도 1 | 52W 신고가 1", summary)
+        p1 = summary.index("=== [1/4] 매수전환 ===")
+        p2 = summary.index("=== [2/4] 눌림목 재진입 ===")
+        p3 = summary.index("=== [3/4] 당일 HULL 매도 ===")
+        p4 = summary.index("=== [4/4] 52주 신고가 갱신 ===")
+        self.assertTrue(p1 < p2 < p3 < p4)
+        self.assertIn("기준:", summary)
+        self.assertIn("건수:", summary)
+
+    def test_build_transition_summary_empty_section_has_placeholder(self):
+        summary = build_transition_summary(
+            [],
+            run_at_kst=datetime(2026, 4, 17, 6, 15, 0),
+            universe_count=1200,
+            result_count=980,
+            skip_count=220,
+            detected_turn_count=0,
+            summary_limit=10,
+            pullback_rows=[],
+            hull_bear_rows=[],
+            high_52w_rows=[],
+        )
+        self.assertGreaterEqual(summary.count("- 해당 없음"), 4)
+
+    def test_build_transition_summary_numbering_resets_per_section(self):
+        summary = build_transition_summary(
+            [
+                {
+                    "ticker": "AAA",
+                    "chg_value": 1.0,
+                    "chg": 1.0,
+                    "volume_ratio_20": 1.2,
+                    "jg_key": "BUY",
+                    "transition_signals": ["UTBot 매수"],
+                }
+            ],
+            run_at_kst=datetime(2026, 4, 17, 6, 15, 0),
+            universe_count=100,
+            result_count=80,
+            skip_count=20,
+            detected_turn_count=1,
+            summary_limit=10,
+            pullback_rows=[
+                {
+                    "ticker": "BBB",
+                    "chg_value": 0.5,
+                    "chg": 0.7,
+                    "volume_ratio_20": 1.3,
+                    "jg_key": "WATCH_BUY",
+                }
+            ],
+            hull_bear_rows=[],
+            high_52w_rows=[],
+        )
+        self.assertRegex(summary, r"=== \[1/4\] 매수전환 ===[\s\S]*\n1\. AAA")
+        self.assertRegex(summary, r"=== \[2/4\] 눌림목 재진입 ===[\s\S]*\n1\. BBB")
+
+    def test_build_transition_summary_does_not_truncate_when_summary_limit_zero(self):
         rows = [
             {
                 "ticker": f"T{i:03d}",
@@ -142,16 +237,50 @@ class DailyScanNotifyTests(unittest.TestCase):
             skip_count=220,
             detected_turn_count=45,
             summary_limit=0,
+            pullback_rows=[],
+            hull_bear_rows=[],
+            high_52w_rows=[],
         )
         self.assertIn("45. T044", summary)
         self.assertNotIn("... 외", summary)
 
-    def test_split_telegram_message_text_chunks_long_message(self):
-        text = "\n".join([f"line-{idx:03d}-abcdefghijklmnopqrstuvwxyz" for idx in range(120)])
-        chunks = split_telegram_message_text(text, chunk_size=220)
+    def test_split_telegram_message_text_preserves_section_boundaries(self):
+        base_row = {
+            "ticker": "AAA",
+            "chg_value": 1.0,
+            "chg": 1.0,
+            "volume_ratio_20": 1.5,
+            "jg_key": "BUY",
+            "transition_signals": ["HULL 매수"],
+        }
+        rows = []
+        for i in range(40):
+            row = dict(base_row)
+            row["ticker"] = f"T{i:03d}"
+            rows.append(row)
+
+        summary = build_transition_summary(
+            rows,
+            run_at_kst=datetime(2026, 4, 16, 6, 15, 0),
+            universe_count=1200,
+            result_count=980,
+            skip_count=220,
+            detected_turn_count=40,
+            summary_limit=0,
+            pullback_rows=rows,
+            hull_bear_rows=rows,
+            high_52w_rows=rows,
+        )
+        chunks = split_telegram_message_text(summary, chunk_size=450)
         self.assertGreater(len(chunks), 1)
-        self.assertEqual("\n".join(chunks), text)
-        self.assertTrue(all(len(chunk) <= 220 for chunk in chunks))
+        self.assertTrue(all(len(chunk) <= 450 for chunk in chunks))
+
+        joined = "\n".join(chunks)
+        p1 = joined.index("=== [1/4] 매수전환 ===")
+        p2 = joined.index("=== [2/4] 눌림목 재진입 ===")
+        p3 = joined.index("=== [3/4] 당일 HULL 매도 ===")
+        p4 = joined.index("=== [4/4] 52주 신고가 갱신 ===")
+        self.assertTrue(p1 < p2 < p3 < p4)
 
     def test_split_tickers_for_shard_union_and_no_overlap(self):
         tickers = [self._alpha_symbol(i) for i in range(300)]

@@ -412,6 +412,12 @@ def _build_scanner_row(ticker: str, *, bias_mode: str, recent_window: int = 5) -
             flip_guard_triggered=flip_guard_triggered,
         )
 
+        latest_bar = dc_.index[-1] if len(dc_.index) else None
+        if hasattr(latest_bar, "date"):
+            latest_bar_date = latest_bar.date().isoformat()
+        else:
+            latest_bar_date = str(latest_bar)[:10] if latest_bar is not None else ""
+
         row = {
             "ticker": ticker,
             "price": _safe_float(current_close),
@@ -470,6 +476,9 @@ def _build_scanner_row(ticker: str, *, bias_mode: str, recent_window: int = 5) -
             "hull_turn_bull_last_date": str(detected_payload.get("hull_turn_bull_last_date", "없음")),
             "hull_turn_bear_recent": bool(detected_payload.get("hull_turn_bear_recent", False)),
             "hull_turn_bear_last_date": str(detected_payload.get("hull_turn_bear_last_date", "없음")),
+            "latest_bar_date": str(latest_bar_date or "없음"),
+            "new_52w_high": bool(latest.get("New_52W_High", False)),
+            "new_52w_closing_high": bool(latest.get("New_52W_Closing_High", False)),
             "detected_combo_count": int(detected_payload.get("detected_combo_count", 0) or 0),
             "detected_combo_summary": str(detected_payload.get("detected_combo_summary", "없음")),
             "detected_transition_count": int(detected_payload.get("detected_transition_count", 0) or 0),
@@ -709,6 +718,52 @@ def filter_turn_rows_for_telegram(
     return filtered
 
 
+def select_pullback_reentry_rows_for_telegram(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    min_volume_ratio_20_exclusive: float = 1.0,
+) -> list[dict[str, Any]]:
+    selected: list[dict[str, Any]] = []
+    for row in rows or []:
+        row_dict = dict(row or {})
+        if not bool(row_dict.get("pullback_reentry", False)):
+            continue
+        volume_ratio = _safe_float(row_dict.get("volume_ratio_20", 0))
+        if volume_ratio <= float(min_volume_ratio_20_exclusive):
+            continue
+        selected.append(row_dict)
+    selected.sort(key=lambda row: (-_safe_float(row.get("scan_score", 0)), -_safe_float(row.get("es", 0)), str(row.get("ticker", ""))))
+    return selected
+
+
+def select_us_session_hull_bear_rows(rows: Iterable[Mapping[str, Any]], *, run_at_kst: datetime) -> list[dict[str, Any]]:
+    target_date = _last_us_market_session_date(run_at_kst)
+    selected: list[dict[str, Any]] = []
+    for row in rows or []:
+        row_dict = dict(row or {})
+        hull_bear_date = _parse_iso_date(row_dict.get("hull_turn_bear_last_date"))
+        if hull_bear_date != target_date:
+            continue
+        selected.append(row_dict)
+    selected.sort(key=lambda row: (-_safe_float(row.get("scan_score", 0)), -_safe_float(row.get("es", 0)), str(row.get("ticker", ""))))
+    return selected
+
+
+def select_us_session_52w_high_rows(rows: Iterable[Mapping[str, Any]], *, run_at_kst: datetime) -> list[dict[str, Any]]:
+    target_date = _last_us_market_session_date(run_at_kst)
+    selected: list[dict[str, Any]] = []
+    for row in rows or []:
+        row_dict = dict(row or {})
+        if not bool(row_dict.get("new_52w_high", False)):
+            continue
+        bar_date = _parse_iso_date(row_dict.get("latest_bar_date"))
+        if bar_date != target_date:
+            continue
+        selected.append(row_dict)
+    selected.sort(key=lambda row: (-_safe_float(row.get("scan_score", 0)), -_safe_float(row.get("es", 0)), str(row.get("ticker", ""))))
+    return selected
+
+
 def _fmt_signed_number(value: Any, decimals: int = 2) -> str:
     try:
         return f"{float(value):+.{decimals}f}"
@@ -723,6 +778,44 @@ def _fmt_ratio(value: Any, decimals: int = 2) -> str:
         return "--"
 
 
+def _build_section_row_line(row: Mapping[str, Any], index: int, tag_text: str) -> str:
+    return (
+        f"{index}. {row.get('ticker', '-')}"
+        f" | ({_fmt_signed_number(row.get('chg_value', 0), 2)}, {_fmt_signed_number(row.get('chg', 0), 2)}%)"
+        f" | 거래량 {_fmt_ratio(row.get('volume_ratio_20', 0), 2)}"
+        f" | {row.get('jg_key', '-')}"
+        f" | {str(tag_text or '-')}"
+    )
+
+
+def _build_summary_section_lines(
+    *,
+    section_index: int,
+    section_total: int,
+    section_name: str,
+    criteria: str,
+    rows: Iterable[Mapping[str, Any]],
+    summary_limit: int,
+    tag_builder: Any,
+) -> list[str]:
+    all_rows = [dict(row or {}) for row in (rows or [])]
+    limited_rows = all_rows if int(summary_limit) <= 0 else all_rows[: int(summary_limit)]
+    lines = [
+        f"=== [{section_index}/{section_total}] {section_name} ===",
+        f"기준: {criteria}",
+        f"건수: {len(all_rows)}개",
+    ]
+    if not all_rows:
+        lines.append("- 해당 없음")
+        return lines
+    for idx, row in enumerate(limited_rows, start=1):
+        lines.append(_build_section_row_line(row, idx, str(tag_builder(row) or "-")))
+    remain = len(all_rows) - len(limited_rows)
+    if remain > 0:
+        lines.append(f"... 외 {remain}개")
+    return lines
+
+
 def build_transition_summary(
     turn_rows: Iterable[Mapping[str, Any]],
     *,
@@ -733,39 +826,78 @@ def build_transition_summary(
     scan_label: str = "자동 스캔",
     detected_turn_count: int | None = None,
     summary_limit: int = 0,
+    pullback_rows: Iterable[Mapping[str, Any]] | None = None,
+    hull_bear_rows: Iterable[Mapping[str, Any]] | None = None,
+    high_52w_rows: Iterable[Mapping[str, Any]] | None = None,
 ) -> str:
-    rows = list(turn_rows or [])
-    detected_count = len(rows) if detected_turn_count is None else max(0, int(detected_turn_count))
+    buy_rows = [dict(row or {}) for row in (turn_rows or [])]
+    pullback_rows_list = [dict(row or {}) for row in (pullback_rows or [])]
+    hull_bear_rows_list = [dict(row or {}) for row in (hull_bear_rows or [])]
+    high_52w_rows_list = [dict(row or {}) for row in (high_52w_rows or [])]
+    detected_count = len(buy_rows) if detected_turn_count is None else max(0, int(detected_turn_count))
     target_us_session_date = _last_us_market_session_date(run_at_kst)
+
     lines = [
         f"[{str(scan_label or '자동 스캔')}] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
-        f"- 전일 미국장 전환일: {target_us_session_date.isoformat()} (US/Eastern)",
-        "- 필터 기준: 전일 미국장(US/Eastern)에서 UTBot/HULL 매수 신호 발생",
-        "- 추가 필터: 20일 평균대비 거래량 > 1.0x",
+        f"- 전일 미국장 기준일: {target_us_session_date.isoformat()} (US/Eastern)",
         f"- 유니버스: {universe_count}개",
         f"- 전체 스캔 결과: {result_count}개 (제외 {skip_count}개)",
-        f"- 전환 감지 {detected_count}개 -> 필터 통과 {len(rows)}개",
+        (
+            f"- 요약 인덱스: 매수전환 {len(buy_rows)}"
+            f" | 눌림목 {len(pullback_rows_list)}"
+            f" | HULL매도 {len(hull_bear_rows_list)}"
+            f" | 52W 신고가 {len(high_52w_rows_list)}"
+        ),
         "",
-        "당일 전환 목록:",
     ]
-    if not rows:
-        lines.append("- 해당 없음")
-        return "\n".join(lines)
 
-    limited_rows = rows if int(summary_limit) <= 0 else rows[: int(summary_limit)]
-    for idx, row in enumerate(limited_rows, start=1):
-        signals = list(row.get("transition_signals") or [])
-        signal_text = ", ".join(signals) if signals else "-"
-        lines.append(
-            f"{idx}. {row.get('ticker', '-')}"
-            f" | ({_fmt_signed_number(row.get('chg_value', 0), 2)}, {_fmt_signed_number(row.get('chg', 0), 2)}%)"
-            f" | 거래량 {_fmt_ratio(row.get('volume_ratio_20', 0), 2)}"
-            f" | {row.get('jg_key', '-')}"
-            f" | {signal_text}"
-        )
-    remain = len(rows) - len(limited_rows)
-    if remain > 0:
-        lines.append(f"... 외 {remain}개")
+    sections = [
+        _build_summary_section_lines(
+            section_index=1,
+            section_total=4,
+            section_name="매수전환",
+            criteria=(
+                "전일 미국장(US/Eastern) UTBot/HULL 매수전환"
+                f" + 거래량 > 1.0x (감지 {detected_count}개)"
+            ),
+            rows=buy_rows,
+            summary_limit=summary_limit,
+            tag_builder=lambda row: ", ".join(list(dict(row or {}).get("transition_signals") or [])) or "-",
+        ),
+        _build_summary_section_lines(
+            section_index=2,
+            section_total=4,
+            section_name="눌림목 재진입",
+            criteria="pullback_reentry=True + volume_ratio_20 > 1.0",
+            rows=pullback_rows_list,
+            summary_limit=summary_limit,
+            tag_builder=lambda _row: "PULLBACK 재진입",
+        ),
+        _build_summary_section_lines(
+            section_index=3,
+            section_total=4,
+            section_name="당일 HULL 매도",
+            criteria=f"hull_turn_bear_last_date == {target_us_session_date.isoformat()}",
+            rows=hull_bear_rows_list,
+            summary_limit=summary_limit,
+            tag_builder=lambda _row: "HULL 매도",
+        ),
+        _build_summary_section_lines(
+            section_index=4,
+            section_total=4,
+            section_name="52주 신고가 갱신",
+            criteria=f"New_52W_High=True + latest_bar_date == {target_us_session_date.isoformat()}",
+            rows=high_52w_rows_list,
+            summary_limit=summary_limit,
+            tag_builder=lambda _row: "52W 신고가",
+        ),
+    ]
+    for block in sections:
+        lines.extend(block)
+        lines.append("")
+
+    if lines and not str(lines[-1]).strip():
+        lines.pop()
     return "\n".join(lines)
 
 
@@ -778,33 +910,85 @@ def split_telegram_message_text(text: str, *, chunk_size: int = 3500) -> list[st
     limit = max(1, int(chunk_size))
     if len(raw) <= limit:
         return [raw]
-    chunks: list[str] = []
-    current: list[str] = []
-    current_len = 0
-    for line in raw.splitlines():
-        line_text = str(line)
-        line_len = len(line_text) + 1
-        if line_len > limit:
-            if current:
+
+    def _split_by_lines(raw_text: str) -> list[str]:
+        chunks: list[str] = []
+        current: list[str] = []
+        current_len = 0
+        for line in str(raw_text or "").splitlines():
+            line_text = str(line)
+            line_len = len(line_text) + 1
+            if line_len > limit:
+                if current:
+                    chunks.append("\n".join(current))
+                    current = []
+                    current_len = 0
+                start = 0
+                while start < len(line_text):
+                    end = min(start + limit, len(line_text))
+                    chunks.append(line_text[start:end])
+                    start = end
+                continue
+            if current and (current_len + line_len > limit):
                 chunks.append("\n".join(current))
-                current = []
-                current_len = 0
-            start = 0
-            while start < len(line_text):
-                end = min(start + limit, len(line_text))
-                chunks.append(line_text[start:end])
-                start = end
-            continue
-        if current and (current_len + line_len > limit):
+                current = [line_text]
+                current_len = line_len
+            else:
+                current.append(line_text)
+                current_len += line_len
+        if current:
             chunks.append("\n".join(current))
-            current = [line_text]
-            current_len = line_len
-        else:
-            current.append(line_text)
-            current_len += line_len
-    if current:
-        chunks.append("\n".join(current))
-    return chunks or [raw]
+        return chunks or [raw_text]
+
+    # Prefer section-aware chunking for daily scanner report blocks.
+    if "=== [1/4]" in raw:
+        lines = raw.splitlines()
+        section_blocks: list[list[str]] = []
+        current_block: list[str] = []
+        for line in lines:
+            if line.startswith("=== [") and current_block:
+                section_blocks.append(current_block)
+                current_block = [line]
+            else:
+                current_block.append(line)
+        if current_block:
+            section_blocks.append(current_block)
+
+        # Keep header preface and first section together when present.
+        if len(section_blocks) >= 2 and not str(section_blocks[0][0] if section_blocks[0] else "").startswith("=== ["):
+            section_blocks[1] = list(section_blocks[0]) + list(section_blocks[1])
+            section_blocks = section_blocks[1:]
+
+        chunked: list[str] = []
+        current_lines: list[str] = []
+        current_len = 0
+        for block_lines in section_blocks:
+            block = [str(line) for line in block_lines]
+            block_len = sum(len(line) + 1 for line in block)
+            if block_len > limit:
+                if current_lines:
+                    chunked.append("\n".join(current_lines))
+                    current_lines = []
+                    current_len = 0
+                # Fallback: split oversized block line-by-line.
+                fallback_chunks = _split_by_lines("\n".join(block))
+                chunked.extend(fallback_chunks)
+                continue
+
+            if current_lines and (current_len + block_len > limit):
+                chunked.append("\n".join(current_lines))
+                current_lines = list(block)
+                current_len = block_len
+            else:
+                current_lines.extend(block)
+                current_len += block_len
+
+        if current_lines:
+            chunked.append("\n".join(current_lines))
+        if chunked:
+            return chunked
+
+    return _split_by_lines(raw)
 
 
 def send_telegram_message(token: str, chat_id: str, text: str, *, chunk_size: int = 3500) -> None:
@@ -892,6 +1076,9 @@ def main() -> int:
 
         detected_turn_rows = select_us_session_turn_rows(merged_rows, run_at_kst=run_at_kst)
         turn_rows = filter_turn_rows_for_telegram(detected_turn_rows, min_volume_ratio_20_exclusive=1.0)
+        pullback_rows = select_pullback_reentry_rows_for_telegram(merged_rows, min_volume_ratio_20_exclusive=1.0)
+        hull_bear_rows = select_us_session_hull_bear_rows(merged_rows, run_at_kst=run_at_kst)
+        high_52w_rows = select_us_session_52w_high_rows(merged_rows, run_at_kst=run_at_kst)
         summary_text = build_transition_summary(
             turn_rows,
             run_at_kst=run_at_kst,
@@ -901,6 +1088,9 @@ def main() -> int:
             scan_label=scan_label,
             detected_turn_count=len(detected_turn_rows),
             summary_limit=int(args.summary_limit),
+            pullback_rows=pullback_rows,
+            hull_bear_rows=hull_bear_rows,
+            high_52w_rows=high_52w_rows,
         )
         summary_path = out_dir / f"trend_turn_summary_{run_label}.txt"
         summary_path.write_text(summary_text, encoding="utf-8")
@@ -914,6 +1104,9 @@ def main() -> int:
                 "result_count": len(merged_rows),
                 "detected_turn_count": len(detected_turn_rows),
                 "trend_turn_count": len(turn_rows),
+                "pullback_reentry_count": len(pullback_rows),
+                "hull_bear_count": len(hull_bear_rows),
+                "new_52w_high_count": len(high_52w_rows),
                 "csv_path": str(csv_path),
                 "rows_path": str(rows_path),
                 "summary_path": str(summary_path),
@@ -947,6 +1140,9 @@ def main() -> int:
         rows_path = write_scan_rows_json(scan_result.rows, out_dir=out_dir, run_label=run_label)
         detected_turn_rows = select_us_session_turn_rows(scan_result.rows, run_at_kst=run_at_kst)
         turn_rows = filter_turn_rows_for_telegram(detected_turn_rows, min_volume_ratio_20_exclusive=1.0)
+        pullback_rows = select_pullback_reentry_rows_for_telegram(scan_result.rows, min_volume_ratio_20_exclusive=1.0)
+        hull_bear_rows = select_us_session_hull_bear_rows(scan_result.rows, run_at_kst=run_at_kst)
+        high_52w_rows = select_us_session_52w_high_rows(scan_result.rows, run_at_kst=run_at_kst)
         summary_text = build_transition_summary(
             turn_rows,
             run_at_kst=run_at_kst,
@@ -956,6 +1152,9 @@ def main() -> int:
             scan_label=scan_label,
             detected_turn_count=len(detected_turn_rows),
             summary_limit=int(args.summary_limit),
+            pullback_rows=pullback_rows,
+            hull_bear_rows=hull_bear_rows,
+            high_52w_rows=high_52w_rows,
         )
         summary_path = out_dir / f"trend_turn_summary_{run_label}.txt"
         summary_path.write_text(summary_text, encoding="utf-8")
@@ -976,6 +1175,9 @@ def main() -> int:
                 "result_count": len(scan_result.rows),
                 "detected_turn_count": len(detected_turn_rows),
                 "trend_turn_count": len(turn_rows),
+                "pullback_reentry_count": len(pullback_rows),
+                "hull_bear_count": len(hull_bear_rows),
+                "new_52w_high_count": len(high_52w_rows),
                 "csv_path": str(csv_path),
                 "rows_path": str(rows_path),
                 "summary_path": str(summary_path),
