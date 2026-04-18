@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import argparse
 import hashlib
@@ -50,6 +50,15 @@ from etf_sources import resolve_etf_universe
 KST = ZoneInfo("Asia/Seoul")
 US_EASTERN = ZoneInfo("America/New_York")
 _SCAN_SYMBOL_PATTERN = re.compile(r"\b[A-Z]{1,6}(?:[.-][A-Z0-9]{1,4})?\b")
+
+SCAN_MODE_LABELS: dict[str, str] = {
+    "post_close": "자동 스캔",
+    "pre_market": "프리마켓 스캔",
+    "early_session": "얼리세션 스캔 ⚠️ 장중",
+}
+US_MARKET_OPEN_ET = dt_time(9, 30)
+US_MARKET_CLOSE_ET = dt_time(16, 0)
+US_REGULAR_SESSION_MINUTES = 390.0
 
 ETF_UNIVERSE_ITEMS: tuple[dict[str, str], ...] = (
     {"requested": "러셀1000", "resolved": "IWB"},
@@ -201,21 +210,21 @@ def build_scan_universe(
     }
 
 
-def _compute_signal_frame(ticker: str, *, bias_mode: str) -> Any | None:
-    history = yf.Ticker(ticker).history(period="2y", auto_adjust=True)
+def _compute_signal_frame(ticker: str, *, bias_mode: str, history_period: str = "2y") -> Any | None:
+    history = yf.Ticker(ticker).history(period=history_period, auto_adjust=True)
     if history is None or history.empty:
         return None
     indicator_frame = compute_indicators(history)
     return detect_all_signals(indicator_frame, bias_mode=resolve_bias_mode(bias_mode))
 
 
-def _build_scanner_row(ticker: str, *, bias_mode: str, recent_window: int = 5) -> dict[str, Any]:
+def _build_scanner_row(ticker: str, *, bias_mode: str, recent_window: int = 5, history_period: str = "2y") -> dict[str, Any]:
     ticker = str(ticker or "").strip().upper()
     if not ticker:
         return {"ok": False, "ticker": "", "skip_reason": "invalid_ticker", "detail": "empty ticker"}
 
     try:
-        frame = _compute_signal_frame(ticker, bias_mode=bias_mode)
+        frame = _compute_signal_frame(ticker, bias_mode=bias_mode, history_period=history_period)
     except Exception as exc:
         return {"ok": False, "ticker": ticker, "skip_reason": "compute_error", "detail": str(exc)[:220]}
 
@@ -496,14 +505,14 @@ def _build_scanner_row(ticker: str, *, bias_mode: str, recent_window: int = 5) -
         return {"ok": False, "ticker": ticker, "skip_reason": "row_build_error", "detail": str(exc)[:220]}
 
 
-def _scan_ticker_worker(ticker: str, *, bias_mode: str) -> dict[str, Any]:
+def _scan_ticker_worker(ticker: str, *, bias_mode: str, history_period: str = "2y") -> dict[str, Any]:
     started = time.perf_counter()
-    payload = dict(_build_scanner_row(ticker, bias_mode=bias_mode))
+    payload = dict(_build_scanner_row(ticker, bias_mode=bias_mode, history_period=history_period))
     payload["elapsed_sec"] = _safe_float(time.perf_counter() - started)
     return payload
 
 
-def scan_universe(tickers: list[str], *, max_workers: int, bias_mode: str) -> ScanRunResult:
+def scan_universe(tickers: list[str], *, max_workers: int, bias_mode: str, history_period: str = "2y") -> ScanRunResult:
     run_started = time.perf_counter()
     results: list[dict[str, Any]] = []
     skip_reasons: list[dict[str, str]] = []
@@ -526,7 +535,7 @@ def scan_universe(tickers: list[str], *, max_workers: int, bias_mode: str) -> Sc
     scan_started = time.perf_counter()
     with ThreadPoolExecutor(max_workers=effective_workers) as executor:
         futures = {
-            executor.submit(_scan_ticker_worker, ticker, bias_mode=bias_mode): ticker
+            executor.submit(_scan_ticker_worker, ticker, bias_mode=bias_mode, history_period=history_period): ticker
             for ticker in tickers
         }
         for future in as_completed(futures):
@@ -677,6 +686,79 @@ def _last_us_market_session_date(run_at_kst: datetime) -> date:
     return session_date
 
 
+def _current_us_session_date(run_at_kst: datetime) -> date:
+    """현재 진행 중이거나 가장 가까운 미국장 세션 날짜 반환 (early_session용)."""
+    us_now = run_at_kst.astimezone(US_EASTERN)
+    session_date = us_now.date()
+    while session_date.weekday() >= 5:
+        session_date -= timedelta(days=1)
+    return session_date
+
+
+def _resolve_target_session_date(run_at_kst: datetime, scan_mode: str) -> date:
+    """scan_mode에 따라 적절한 타겟 세션 날짜 반환."""
+    if scan_mode == "early_session":
+        return _current_us_session_date(run_at_kst)
+    return _last_us_market_session_date(run_at_kst)
+
+
+def _scan_label_for_mode(scan_mode: str, universe_profile: str) -> str:
+    """scan_mode와 universe_profile을 조합하여 라벨 생성."""
+    base = SCAN_MODE_LABELS.get(scan_mode, "자동 스캔")
+    if _normalize_universe_profile(universe_profile) == "russell2000":
+        return f"{base}:RUSSELL2000"
+    return base
+
+
+def _history_period_for_mode(scan_mode: str) -> str:
+    """scan_mode에 따라 yfinance history period 결정."""
+    if scan_mode == "pre_market":
+        return "5d"
+    if scan_mode == "early_session":
+        return "1y"
+    return "2y"
+
+
+def _time_adjusted_volume_threshold(
+    run_at_kst: datetime,
+    *,
+    base_threshold: float = 1.0,
+) -> float:
+    """장 개시 후 경과 시간에 비례한 거래량 임계값 반환.
+
+    보정 모델 (U-shape 반영):
+    - 처음 30분: 하루 거래량의 ~25% 집중
+    - 30~60분: 추가 ~15%
+    - 60분 이후: 나머지 ~60% 균등 분포
+    """
+    us_now = run_at_kst.astimezone(US_EASTERN)
+    market_open = us_now.replace(
+        hour=US_MARKET_OPEN_ET.hour, minute=US_MARKET_OPEN_ET.minute,
+        second=0, microsecond=0,
+    )
+    market_close = us_now.replace(
+        hour=US_MARKET_CLOSE_ET.hour, minute=US_MARKET_CLOSE_ET.minute,
+        second=0, microsecond=0,
+    )
+
+    if us_now <= market_open:
+        return max(0.05, base_threshold * 0.05)
+    if us_now >= market_close:
+        return base_threshold
+
+    elapsed = (us_now - market_open).total_seconds() / 60.0
+
+    if elapsed <= 30:
+        ratio = 0.25 * (elapsed / 30.0)
+    elif elapsed <= 60:
+        ratio = 0.25 + 0.15 * ((elapsed - 30) / 30.0)
+    else:
+        ratio = 0.40 + 0.60 * ((elapsed - 60) / (US_REGULAR_SESSION_MINUTES - 60))
+
+    return max(0.05, base_threshold * min(1.0, ratio))
+
+
+
 def _transition_signals_on_date(row: Mapping[str, Any], target_date: date) -> list[str]:
     signals: list[str] = []
     utbot_buy_date = _parse_iso_date(row.get("utbot_buy_last_date"))
@@ -688,8 +770,8 @@ def _transition_signals_on_date(row: Mapping[str, Any], target_date: date) -> li
     return signals
 
 
-def select_us_session_turn_rows(rows: Iterable[Mapping[str, Any]], *, run_at_kst: datetime) -> list[dict[str, Any]]:
-    target_date = _last_us_market_session_date(run_at_kst)
+def select_us_session_turn_rows(rows: Iterable[Mapping[str, Any]], *, run_at_kst: datetime, scan_mode: str = "post_close") -> list[dict[str, Any]]:
+    target_date = _resolve_target_session_date(run_at_kst, scan_mode)
     selected: list[dict[str, Any]] = []
     for row in rows or []:
         row_dict = dict(row or {})
@@ -736,8 +818,8 @@ def select_pullback_reentry_rows_for_telegram(
     return selected
 
 
-def select_us_session_hull_bear_rows(rows: Iterable[Mapping[str, Any]], *, run_at_kst: datetime) -> list[dict[str, Any]]:
-    target_date = _last_us_market_session_date(run_at_kst)
+def select_us_session_hull_bear_rows(rows: Iterable[Mapping[str, Any]], *, run_at_kst: datetime, scan_mode: str = "post_close") -> list[dict[str, Any]]:
+    target_date = _resolve_target_session_date(run_at_kst, scan_mode)
     selected: list[dict[str, Any]] = []
     for row in rows or []:
         row_dict = dict(row or {})
@@ -749,8 +831,8 @@ def select_us_session_hull_bear_rows(rows: Iterable[Mapping[str, Any]], *, run_a
     return selected
 
 
-def select_us_session_52w_high_rows(rows: Iterable[Mapping[str, Any]], *, run_at_kst: datetime) -> list[dict[str, Any]]:
-    target_date = _last_us_market_session_date(run_at_kst)
+def select_us_session_52w_high_rows(rows: Iterable[Mapping[str, Any]], *, run_at_kst: datetime, scan_mode: str = "post_close") -> list[dict[str, Any]]:
+    target_date = _resolve_target_session_date(run_at_kst, scan_mode)
     selected: list[dict[str, Any]] = []
     for row in rows or []:
         row_dict = dict(row or {})
@@ -829,27 +911,56 @@ def build_transition_summary(
     pullback_rows: Iterable[Mapping[str, Any]] | None = None,
     hull_bear_rows: Iterable[Mapping[str, Any]] | None = None,
     high_52w_rows: Iterable[Mapping[str, Any]] | None = None,
+    scan_mode: str = "post_close",
+    volume_threshold: float | None = None,
 ) -> str:
     buy_rows = [dict(row or {}) for row in (turn_rows or [])]
     pullback_rows_list = [dict(row or {}) for row in (pullback_rows or [])]
     hull_bear_rows_list = [dict(row or {}) for row in (hull_bear_rows or [])]
     high_52w_rows_list = [dict(row or {}) for row in (high_52w_rows or [])]
     detected_count = len(buy_rows) if detected_turn_count is None else max(0, int(detected_turn_count))
-    target_us_session_date = _last_us_market_session_date(run_at_kst)
+    target_us_session_date = _resolve_target_session_date(run_at_kst, scan_mode)
 
-    lines = [
-        f"[{str(scan_label or '자동 스캔')}] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
-        f"- 전일 미국장 기준일: {target_us_session_date.isoformat()} (US/Eastern)",
-        f"- 유니버스: {universe_count}개",
-        f"- 전체 스캔 결과: {result_count}개 (제외 {skip_count}개)",
-        (
-            f"- 요약 인덱스: 매수전환 {len(buy_rows)}"
-            f" | 눌림목 {len(pullback_rows_list)}"
-            f" | HULL매도 {len(hull_bear_rows_list)}"
-            f" | 52W 신고가 {len(high_52w_rows_list)}"
-        ),
-        "",
-    ]
+    index_line = (
+        f"- 요약 인덱스: 매수전환 {len(buy_rows)}"
+        f" | 눌림목 {len(pullback_rows_list)}"
+        f" | HULL매도 {len(hull_bear_rows_list)}"
+        f" | 52W 신고가 {len(high_52w_rows_list)}"
+    )
+
+    if scan_mode == "pre_market":
+        lines = [
+            f"[{str(scan_label or '프리마켓 스캔')}] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
+            f"- 기준: 전일 미국장 확정 데이터 ({target_us_session_date.isoformat()})",
+            f"- 목적: 오늘 본장에서 주목할 종목 선점",
+            f"- 유니버스: {universe_count}개 | 스캔 결과: {result_count}개",
+            index_line,
+            "",
+        ]
+    elif scan_mode == "early_session":
+        vol_text = f"{volume_threshold:.2f}x" if volume_threshold is not None else "시간비례"
+        lines = [
+            f"[{str(scan_label or '얼리세션 스캔')}] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
+            f"- 기준: 오늘 미국장 장중 데이터 ({target_us_session_date.isoformat()}) ⚠️ 미확정",
+            f"- 목적: 장 시작 후 강세 종목 빠른 포착",
+            f"- 거래량 기준: {vol_text} (시간비례 보정 적용)",
+            f"- 유니버스: {universe_count}개 | 스캔 결과: {result_count}개 (제외 {skip_count}개)",
+            "- ⚠️ 장중 스냅샷: 신호/거래량은 장 마감 시 변동될 수 있습니다",
+            index_line,
+            "",
+        ]
+    else:
+        lines = [
+            f"[{str(scan_label or '자동 스캔')}] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
+            f"- 전일 미국장 기준일: {target_us_session_date.isoformat()} (US/Eastern)",
+            f"- 유니버스: {universe_count}개",
+            f"- 전체 스캔 결과: {result_count}개 (제외 {skip_count}개)",
+            index_line,
+            "",
+        ]
+
+    vol_criteria_suffix = f" + 거래량 > {volume_threshold:.2f}x" if volume_threshold is not None and volume_threshold < 1.0 else " + 거래량 > 1.0x"
+    session_label = "장중" if scan_mode == "early_session" else "전일 미국장(US/Eastern)"
 
     sections = [
         _build_summary_section_lines(
@@ -857,8 +968,8 @@ def build_transition_summary(
             section_total=4,
             section_name="매수전환",
             criteria=(
-                "전일 미국장(US/Eastern) UTBot/HULL 매수전환"
-                f" + 거래량 > 1.0x (감지 {detected_count}개)"
+                f"{session_label} UTBot/HULL 매수전환"
+                f"{vol_criteria_suffix} (감지 {detected_count}개)"
             ),
             rows=buy_rows,
             summary_limit=summary_limit,
@@ -868,7 +979,7 @@ def build_transition_summary(
             section_index=2,
             section_total=4,
             section_name="눌림목 재진입",
-            criteria="pullback_reentry=True + volume_ratio_20 > 1.0",
+            criteria=f"pullback_reentry=True{vol_criteria_suffix}",
             rows=pullback_rows_list,
             summary_limit=summary_limit,
             tag_builder=lambda _row: "PULLBACK 재진입",
@@ -993,32 +1104,62 @@ def split_telegram_message_text(text: str, *, chunk_size: int = 3500) -> list[st
 
 def send_telegram_message(token: str, chat_id: str, text: str, *, chunk_size: int = 3500) -> None:
     chunks = split_telegram_message_text(text, chunk_size=chunk_size)
-    for chunk in chunks:
+    for chunk_idx, chunk in enumerate(chunks, start=1):
         if not str(chunk or "").strip():
             continue
-        response = requests.post(
-            _telegram_api(token, "sendMessage"),
-            json={"chat_id": chat_id, "text": chunk},
-            timeout=30,
-        )
-        response.raise_for_status()
-        payload = response.json()
-        if not payload.get("ok"):
-            raise RuntimeError(f"Telegram sendMessage failed: {payload}")
+        success = False
+        last_error = ""
+        for attempt in range(1, 4):
+            try:
+                response = requests.post(
+                    _telegram_api(token, "sendMessage"),
+                    json={"chat_id": chat_id, "text": chunk},
+                    timeout=30,
+                )
+                response.raise_for_status()
+                payload = response.json()
+                if payload.get("ok"):
+                    success = True
+                    break
+                else:
+                    last_error = f"Payload not ok: {payload}"
+            except Exception as exc:
+                last_error = str(exc)
+            
+            if attempt < 3:
+                time.sleep(2)
+        
+        if not success:
+            print(f"[ERROR] Failed to send Telegram message chunk {chunk_idx}/{len(chunks)} after 3 attempts. Last error: {last_error}")
 
 
 def send_telegram_document(token: str, chat_id: str, file_path: Path, caption: str = "") -> None:
-    with file_path.open("rb") as handle:
-        response = requests.post(
-            _telegram_api(token, "sendDocument"),
-            data={"chat_id": chat_id, "caption": caption},
-            files={"document": (file_path.name, handle, "text/csv")},
-            timeout=60,
-        )
-    response.raise_for_status()
-    payload = response.json()
-    if not payload.get("ok"):
-        raise RuntimeError(f"Telegram sendDocument failed: {payload}")
+    success = False
+    last_error = ""
+    for attempt in range(1, 4):
+        try:
+            with file_path.open("rb") as handle:
+                response = requests.post(
+                    _telegram_api(token, "sendDocument"),
+                    data={"chat_id": chat_id, "caption": caption},
+                    files={"document": (file_path.name, handle, "text/csv")},
+                    timeout=60,
+                )
+            response.raise_for_status()
+            payload = response.json()
+            if payload.get("ok"):
+                success = True
+                break
+            else:
+                last_error = f"Payload not ok: {payload}"
+        except Exception as exc:
+            last_error = str(exc)
+            
+        if attempt < 3:
+            time.sleep(2)
+            
+    if not success:
+        print(f"[ERROR] Failed to send Telegram document {file_path.name} after 3 attempts. Last error: {last_error}")
 
 
 def parse_args() -> argparse.Namespace:
@@ -1038,24 +1179,147 @@ def parse_args() -> argparse.Namespace:
         choices=sorted(UNIVERSE_PROFILE_ITEMS.keys()),
         help="Universe profile (default or russell2000)",
     )
+    parser.add_argument(
+        "--scan-mode",
+        default="post_close",
+        choices=["post_close", "pre_market", "early_session"],
+        help="post_close(05시 장마감), pre_market(21시 프리마켓), early_session(23시 장초반)",
+    )
+    parser.add_argument(
+        "--prev-scan-dir",
+        default="",
+        help="pre_market 모드: 이전 post_close 스캔 결과를 로드할 디렉토리",
+    )
     return parser.parse_args()
 
 
-def main() -> int:
-    args = parse_args()
-    run_at_kst = datetime.now(KST)
+# ---------------------------------------------------------------------------
+# Phase 4: Pre-market helper functions
+# ---------------------------------------------------------------------------
+
+def _load_json_file(path: Path) -> Any:
+    """JSON 파일 로드 유틸."""
+    with path.open("r", encoding="utf-8") as fp:
+        return json.load(fp)
+
+
+def _load_latest_scan_rows(scan_dir: Path) -> tuple[list[dict[str, Any]], Path | None]:
+    """가장 최근의 scan_rows JSON을 로드. merged 우선, 없으면 단일 shard."""
+    merged = sorted(scan_dir.glob("scan_rows_*_merged.json"), reverse=True)
+    if merged:
+        data = _load_json_file(merged[0])
+        rows = list(data) if isinstance(data, list) else list(data.get("rows", [])) if isinstance(data, dict) else []
+        return rows, merged[0]
+    singles = sorted(scan_dir.glob("scan_rows_*.json"), reverse=True)
+    if singles:
+        data = _load_json_file(singles[0])
+        rows = list(data) if isinstance(data, list) else list(data.get("rows", [])) if isinstance(data, dict) else []
+        return rows, singles[0]
+    return [], None
+
+
+def _fetch_premarket_gaps(
+    tickers: list[str],
+    *,
+    max_workers: int = 8,
+) -> dict[str, dict[str, float]]:
+    """프리마켓 가격을 수집하여 전일 종가 대비 갭 계산."""
+
+    def _fetch_one(ticker: str) -> tuple[str, dict[str, float] | None]:
+        try:
+            hist = yf.Ticker(ticker).history(period="5d", prepost=True)
+            if hist is None or len(hist) < 2:
+                return ticker, None
+            prev_close = float(hist["Close"].iloc[-2])
+            current = float(hist["Close"].iloc[-1])
+            if prev_close <= 0:
+                return ticker, None
+            gap_pct = (current - prev_close) / prev_close * 100
+            return ticker, {
+                "premarket_price": round(current, 4),
+                "prev_close": round(prev_close, 4),
+                "gap_pct": round(gap_pct, 4),
+            }
+        except Exception:
+            return ticker, None
+
+    results: dict[str, dict[str, float]] = {}
+    effective_workers = min(max_workers, max(1, len(tickers)))
+    with ThreadPoolExecutor(max_workers=effective_workers) as executor:
+        futures = {executor.submit(_fetch_one, t): t for t in tickers}
+        for future in as_completed(futures):
+            ticker, data = future.result()
+            if data is not None:
+                results[ticker] = data
+    return results
+
+
+def _enrich_rows_with_gap(
+    rows: list[dict[str, Any]],
+    gap_data: dict[str, dict[str, float]],
+) -> list[dict[str, Any]]:
+    """기존 스캔 결과에 프리마켓 갭 데이터를 주입."""
+    enriched = []
+    for row in rows:
+        row_dict = dict(row)
+        ticker = str(row_dict.get("ticker", "")).strip().upper()
+        gap = gap_data.get(ticker)
+        if gap:
+            row_dict["premarket_price"] = gap["premarket_price"]
+            row_dict["prev_close"] = gap["prev_close"]
+            row_dict["gap_pct"] = gap["gap_pct"]
+        else:
+            row_dict["premarket_price"] = _safe_float(row_dict.get("price", 0))
+            row_dict["prev_close"] = _safe_float(row_dict.get("price", 0))
+            row_dict["gap_pct"] = 0.0
+        enriched.append(row_dict)
+    return enriched
+
+
+# ---------------------------------------------------------------------------
+# Phase 6: Run mode functions
+# ---------------------------------------------------------------------------
+
+def _send_telegram_if_enabled(
+    args: argparse.Namespace,
+    *,
+    summary_text: str,
+    csv_path: Path,
+    scan_label: str,
+    run_at_kst: datetime,
+) -> None:
+    """Telegram 전송 공통 로직."""
+    if args.dry_run or args.skip_telegram:
+        print("[SCAN] Telegram send skipped by option.")
+        return
+
+    token = str(os.getenv("TELEGRAM_BOT_TOKEN", "")).strip()
+    chat_id = str(os.getenv("TELEGRAM_CHAT_ID", "")).strip()
+    if not token or not chat_id:
+        raise RuntimeError("TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID must be set")
+
+    print("[SCAN] Sending Telegram summary...")
+    send_telegram_message(token, chat_id, summary_text)
+    print("[SCAN] Sending Telegram CSV...")
+    send_telegram_document(
+        token,
+        chat_id,
+        csv_path,
+        caption=f"{scan_label} CSV ({run_at_kst.strftime('%Y-%m-%d %H:%M')} KST)",
+    )
+    print("[SCAN] Telegram notification completed.")
+
+
+def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: Path) -> int:
+    """기존 05시 post_close 로직 (변경 없음)."""
     stamp = run_at_kst.strftime("%Y%m%d_%H%M%S")
-    out_dir = Path(args.out_dir)
     shard_count = int(args.shard_count or 1)
     shard_index = int(args.shard_index or 0)
     merge_dir_arg = str(args.merge_dir or "").strip()
     merge_dir = Path(merge_dir_arg).expanduser().resolve() if merge_dir_arg else None
     universe_profile = _normalize_universe_profile(args.universe_profile)
     scan_label = _scan_label_for_profile(universe_profile)
-    if shard_count <= 0:
-        raise RuntimeError("--shard-count must be > 0")
-    if shard_index < 0 or shard_index >= shard_count:
-        raise RuntimeError("--shard-index out of range")
+    scan_mode = "post_close"
 
     if merge_dir:
         run_label = f"{stamp}_merged"
@@ -1074,11 +1338,11 @@ def main() -> int:
         csv_path = write_scan_csv(merged_rows, out_dir=out_dir, run_label=run_label)
         rows_path = write_scan_rows_json(merged_rows, out_dir=out_dir, run_label=run_label)
 
-        detected_turn_rows = select_us_session_turn_rows(merged_rows, run_at_kst=run_at_kst)
+        detected_turn_rows = select_us_session_turn_rows(merged_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
         turn_rows = filter_turn_rows_for_telegram(detected_turn_rows, min_volume_ratio_20_exclusive=1.0)
         pullback_rows = select_pullback_reentry_rows_for_telegram(merged_rows, min_volume_ratio_20_exclusive=1.0)
-        hull_bear_rows = select_us_session_hull_bear_rows(merged_rows, run_at_kst=run_at_kst)
-        high_52w_rows = select_us_session_52w_high_rows(merged_rows, run_at_kst=run_at_kst)
+        hull_bear_rows = select_us_session_hull_bear_rows(merged_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
+        high_52w_rows = select_us_session_52w_high_rows(merged_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
         summary_text = build_transition_summary(
             turn_rows,
             run_at_kst=run_at_kst,
@@ -1091,6 +1355,7 @@ def main() -> int:
             pullback_rows=pullback_rows,
             hull_bear_rows=hull_bear_rows,
             high_52w_rows=high_52w_rows,
+            scan_mode=scan_mode,
         )
         summary_path = out_dir / f"trend_turn_summary_{run_label}.txt"
         summary_path.write_text(summary_text, encoding="utf-8")
@@ -1099,6 +1364,7 @@ def main() -> int:
             {
                 "run_at_kst": run_at_kst.isoformat(),
                 "mode": "merge",
+                "scan_mode": scan_mode,
                 "universe_profile": universe_profile,
                 "merged_payload": merged_payload,
                 "result_count": len(merged_rows),
@@ -1138,11 +1404,11 @@ def main() -> int:
 
         csv_path = write_scan_csv(scan_result.rows, out_dir=out_dir, run_label=run_label)
         rows_path = write_scan_rows_json(scan_result.rows, out_dir=out_dir, run_label=run_label)
-        detected_turn_rows = select_us_session_turn_rows(scan_result.rows, run_at_kst=run_at_kst)
+        detected_turn_rows = select_us_session_turn_rows(scan_result.rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
         turn_rows = filter_turn_rows_for_telegram(detected_turn_rows, min_volume_ratio_20_exclusive=1.0)
         pullback_rows = select_pullback_reentry_rows_for_telegram(scan_result.rows, min_volume_ratio_20_exclusive=1.0)
-        hull_bear_rows = select_us_session_hull_bear_rows(scan_result.rows, run_at_kst=run_at_kst)
-        high_52w_rows = select_us_session_52w_high_rows(scan_result.rows, run_at_kst=run_at_kst)
+        hull_bear_rows = select_us_session_hull_bear_rows(scan_result.rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
+        high_52w_rows = select_us_session_52w_high_rows(scan_result.rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
         summary_text = build_transition_summary(
             turn_rows,
             run_at_kst=run_at_kst,
@@ -1155,6 +1421,7 @@ def main() -> int:
             pullback_rows=pullback_rows,
             hull_bear_rows=hull_bear_rows,
             high_52w_rows=high_52w_rows,
+            scan_mode=scan_mode,
         )
         summary_path = out_dir / f"trend_turn_summary_{run_label}.txt"
         summary_path.write_text(summary_text, encoding="utf-8")
@@ -1163,6 +1430,7 @@ def main() -> int:
             {
                 "run_at_kst": run_at_kst.isoformat(),
                 "mode": "scan",
+                "scan_mode": scan_mode,
                 "universe_profile": universe_profile,
                 "full_universe_count": len(full_tickers),
                 "shard_ticker_count": len(tickers),
@@ -1189,26 +1457,301 @@ def main() -> int:
         print(f"[SCAN] CSV saved: {csv_path}")
         print(f"[SCAN] Summary saved: {summary_path}")
 
-    if args.dry_run or args.skip_telegram:
-        print("[SCAN] Telegram send skipped by option.")
-        return 0
-
-    token = str(os.getenv("TELEGRAM_BOT_TOKEN", "")).strip()
-    chat_id = str(os.getenv("TELEGRAM_CHAT_ID", "")).strip()
-    if not token or not chat_id:
-        raise RuntimeError("TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID must be set")
-
-    print("[SCAN] Sending Telegram summary...")
-    send_telegram_message(token, chat_id, summary_text)
-    print("[SCAN] Sending Telegram CSV...")
-    send_telegram_document(
-        token,
-        chat_id,
-        csv_path,
-        caption=f"{scan_label} CSV ({run_at_kst.strftime('%Y-%m-%d %H:%M')} KST)",
-    )
-    print("[SCAN] Telegram notification completed.")
+    _send_telegram_if_enabled(args, summary_text=summary_text, csv_path=csv_path, scan_label=scan_label, run_at_kst=run_at_kst)
     return 0
+
+
+def _run_pre_market(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: Path) -> int:
+    """21시 프리마켓 모드: 05시 결과 로드 + 프리마켓 갭 수집."""
+    stamp = run_at_kst.strftime("%Y%m%d_%H%M%S")
+    shard_count = int(args.shard_count or 1)
+    shard_index = int(args.shard_index or 0)
+    merge_dir_arg = str(args.merge_dir or "").strip()
+    merge_dir = Path(merge_dir_arg).expanduser().resolve() if merge_dir_arg else None
+    universe_profile = _normalize_universe_profile(args.universe_profile)
+    scan_mode = "pre_market"
+    scan_label = _scan_label_for_mode(scan_mode, universe_profile)
+    prev_scan_dir = str(args.prev_scan_dir or args.out_dir or "").strip()
+
+    if merge_dir:
+        run_label = f"{stamp}_pre_market_merged"
+        print(f"[PRE_MARKET:MERGE] Loading shard artifacts from {merge_dir}")
+        merged_payload = merge_shard_scan_rows(merge_dir)
+        merged_rows = list(merged_payload.get("rows") or [])
+        print(f"[PRE_MARKET:MERGE] Completed: merged={len(merged_rows)}")
+
+        csv_path = write_scan_csv(merged_rows, out_dir=out_dir, run_label=run_label)
+        rows_path = write_scan_rows_json(merged_rows, out_dir=out_dir, run_label=run_label)
+
+        detected_turn_rows = select_us_session_turn_rows(merged_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
+        turn_rows = filter_turn_rows_for_telegram(detected_turn_rows, min_volume_ratio_20_exclusive=1.0)
+        pullback_rows = select_pullback_reentry_rows_for_telegram(merged_rows, min_volume_ratio_20_exclusive=1.0)
+        hull_bear_rows = select_us_session_hull_bear_rows(merged_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
+        high_52w_rows = select_us_session_52w_high_rows(merged_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
+        summary_text = build_transition_summary(
+            turn_rows,
+            run_at_kst=run_at_kst,
+            universe_count=int(_safe_float(merged_payload.get("universe_count", 0))),
+            result_count=len(merged_rows),
+            skip_count=int(_safe_float(merged_payload.get("skip_count_sum", 0))),
+            scan_label=scan_label,
+            detected_turn_count=len(detected_turn_rows),
+            summary_limit=int(args.summary_limit),
+            pullback_rows=pullback_rows,
+            hull_bear_rows=hull_bear_rows,
+            high_52w_rows=high_52w_rows,
+            scan_mode=scan_mode,
+        )
+        summary_path = out_dir / f"trend_turn_summary_{run_label}.txt"
+        summary_path.write_text(summary_text, encoding="utf-8")
+
+        write_json(
+            {
+                "run_at_kst": run_at_kst.isoformat(),
+                "mode": "merge",
+                "scan_mode": scan_mode,
+                "result_count": len(merged_rows),
+                "detected_turn_count": len(detected_turn_rows),
+                "csv_path": str(csv_path),
+                "rows_path": str(rows_path),
+                "summary_path": str(summary_path),
+            },
+            out_dir=out_dir,
+            filename=f"run_meta_{run_label}.json",
+        )
+        print(f"[PRE_MARKET:MERGE] CSV saved: {csv_path}")
+        print(f"[PRE_MARKET:MERGE] Summary saved: {summary_path}")
+
+        _send_telegram_if_enabled(args, summary_text=summary_text, csv_path=csv_path, scan_label=scan_label, run_at_kst=run_at_kst)
+    else:
+        run_label = f"{stamp}_pre_market_shard{shard_index}of{shard_count}"
+        # 1) 이전 post_close 결과 로드
+        prev_rows, prev_path = _load_latest_scan_rows(Path(prev_scan_dir))
+        if not prev_rows:
+            print(f"[PRE_MARKET] No previous scan results found in {prev_scan_dir}. Exiting.")
+            return 1
+        print(f"[PRE_MARKET] Loaded {len(prev_rows)} rows from {prev_path}")
+
+        # 2) Shard 분리
+        all_tickers = [str(r.get("ticker", "")).strip().upper() for r in prev_rows if r.get("ticker")]
+        shard_tickers = split_tickers_for_shard(all_tickers, shard_count, shard_index)
+        print(f"[PRE_MARKET] Shard {shard_index}/{shard_count - 1}: {len(shard_tickers)} tickers for gap collection")
+
+        # 3) 프리마켓 갭 수집
+        gap_data = _fetch_premarket_gaps(shard_tickers, max_workers=int(args.max_workers))
+        print(f"[PRE_MARKET] Gap data collected: {len(gap_data)}/{len(shard_tickers)}")
+
+        # 4) 자기 shard ticker만 필터 + 갭 병합
+        shard_ticker_set = set(shard_tickers)
+        shard_rows = [r for r in prev_rows if str(r.get("ticker", "")).strip().upper() in shard_ticker_set]
+        enriched_rows = _enrich_rows_with_gap(shard_rows, gap_data)
+
+        # 5) 저장
+        write_scan_rows_json(enriched_rows, out_dir=out_dir, run_label=run_label)
+        write_json(
+            {
+                "run_at_kst": run_at_kst.isoformat(),
+                "mode": "pre_market",
+                "scan_mode": scan_mode,
+                "universe_profile": universe_profile,
+                "shard_count": shard_count,
+                "shard_index": shard_index,
+                "full_universe_count": len(all_tickers),
+                "shard_ticker_count": len(shard_tickers),
+                "gap_collected_count": len(gap_data),
+                "result_count": len(enriched_rows),
+                "performance": {"skip_count": len(shard_tickers) - len(gap_data)},
+            },
+            out_dir=out_dir,
+            filename=f"run_meta_{run_label}.json",
+        )
+        print(f"[PRE_MARKET] Shard results saved: {len(enriched_rows)} rows")
+
+    return 0
+
+
+def _run_early_session(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: Path) -> int:
+    """23시 얼리세션 모드: period=1y 풀스캔 + 시간비례 거래량 보정."""
+    stamp = run_at_kst.strftime("%Y%m%d_%H%M%S")
+    shard_count = int(args.shard_count or 1)
+    shard_index = int(args.shard_index or 0)
+    merge_dir_arg = str(args.merge_dir or "").strip()
+    merge_dir = Path(merge_dir_arg).expanduser().resolve() if merge_dir_arg else None
+    universe_profile = _normalize_universe_profile(args.universe_profile)
+    scan_mode = "early_session"
+    scan_label = _scan_label_for_mode(scan_mode, universe_profile)
+    history_period = _history_period_for_mode(scan_mode)
+    vol_threshold = _time_adjusted_volume_threshold(run_at_kst, base_threshold=1.0)
+    print(f"[EARLY_SESSION] Volume threshold: {vol_threshold:.3f}x (time-adjusted), period={history_period}")
+
+    if merge_dir:
+        run_label = f"{stamp}_early_session_merged"
+        print(f"[EARLY_SESSION:MERGE] Loading shard artifacts from {merge_dir}")
+        merged_payload = merge_shard_scan_rows(merge_dir)
+        merged_rows = list(merged_payload.get("rows") or [])
+        profile_candidates = list(merged_payload.get("universe_profiles") or [])
+        if universe_profile == "default" and len(profile_candidates) == 1:
+            universe_profile = _normalize_universe_profile(profile_candidates[0])
+            scan_label = _scan_label_for_mode(scan_mode, universe_profile)
+        print(
+            f"[EARLY_SESSION:MERGE] Completed: merged={len(merged_rows)} "
+            f"source_rows={int(merged_payload.get('source_row_count', 0))}"
+        )
+        csv_path = write_scan_csv(merged_rows, out_dir=out_dir, run_label=run_label)
+        rows_path = write_scan_rows_json(merged_rows, out_dir=out_dir, run_label=run_label)
+
+        detected_turn_rows = select_us_session_turn_rows(merged_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
+        turn_rows = filter_turn_rows_for_telegram(detected_turn_rows, min_volume_ratio_20_exclusive=vol_threshold)
+        pullback_rows = select_pullback_reentry_rows_for_telegram(merged_rows, min_volume_ratio_20_exclusive=vol_threshold)
+        hull_bear_rows = select_us_session_hull_bear_rows(merged_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
+        high_52w_rows = select_us_session_52w_high_rows(merged_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
+        summary_text = build_transition_summary(
+            turn_rows,
+            run_at_kst=run_at_kst,
+            universe_count=int(_safe_float(merged_payload.get("universe_count", 0))),
+            result_count=len(merged_rows),
+            skip_count=int(_safe_float(merged_payload.get("skip_count_sum", 0))),
+            scan_label=scan_label,
+            detected_turn_count=len(detected_turn_rows),
+            summary_limit=int(args.summary_limit),
+            pullback_rows=pullback_rows,
+            hull_bear_rows=hull_bear_rows,
+            high_52w_rows=high_52w_rows,
+            scan_mode=scan_mode,
+            volume_threshold=vol_threshold,
+        )
+        summary_path = out_dir / f"trend_turn_summary_{run_label}.txt"
+        summary_path.write_text(summary_text, encoding="utf-8")
+
+        write_json(
+            {
+                "run_at_kst": run_at_kst.isoformat(),
+                "mode": "merge",
+                "scan_mode": scan_mode,
+                "universe_profile": universe_profile,
+                "volume_threshold": vol_threshold,
+                "history_period": history_period,
+                "merged_payload": merged_payload,
+                "result_count": len(merged_rows),
+                "detected_turn_count": len(detected_turn_rows),
+                "trend_turn_count": len(turn_rows),
+                "pullback_reentry_count": len(pullback_rows),
+                "hull_bear_count": len(hull_bear_rows),
+                "new_52w_high_count": len(high_52w_rows),
+                "csv_path": str(csv_path),
+                "rows_path": str(rows_path),
+                "summary_path": str(summary_path),
+            },
+            out_dir=out_dir,
+            filename=f"run_meta_{run_label}.json",
+        )
+        print(f"[EARLY_SESSION:MERGE] CSV saved: {csv_path}")
+        print(f"[EARLY_SESSION:MERGE] Summary saved: {summary_path}")
+
+        _send_telegram_if_enabled(args, summary_text=summary_text, csv_path=csv_path, scan_label=scan_label, run_at_kst=run_at_kst)
+    else:
+        run_label = f"{stamp}_early_session_shard{shard_index}of{shard_count}"
+        print("[EARLY_SESSION] Building universe...")
+        universe_payload = build_scan_universe(universe_profile=universe_profile)
+        full_tickers = list(universe_payload.get("tickers") or [])
+        tickers = split_tickers_for_shard(full_tickers, shard_count, shard_index)
+        print(
+            f"[EARLY_SESSION] Universe ready: full={len(full_tickers)} shard={len(tickers)} "
+            f"(shard={shard_index}/{shard_count - 1})"
+        )
+        if universe_payload.get("etf_errors"):
+            print("[EARLY_SESSION] ETF resolve errors:", " | ".join(universe_payload["etf_errors"]))
+
+        scan_result = scan_universe(
+            tickers, max_workers=int(args.max_workers), bias_mode=str(args.bias_mode), history_period=history_period,
+        )
+        print(
+            f"[EARLY_SESSION] Completed: results={len(scan_result.rows)} "
+            f"skips={len(scan_result.skips)} total_sec={_safe_float(scan_result.perf.get('total_seconds', 0)):.1f}"
+        )
+
+        csv_path = write_scan_csv(scan_result.rows, out_dir=out_dir, run_label=run_label)
+        rows_path = write_scan_rows_json(scan_result.rows, out_dir=out_dir, run_label=run_label)
+        detected_turn_rows = select_us_session_turn_rows(scan_result.rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
+        turn_rows = filter_turn_rows_for_telegram(detected_turn_rows, min_volume_ratio_20_exclusive=vol_threshold)
+        pullback_rows = select_pullback_reentry_rows_for_telegram(scan_result.rows, min_volume_ratio_20_exclusive=vol_threshold)
+        hull_bear_rows = select_us_session_hull_bear_rows(scan_result.rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
+        high_52w_rows = select_us_session_52w_high_rows(scan_result.rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
+        summary_text = build_transition_summary(
+            turn_rows,
+            run_at_kst=run_at_kst,
+            universe_count=len(tickers),
+            result_count=len(scan_result.rows),
+            skip_count=len(scan_result.skips),
+            scan_label=scan_label,
+            detected_turn_count=len(detected_turn_rows),
+            summary_limit=int(args.summary_limit),
+            pullback_rows=pullback_rows,
+            hull_bear_rows=hull_bear_rows,
+            high_52w_rows=high_52w_rows,
+            scan_mode=scan_mode,
+            volume_threshold=vol_threshold,
+        )
+        summary_path = out_dir / f"trend_turn_summary_{run_label}.txt"
+        summary_path.write_text(summary_text, encoding="utf-8")
+
+        write_json(
+            {
+                "run_at_kst": run_at_kst.isoformat(),
+                "mode": "scan",
+                "scan_mode": scan_mode,
+                "universe_profile": universe_profile,
+                "volume_threshold": vol_threshold,
+                "history_period": history_period,
+                "full_universe_count": len(full_tickers),
+                "shard_ticker_count": len(tickers),
+                "shard_count": shard_count,
+                "shard_index": shard_index,
+                "universe": universe_payload,
+                "etf_errors": list(universe_payload.get("etf_errors") or []),
+                "performance": scan_result.perf,
+                "skip_reasons": scan_result.skips,
+                "result_count": len(scan_result.rows),
+                "detected_turn_count": len(detected_turn_rows),
+                "trend_turn_count": len(turn_rows),
+                "pullback_reentry_count": len(pullback_rows),
+                "hull_bear_count": len(hull_bear_rows),
+                "new_52w_high_count": len(high_52w_rows),
+                "csv_path": str(csv_path),
+                "rows_path": str(rows_path),
+                "summary_path": str(summary_path),
+            },
+            out_dir=out_dir,
+            filename=f"run_meta_{run_label}.json",
+        )
+
+        print(f"[EARLY_SESSION] CSV saved: {csv_path}")
+        print(f"[EARLY_SESSION] Summary saved: {summary_path}")
+
+    return 0
+
+
+def main() -> int:
+    args = parse_args()
+    scan_mode = str(getattr(args, "scan_mode", "post_close") or "post_close")
+    run_at_kst = datetime.now(KST)
+    out_dir = Path(args.out_dir)
+
+    shard_count = int(args.shard_count or 1)
+    shard_index = int(args.shard_index or 0)
+    if shard_count <= 0:
+        raise RuntimeError("--shard-count must be > 0")
+    if shard_index < 0 or shard_index >= shard_count:
+        raise RuntimeError("--shard-index out of range")
+
+    print(f"[MAIN] scan_mode={scan_mode}")
+
+    if scan_mode == "pre_market":
+        return _run_pre_market(args, run_at_kst=run_at_kst, out_dir=out_dir)
+    elif scan_mode == "early_session":
+        return _run_early_session(args, run_at_kst=run_at_kst, out_dir=out_dir)
+    else:
+        return _run_post_close(args, run_at_kst=run_at_kst, out_dir=out_dir)
 
 
 if __name__ == "__main__":

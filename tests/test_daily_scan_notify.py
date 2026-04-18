@@ -1,4 +1,4 @@
-﻿import json
+import json
 import re
 import tempfile
 import unittest
@@ -368,5 +368,185 @@ class DailyScanNotifyTests(unittest.TestCase):
         self.assertEqual(merged["universe_count"], 500)
 
 
+from scripts.daily_scan_and_notify import (
+    _current_us_session_date,
+    _resolve_target_session_date,
+    _time_adjusted_volume_threshold,
+    _enrich_rows_with_gap,
+    _scan_label_for_mode,
+    _history_period_for_mode,
+    KST,
+)
+from datetime import date, timezone, timedelta
+from zoneinfo import ZoneInfo
+
+
+class ScanModeExpansionTests(unittest.TestCase):
+    """21시/23시 스캔 모드 확장 테스트."""
+
+    # --- _current_us_session_date ---
+
+    def test_current_us_session_date_weekday(self):
+        """평일 KST 23시 = ET 10시 → 오늘(ET) 반환."""
+        # 2026-04-17 금요일 KST 23시 → ET 2026-04-17 10시
+        kst_time = datetime(2026, 4, 17, 23, 0, 0, tzinfo=KST)
+        result = _current_us_session_date(kst_time)
+        self.assertEqual(result, date(2026, 4, 17))
+
+    def test_current_us_session_date_saturday_returns_friday(self):
+        """토요일 → 직전 금요일 반환."""
+        kst_time = datetime(2026, 4, 18, 21, 0, 0, tzinfo=KST)  # KST 토요일 21시
+        result = _current_us_session_date(kst_time)
+        self.assertEqual(result.weekday(), 4)  # Friday
+
+    def test_current_us_session_date_sunday_returns_friday(self):
+        """일요일 → 직전 금요일 반환."""
+        kst_time = datetime(2026, 4, 19, 21, 0, 0, tzinfo=KST)  # KST 일요일 21시
+        result = _current_us_session_date(kst_time)
+        self.assertEqual(result.weekday(), 4)  # Friday
+
+    # --- _resolve_target_session_date ---
+
+    def test_resolve_target_date_post_close_uses_last_session(self):
+        kst_time = datetime(2026, 4, 17, 5, 0, 0, tzinfo=KST)
+        from scripts.daily_scan_and_notify import _last_us_market_session_date
+        expected = _last_us_market_session_date(kst_time)
+        result = _resolve_target_session_date(kst_time, "post_close")
+        self.assertEqual(result, expected)
+
+    def test_resolve_target_date_pre_market_uses_last_session(self):
+        kst_time = datetime(2026, 4, 17, 21, 0, 0, tzinfo=KST)
+        from scripts.daily_scan_and_notify import _last_us_market_session_date
+        expected = _last_us_market_session_date(kst_time)
+        result = _resolve_target_session_date(kst_time, "pre_market")
+        self.assertEqual(result, expected)
+
+    def test_resolve_target_date_early_session_uses_current_session(self):
+        kst_time = datetime(2026, 4, 17, 23, 0, 0, tzinfo=KST)
+        expected = _current_us_session_date(kst_time)
+        result = _resolve_target_session_date(kst_time, "early_session")
+        self.assertEqual(result, expected)
+
+    # --- _time_adjusted_volume_threshold ---
+
+    def test_volume_threshold_before_market_open(self):
+        """장 개시 전 → 0.05 (사실상 비활성화)."""
+        kst_time = datetime(2026, 4, 17, 21, 0, 0, tzinfo=KST)  # ET ~08:00
+        result = _time_adjusted_volume_threshold(kst_time)
+        self.assertAlmostEqual(result, 0.05, places=2)
+
+    def test_volume_threshold_30min_after_open(self):
+        """장 개시 30분 후 → ~0.25."""
+        kst_time = datetime(2026, 4, 17, 23, 0, 0, tzinfo=KST)  # ET ~10:00
+        result = _time_adjusted_volume_threshold(kst_time)
+        self.assertGreater(result, 0.10)
+        self.assertLess(result, 0.60)
+
+    def test_volume_threshold_after_close(self):
+        """장 마감 후 → 1.0 (기존과 동일)."""
+        kst_time = datetime(2026, 4, 18, 6, 0, 0, tzinfo=KST)  # ET ~17:00
+        result = _time_adjusted_volume_threshold(kst_time)
+        self.assertEqual(result, 1.0)
+
+    def test_volume_threshold_returns_positive(self):
+        """어떤 시간이든 양수 반환."""
+        for hour in range(0, 24):
+            kst_time = datetime(2026, 4, 17, hour, 0, 0, tzinfo=KST)
+            result = _time_adjusted_volume_threshold(kst_time)
+            self.assertGreater(result, 0)
+
+    # --- _scan_label_for_mode ---
+
+    def test_scan_label_post_close(self):
+        self.assertIn("자동 스캔", _scan_label_for_mode("post_close", "default"))
+
+    def test_scan_label_pre_market(self):
+        self.assertIn("프리마켓", _scan_label_for_mode("pre_market", "default"))
+
+    def test_scan_label_early_session(self):
+        label = _scan_label_for_mode("early_session", "default")
+        self.assertIn("얼리세션", label)
+        self.assertIn("장중", label)
+
+    def test_scan_label_russell2000_suffix(self):
+        label = _scan_label_for_mode("early_session", "russell2000")
+        self.assertIn("RUSSELL2000", label)
+
+    # --- _history_period_for_mode ---
+
+    def test_history_period_post_close(self):
+        self.assertEqual(_history_period_for_mode("post_close"), "2y")
+
+    def test_history_period_pre_market(self):
+        self.assertEqual(_history_period_for_mode("pre_market"), "5d")
+
+    def test_history_period_early_session(self):
+        self.assertEqual(_history_period_for_mode("early_session"), "1y")
+
+    # --- _enrich_rows_with_gap ---
+
+    def test_enrich_rows_with_gap_injects_data(self):
+        rows = [{"ticker": "AAPL", "price": 150.0}, {"ticker": "MSFT", "price": 300.0}]
+        gap_data = {
+            "AAPL": {"premarket_price": 155.0, "prev_close": 150.0, "gap_pct": 3.33},
+        }
+        enriched = _enrich_rows_with_gap(rows, gap_data)
+        self.assertEqual(len(enriched), 2)
+        # AAPL has gap data
+        aapl = enriched[0]
+        self.assertEqual(aapl["premarket_price"], 155.0)
+        self.assertEqual(aapl["gap_pct"], 3.33)
+        # MSFT has no gap data → defaults
+        msft = enriched[1]
+        self.assertEqual(msft["gap_pct"], 0.0)
+
+    def test_enrich_rows_preserves_existing_fields(self):
+        rows = [{"ticker": "TSLA", "price": 200.0, "scan_score": 5.0}]
+        enriched = _enrich_rows_with_gap(rows, {})
+        self.assertEqual(enriched[0]["scan_score"], 5.0)
+        self.assertEqual(enriched[0]["gap_pct"], 0.0)
+
+    # --- build_transition_summary mode headers ---
+
+    def test_summary_header_post_close_default(self):
+        kst_time = datetime(2026, 4, 17, 5, 0, 0, tzinfo=KST)
+        summary = build_transition_summary(
+            [], run_at_kst=kst_time, universe_count=100, result_count=50,
+            skip_count=5, scan_label="자동 스캔", scan_mode="post_close",
+        )
+        self.assertIn("자동 스캔", summary)
+        self.assertIn("전일 미국장 기준일", summary)
+
+    def test_summary_header_pre_market(self):
+        kst_time = datetime(2026, 4, 17, 21, 0, 0, tzinfo=KST)
+        summary = build_transition_summary(
+            [], run_at_kst=kst_time, universe_count=100, result_count=50,
+            skip_count=5, scan_label="프리마켓 스캔", scan_mode="pre_market",
+        )
+        self.assertIn("프리마켓", summary)
+        self.assertIn("오늘 본장에서 주목할 종목", summary)
+
+    def test_summary_header_early_session(self):
+        kst_time = datetime(2026, 4, 17, 23, 0, 0, tzinfo=KST)
+        summary = build_transition_summary(
+            [], run_at_kst=kst_time, universe_count=100, result_count=50,
+            skip_count=5, scan_label="얼리세션 스캔", scan_mode="early_session",
+            volume_threshold=0.25,
+        )
+        self.assertIn("미확정", summary)
+        self.assertIn("장중 스냅샷", summary)
+        self.assertIn("0.25x", summary)
+
+    def test_summary_early_session_volume_criteria(self):
+        """얼리세션 요약에 시간비례 거래량 기준이 포함되는지 확인."""
+        kst_time = datetime(2026, 4, 17, 23, 0, 0, tzinfo=KST)
+        summary = build_transition_summary(
+            [], run_at_kst=kst_time, universe_count=100, result_count=50,
+            skip_count=5, scan_mode="early_session", volume_threshold=0.30,
+        )
+        self.assertIn("시간비례 보정", summary)
+
+
 if __name__ == "__main__":
     unittest.main()
+

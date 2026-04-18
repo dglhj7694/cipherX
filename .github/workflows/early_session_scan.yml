@@ -1,0 +1,98 @@
+name: Early Session Scan (23:00 KST)
+
+on:
+  schedule:
+    # KST 23:00 = UTC 14:00 (월~금)
+    - cron: "0 14 * * 1-5"
+  workflow_dispatch:
+
+concurrency:
+  group: early-session-scan
+  cancel-in-progress: false
+
+jobs:
+  early_session_shard:
+    name: early-session-shard-${{ matrix.shard_index }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard_index: [0, 1, 2, 3, 4, 5, 6, 7]
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run early session scan (period=1y)
+        run: |
+          python -m scripts.daily_scan_and_notify \
+            --scan-mode early_session \
+            --out-dir artifacts/early_session/shard_${{ matrix.shard_index }} \
+            --skip-telegram \
+            --shard-count 8 \
+            --shard-index ${{ matrix.shard_index }}
+
+      - name: Upload early session shard artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: early-session-shard-${{ matrix.shard_index }}-${{ github.run_id }}
+          path: artifacts/early_session/shard_${{ matrix.shard_index }}/*
+          if-no-files-found: error
+
+  early_session_merge_and_notify:
+    name: early-session-merge-and-notify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: early_session_shard
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Download early session shard artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: early-session-shard-*-${{ github.run_id }}
+          path: artifacts/early_session/merge_inputs
+          merge-multiple: true
+
+      - name: Merge and notify
+        run: |
+          python -m scripts.daily_scan_and_notify \
+            --scan-mode early_session \
+            --out-dir artifacts/early_session/final \
+            --merge-dir artifacts/early_session/merge_inputs
+
+      - name: Upload merged artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: early-session-final-${{ github.run_id }}
+          path: artifacts/early_session/final/*
+          if-no-files-found: ignore

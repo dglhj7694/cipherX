@@ -1,10 +1,11 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import argparse
 import math
 import os
 import re
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping
@@ -626,18 +627,33 @@ def _telegram_api(token: str, method: str) -> str:
 
 def send_telegram_message(token: str, chat_id: str, text: str, *, chunk_size: int = DEFAULT_CHUNK_SIZE) -> None:
     chunks = split_telegram_message_text(text, chunk_size=chunk_size)
-    for chunk in chunks:
+    for chunk_idx, chunk in enumerate(chunks, start=1):
         if not _coerce_text(chunk):
             continue
-        response = requests.post(
-            _telegram_api(token, "sendMessage"),
-            json={"chat_id": chat_id, "text": chunk},
-            timeout=30,
-        )
-        response.raise_for_status()
-        payload = response.json()
-        if not payload.get("ok"):
-            raise RuntimeError(f"Telegram sendMessage failed: {payload}")
+        success = False
+        last_error = ""
+        for attempt in range(1, 4):
+            try:
+                response = requests.post(
+                    _telegram_api(token, "sendMessage"),
+                    json={"chat_id": chat_id, "text": chunk},
+                    timeout=30,
+                )
+                response.raise_for_status()
+                payload = response.json()
+                if payload.get("ok"):
+                    success = True
+                    break
+                else:
+                    last_error = f"Payload not ok: {payload}"
+            except Exception as exc:
+                last_error = str(exc)
+            
+            if attempt < 3:
+                time.sleep(2)
+        
+        if not success:
+            print(f"[ERROR] Failed to send Telegram chunk {chunk_idx}/{len(chunks)} after 3 attempts. Last error: {last_error}")
 
 
 def write_text_artifact(text: str, *, out_dir: Path, run_label: str, suffix: str = "") -> Path:
