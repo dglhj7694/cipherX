@@ -607,13 +607,73 @@ def _load_json_file(path: Path) -> Any:
         return None
 
 
+_SHARD_MARKER_PATTERN = re.compile(r"shard(?P<index>\d+)of(?P<count>\d+)", re.IGNORECASE)
+
+
+def _parse_shard_marker(value: Any) -> tuple[int, int] | None:
+    match = _SHARD_MARKER_PATTERN.search(str(value or ""))
+    if not match:
+        return None
+    try:
+        index = int(match.group("index"))
+        count = int(match.group("count"))
+    except Exception:
+        return None
+    if index < 0 or count <= 0:
+        return None
+    return index, count
+
+
+def _prepend_summary_warning(summary_text: str, warning_line: str) -> str:
+    warning = str(warning_line or "").strip()
+    body = str(summary_text or "").strip()
+    if not warning:
+        return body
+    if not body:
+        return warning
+    return f"{warning}\n{body}"
+
+
+def _build_premarket_fallback_rows(tickers: Iterable[str]) -> list[dict[str, Any]]:
+    fallback_rows: list[dict[str, Any]] = []
+    for ticker in _ordered_unique(tickers):
+        fallback_rows.append(
+            {
+                "ticker": ticker,
+                "scan_source": "pre_market_fallback",
+                "scan_score": 0.0,
+                "strength": 0.0,
+                "es": 0.0,
+                "cf": 0.0,
+                "jg_key": "N/A",
+                "pullback_reentry": False,
+                "volume_ratio_20": 0.0,
+                "utbot_buy_last_date": "N/A",
+                "hull_turn_bull_last_date": "N/A",
+                "hull_turn_bear_last_date": "N/A",
+                "new_52w_high": False,
+                "latest_bar_date": "N/A",
+                "price": 0.0,
+            }
+        )
+    return fallback_rows
+
+
 def merge_shard_scan_rows(merge_dir: Path) -> dict[str, Any]:
     files = sorted(Path(merge_dir).glob("**/scan_rows_*.json"))
     if not files:
         raise RuntimeError(f"No shard row files found in {merge_dir}")
 
     all_rows: list[dict[str, Any]] = []
+    expected_shard_count = 0
+    found_shard_indices: set[int] = set()
     for file_path in files:
+        shard_marker = _parse_shard_marker(file_path.name)
+        if shard_marker:
+            shard_index, shard_count = shard_marker
+            expected_shard_count = max(expected_shard_count, int(shard_count))
+            if shard_index < shard_count:
+                found_shard_indices.add(shard_index)
         payload = _load_json_file(file_path)
         if isinstance(payload, dict):
             rows = payload.get("rows") or []
@@ -635,11 +695,24 @@ def merge_shard_scan_rows(merge_dir: Path) -> dict[str, Any]:
     shard_meta_count = 0
     shard_errors: list[str] = []
     shard_profiles: list[str] = []
+    priority_modes: list[str] = []
     for meta_file in meta_files:
+        shard_marker = _parse_shard_marker(meta_file.name)
+        if shard_marker:
+            shard_index, shard_count = shard_marker
+            expected_shard_count = max(expected_shard_count, int(shard_count))
+            if shard_index < shard_count:
+                found_shard_indices.add(shard_index)
         payload = _load_json_file(meta_file)
         if not isinstance(payload, dict):
             continue
         shard_meta_count += 1
+        shard_count = int(_safe_float(payload.get("shard_count", 0)))
+        shard_index = int(_safe_float(payload.get("shard_index", -1)))
+        if shard_count > 0:
+            expected_shard_count = max(expected_shard_count, shard_count)
+            if 0 <= shard_index < shard_count:
+                found_shard_indices.add(shard_index)
         shard_universe_sum += int(_safe_float(payload.get("shard_ticker_count", 0)))
         full_universe_max = max(full_universe_max, int(_safe_float(payload.get("full_universe_count", 0))))
         performance = payload.get("performance") or {}
@@ -649,8 +722,17 @@ def merge_shard_scan_rows(merge_dir: Path) -> dict[str, Any]:
             shard_errors.append(str(err))
         profile = _normalize_universe_profile(payload.get("universe_profile"))
         shard_profiles.append(profile)
+        priority_mode = str(payload.get("priority_mode") or "").strip().lower()
+        if priority_mode and priority_mode not in priority_modes:
+            priority_modes.append(priority_mode)
 
     universe_count = full_universe_max or shard_universe_sum
+    found_indices_sorted = sorted(found_shard_indices)
+    missing_indices = (
+        [idx for idx in range(expected_shard_count) if idx not in found_shard_indices]
+        if expected_shard_count > 0
+        else []
+    )
     return {
         "rows": merged_rows,
         "row_files": [str(path) for path in files],
@@ -663,6 +745,11 @@ def merge_shard_scan_rows(merge_dir: Path) -> dict[str, Any]:
         "shard_meta_count": shard_meta_count,
         "etf_errors": _ordered_unique(shard_errors),
         "universe_profiles": _ordered_unique(shard_profiles),
+        "expected_shard_count": int(expected_shard_count),
+        "found_shard_count": len(found_indices_sorted),
+        "found_shard_indices": found_indices_sorted,
+        "missing_shard_indices": missing_indices,
+        "priority_modes": priority_modes,
     }
 
 
@@ -1357,6 +1444,15 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
             high_52w_rows=high_52w_rows,
             scan_mode=scan_mode,
         )
+        missing_shard_indices = [int(_safe_float(v)) for v in (merged_payload.get("missing_shard_indices") or [])]
+        if missing_shard_indices:
+            found_shard_count = int(_safe_float(merged_payload.get("found_shard_count", 0)))
+            expected_shard_count = int(_safe_float(merged_payload.get("expected_shard_count", 0)))
+            missing_text = ", ".join(str(idx) for idx in missing_shard_indices)
+            summary_text = _prepend_summary_warning(
+                summary_text,
+                f"※ 부분 결과: 샤드 {found_shard_count}/{expected_shard_count} 수집 완료, 누락 index=[{missing_text}]",
+            )
         summary_path = out_dir / f"trend_turn_summary_{run_label}.txt"
         summary_path.write_text(summary_text, encoding="utf-8")
 
@@ -1502,6 +1598,12 @@ def _run_pre_market(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
             high_52w_rows=high_52w_rows,
             scan_mode=scan_mode,
         )
+        priority_modes = {str(mode or "").strip().lower() for mode in (merged_payload.get("priority_modes") or [])}
+        if "empty_fallback" in priority_modes:
+            summary_text = _prepend_summary_warning(
+                summary_text,
+                "※ 안내: 전일 daily-scan 결과 부재로 priority 비활성(전체 유니버스 fallback) 샤드가 포함되었습니다.",
+            )
         summary_path = out_dir / f"trend_turn_summary_{run_label}.txt"
         summary_path.write_text(summary_text, encoding="utf-8")
 
@@ -1510,6 +1612,8 @@ def _run_pre_market(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
                 "run_at_kst": run_at_kst.isoformat(),
                 "mode": "merge",
                 "scan_mode": scan_mode,
+                "universe_profile": universe_profile,
+                "merged_payload": merged_payload,
                 "result_count": len(merged_rows),
                 "detected_turn_count": len(detected_turn_rows),
                 "csv_path": str(csv_path),
@@ -1527,14 +1631,30 @@ def _run_pre_market(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
         run_label = f"{stamp}_pre_market_shard{shard_index}of{shard_count}"
         # 1) 이전 post_close 결과 로드
         prev_rows, prev_path = _load_latest_scan_rows(Path(prev_scan_dir))
-        if not prev_rows:
-            print(f"[PRE_MARKET] No previous scan results found in {prev_scan_dir}. Exiting.")
-            return 1
-        print(f"[PRE_MARKET] Loaded {len(prev_rows)} rows from {prev_path}")
+        prev_scan_found = bool(prev_rows)
+        priority_mode = "from_prev_scan"
+        fallback_reason = ""
+        if prev_scan_found:
+            print(f"[PRE_MARKET] Loaded {len(prev_rows)} rows from {prev_path}")
+        else:
+            priority_mode = "empty_fallback"
+            fallback_reason = "missing_prev_scan_artifact"
+            print(
+                f"[PRE_MARKET] No previous scan results found in {prev_scan_dir}. "
+                "Falling back to full universe scan without priority."
+            )
 
         # 2) Shard 분리
-        all_tickers = [str(r.get("ticker", "")).strip().upper() for r in prev_rows if r.get("ticker")]
-        shard_tickers = split_tickers_for_shard(all_tickers, shard_count, shard_index)
+        if prev_scan_found:
+            all_tickers = [str(r.get("ticker", "")).strip().upper() for r in prev_rows if r.get("ticker")]
+            shard_tickers = split_tickers_for_shard(all_tickers, shard_count, shard_index)
+            shard_ticker_set = set(shard_tickers)
+            shard_rows = [r for r in prev_rows if str(r.get("ticker", "")).strip().upper() in shard_ticker_set]
+        else:
+            universe_payload = build_scan_universe(universe_profile=universe_profile)
+            all_tickers = list(universe_payload.get("tickers") or [])
+            shard_tickers = split_tickers_for_shard(all_tickers, shard_count, shard_index)
+            shard_rows = _build_premarket_fallback_rows(shard_tickers)
         print(f"[PRE_MARKET] Shard {shard_index}/{shard_count - 1}: {len(shard_tickers)} tickers for gap collection")
 
         # 3) 프리마켓 갭 수집
@@ -1542,8 +1662,6 @@ def _run_pre_market(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
         print(f"[PRE_MARKET] Gap data collected: {len(gap_data)}/{len(shard_tickers)}")
 
         # 4) 자기 shard ticker만 필터 + 갭 병합
-        shard_ticker_set = set(shard_tickers)
-        shard_rows = [r for r in prev_rows if str(r.get("ticker", "")).strip().upper() in shard_ticker_set]
         enriched_rows = _enrich_rows_with_gap(shard_rows, gap_data)
 
         # 5) 저장
@@ -1560,6 +1678,10 @@ def _run_pre_market(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
                 "shard_ticker_count": len(shard_tickers),
                 "gap_collected_count": len(gap_data),
                 "result_count": len(enriched_rows),
+                "priority_mode": priority_mode,
+                "prev_scan_found": prev_scan_found,
+                "prev_scan_path": str(prev_path) if prev_path else "",
+                "fallback_reason": fallback_reason,
                 "performance": {"skip_count": len(shard_tickers) - len(gap_data)},
             },
             out_dir=out_dir,
