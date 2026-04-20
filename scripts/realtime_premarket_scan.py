@@ -140,7 +140,25 @@ def fetch_and_synthesize_daily(ticker: str) -> tuple[pd.DataFrame | None, dict[s
     
     return combined_hist, metrics
 
-def _build_pm_scanner_row(ticker: str, bias_mode: str, min_dollar_volume: float = 0.0) -> dict[str, Any]:
+def fetch_tv_pm_volumes(tickers: list[str]) -> dict[str, float]:
+    """Fallback to TradingView to get pre-market volume which Yahoo Finance misses early on."""
+    if not tickers:
+        return {}
+    try:
+        url = "https://scanner.tradingview.com/america/scan"
+        # We process in a shard, usually < 500 tickers, well within single request limit
+        req = {
+            "filter": [{"left": "name", "operation": "in_range", "right": tickers}],
+            "columns": ["name", "premarket_volume"],
+            "range": [0, len(tickers) + 50]
+        }
+        res = requests.post(url, json=req, timeout=10).json()
+        return {str(item["d"][0]).strip().upper(): _safe_float(item["d"][1]) for item in res.get("data", [])}
+    except Exception as exc:
+        logger.warning(f"Failed to fetch TV volumes: {exc}")
+        return {}
+
+def _build_pm_scanner_row(ticker: str, bias_mode: str, min_dollar_volume: float = 0.0, tv_volume: float = 0.0) -> dict[str, Any]:
     ticker = str(ticker or "").strip().upper()
     if not ticker:
         return {"ok": False, "ticker": "", "skip_reason": "invalid_ticker"}
@@ -150,6 +168,13 @@ def _build_pm_scanner_row(ticker: str, bias_mode: str, min_dollar_volume: float 
     if combined_hist is None or metrics is None:
         err = metrics.get("error", "fetch_error") if metrics else "unknown_error"
         return {"ok": False, "ticker": ticker, "skip_reason": err}
+        
+    # Override yfinance volume with tradingview volume if missing early on
+    if metrics["pm_volume"] == 0 and tv_volume > 0:
+        metrics["pm_volume"] = tv_volume
+        metrics["dollar_volume"] = metrics["pm_vwap"] * tv_volume
+        if metrics["market_cap"] > 0:
+            metrics["mcap_ratio"] = (metrics["dollar_volume"] / metrics["market_cap"] * 100.0)
         
     if len(combined_hist) < 50:
         return {"ok": False, "ticker": ticker, "skip_reason": "insufficient_history", "detail": f"bars={len(combined_hist)}"}
@@ -226,9 +251,9 @@ def _build_pm_scanner_row(ticker: str, bias_mode: str, min_dollar_volume: float 
     except Exception as exc:
         return {"ok": False, "ticker": ticker, "skip_reason": "engine_error", "detail": str(exc)[:200]}
 
-def _scan_ticker_worker(ticker: str, bias_mode: str, min_dollar_volume: float) -> dict[str, Any]:
+def _scan_ticker_worker(ticker: str, bias_mode: str, min_dollar_volume: float, tv_volume: float) -> dict[str, Any]:
     started = time.perf_counter()
-    payload = _build_pm_scanner_row(ticker, bias_mode, min_dollar_volume)
+    payload = _build_pm_scanner_row(ticker, bias_mode, min_dollar_volume, tv_volume)
     payload["elapsed_sec"] = _safe_float(time.perf_counter() - started)
     return payload
 
@@ -242,10 +267,13 @@ def scan_universe(tickers: list[str], max_workers: int, bias_mode: str, min_doll
         return PMScanResult(rows=[], skips=[], perf={"workers": 0, "total_seconds": 0.0, "ticker_count": 0})
 
     effective_workers = min(max_workers, max(1, len(tickers)))
+    
+    logger.info(f"Fetching TradingView fallback volumes for {len(tickers)} tickers...")
+    tv_volumes = fetch_tv_pm_volumes(tickers)
 
     with ThreadPoolExecutor(max_workers=effective_workers) as executor:
         futures = {
-            executor.submit(_scan_ticker_worker, ticker, bias_mode, min_dollar_volume): ticker
+            executor.submit(_scan_ticker_worker, ticker, bias_mode, min_dollar_volume, tv_volumes.get(ticker, 0.0)): ticker
             for ticker in tickers
         }
         for future in as_completed(futures):
