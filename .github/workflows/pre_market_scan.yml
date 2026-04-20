@@ -35,23 +35,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Download latest post_close scan results
-        uses: actions/download-artifact@v4
-        with:
-          pattern: daily-scan-final-*
-          path: artifacts/daily_scan/prev_results
-          merge-multiple: true
-        continue-on-error: true
-
-      - name: Run pre-market gap collection
+      - name: Run pre-market realtime scan
         run: |
-          python -m scripts.daily_scan_and_notify \
-            --scan-mode pre_market \
-            --prev-scan-dir artifacts/daily_scan/prev_results \
+          python -m scripts.realtime_premarket_scan \
             --out-dir artifacts/pre_market/shard_${{ matrix.shard_index }} \
             --skip-telegram \
             --shard-count 6 \
-            --shard-index ${{ matrix.shard_index }}
+            --shard-index ${{ matrix.shard_index }} \
+            --scan-label "프리마켓 21시 실시간 스캔"
 
       - name: Upload pre-market shard artifacts
         if: always()
@@ -93,10 +84,10 @@ jobs:
 
       - name: Merge and notify
         run: |
-          python -m scripts.daily_scan_and_notify \
-            --scan-mode pre_market \
+          python -m scripts.realtime_premarket_scan \
             --out-dir artifacts/pre_market/final \
-            --merge-dir artifacts/pre_market/merge_inputs
+            --merge-dir artifacts/pre_market/merge_inputs \
+            --scan-label "프리마켓 21시 실시간 스캔"
 
       - name: Upload merged artifacts
         if: always()

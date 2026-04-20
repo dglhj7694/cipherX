@@ -42,7 +42,8 @@ jobs:
             --skip-telegram \
             --shard-count 6 \
             --shard-index ${{ matrix.shard_index }} \
-            --max-workers 12
+            --max-workers 12 \
+            --scan-label "프리마켓 18시 실시간 스캔"
 
       - name: Upload Shard Artifacts
         if: always()
@@ -86,7 +87,8 @@ jobs:
         run: |
           python -m scripts.realtime_premarket_scan \
             --out-dir artifacts/pm1800/final \
-            --merge-dir artifacts/pm1800/merge_inputs
+            --merge-dir artifacts/pm1800/merge_inputs \
+            --scan-label "프리마켓 18시 실시간 스캔"
 
       - name: Upload Final Artifacts
         if: always()
