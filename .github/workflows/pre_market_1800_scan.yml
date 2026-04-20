@@ -1,0 +1,97 @@
+name: Pre-Market 18:00 Realtime Scan
+
+on:
+  schedule:
+    # KST 18:00 = UTC 09:00 (월~금)
+    - cron: "0 9 * * 1-5"
+  workflow_dispatch:
+
+concurrency:
+  group: pre-market-1800-scan
+  cancel-in-progress: false
+
+jobs:
+  pm1800_shard:
+    name: pm1800-shard-${{ matrix.shard_index }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard_index: [0, 1, 2, 3, 4, 5]
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Shard Scan
+        run: |
+          python -m scripts.realtime_premarket_scan \
+            --out-dir artifacts/pm1800/shard_${{ matrix.shard_index }} \
+            --skip-telegram \
+            --shard-count 6 \
+            --shard-index ${{ matrix.shard_index }} \
+            --max-workers 12
+
+      - name: Upload Shard Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pm1800-shard-${{ matrix.shard_index }}-${{ github.run_id }}
+          path: artifacts/pm1800/shard_${{ matrix.shard_index }}/*
+          if-no-files-found: ignore
+
+  pm1800_merge_and_notify:
+    name: pm1800-merge-and-notify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: pm1800_shard
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Download Shard Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: pm1800-shard-*-${{ github.run_id }}
+          path: artifacts/pm1800/merge_inputs
+          merge-multiple: true
+
+      - name: Merge and Notify
+        run: |
+          python -m scripts.realtime_premarket_scan \
+            --out-dir artifacts/pm1800/final \
+            --merge-dir artifacts/pm1800/merge_inputs
+
+      - name: Upload Final Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pm1800-final-${{ github.run_id }}
+          path: artifacts/pm1800/final/*
+          if-no-files-found: ignore
