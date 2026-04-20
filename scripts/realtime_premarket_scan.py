@@ -29,7 +29,7 @@ from etf_sources import resolve_etf_universe
 from scanner_csv import scanner_rows_to_csv_bytes
 
 # reuse some utilities from daily_scan_and_notify
-from daily_scan_and_notify import (
+from scripts.daily_scan_and_notify import (
     _safe_float,
     _stable_shard_index,
     _ordered_unique,
