@@ -185,21 +185,42 @@ def _build_pm_scanner_row(ticker: str, bias_mode: str, min_dollar_volume: float 
         _ensure_runtime_combo_registry()
         signal_frame = detect_all_signals(indicator_frame, bias_mode=resolve_bias_mode(bias_mode))
         
+        # latest = 오늘 합성 캔들 (프리마켓 기반 가상 일봉)
+        # latest에서는 UTBot/Hull 같은 교차 시그널이 절대 발생하지 않음
+        # 따라서 G2/G3 판단은 최근 3일 실제 일봉(latest 제외 앞 3개 봉)을 기준으로 함
         latest = signal_frame.iloc[-1]
+        recent_real = signal_frame.iloc[-4:-1] if len(signal_frame) >= 4 else signal_frame.iloc[:-1]
         prev = signal_frame.iloc[-2] if len(signal_frame) > 1 else latest
+        prev2 = signal_frame.iloc[-3] if len(signal_frame) > 2 else prev
         
-        # Extract necessary indicators for categorization
-        ut_turn_bull = bool(latest.get("UTBot_Buy", False))
-        ut_turn_bear = bool(latest.get("UTBot_Sell", False))
-        hull_turn_bull = bool(latest.get("Hull_Turn_Bull", False))
-        hull_turn_bear = bool(latest.get("Hull_Turn_Bear", False))
+        def _any_recent(col: str) -> bool:
+            """최근 3일 실제 일봉에서 해당 시그널이 True였는지 확인"""
+            if col not in recent_real.columns:
+                return False
+            try:
+                return bool(recent_real[col].fillna(False).astype(bool).any())
+            except Exception:
+                return False
         
-        # Check condition for 'pullback strong candidate'
-        prev_hull_bull = bool(prev.get("Hull_Turn_Bull", False) or prev.get("Hull_Trend", "") == "bullish")
+        # G2/G3: 최근 3일 실제 일봉에서 전환 시그널 확인
+        ut_turn_bull = _any_recent("UTBot_Buy")
+        ut_turn_bear = _any_recent("UTBot_Sell")
+        hull_turn_bull = _any_recent("Hull_Turn_Bull")
+        hull_turn_bear = _any_recent("Hull_Turn_Bear")
+        
+        # 눌림목/추세 판단: 전전날(prev2) 기준으로 추세 확인 (prev는 어제 실제 봉)
+        prev_hull_bull = bool(
+            prev.get("Hull_Turn_Bull", False) or prev.get("Hull_Trend", "") == "bullish"
+            or prev2.get("Hull_Turn_Bull", False) or prev2.get("Hull_Trend", "") == "bullish"
+        )
         prev_uptrend = bool(_safe_float(prev.get("Close", 0)) > _safe_float(prev.get("MA20", 0)))
         
-        # New 52w high
-        new_52w_high = bool(latest.get("New_52W_High", False) or prev.get("New_52W_High", False))
+        # New 52w high: 최근 3일 실제 봉 기준
+        new_52w_high = bool(
+            latest.get("New_52W_High", False)
+            or prev.get("New_52W_High", False)
+            or prev2.get("New_52W_High", False)
+        )
         
         es = _safe_float(latest.get("Ensemble_Score", 0))
         cf = _safe_float(latest.get("Judgment_Confidence", 0))
@@ -225,9 +246,11 @@ def _build_pm_scanner_row(ticker: str, bias_mode: str, min_dollar_volume: float 
             
         row["group"] = "None"
         
+        # G1: 거래량=0일 때 pm_vwap == pm_close로 계산되므로 >= 사용
+        # VWAP 조건 없이 갭+전고 돌파만으로도 강세로 인정
         is_pm_strong = (
-            metrics["gap_pct"] > 0 and 
-            metrics["pm_close"] > metrics["pm_vwap"] and 
+            metrics["gap_pct"] > 0 and
+            metrics["pm_close"] >= metrics["pm_vwap"] and
             metrics["pm_close"] > metrics["prev_high"]
         )
         
@@ -239,7 +262,7 @@ def _build_pm_scanner_row(ticker: str, bias_mode: str, min_dollar_volume: float 
             row["group"] = "G3_SELL_TURN"
         elif (prev_hull_bull or prev_uptrend) and (metrics["pm_close"] >= metrics["pm_vwap"]) and metrics["change_pct"] > -1.0:
             row["group"] = "G4_PULLBACK_HOLD"
-        elif new_52w_high and metrics["change_pct"] > 0 and metrics["pm_close"] > metrics["pm_vwap"]:
+        elif new_52w_high and metrics["change_pct"] > 0 and metrics["pm_close"] >= metrics["pm_vwap"]:
             row["group"] = "G5_NEW_HIGH_CHALLENGE"
         elif es >= 2.0 and cf >= 4.0:
             row["group"] = "G6_WATCHLIST"
