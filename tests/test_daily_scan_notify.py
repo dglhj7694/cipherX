@@ -1,3 +1,5 @@
+import csv
+import io
 import json
 import re
 import tempfile
@@ -7,7 +9,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scripts.daily_scan_and_notify import (
+    POST_CLOSE_LATEST_SESSION_FIELD_SPECS,
     RUSSELL2000_UNIVERSE_ITEMS,
+    _last_us_market_session_date,
+    _with_latest_session_buy_turn_flags,
     build_scan_universe,
     build_transition_summary,
     filter_turn_rows_for_telegram,
@@ -18,6 +23,7 @@ from scripts.daily_scan_and_notify import (
     select_us_session_turn_rows,
     split_telegram_message_text,
     split_tickers_for_shard,
+    write_scan_csv,
 )
 
 
@@ -77,6 +83,60 @@ class DailyScanNotifyTests(unittest.TestCase):
         self.assertEqual([row["ticker"] for row in selected], ["CCC", "AAA"])
         self.assertEqual(selected[0]["transition_signals"], ["HULL 매수"])
         self.assertEqual(selected[1]["transition_signals"], ["UTBot 매수"])
+
+    def test_with_latest_session_buy_turn_flags_uses_previous_us_session_for_5am_post_close(self):
+        run_at_kst = datetime(2026, 4, 21, 5, 0, 0)
+        target_date = _last_us_market_session_date(run_at_kst)
+        self.assertEqual(target_date.isoformat(), "2026-04-20")
+
+        rows = [
+            {"ticker": "AAA", "utbot_buy_last_date": "2026-04-20", "hull_turn_bull_last_date": "2026-04-18"},
+            {"ticker": "BBB", "utbot_buy_last_date": "2026-04-19", "hull_turn_bull_last_date": "2026-04-20"},
+            {"ticker": "CCC", "utbot_buy_last_date": "N/A", "hull_turn_bull_last_date": "N/A"},
+        ]
+        flagged = _with_latest_session_buy_turn_flags(rows, target_date=target_date)
+
+        self.assertTrue(flagged[0]["latest_session_utbot_buy_turn"])
+        self.assertFalse(flagged[0]["latest_session_hull_buy_turn"])
+        self.assertFalse(flagged[1]["latest_session_utbot_buy_turn"])
+        self.assertTrue(flagged[1]["latest_session_hull_buy_turn"])
+        self.assertFalse(flagged[2]["latest_session_utbot_buy_turn"])
+        self.assertFalse(flagged[2]["latest_session_hull_buy_turn"])
+
+    def test_write_scan_csv_post_close_extra_columns_and_default_headers(self):
+        row = {
+            "ticker": "AAPL",
+            "latest_session_utbot_buy_turn": True,
+            "latest_session_hull_buy_turn": False,
+            "chg_5d": 3.42,
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            out_dir = Path(temp_dir)
+            with_extra = write_scan_csv(
+                [row],
+                out_dir=out_dir,
+                run_label="post_close_extra",
+                extra_field_specs=POST_CLOSE_LATEST_SESSION_FIELD_SPECS,
+            )
+            without_extra = write_scan_csv([row], out_dir=out_dir, run_label="default_no_extra")
+
+            extra_rows = list(csv.reader(io.StringIO(with_extra.read_text(encoding="utf-8-sig"))))
+            base_rows = list(csv.reader(io.StringIO(without_extra.read_text(encoding="utf-8-sig"))))
+
+        extra_header = extra_rows[0]
+        extra_data = extra_rows[1]
+        base_header = base_rows[0]
+
+        utbot_idx = next(i for i, name in enumerate(extra_header) if str(name).endswith("(latest_session_utbot_buy_turn)"))
+        hull_idx = next(i for i, name in enumerate(extra_header) if str(name).endswith("(latest_session_hull_buy_turn)"))
+        chg_5d_idx = next(i for i, name in enumerate(extra_header) if str(name).endswith("(chg_5d)"))
+        self.assertEqual(extra_data[utbot_idx], "Y")
+        self.assertEqual(extra_data[hull_idx], "N")
+        self.assertEqual(extra_data[chg_5d_idx], "3.42")
+
+        self.assertFalse(any(str(name).endswith("(latest_session_utbot_buy_turn)") for name in base_header))
+        self.assertFalse(any(str(name).endswith("(latest_session_hull_buy_turn)") for name in base_header))
+        self.assertFalse(any(str(name).endswith("(chg_5d)") for name in base_header))
 
     def test_filter_turn_rows_for_telegram_uses_volume_ratio_gt_one(self):
         rows = [

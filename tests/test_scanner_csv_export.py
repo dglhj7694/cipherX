@@ -178,6 +178,21 @@ class ScannerCsvExportTests(unittest.TestCase):
         self.assertEqual(data[h_index["강한추세지속(strong_trend_persistent)"]], "Y")
         self.assertEqual(data[h_index["눌림목재진입(pullback_reentry)"]], "N")
 
+    def test_default_scanner_rows_to_csv_bytes_matches_explicit_default_field_specs(self):
+        row = {
+            "ticker": "AAPL",
+            "utbot_buy_recent": True,
+            "latest_session_utbot_buy_turn": True,
+            "latest_session_hull_buy_turn": False,
+        }
+        implicit = scanner_rows_to_csv_bytes([row]).decode("utf-8-sig")
+        explicit = scanner_rows_to_csv_bytes([row], field_specs=scanner_csv_field_specs()).decode("utf-8-sig")
+        self.assertEqual(implicit, explicit)
+
+        header = list(csv.reader(io.StringIO(implicit)))[0]
+        self.assertNotIn("최근일자UTBot매수전환(latest_session_utbot_buy_turn)", header)
+        self.assertNotIn("최근일자HULL매수전환(latest_session_hull_buy_turn)", header)
+
     def test_dictionary_csv_is_synced_with_field_specs(self):
         specs = scanner_csv_field_specs()
         expected_keys = {str(spec["key"]) for spec in specs}

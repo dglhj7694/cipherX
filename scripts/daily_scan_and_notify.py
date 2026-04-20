@@ -35,6 +35,7 @@ from localization import (
 from scanner_csv import (
     CORE_SIGNAL_GROUP as SCANNER_CORE_SIGNAL_CFG,
     build_detected_signal_payload,
+    scanner_csv_field_specs,
     scanner_rows_to_csv_bytes,
 )
 from scanner_filters import (
@@ -80,6 +81,36 @@ SCANNER_TRANSITION_CFG = {
     "Hull_Turn_Bull": {"label": "HULL 전환↑", "icon": "🟢", "dir": "buy"},
     "Hull_Turn_Bear": {"label": "HULL 전환↓", "icon": "🔴", "dir": "sell"},
 }
+
+POST_CLOSE_LATEST_SESSION_FIELD_SPECS: tuple[dict[str, str], ...] = (
+    {
+        "group": "전환",
+        "key": "latest_session_utbot_buy_turn",
+        "label": "최근일자UTBot매수전환",
+        "type": "bool",
+        "description": "직전 미국 정규장 세션일 UTBot 매수 전환 여부",
+        "rule": "utbot_buy_last_date == 직전 미국 정규장 세션일",
+        "example": "Y",
+    },
+    {
+        "group": "전환",
+        "key": "latest_session_hull_buy_turn",
+        "label": "최근일자HULL매수전환",
+        "type": "bool",
+        "description": "직전 미국 정규장 세션일 HULL 매수 전환 여부",
+        "rule": "hull_turn_bull_last_date == 직전 미국 정규장 세션일",
+        "example": "N",
+    },
+    {
+        "group": "기본",
+        "key": "chg_5d",
+        "label": "최근5일등락률(%)",
+        "type": "number",
+        "description": "최근 5거래일 기준 등락률",
+        "rule": "(현재가-5거래일전종가)/5거래일전종가*100",
+        "example": "3.42",
+    },
+)
 
 
 @dataclass
@@ -238,6 +269,7 @@ def _build_scanner_row(ticker: str, *, bias_mode: str, recent_window: int = 5, h
         latest = dc_.iloc[-1]
         prev_close = _safe_float(dc_.iloc[-2].get("Close", latest.get("Close", 0))) if len(dc_) >= 2 else _safe_float(latest.get("Close", 0))
         current_close = _safe_float(latest.get("Close", 0))
+        close_5d_ago = _safe_float(dc_.iloc[-6].get("Close", 0)) if len(dc_) >= 6 else 0.0
 
         strategy_payload = build_strategy_payload(dc_)
         strategy_summary = strategy_payload.get("summary", {})
@@ -282,6 +314,7 @@ def _build_scanner_row(ticker: str, *, bias_mode: str, recent_window: int = 5, h
 
         chg_value = _safe_float(current_close - prev_close)
         chg_pct = _safe_float((current_close - prev_close) / prev_close * 100) if prev_close else 0.0
+        chg_5d_pct = _safe_float((current_close - close_5d_ago) / close_5d_ago * 100) if close_5d_ago else 0.0
         buy_total = _safe_float(latest.get("Buy_Total", 0))
         sell_total = _safe_float(latest.get("Sell_Total", 0))
         buy_agree = int(_safe_float(latest.get("Buy_Agree", 0)))
@@ -432,6 +465,7 @@ def _build_scanner_row(ticker: str, *, bias_mode: str, recent_window: int = 5, h
             "price": _safe_float(current_close),
             "chg_value": chg_value,
             "chg": chg_pct,
+            "chg_5d": chg_5d_pct,
             "scans": sorted(combos, key=lambda item: item["tier"]),
             "transitions": transitions,
             "multi_sig": multi_sig,
@@ -579,10 +613,21 @@ def scan_universe(tickers: list[str], *, max_workers: int, bias_mode: str, histo
     return ScanRunResult(rows=results, skips=skip_reasons, perf=perf_stats)
 
 
-def write_scan_csv(rows: list[dict[str, Any]], *, out_dir: Path, run_label: str) -> Path:
+def write_scan_csv(
+    rows: list[dict[str, Any]],
+    *,
+    out_dir: Path,
+    run_label: str,
+    extra_field_specs: Iterable[Mapping[str, str]] | None = None,
+) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     output_path = out_dir / f"scanner_full_{run_label}.csv"
-    output_path.write_bytes(scanner_rows_to_csv_bytes(rows))
+    if extra_field_specs:
+        field_specs = [*scanner_csv_field_specs(), *[dict(spec) for spec in extra_field_specs]]
+        payload = scanner_rows_to_csv_bytes(rows, field_specs=field_specs)
+    else:
+        payload = scanner_rows_to_csv_bytes(rows)
+    output_path.write_bytes(payload)
     return output_path
 
 
@@ -761,6 +806,20 @@ def _parse_iso_date(value: Any) -> date | None:
         return datetime.strptime(text, "%Y-%m-%d").date()
     except Exception:
         return None
+
+
+def _with_latest_session_buy_turn_flags(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    target_date: date,
+) -> list[dict[str, Any]]:
+    flagged_rows: list[dict[str, Any]] = []
+    for row in rows or []:
+        row_dict = dict(row or {})
+        row_dict["latest_session_utbot_buy_turn"] = _parse_iso_date(row_dict.get("utbot_buy_last_date")) == target_date
+        row_dict["latest_session_hull_buy_turn"] = _parse_iso_date(row_dict.get("hull_turn_bull_last_date")) == target_date
+        flagged_rows.append(row_dict)
+    return flagged_rows
 
 
 def _last_us_market_session_date(run_at_kst: datetime) -> date:
@@ -1407,6 +1466,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
     universe_profile = _normalize_universe_profile(args.universe_profile)
     scan_label = _scan_label_for_profile(universe_profile)
     scan_mode = "post_close"
+    latest_session_date = _last_us_market_session_date(run_at_kst)
 
     if merge_dir:
         run_label = f"{stamp}_merged"
@@ -1422,7 +1482,13 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
             f"source_rows={int(merged_payload.get('source_row_count', 0))} "
             f"source_sum={int(merged_payload.get('source_result_count_sum', 0))}"
         )
-        csv_path = write_scan_csv(merged_rows, out_dir=out_dir, run_label=run_label)
+        csv_rows = _with_latest_session_buy_turn_flags(merged_rows, target_date=latest_session_date)
+        csv_path = write_scan_csv(
+            csv_rows,
+            out_dir=out_dir,
+            run_label=run_label,
+            extra_field_specs=POST_CLOSE_LATEST_SESSION_FIELD_SPECS,
+        )
         rows_path = write_scan_rows_json(merged_rows, out_dir=out_dir, run_label=run_label)
 
         detected_turn_rows = select_us_session_turn_rows(merged_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
@@ -1498,7 +1564,13 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
             f"skips={len(scan_result.skips)} total_sec={_safe_float(scan_result.perf.get('total_seconds', 0)):.1f}"
         )
 
-        csv_path = write_scan_csv(scan_result.rows, out_dir=out_dir, run_label=run_label)
+        csv_rows = _with_latest_session_buy_turn_flags(scan_result.rows, target_date=latest_session_date)
+        csv_path = write_scan_csv(
+            csv_rows,
+            out_dir=out_dir,
+            run_label=run_label,
+            extra_field_specs=POST_CLOSE_LATEST_SESSION_FIELD_SPECS,
+        )
         rows_path = write_scan_rows_json(scan_result.rows, out_dir=out_dir, run_label=run_label)
         detected_turn_rows = select_us_session_turn_rows(scan_result.rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
         turn_rows = filter_turn_rows_for_telegram(detected_turn_rows, min_volume_ratio_20_exclusive=1.0)

@@ -37,6 +37,8 @@ BOOL_TO_YN_KEYS: set[str] = {
     "utbot_sell_recent",
     "hull_turn_bull_recent",
     "hull_turn_bear_recent",
+    "latest_session_utbot_buy_turn",
+    "latest_session_hull_buy_turn",
 }
 
 SCANNER_CSV_FIELD_SPECS: tuple[dict[str, str], ...] = (
@@ -310,8 +312,12 @@ def _normalized_csv_row(row: Mapping[str, Any]) -> dict[str, Any]:
     return normalized
 
 
-def scanner_rows_to_csv_bytes(rows: Iterable[Mapping[str, Any]]) -> bytes:
-    specs = scanner_csv_field_specs()
+def scanner_rows_to_csv_bytes(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    field_specs: Iterable[Mapping[str, str]] | None = None,
+) -> bytes:
+    specs = tuple(field_specs) if field_specs is not None else scanner_csv_field_specs()
     field_names = [str(spec["key"]) for spec in specs]
 
     out = io.StringIO()
