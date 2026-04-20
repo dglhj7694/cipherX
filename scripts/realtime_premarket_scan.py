@@ -193,7 +193,9 @@ def _build_pm_scanner_row(ticker: str, bias_mode: str, min_dollar_volume: float 
         }
         
         # Filter purely empty premarket early
-        if metrics["dollar_volume"] < min_dollar_volume:
+        # yfinance often returns 0 volume in early premarket despite price action.
+        has_price_action = metrics["dollar_volume"] == 0 and (abs(metrics["gap_pct"]) > 0.0 or metrics["pm_open"] != metrics["pm_close"])
+        if metrics["dollar_volume"] < min_dollar_volume and not has_price_action:
             return {"ok": False, "ticker": ticker, "skip_reason": f"low_volume ({metrics['dollar_volume']:.1f} < {min_dollar_volume})"}
             
         row["group"] = "None"
@@ -313,7 +315,7 @@ def format_telegram_summary(rows: list[dict], run_at_kst: datetime, universe_cou
     ]
     
     for title, group_rows in sections:
-        group_rows.sort(key=lambda x: -x["dollar_volume"]) # 거래대금 순 정렬
+        group_rows.sort(key=lambda x: (-x["dollar_volume"], -x.get("market_cap", 0))) # 거래대금 우선, 그다음 시총 순 정렬
         lines.append(f"=== {title} ({len(group_rows)}개) ===")
         if not group_rows:
             lines.append("- 해당 종목 없음")
