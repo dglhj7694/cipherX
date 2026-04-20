@@ -22,6 +22,19 @@ DEFAULT_DETAIL_LIMIT = 30
 DEFAULT_CORE_MOVER_LIMIT = 10
 DEFAULT_QUICK_TARGET_LIMIT = 8
 DEFAULT_CHUNK_SIZE = 3500
+SECTOR_LABELS_KO: dict[str, str] = {
+    "XLK": "기술",
+    "XLF": "금융",
+    "XLE": "에너지",
+    "XLV": "헬스케어",
+    "XLI": "산업재",
+    "XLY": "경기소비재",
+    "XLP": "필수소비재",
+    "XLU": "유틸리티",
+    "XLB": "소재",
+    "XLC": "커뮤니케이션",
+    "XLRE": "부동산",
+}
 
 
 def _safe_float(value: Any, default: float | None = None) -> float | None:
@@ -109,16 +122,50 @@ def _format_mover_line(row: Mapping[str, Any], rank: int) -> str:
     return f"{rank}. {symbol} | {price} ({change_value}, {change_pct}%) | 거래량 {volume_ratio} | {reason}"
 
 
+def _normalize_10y_snapshot(entry: Mapping[str, Any]) -> dict[str, float | None]:
+    price_raw = _safe_float(entry.get("price"), None)
+    change_raw = _safe_float(entry.get("change_value"), None)
+    change_pct = _safe_float(entry.get("change_pct"), None)
+    if price_raw is None:
+        return {"level_pct": None, "change_bp": None, "change_pct": change_pct}
+    if abs(price_raw) >= 20:
+        level_pct = price_raw / 10.0
+        change_bp = change_raw * 10.0 if change_raw is not None else None
+    else:
+        level_pct = price_raw
+        change_bp = change_raw * 100.0 if change_raw is not None else None
+    return {"level_pct": level_pct, "change_bp": change_bp, "change_pct": change_pct}
+
+
+def _build_sector_label_map(sector_rank: list[Mapping[str, Any]]) -> dict[str, str]:
+    label_map = dict(SECTOR_LABELS_KO)
+    for row in sector_rank:
+        symbol = _coerce_text(row.get("symbol")).upper()
+        label = _coerce_text(row.get("label"))
+        if symbol and symbol not in label_map and label:
+            label_map[symbol] = label
+    return label_map
+
+
+def _format_sector_symbol_with_label(symbol: str, label_map: Mapping[str, str]) -> str:
+    normalized = _coerce_text(symbol).upper()
+    if not normalized:
+        return ""
+    label = _coerce_text(label_map.get(normalized))
+    return f"{normalized} ({label})" if label else normalized
+
+
 def _format_snapshot_line(display_name: str, entry: Mapping[str, Any]) -> str:
     symbol = _coerce_text(entry.get("symbol"))
     prefix = f"{display_name} ({symbol})" if symbol and symbol != display_name else display_name
+    if display_name == "10Y":
+        normalized = _normalize_10y_snapshot(entry)
+        value_text = f"{normalized['level_pct']:.2f}%" if normalized["level_pct"] is not None else "N/A"
+        delta_text = f"{normalized['change_bp']:+.1f}bp" if normalized["change_bp"] is not None else f"{_fmt_signed(normalized['change_pct'], 2)}%"
+        return f"- {prefix}: {value_text} ({delta_text})"
     price = _safe_float(entry.get("price"), None)
     change_value = _safe_float(entry.get("change_value"), None)
     change_pct = _safe_float(entry.get("change_pct"), None)
-    if display_name == "10Y":
-        value_text = f"{(price / 10):.2f}%" if price is not None else "N/A"
-        delta_text = f"{(change_value * 10):+.1f}bp" if change_value is not None else f"{_fmt_signed(change_pct, 2)}%"
-        return f"- {prefix}: {value_text} ({delta_text})"
     return f"- {prefix}: {_fmt_price(price)} ({_fmt_signed(change_value, 2)}, {_fmt_signed(change_pct, 2)}%)"
 
 
@@ -145,13 +192,15 @@ def _build_index_interpretation_lines(benchmarks: Mapping[str, Any]) -> list[str
 
 def _build_macro_interpretation_lines(macro: Mapping[str, Any]) -> list[str]:
     lines: list[str] = []
-    tnx_change = _safe_float(dict(macro.get("10Y") or {}).get("change_value"), None)
+    tnx_entry = dict(macro.get("10Y") or {})
+    tnx_normalized = _normalize_10y_snapshot(tnx_entry)
+    tnx_change_bp = _safe_float(tnx_normalized.get("change_bp"), None)
     dxy_change = _safe_float(dict(macro.get("DXY") or {}).get("change_pct"), None)
     wti_change = _safe_float(dict(macro.get("WTI") or {}).get("change_pct"), None)
     gold_change = _safe_float(dict(macro.get("Gold") or {}).get("change_pct"), None)
     btc_change = _safe_float(dict(macro.get("BTC") or {}).get("change_pct"), None)
-    if tnx_change is not None:
-        lines.append(f"- 해석: 10Y {_fmt_signed(tnx_change * 10, 1)}bp -> {'금리 부담 완화' if tnx_change < 0 else '금리 부담 잔존'}")
+    if tnx_change_bp is not None:
+        lines.append(f"- 해석: 10Y {_fmt_signed(tnx_change_bp, 1)}bp -> {'금리 부담 완화' if tnx_change_bp < 0 else '금리 부담 잔존'}")
     if dxy_change is not None:
         lines.append(f"- 해석: DXY {_fmt_signed(dxy_change, 2)}% -> {'달러 압력 완화' if dxy_change < 0 else '달러 압력 확대'}")
     if wti_change is not None:
@@ -176,23 +225,16 @@ def _build_report_core_briefing_text(
     def _normalize_for_compare(text: str) -> str:
         return re.sub(r"[\s\.\,\-\|]+", "", str(text or "").lower())
 
-    def _coerce_action_lines(values: list[str], *, allow_check_words: bool = True) -> list[str]:
-        lines: list[str] = []
-        blocked = ("확인", "점검", "체크")
-        for raw in values:
-            text = _coerce_text(raw)
-            if not text:
-                continue
-            if not allow_check_words and any(word in text for word in blocked):
-                continue
-            lines.append(text.rstrip(". "))
-        return lines
-
     executive = dict(report.get("executive_summary") or {})
     sentiment = dict(report.get("sentiment") or {})
     risk_state_display = _coerce_text(executive.get("risk_state_display")) or _coerce_text(sentiment.get("risk_state_display")) or _coerce_text(sentiment.get("risk_state")) or "N/A"
     fear_greed_score = sentiment.get("fear_greed_score", executive.get("fear_greed_score"))
     fear_greed_label = _coerce_text(sentiment.get("fear_greed_label") or executive.get("fear_greed_label")) or "N/A"
+    fear_greed_source_key = _coerce_text(sentiment.get("fear_greed_source") or executive.get("fear_greed_source")).lower()
+    fear_greed_source_label = {"cnn": "CNN", "proxy": "Proxy"}.get(fear_greed_source_key, "")
+    if not fear_greed_source_label and fear_greed_source_key:
+        fear_greed_source_label = fear_greed_source_key
+    fear_greed_source_suffix = f", {fear_greed_source_label}" if fear_greed_source_label else ""
 
     benchmarks = dict(report.get("benchmarks") or {})
     macro = dict(report.get("macro") or {})
@@ -202,7 +244,6 @@ def _build_report_core_briefing_text(
     market_structure_text = _coerce_text(report.get("market_structure_text"))
     session_flow = dict(report.get("session_flow") or {})
     sector_summary = dict(report.get("sector_summary") or {})
-    response_guidance = dict(report.get("response_guidance") or {})
 
     movers = dict(report.get("movers") or {})
     core_movers = dict(report.get("core_movers") or {})
@@ -214,35 +255,10 @@ def _build_report_core_briefing_text(
 
     action_points = dict(report.get("action_points") or {})
     insight_bullets = [_coerce_text(item) for item in list(action_points.get("insight_bullets") or []) if _coerce_text(item)]
-    watchlist = [_coerce_text(item) for item in list(action_points.get("watchlist") or []) if _coerce_text(item)]
     analysis_actions = [dict(item or {}) for item in list(action_points.get("analysis_actions") or []) if isinstance(item, dict)]
 
-    favorable_source = list(response_guidance.get("favorable_actions") or response_guidance.get("favorable") or [])
-    avoid_source = list(response_guidance.get("avoid_actions") or response_guidance.get("avoid") or [])
-    checkpoints_source = list(report.get("checkpoints") or response_guidance.get("checkpoints") or [])
-    favorable = _coerce_action_lines([_coerce_text(item) for item in favorable_source], allow_check_words=True)
-    avoid = _coerce_action_lines([_coerce_text(item) for item in avoid_source], allow_check_words=False)
-    checkpoints = _coerce_action_lines([_coerce_text(item) for item in checkpoints_source], allow_check_words=True)
     quick_targets = [dict(item or {}) for item in list(report.get("quick_targets") or []) if isinstance(item, dict)]
 
-    if not favorable:
-        favorable = [
-            "빅테크·리더주 중심으로 눌림 구간만 선별 대응",
-            "거래량 1배 이상 종목만 압축 관찰",
-            "확산 확인 전까지는 지수보다 리더주 우선 대응",
-        ]
-    if not avoid:
-        avoid = [
-            "breadth 약한 구간에서 지수 추격 매수",
-            "거래량 1배 미만 급등주 후행 추격",
-            "IWM 확산 확인 전 중소형주 광범위 베팅",
-        ]
-    if not checkpoints:
-        checkpoints = watchlist[:3] or [
-            "10Y·DXY·WTI 장초반 동조 방향 확인",
-            "QQQ-SPY / IWM-SPY 상대강도 변화 확인",
-            "VIX·Gold·BTC로 방어 심리 재확대 여부 점검",
-        ]
     if not quick_targets:
         quick_targets = [{"symbol": _coerce_text(item.get("symbol"))} for item in analysis_actions[:quick_cap] if _coerce_text(item.get("symbol"))]
 
@@ -256,6 +272,9 @@ def _build_report_core_briefing_text(
 
     strong_sectors = [_coerce_text(item.get("symbol")) for item in sector_rank[:3] if _coerce_text(item.get("symbol"))]
     weak_sectors = [_coerce_text(item.get("symbol")) for item in list(reversed(sector_rank[-3:])) if _coerce_text(item.get("symbol"))]
+    sector_label_map = _build_sector_label_map(sector_rank)
+    strong_sector_labels = [_format_sector_symbol_with_label(symbol, sector_label_map) for symbol in strong_sectors]
+    weak_sector_labels = [_format_sector_symbol_with_label(symbol, sector_label_map) for symbol in weak_sectors]
     close_text = _coerce_text(session_flow.get("close")) or one_liner
     if _normalize_for_compare(close_text) == _normalize_for_compare(one_liner):
         close_text = "종가 기준으로는 지수 방향보다 리더십 유지 여부가 더 중요한 세션이었습니다."
@@ -269,7 +288,7 @@ def _build_report_core_briefing_text(
         "",
         "2) 시장 상태",
         f"- 시장 상태: {risk_state_display}",
-        f"- 공포탐욕: {int(_safe_float(fear_greed_score, 50) or 50)}/100 ({fear_greed_label})",
+        f"- 공포탐욕: {int(_safe_float(fear_greed_score, 50) or 50)}/100 ({fear_greed_label}{fear_greed_source_suffix})",
         f"- 구조 해석: {_coerce_text(market_structure.get('label')) or '혼조'} / {_coerce_text(market_structure.get('note')) or one_liner}",
         "",
         "3) Session Flow",
@@ -305,8 +324,8 @@ def _build_report_core_briefing_text(
         f"- 해석: {market_structure_text}",
         "",
         "7) Sector Summary",
-        f"- 강한 섹터: {', '.join(strong_sectors) if strong_sectors else 'N/A'}",
-        f"- 약한 섹터: {', '.join(weak_sectors) if weak_sectors else 'N/A'}",
+        f"- 강한 섹터: {', '.join(strong_sector_labels) if strong_sector_labels else 'N/A'}",
+        f"- 약한 섹터: {', '.join(weak_sector_labels) if weak_sector_labels else 'N/A'}",
         f"- 해석: {_coerce_text(sector_summary.get('interpretation')) or one_liner}",
         "",
         f"8) Top Movers +{len(gainers)} / -{len(losers)} (max {core_cap})",
@@ -322,25 +341,7 @@ def _build_report_core_briefing_text(
     else:
         lines.append("- 표시할 하락 종목이 없습니다.")
 
-    lines += ["", "9) 오늘 유리한 대응"]
-    if favorable[:3]:
-        lines.extend([f"- {text}" for text in favorable[:3]])
-    else:
-        lines.append("- 리더주 선별 대응 우선")
-
-    lines += ["", "10) 오늘 피해야 할 대응"]
-    if avoid[:3]:
-        lines.extend([f"- {text}" for text in avoid[:3]])
-    else:
-        lines.append("- 확산 확인 전 무리한 추격 자제")
-
-    lines += ["", "11) 체크포인트"]
-    if checkpoints:
-        lines.extend([f"- {text}" for text in checkpoints[:3]])
-    else:
-        lines.append("- 장 초반 금리/달러/유가 동조 여부 확인")
-
-    lines += ["", f"12) 빠른 분석 대상 (max {quick_cap})"]
+    lines += ["", f"9) 빠른 분석 대상 (max {quick_cap})"]
     if quick_targets:
         for target in quick_targets[:quick_cap]:
             symbol = _coerce_text(target.get("symbol")) or "-"
@@ -366,9 +367,6 @@ def _build_report_detail_briefing_text(
     movers = dict(report.get("movers") or {})
     gainers = [dict(item or {}) for item in list(movers.get("gainers") or [])][:limit]
     losers = [dict(item or {}) for item in list(movers.get("losers") or [])][:limit]
-    action_points = dict(report.get("action_points") or {})
-    insight_bullets = [_coerce_text(item) for item in list(action_points.get("insight_bullets") or []) if _coerce_text(item)]
-    checkpoints = [_coerce_text(item) for item in list(report.get("checkpoints") or []) if _coerce_text(item)]
 
     lines = [
         f"[오늘 미국장 상세 브리핑] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
@@ -413,18 +411,6 @@ def _build_report_detail_briefing_text(
         lines.extend([_format_mover_line(row, idx) for idx, row in enumerate(losers, start=1)])
     else:
         lines.append("- 표시할 하락 종목이 없습니다.")
-
-    lines += ["", "4) 추가 인사이트"]
-    if insight_bullets:
-        lines.extend([f"- {text}" for text in insight_bullets[:6]])
-    else:
-        lines.append("- 추가 인사이트가 아직 집계되지 않았습니다.")
-
-    lines += ["", "5) 다음 세션 트리거"]
-    if checkpoints:
-        lines.extend([f"- {text}" for text in checkpoints[:5]])
-    else:
-        lines.append("- 다음 세션 트리거가 아직 집계되지 않았습니다.")
 
     return "\n".join(lines)
 

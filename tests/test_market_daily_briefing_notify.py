@@ -105,9 +105,12 @@ class MarketDailyBriefingNotifyTests(unittest.TestCase):
                 "relative_strength": {"QQQ_SPY": 0.71, "IWM_SPY": -0.22},
                 "sentiment": {"risk_state_display": "RISK_ON", "fear_greed_score": 72, "fear_greed_label": "탐욕"},
                 "sector_rank": [
-                    {"rank": 1, "symbol": "XLK", "label": "Technology", "change_pct": 2.1},
-                    {"rank": 2, "symbol": "XLF", "label": "Financials", "change_pct": 0.8},
-                    {"rank": 3, "symbol": "XLU", "label": "Utilities", "change_pct": -1.2},
+                    {"rank": 1, "symbol": "XLY", "label": "Consumer Discretionary", "change_pct": 2.1},
+                    {"rank": 2, "symbol": "XLI", "label": "Industrials", "change_pct": 0.8},
+                    {"rank": 3, "symbol": "XLK", "label": "Technology", "change_pct": 0.6},
+                    {"rank": 4, "symbol": "XLC", "label": "Communication Services", "change_pct": -0.2},
+                    {"rank": 5, "symbol": "XLU", "label": "Utilities", "change_pct": -0.9},
+                    {"rank": 6, "symbol": "XLE", "label": "Energy", "change_pct": -1.2},
                 ],
                 "movers": {"gainers": gainers, "losers": losers},
                 "core_movers": {"gainers": gainers[:10], "losers": losers[:10]},
@@ -143,10 +146,16 @@ class MarketDailyBriefingNotifyTests(unittest.TestCase):
         self.assertIn("6) Market Structure", core)
         self.assertIn("Breadth: 상승 섹터 4/11, 확산 약함", core)
         self.assertIn("해석: 리더십은 QQQ 우위였지만 IWM 열세와 breadth 약세가 겹쳐 선별 장세 해석이 유효했습니다.", core)
+        self.assertIn("- 10Y: 4.31% (-4.0bp)", core)
+        self.assertIn("강한 섹터: XLY (경기소비재), XLI (산업재), XLK (기술)", core)
+        self.assertIn("약한 섹터: XLE (에너지), XLU (유틸리티), XLC (커뮤니케이션)", core)
         self.assertIn("8) Top Movers +10 / -10", core)
         self.assertIn("10. G009", core)
         self.assertNotIn("11. G010", core)
-        self.assertNotIn("확인", core.split("10) 오늘 피해야 할 대응", 1)[1].split("11) 체크포인트", 1)[0])
+        self.assertNotIn("9) 오늘 유리한 대응", core)
+        self.assertNotIn("10) 오늘 피해야 할 대응", core)
+        self.assertNotIn("11) 체크포인트", core)
+        self.assertIn("9) 빠른 분석 대상", core)
 
         self.assertIn("[오늘 미국장 상세 브리핑]", detail)
         self.assertIn("breadth 요약: 상승 섹터 4/11, 확산 약함", detail)
@@ -154,7 +163,7 @@ class MarketDailyBriefingNotifyTests(unittest.TestCase):
         self.assertIn("30. G029", detail)
         self.assertNotIn("31. G030", detail)
 
-    def test_detail_section_order_is_sector_theme_movers_insight_trigger(self):
+    def test_detail_section_order_is_sector_theme_then_movers_only(self):
         payload = self._build_report_payload()
         detail = build_market_daily_briefing_messages(
             payload,
@@ -167,9 +176,46 @@ class MarketDailyBriefingNotifyTests(unittest.TestCase):
         p1 = detail.index("1) 전체 섹터 순위")
         p2 = detail.index("2) 테마 묶음 요약")
         p3 = detail.index("3) Top Movers +30 / -30")
-        p4 = detail.index("4) 추가 인사이트")
-        p5 = detail.index("5) 다음 세션 트리거")
-        self.assertTrue(p1 < p2 < p3 < p4 < p5)
+        self.assertTrue(p1 < p2 < p3)
+        self.assertNotIn("4) 추가 인사이트", detail)
+        self.assertNotIn("5) 다음 세션 트리거", detail)
+
+    def test_core_10y_snapshot_uses_direct_percent_scale_when_raw_price_is_under_20(self):
+        payload = self._build_report_payload()
+        report = dict(payload["briefing_report"])
+        report["macro"] = dict(report["macro"])
+        report["macro"]["10Y"] = {"symbol": "10Y", "price": 4.2, "change_value": -0.06, "change_pct": -1.41}
+        payload["briefing_report"] = report
+
+        core = build_market_daily_briefing_messages(
+            payload,
+            run_at_kst=datetime(2026, 4, 16, 6, 15, 0),
+            detail_limit=30,
+            core_mover_limit=10,
+            quick_target_limit=8,
+        )[0]
+
+        self.assertIn("- 10Y: 4.20% (-6.0bp)", core)
+        self.assertIn("해석: 10Y -6.0bp -> 금리 부담 완화", core)
+
+    def test_core_fear_greed_source_is_appended_when_present(self):
+        payload = self._build_report_payload()
+        report = dict(payload["briefing_report"])
+        report["executive_summary"] = dict(report.get("executive_summary") or {})
+        report["sentiment"] = dict(report.get("sentiment") or {})
+        report["executive_summary"]["fear_greed_source"] = "proxy"
+        report["sentiment"]["fear_greed_source"] = "proxy"
+        payload["briefing_report"] = report
+
+        core = build_market_daily_briefing_messages(
+            payload,
+            run_at_kst=datetime(2026, 4, 16, 6, 15, 0),
+            detail_limit=30,
+            core_mover_limit=10,
+            quick_target_limit=8,
+        )[0]
+
+        self.assertIn("- 공포탐욕: 72/100 (탐욕, Proxy)", core)
 
     def test_core_avoids_duplicate_close_sentence(self):
         payload = self._build_report_payload()

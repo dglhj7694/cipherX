@@ -16,6 +16,8 @@ class MarketDailyMoverUniverseTests(unittest.TestCase):
             ui._download_market_history.clear()
         if hasattr(ui.build_us_market_daily_payload, "clear"):
             ui.build_us_market_daily_payload.clear()
+        if hasattr(ui._fetch_cnn_fear_greed_snapshot, "clear"):
+            ui._fetch_cnn_fear_greed_snapshot.clear()
 
     def test_market_mover_universe_is_union_without_96_cap(self):
         fake_sectors = {"A": [f"S{i:03d}" for i in range(120)]}
@@ -108,6 +110,79 @@ class MarketDailyMoverUniverseTests(unittest.TestCase):
         self.assertIn("AAA", set(history.columns.get_level_values(0)))
         self.assertIn("BBB", set(history.columns.get_level_values(0)))
         self.assertIn("CCC", set(history.columns.get_level_values(0)))
+
+    def test_download_market_history_uses_fallback_only_for_missing_symbols(self):
+        calls = []
+        idx = pd.date_range("2026-04-10", periods=3, freq="D")
+
+        def _fake_download(tickers, period, interval, group_by, auto_adjust, progress, threads):
+            symbols = [str(item) for item in tickers]
+            calls.append(tuple(symbols))
+            if symbols == ["DX-Y.NYB", "AAA"]:
+                return pd.DataFrame(
+                    {
+                        ("AAA", "Close"): [10.0, 10.5, 11.0],
+                        ("AAA", "Volume"): [100, 101, 102],
+                    },
+                    index=idx,
+                )
+            if symbols == ["DX=F"]:
+                return pd.DataFrame(
+                    {
+                        "Close": [99.0, 99.2, 99.4],
+                        "Volume": [200, 210, 220],
+                    },
+                    index=idx,
+                )
+            return pd.DataFrame()
+
+        with patch.object(ui, "yf") as yf_mock, patch.object(ui, "_US_MARKET_DOWNLOAD_CHUNK_SIZE", 10):
+            yf_mock.download.side_effect = _fake_download
+            history = ui._download_market_history(("DX-Y.NYB", "AAA"), period="3mo")
+
+        self.assertEqual(calls[0], ("DX-Y.NYB", "AAA"))
+        self.assertIn(("DX=F",), calls)
+        self.assertFalse(ui._extract_symbol_frame(history, "DX-Y.NYB").empty)
+        self.assertFalse(ui._extract_symbol_frame(history, "AAA").empty)
+
+    def test_market_structure_text_uses_expansion_friendly_message_when_iwm_and_breadth_strong(self):
+        text = ui._build_market_structure_text(
+            0.12,
+            0.85,
+            leadership_bias="메가캡 우위",
+            breadth_summary="상승 섹터 9/11, 확산 강함",
+            sector_up=9,
+            sector_total=11,
+        )
+
+        self.assertIn("소형주 확산이 우호적", text)
+        self.assertIn("확산 강함 구간", text)
+
+    def test_market_structure_text_uses_restricted_message_when_iwm_or_breadth_weak(self):
+        text = ui._build_market_structure_text(
+            0.20,
+            -0.55,
+            leadership_bias="메가캡 우위",
+            breadth_summary="상승 섹터 3/11, 확산 약함",
+            sector_up=3,
+            sector_total=11,
+        )
+
+        self.assertIn("소형주 확산 강도는 제한됐습니다", text)
+        self.assertIn("확산 약함 구간", text)
+
+    def test_market_structure_text_uses_neutral_message_when_signals_mixed(self):
+        text = ui._build_market_structure_text(
+            0.05,
+            0.10,
+            leadership_bias="메가캡 우위",
+            breadth_summary="상승 섹터 6/11, 확산 중립",
+            sector_up=6,
+            sector_total=11,
+        )
+
+        self.assertIn("소형주 확산은 중립", text)
+        self.assertIn("확산 중립 구간", text)
 
     def test_top_mover_card_count_stays_limited_to_9_each_side_and_report_exists(self):
         mover_universe = tuple(f"M{i:02d}" for i in range(30))
@@ -238,6 +313,120 @@ class MarketDailyMoverUniverseTests(unittest.TestCase):
         self.assertEqual(len(actions), 3)
         self.assertEqual([row.get("symbol") for row in actions], ["AAA", "BBB", "CCC"])
         self.assertEqual([row.get("rank") for row in actions], [1, 2, 3])
+
+    def test_briefing_report_prefers_cnn_fear_greed_when_available(self):
+        mover_universe = ("AAA", "BBB", "CCC")
+
+        def _fake_extract_symbol_frame(_history, symbol):
+            idx = pd.date_range("2026-03-01", periods=30, freq="D")
+            if symbol == "AAA":
+                close = [100.0] * 29 + [106.0]
+            elif symbol == "BBB":
+                close = [100.0] * 29 + [103.0]
+            elif symbol == "CCC":
+                close = [100.0] * 29 + [96.0]
+            elif symbol == "^TNX":
+                close = [43.5] * 29 + [43.1]
+            elif symbol == "^VIX":
+                close = [16.2] * 29 + [15.8]
+            else:
+                close = [100.0] * 29 + [100.5]
+            volume = [1_000_000] * 30
+            return pd.DataFrame({"Close": close, "Volume": volume}, index=idx)
+
+        with patch.object(
+            ui,
+            "_resolve_market_mover_etf_payload",
+            return_value={"items": [], "tickers": [], "note": "", "errors": []},
+        ), patch.object(ui, "_market_mover_universe", return_value=mover_universe), patch.object(
+            ui,
+            "_download_market_history",
+            return_value=pd.DataFrame(),
+        ), patch.object(
+            ui,
+            "_extract_symbol_frame",
+            side_effect=_fake_extract_symbol_frame,
+        ), patch.object(
+            ui,
+            "_collect_market_news",
+            return_value={"items": [], "ranked_items": [], "rate_limited": False},
+        ), patch.object(
+            ui,
+            "_generate_us_market_ai_copy",
+            return_value={},
+        ), patch.object(
+            ui,
+            "_fetch_cnn_fear_greed_snapshot",
+            return_value={"score": 88, "label": "극단적 탐욕", "rating": "Extreme Greed"},
+        ):
+            payload = ui.build_us_market_daily_payload()
+
+        briefing_report = dict(payload.get("briefing_report") or {})
+        sentiment = dict(briefing_report.get("sentiment") or {})
+        executive_summary = dict(briefing_report.get("executive_summary") or {})
+        self.assertEqual(sentiment.get("fear_greed_score"), 88)
+        self.assertEqual(sentiment.get("fear_greed_label"), "극단적 탐욕")
+        self.assertEqual(sentiment.get("fear_greed_source"), "cnn")
+        self.assertEqual(executive_summary.get("fear_greed_score"), 88)
+        self.assertEqual(executive_summary.get("fear_greed_label"), "극단적 탐욕")
+        self.assertEqual(executive_summary.get("fear_greed_source"), "cnn")
+
+    def test_briefing_report_falls_back_to_proxy_when_cnn_unavailable(self):
+        mover_universe = ("AAA", "BBB", "CCC")
+
+        def _fake_extract_symbol_frame(_history, symbol):
+            idx = pd.date_range("2026-03-01", periods=30, freq="D")
+            if symbol == "AAA":
+                close = [100.0] * 29 + [106.0]
+            elif symbol == "BBB":
+                close = [100.0] * 29 + [103.0]
+            elif symbol == "CCC":
+                close = [100.0] * 29 + [96.0]
+            elif symbol == "^TNX":
+                close = [43.5] * 29 + [43.1]
+            elif symbol == "^VIX":
+                close = [16.2] * 29 + [15.8]
+            else:
+                close = [100.0] * 29 + [100.5]
+            volume = [1_000_000] * 30
+            return pd.DataFrame({"Close": close, "Volume": volume}, index=idx)
+
+        with patch.object(
+            ui,
+            "_resolve_market_mover_etf_payload",
+            return_value={"items": [], "tickers": [], "note": "", "errors": []},
+        ), patch.object(ui, "_market_mover_universe", return_value=mover_universe), patch.object(
+            ui,
+            "_download_market_history",
+            return_value=pd.DataFrame(),
+        ), patch.object(
+            ui,
+            "_extract_symbol_frame",
+            side_effect=_fake_extract_symbol_frame,
+        ), patch.object(
+            ui,
+            "_collect_market_news",
+            return_value={"items": [], "ranked_items": [], "rate_limited": False},
+        ), patch.object(
+            ui,
+            "_generate_us_market_ai_copy",
+            return_value={},
+        ), patch.object(
+            ui,
+            "_fetch_cnn_fear_greed_snapshot",
+            return_value={},
+        ):
+            payload = ui.build_us_market_daily_payload()
+
+        briefing_report = dict(payload.get("briefing_report") or {})
+        sentiment = dict(briefing_report.get("sentiment") or {})
+        executive_summary = dict(briefing_report.get("executive_summary") or {})
+        self.assertEqual(sentiment.get("fear_greed_source"), "proxy")
+        self.assertEqual(executive_summary.get("fear_greed_source"), "proxy")
+        self.assertIn(sentiment.get("fear_greed_label"), {"극단적 공포", "공포", "중립", "탐욕", "극단적 탐욕"})
+        self.assertIsInstance(sentiment.get("fear_greed_score"), int)
+        self.assertGreaterEqual(sentiment.get("fear_greed_score"), 0)
+        self.assertLessEqual(sentiment.get("fear_greed_score"), 100)
 
     def test_analysis_actions_dedupes_and_filters_invalid_symbols(self):
         movers_sorted = [

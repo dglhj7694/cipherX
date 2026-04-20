@@ -9,6 +9,7 @@ import html
 import json
 import re
 import yfinance as yf
+import requests
 from datetime import datetime, timedelta
 from textwrap import dedent
 try:
@@ -65,6 +66,18 @@ _US_MARKET_NEWS_GOOD_EXCERPT_SCORE = 140
 _US_MARKET_NEWS_MEGA_CAP_LIMIT = 8
 _US_MARKET_NEWS_GAINER_SYMBOL_LIMIT = 4
 _US_MARKET_NEWS_LOSER_SYMBOL_LIMIT = 4
+_CNN_FEAR_GREED_CACHE_TTL_SEC = 900
+_CNN_FEAR_GREED_TIMEOUT_SEC = 6
+_CNN_FEAR_GREED_API_URL = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
+_CNN_FEAR_GREED_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/123.0.0.0 Safari/537.36"
+    ),
+    "Accept": "application/json",
+    "Referer": "https://edition.cnn.com/",
+}
 _US_MARKET_NEWS_SECTION_ORDER = [
     "시장 총평",
     "거시·연준",
@@ -295,6 +308,88 @@ def _safe_market_float(value):
         return None
 
 
+def _normalize_market_fear_greed_score(value):
+    numeric = _safe_market_float(value)
+    if numeric is None:
+        return None
+    return int(max(0, min(100, round(numeric))))
+
+
+def _label_from_market_fear_greed_score(score):
+    normalized = _normalize_market_fear_greed_score(score)
+    if normalized is None:
+        return "중립"
+    if normalized <= 24:
+        return "극단적 공포"
+    if normalized <= 44:
+        return "공포"
+    if normalized <= 55:
+        return "중립"
+    if normalized <= 75:
+        return "탐욕"
+    return "극단적 탐욕"
+
+
+def _label_from_cnn_fear_greed_rating(rating, score):
+    sample = str(rating or "").strip().lower()
+    if "extreme fear" in sample:
+        return "극단적 공포"
+    if "extreme greed" in sample:
+        return "극단적 탐욕"
+    if "fear" in sample:
+        return "공포"
+    if "greed" in sample:
+        return "탐욕"
+    if "neutral" in sample:
+        return "중립"
+    return _label_from_market_fear_greed_score(score)
+
+
+@st.cache_data(ttl=_CNN_FEAR_GREED_CACHE_TTL_SEC, show_spinner=False)
+def _fetch_cnn_fear_greed_snapshot():
+    try:
+        response = requests.get(
+            _CNN_FEAR_GREED_API_URL,
+            headers=_CNN_FEAR_GREED_HEADERS,
+            timeout=_CNN_FEAR_GREED_TIMEOUT_SEC,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, dict):
+            return {}
+        current = payload.get("fear_and_greed")
+        if not isinstance(current, dict):
+            return {}
+        score = _normalize_market_fear_greed_score(current.get("score"))
+        if score is None:
+            return {}
+        rating = str(current.get("rating") or "").strip()
+        label = _label_from_cnn_fear_greed_rating(rating, score)
+        return {
+            "score": score,
+            "label": label,
+            "rating": rating,
+        }
+    except Exception:
+        return {}
+
+
+def _resolve_market_fear_greed_snapshot(market_regime):
+    regime = market_regime or {}
+    proxy_score = _normalize_market_fear_greed_score(regime.get("fear_greed_score"))
+    if proxy_score is None:
+        proxy_score = 50
+    proxy_label = str(regime.get("fear_greed_label") or "").strip() or _label_from_market_fear_greed_score(proxy_score)
+
+    cnn_snapshot = _fetch_cnn_fear_greed_snapshot()
+    cnn_score = _normalize_market_fear_greed_score(cnn_snapshot.get("score"))
+    if cnn_score is not None:
+        cnn_label = str(cnn_snapshot.get("label") or "").strip() or _label_from_market_fear_greed_score(cnn_score)
+        return {"score": cnn_score, "label": cnn_label, "source": "cnn"}
+
+    return {"score": proxy_score, "label": proxy_label, "source": "proxy"}
+
+
 def _format_mover_price_summary(snapshot, change_pct=None):
     snapshot = snapshot or {}
     price = _safe_market_float(snapshot.get("price"))
@@ -455,6 +550,30 @@ def _format_pct_point(change_pct):
     return f"{change_pct:+.2f}%p"
 
 
+def _build_market_structure_text(qqq_vs_spy, iwm_vs_spy, *, leadership_bias, breadth_summary, sector_up, sector_total):
+    up = int(sector_up or 0)
+    total = max(1, int(sector_total or 0))
+    breadth_ratio = up / total
+    qqq_spread = _format_pct_point(qqq_vs_spy)
+    iwm_spread = _format_pct_point(iwm_vs_spy)
+    iwm_value = _safe_market_float(iwm_vs_spy)
+
+    if iwm_value is not None and iwm_value >= 0.35 and breadth_ratio >= 0.64:
+        expansion_text = f"IWM-SPY {iwm_spread}와 breadth 흐름이 동반돼 소형주 확산이 우호적입니다."
+        guidance_text = "지수 추격보다 리더주와 순환주를 분할로 확장 대응하는 편이 유리합니다."
+    elif (iwm_value is not None and iwm_value <= -0.35) or breadth_ratio <= 0.36:
+        expansion_text = f"IWM-SPY {iwm_spread} 흐름에서 소형주 확산 강도는 제한됐습니다."
+        guidance_text = "지수 추격보다 거래량 동반 리더주 선별이 유리합니다."
+    else:
+        expansion_text = f"IWM-SPY {iwm_spread}와 breadth 흐름이 혼조라 소형주 확산은 중립입니다."
+        guidance_text = "지수 추격보다 강도 확인 후 선별 대응이 유리합니다."
+
+    return (
+        f"리더십은 QQQ-SPY {qqq_spread}로 {leadership_bias} 성격이 유지됐고, "
+        f"{expansion_text} {breadth_summary} 구간이라 {guidance_text}"
+    )
+
+
 def _build_relative_strength_metric(label, note, spread):
     if spread is None or pd.isna(spread):
         return {"label": label, "value": "N/A", "delta": "", "note": note, "tone": "neutral"}
@@ -572,14 +691,12 @@ def _build_market_regime(benchmarks, macro, sector_rows):
         state_note = "혼조"
         tone = "neutral"
 
-    if fear_greed_score >= 65:
-        fear_greed_label = "탐욕"
+    fear_greed_label = _label_from_market_fear_greed_score(fear_greed_score)
+    if fear_greed_label in {"탐욕", "극단적 탐욕"}:
         fear_greed_tone = "positive"
-    elif fear_greed_score <= 35:
-        fear_greed_label = "공포"
+    elif fear_greed_label in {"공포", "극단적 공포"}:
         fear_greed_tone = "negative"
     else:
-        fear_greed_label = "중립"
         fear_greed_tone = "neutral"
     state_display = f"{state_note} ({state})"
 
@@ -2873,15 +2990,10 @@ def _build_market_news_card(market_date_key, benchmark_snapshots, macro_snapshot
     }
 
 
-@st.cache_data(ttl=1800, show_spinner=False)
-def _download_market_history(tickers, period=_US_MARKET_HISTORY_PERIOD):
-    expanded = []
-    for ticker in tickers:
-        expanded.extend(_market_symbol_candidates(ticker))
-    symbols = tuple(_ordered_unique(symbol for symbol in expanded if symbol))
+def _download_market_history_chunks(symbols, *, period):
+    symbols = tuple(_ordered_unique(symbol for symbol in symbols if symbol))
     if not symbols:
         return pd.DataFrame()
-
     chunk_size = max(1, int(_US_MARKET_DOWNLOAD_CHUNK_SIZE or 1))
     chunks = [symbols[idx:idx + chunk_size] for idx in range(0, len(symbols), chunk_size)]
     downloaded_frames = []
@@ -2913,6 +3025,41 @@ def _download_market_history(tickers, period=_US_MARKET_HISTORY_PERIOD):
         return pd.DataFrame()
 
     merged = pd.concat(downloaded_frames, axis=1)
+    if isinstance(merged.columns, pd.MultiIndex):
+        merged = merged.loc[:, ~merged.columns.duplicated()]
+    else:
+        merged = merged.loc[:, ~merged.columns.duplicated()]
+    return merged.sort_index()
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _download_market_history(tickers, period=_US_MARKET_HISTORY_PERIOD):
+    base_symbols = tuple(_ordered_unique(_normalize_market_symbol(ticker) for ticker in tickers))
+    if not base_symbols:
+        return pd.DataFrame()
+
+    base_history = _download_market_history_chunks(base_symbols, period=period)
+    if not base_symbols:
+        return base_history
+
+    missing_symbols = [symbol for symbol in base_symbols if _extract_symbol_frame(base_history, symbol).empty]
+    fallback_symbols: list[str] = []
+    for symbol in missing_symbols:
+        for candidate in _market_symbol_candidates(symbol)[1:]:
+            normalized = _normalize_market_symbol(candidate)
+            if normalized and normalized not in base_symbols and normalized not in fallback_symbols:
+                fallback_symbols.append(normalized)
+
+    if not fallback_symbols:
+        return base_history
+
+    fallback_history = _download_market_history_chunks(tuple(fallback_symbols), period=period)
+    if fallback_history.empty:
+        return base_history
+    if base_history.empty:
+        return fallback_history
+
+    merged = pd.concat([base_history, fallback_history], axis=1)
     if isinstance(merged.columns, pd.MultiIndex):
         merged = merged.loc[:, ~merged.columns.duplicated()]
     else:
@@ -3036,6 +3183,7 @@ def build_us_market_daily_payload():
 
     market_regime = _build_market_regime(benchmark_snapshots, macro_snapshots, sector_sorted)
     market_structure = _describe_market_structure(benchmark_snapshots, macro_snapshots, sector_sorted)
+    fear_greed_snapshot = _resolve_market_fear_greed_snapshot(market_regime)
     qqq_vs_spy = market_regime.get("qqq_vs_spy")
     iwm_vs_spy = market_regime.get("iwm_vs_spy")
     driver_candidates = _build_driver_candidates(benchmark_snapshots, macro_snapshots, sector_sorted)
@@ -3078,8 +3226,9 @@ def build_us_market_daily_payload():
             "state": market_regime.get("state"),
             "state_note": market_regime.get("state_note"),
             "score": market_regime.get("score"),
-            "fear_greed_score": market_regime.get("fear_greed_score"),
-            "fear_greed_label": market_regime.get("fear_greed_label"),
+            "fear_greed_score": fear_greed_snapshot.get("score"),
+            "fear_greed_label": fear_greed_snapshot.get("label"),
+            "fear_greed_source": fear_greed_snapshot.get("source"),
         },
         "market_structure": market_structure.get("label"),
         "market_structure_note": market_structure.get("note"),
@@ -3511,10 +3660,13 @@ def build_us_market_daily_payload():
                 break
 
     theme_clusters = _collect_theme_clusters(gainers_detail + losers_detail, max_items=6)
-    market_structure_text = (
-        f"리더십은 QQQ-SPY {_format_pct_point(qqq_vs_spy)}로 {leadership_bias} 성격이 유지됐고, "
-        f"IWM-SPY {_format_pct_point(iwm_vs_spy)} 흐름에서 소형주 확산 강도는 제한됐습니다. "
-        f"{breadth_summary} 구간이라 지수 추격보다 거래량 동반 리더주 선별이 유리합니다."
+    market_structure_text = _build_market_structure_text(
+        qqq_vs_spy,
+        iwm_vs_spy,
+        leadership_bias=leadership_bias,
+        breadth_summary=breadth_summary,
+        sector_up=sector_breadth,
+        sector_total=sector_total,
     )
 
     briefing_report = {
@@ -3548,8 +3700,9 @@ def build_us_market_daily_payload():
         "executive_summary": {
             "risk_state": market_regime.get("state"),
             "risk_state_display": market_regime.get("state_display"),
-            "fear_greed_score": market_regime.get("fear_greed_score"),
-            "fear_greed_label": market_regime.get("fear_greed_label"),
+            "fear_greed_score": fear_greed_snapshot.get("score"),
+            "fear_greed_label": fear_greed_snapshot.get("label"),
+            "fear_greed_source": fear_greed_snapshot.get("source"),
             "short_view": insight_short_view,
         },
         "benchmarks": {
@@ -3574,8 +3727,9 @@ def build_us_market_daily_payload():
         "sentiment": {
             "risk_state": market_regime.get("state"),
             "risk_state_display": market_regime.get("state_display"),
-            "fear_greed_score": market_regime.get("fear_greed_score"),
-            "fear_greed_label": market_regime.get("fear_greed_label"),
+            "fear_greed_score": fear_greed_snapshot.get("score"),
+            "fear_greed_label": fear_greed_snapshot.get("label"),
+            "fear_greed_source": fear_greed_snapshot.get("source"),
         },
         "sector_rank": [
             {
