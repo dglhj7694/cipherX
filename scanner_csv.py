@@ -39,6 +39,14 @@ BOOL_TO_YN_KEYS: set[str] = {
     "hull_turn_bear_recent",
     "latest_session_utbot_buy_turn",
     "latest_session_hull_buy_turn",
+    "ichimoku_above_cloud",
+    "ichimoku_below_cloud",
+    "volume_climax_flag",
+    "gap_risk_2pct",
+    "gap_risk_atr",
+    "first_close_above_ma20_after_5bars",
+    "first_higher_low_pivot2",
+    "first_higher_high_pivot2",
 }
 
 SCANNER_CSV_FIELD_SPECS: tuple[dict[str, str], ...] = (
@@ -305,6 +313,7 @@ def _normalized_csv_row(row: Mapping[str, Any]) -> dict[str, Any]:
         "utbot_sell_last_date",
         "hull_turn_bull_last_date",
         "hull_turn_bear_last_date",
+        "system_turn_bull_last_date",
         "detected_signal_latest_date",
     ):
         value = str(normalized.get(key) or "").strip()

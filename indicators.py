@@ -287,8 +287,8 @@ def compute_indicators(df):
     df['Has_MA50_History']=df['History_Bars']>=JT.MIN_HISTORY_MA50
     df['Has_MA200_History']=df['History_Bars']>=JT.MIN_HISTORY_MA200
     df['Has_Long_History']=df['History_Bars']>=JT.MIN_HISTORY_LONG
-    for ma in [5,10,20,50,200]:df[f'MA{ma}']=c.rolling(ma).mean()
-    df['EMA8']=c.ewm(span=8,adjust=False).mean();df['EMA21']=c.ewm(span=21,adjust=False).mean()
+    for ma in [5,10,20,50,120,200]:df[f'MA{ma}']=c.rolling(ma).mean()
+    df['EMA8']=c.ewm(span=8,adjust=False).mean();df['EMA21']=c.ewm(span=21,adjust=False).mean();df['EMA50']=c.ewm(span=50,adjust=False).mean()
     df['EMA12']=c.ewm(span=12,adjust=False).mean();df['EMA26']=c.ewm(span=26,adjust=False).mean()
     df['BB_Mid']=df['MA20'];s20=c.rolling(20).std();df['BB_Up'],df['BB_Low']=df['BB_Mid']+s20*2,df['BB_Mid']-s20*2
     df['BB_Width']=(df['BB_Up']-df['BB_Low'])/(df['BB_Mid']+1e-10);df['Percent_B']=(c-df['BB_Low'])/(df['BB_Up']-df['BB_Low']+1e-10)
@@ -473,6 +473,8 @@ def compute_indicators(df):
     rr_=rsc.rolling(5,min_periods=3).mean();df['Regime_Score']=rr_.clip(-8,8);df['Regime']=np.select([rr_>=4,rr_>=1.5,rr_<=-4,rr_<=-1.5],[2,1,-2,-1],default=0)
     df=df.copy()
     df['HMA'],df['HMA_Rising'],df['Hull_Turn_Bull_Raw'],df['Hull_Turn_Bear_Raw']=compute_hull_ma(c,20)
+    df['HMA60'],df['HMA60_Rising'],_,_=compute_hull_ma(c,60)
+    df['HMA200'],df['HMA200_Rising'],_,_=compute_hull_ma(c,200)
     df['UTBot_Stop'],df['UTBot_Dir'],df['UTBot_Buy_Raw'],df['UTBot_Sell_Raw']=compute_ut_bot(c,h,l,df['ATR'],1)
     df['SlowK'],df['SlowD']=compute_stochastic_slow(h,l,c)
     sqe=compute_squeeze_mom_enh(c,h,l,df['BB_Up'],df['BB_Low'],df['KC_Upper'],df['KC_Lower'],df['KC_Mid'])

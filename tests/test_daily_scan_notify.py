@@ -8,9 +8,13 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
+import pandas as pd
+
 from scripts.daily_scan_and_notify import (
     POST_CLOSE_LATEST_SESSION_FIELD_SPECS,
     RUSSELL2000_UNIVERSE_ITEMS,
+    _compute_post_close_row_metrics,
+    _with_post_close_cross_section_metrics,
     _last_us_market_session_date,
     _with_latest_session_buy_turn_flags,
     build_scan_universe,
@@ -109,6 +113,7 @@ class DailyScanNotifyTests(unittest.TestCase):
             "latest_session_utbot_buy_turn": True,
             "latest_session_hull_buy_turn": False,
             "chg_5d": 3.42,
+            "gap_risk_2pct": True,
         }
         with tempfile.TemporaryDirectory() as temp_dir:
             out_dir = Path(temp_dir)
@@ -130,13 +135,16 @@ class DailyScanNotifyTests(unittest.TestCase):
         utbot_idx = next(i for i, name in enumerate(extra_header) if str(name).endswith("(latest_session_utbot_buy_turn)"))
         hull_idx = next(i for i, name in enumerate(extra_header) if str(name).endswith("(latest_session_hull_buy_turn)"))
         chg_5d_idx = next(i for i, name in enumerate(extra_header) if str(name).endswith("(chg_5d)"))
+        gap_risk_idx = next(i for i, name in enumerate(extra_header) if str(name).endswith("(gap_risk_2pct)"))
         self.assertEqual(extra_data[utbot_idx], "Y")
         self.assertEqual(extra_data[hull_idx], "N")
         self.assertEqual(extra_data[chg_5d_idx], "3.42")
+        self.assertEqual(extra_data[gap_risk_idx], "Y")
 
         self.assertFalse(any(str(name).endswith("(latest_session_utbot_buy_turn)") for name in base_header))
         self.assertFalse(any(str(name).endswith("(latest_session_hull_buy_turn)") for name in base_header))
         self.assertFalse(any(str(name).endswith("(chg_5d)") for name in base_header))
+        self.assertFalse(any(str(name).endswith("(gap_risk_2pct)") for name in base_header))
 
     def test_filter_turn_rows_for_telegram_uses_volume_ratio_gt_one(self):
         rows = [
@@ -426,6 +434,119 @@ class DailyScanNotifyTests(unittest.TestCase):
         self.assertEqual(merged["source_result_count_sum"], 4)
         self.assertEqual(merged["skip_count_sum"], 7)
         self.assertEqual(merged["universe_count"], 500)
+
+    def test_compute_post_close_row_metrics_core_values(self):
+        idx = pd.date_range("2026-01-01", periods=130, freq="D")
+        close = pd.Series(range(1, 131), index=idx, dtype=float)
+        frame = pd.DataFrame(index=idx)
+        frame["Open"] = close - 0.5
+        frame.loc[idx[-1], "Open"] = 133.0
+        frame["Close"] = close
+        frame["High"] = close + 1.0
+        frame["Low"] = close - 1.0
+        frame["MA20"] = close - 1.0
+        frame["MA50"] = close - 2.0
+        frame["MA120"] = close - 3.0
+        frame["MA200"] = close - 4.0
+        frame["EMA8"] = close - 0.8
+        frame["EMA21"] = close - 1.1
+        frame["EMA50"] = close - 1.7
+        frame["HMA"] = close - 0.4
+        frame["HMA60"] = close - 0.6
+        frame["HMA200"] = close - 0.9
+        frame["ADX"] = 25.0
+        frame["Ichimoku_SenkouA"] = close - 2.0
+        frame["Ichimoku_SenkouB"] = close - 3.0
+        frame["Fib_Swing_High"] = close + 10.0
+        frame["Percent_B"] = 0.7
+        frame["ATR"] = 2.0
+        frame["Volume_Ratio_20"] = 1.4
+        frame["OBV_Slope"] = 0.12
+        frame["CMF"] = 0.08
+        frame["Volume_Climax_Buy"] = False
+        frame["Volume_Climax_Sell"] = False
+        frame.loc[idx[-1], "Volume_Climax_Sell"] = True
+        frame["VWAP"] = close - 1.0
+        frame["BB_Mid"] = close - 1.2
+        frame["BB_Up"] = close + 2.0
+        frame["Price_Channel_Up"] = close + 1.5
+        frame["RS_Ratio"] = 1.05
+        frame["UTBot_Buy"] = False
+        frame["Hull_Turn_Bull"] = False
+        frame["Hull_Turn_Bear"] = False
+        frame["System_Turn_Bull"] = False
+        frame.loc[idx[-4], "UTBot_Buy"] = True
+        frame.loc[idx[-6], "Hull_Turn_Bull"] = True
+        frame.loc[idx[-9], "Hull_Turn_Bear"] = True
+        frame.loc[idx[-5], "System_Turn_Bull"] = True
+
+        metrics = _compute_post_close_row_metrics(frame)
+
+        expected_dist_sma120 = ((130.0 - 127.0) / 127.0) * 100.0
+        self.assertAlmostEqual(metrics["dist_sma120_pct"], expected_dist_sma120, places=6)
+        self.assertAlmostEqual(metrics["atr_pct"], (2.0 / 130.0) * 100.0, places=6)
+        self.assertAlmostEqual(metrics["zscore20"], 1.647508942095828, places=5)
+        self.assertTrue(metrics["gap_risk_2pct"])
+        self.assertTrue(metrics["gap_risk_atr"])
+        self.assertEqual(metrics["days_since_utbot_buy"], 3)
+        self.assertEqual(metrics["days_since_hull_turn_bull"], 5)
+        self.assertEqual(metrics["days_since_hull_turn_bear"], 8)
+        self.assertEqual(metrics["system_turn_bull_last_date"], idx[-5].date().isoformat())
+        self.assertTrue(metrics["volume_climax_flag"])
+
+    def test_compute_post_close_row_metrics_first_close_above_ma20_after_5bars(self):
+        idx = pd.date_range("2026-04-01", periods=8, freq="D")
+        frame = pd.DataFrame(index=idx)
+        frame["Open"] = [10, 10, 10, 10, 10, 10, 10, 12]
+        frame["Close"] = [9, 9, 9, 9, 9, 9, 9, 11]
+        frame["High"] = [10, 10, 10, 10, 10, 10, 10, 12]
+        frame["Low"] = [8, 8, 8, 8, 8, 8, 8, 10]
+        frame["MA20"] = [10] * 8
+        frame["ATR"] = [1.5] * 8
+        frame["Volume_Ratio_20"] = [1.0] * 8
+
+        metrics = _compute_post_close_row_metrics(frame)
+        self.assertTrue(metrics["first_close_above_ma20_after_5bars"])
+
+    def test_compute_post_close_row_metrics_pivot2_flags(self):
+        idx = pd.date_range("2026-05-01", periods=9, freq="D")
+        frame_hl = pd.DataFrame(index=idx)
+        frame_hl["Open"] = [10] * 9
+        frame_hl["Close"] = [10] * 9
+        frame_hl["High"] = [11, 12, 13, 12, 12, 12, 12, 12, 12]
+        frame_hl["Low"] = [10, 9, 8, 5, 7, 8, 6, 8, 9]
+        frame_hl["MA20"] = [10] * 9
+        frame_hl["ATR"] = [1.0] * 9
+        frame_hl["Volume_Ratio_20"] = [1.0] * 9
+
+        frame_hh = pd.DataFrame(index=idx)
+        frame_hh["Open"] = [10] * 9
+        frame_hh["Close"] = [10] * 9
+        frame_hh["High"] = [10, 11, 12, 9, 10, 11, 13, 12, 11]
+        frame_hh["Low"] = [9, 9, 9, 9, 9, 9, 9, 9, 9]
+        frame_hh["MA20"] = [10] * 9
+        frame_hh["ATR"] = [1.0] * 9
+        frame_hh["Volume_Ratio_20"] = [1.0] * 9
+
+        hl_metrics = _compute_post_close_row_metrics(frame_hl)
+        hh_metrics = _compute_post_close_row_metrics(frame_hh)
+        self.assertTrue(hl_metrics["first_higher_low_pivot2"])
+        self.assertTrue(hh_metrics["first_higher_high_pivot2"])
+
+    def test_with_post_close_cross_section_metrics_enable_and_disable(self):
+        rows = [
+            {"ticker": "AAA", "rs_ratio": 0.90, "ret20_pct": 2.0, "ret60_pct": 4.0, "ret120_pct": 8.0},
+            {"ticker": "BBB", "rs_ratio": 1.10, "ret20_pct": 8.0, "ret60_pct": 10.0, "ret120_pct": 15.0},
+            {"ticker": "CCC", "rs_ratio": 1.00, "ret20_pct": 5.0, "ret60_pct": 6.0, "ret120_pct": 11.0},
+        ]
+        ranked = _with_post_close_cross_section_metrics(rows, enabled=True)
+        self.assertGreater(ranked[1]["rs_rank_vs_index"], ranked[2]["rs_rank_vs_index"])
+        self.assertGreater(ranked[2]["rs_rank_vs_index"], ranked[0]["rs_rank_vs_index"])
+        self.assertGreater(ranked[1]["ret20_percentile"], ranked[2]["ret20_percentile"])
+
+        disabled = _with_post_close_cross_section_metrics(rows, enabled=False)
+        self.assertEqual(disabled[0]["rs_rank_vs_index"], "")
+        self.assertEqual(disabled[1]["ret20_percentile"], "")
 
 
 from scripts.daily_scan_and_notify import (

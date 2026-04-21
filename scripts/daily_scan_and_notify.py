@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import bisect
 import hashlib
 import json
 import math
@@ -55,7 +56,7 @@ _SCAN_SYMBOL_PATTERN = re.compile(r"\b[A-Z]{1,6}(?:[.-][A-Z0-9]{1,4})?\b")
 SCAN_MODE_LABELS: dict[str, str] = {
     "post_close": "자동 스캔",
     "pre_market": "프리마켓 스캔",
-    "early_session": "얼리세션 스캔 ⚠️ 장중",
+    "early_session": "얼리세션 스캔 장중 미확정 추세",
 }
 US_MARKET_OPEN_ET = dt_time(9, 30)
 US_MARKET_CLOSE_ET = dt_time(16, 0)
@@ -76,40 +77,62 @@ UNIVERSE_PROFILE_ITEMS: dict[str, tuple[dict[str, str], ...]] = {
 }
 
 SCANNER_TRANSITION_CFG = {
-    "UTBot_Buy": {"label": "UTBot 전환↑", "icon": "🟢", "dir": "buy"},
-    "UTBot_Sell": {"label": "UTBot 전환↓", "icon": "🔴", "dir": "sell"},
-    "Hull_Turn_Bull": {"label": "HULL 전환↑", "icon": "🟢", "dir": "buy"},
-    "Hull_Turn_Bear": {"label": "HULL 전환↓", "icon": "🔴", "dir": "sell"},
+    "UTBot_Buy": {"label": "UTBot 전환↑", "icon": "▲", "dir": "buy"},
+    "UTBot_Sell": {"label": "UTBot 전환↓", "icon": "▼", "dir": "sell"},
+    "Hull_Turn_Bull": {"label": "HULL 전환↑", "icon": "▲", "dir": "buy"},
+    "Hull_Turn_Bear": {"label": "HULL 전환↓", "icon": "▼", "dir": "sell"},
 }
 
 POST_CLOSE_LATEST_SESSION_FIELD_SPECS: tuple[dict[str, str], ...] = (
-    {
-        "group": "전환",
-        "key": "latest_session_utbot_buy_turn",
-        "label": "최근일자UTBot매수전환",
-        "type": "bool",
-        "description": "직전 미국 정규장 세션일 UTBot 매수 전환 여부",
-        "rule": "utbot_buy_last_date == 직전 미국 정규장 세션일",
-        "example": "Y",
-    },
-    {
-        "group": "전환",
-        "key": "latest_session_hull_buy_turn",
-        "label": "최근일자HULL매수전환",
-        "type": "bool",
-        "description": "직전 미국 정규장 세션일 HULL 매수 전환 여부",
-        "rule": "hull_turn_bull_last_date == 직전 미국 정규장 세션일",
-        "example": "N",
-    },
-    {
-        "group": "기본",
-        "key": "chg_5d",
-        "label": "최근5일등락률(%)",
-        "type": "number",
-        "description": "최근 5거래일 기준 등락률",
-        "rule": "(현재가-5거래일전종가)/5거래일전종가*100",
-        "example": "3.42",
-    },
+    {"group": "session", "key": "latest_session_utbot_buy_turn", "label": "RecentSessionUTBotBuyTurn", "type": "bool", "description": "UTBot buy turn on latest US session", "rule": "utbot_buy_last_date == target session", "example": "Y"},
+    {"group": "session", "key": "latest_session_hull_buy_turn", "label": "RecentSessionHULLBuyTurn", "type": "bool", "description": "Hull buy turn on latest US session", "rule": "hull_turn_bull_last_date == target session", "example": "N"},
+    {"group": "price", "key": "chg_5d", "label": "Change5D(%)", "type": "number", "description": "5-session return", "rule": "(close-close_5d_ago)/close_5d_ago*100", "example": "3.42"},
+    {"group": "trend", "key": "dist_sma20_pct", "label": "DistSMA20(%)", "type": "number", "description": "Distance from SMA20", "rule": "(close-MA20)/MA20*100", "example": "1.25"},
+    {"group": "trend", "key": "dist_sma50_pct", "label": "DistSMA50(%)", "type": "number", "description": "Distance from SMA50", "rule": "(close-MA50)/MA50*100", "example": "4.20"},
+    {"group": "trend", "key": "dist_sma120_pct", "label": "DistSMA120(%)", "type": "number", "description": "Distance from SMA120", "rule": "(close-MA120)/MA120*100", "example": "8.10"},
+    {"group": "trend", "key": "dist_sma200_pct", "label": "DistSMA200(%)", "type": "number", "description": "Distance from SMA200", "rule": "(close-MA200)/MA200*100", "example": "11.50"},
+    {"group": "trend", "key": "dist_ema8_pct", "label": "DistEMA8(%)", "type": "number", "description": "Distance from EMA8", "rule": "(close-EMA8)/EMA8*100", "example": "0.92"},
+    {"group": "trend", "key": "dist_ema21_pct", "label": "DistEMA21(%)", "type": "number", "description": "Distance from EMA21", "rule": "(close-EMA21)/EMA21*100", "example": "2.31"},
+    {"group": "trend", "key": "dist_ema50_pct", "label": "DistEMA50(%)", "type": "number", "description": "Distance from EMA50", "rule": "(close-EMA50)/EMA50*100", "example": "4.65"},
+    {"group": "trend", "key": "hma20_slope_pct", "label": "HMA20Slope(%)", "type": "number", "description": "HMA20 one-bar slope", "rule": "(HMA-HMA[-1])/abs(HMA[-1])*100", "example": "0.44"},
+    {"group": "trend", "key": "hma60_slope_pct", "label": "HMA60Slope(%)", "type": "number", "description": "HMA60 one-bar slope", "rule": "(HMA60-HMA60[-1])/abs(HMA60[-1])*100", "example": "0.18"},
+    {"group": "trend", "key": "hma200_slope_pct", "label": "HMA200Slope(%)", "type": "number", "description": "HMA200 one-bar slope", "rule": "(HMA200-HMA200[-1])/abs(HMA200[-1])*100", "example": "0.07"},
+    {"group": "trend", "key": "adx", "label": "ADX", "type": "number", "description": "Average directional index", "rule": "ADX", "example": "23.5"},
+    {"group": "trend", "key": "ichimoku_above_cloud", "label": "AboveIchimokuCloud", "type": "bool", "description": "Close above cloud", "rule": "close > max(SenkouA,SenkouB)", "example": "Y"},
+    {"group": "trend", "key": "ichimoku_below_cloud", "label": "BelowIchimokuCloud", "type": "bool", "description": "Close below cloud", "rule": "close < min(SenkouA,SenkouB)", "example": "N"},
+    {"group": "pullback", "key": "drawdown_from_52w_high_pct", "label": "DrawdownFrom52WHigh(%)", "type": "number", "description": "Drawdown from 52-week high", "rule": "(close-52w_high)/52w_high*100", "example": "-14.8"},
+    {"group": "pullback", "key": "drawdown_from_20d_high_pct", "label": "DrawdownFrom20DHigh(%)", "type": "number", "description": "Drawdown from 20-day high", "rule": "(close-20d_high)/20d_high*100", "example": "-4.3"},
+    {"group": "pullback", "key": "pullback_from_swing_high_pct", "label": "PullbackFromSwingHigh(%)", "type": "number", "description": "Pullback from swing high", "rule": "(close-swing_high)/swing_high*100", "example": "-6.1"},
+    {"group": "volatility", "key": "zscore20", "label": "ZScore20", "type": "number", "description": "20-bar close z-score", "rule": "(close-mean20)/std20", "example": "1.12"},
+    {"group": "volatility", "key": "bb_percent_b", "label": "BBPercentB", "type": "number", "description": "Bollinger %B", "rule": "Percent_B", "example": "0.73"},
+    {"group": "volatility", "key": "atr_pct", "label": "ATR(%)", "type": "number", "description": "ATR percentage of close", "rule": "ATR/close*100", "example": "2.15"},
+    {"group": "volatility", "key": "pullback_atr_multiple", "label": "PullbackATRMultiple", "type": "number", "description": "Pullback in ATR multiples", "rule": "(20d_high-close)/ATR", "example": "1.84"},
+    {"group": "turn", "key": "days_since_utbot_buy", "label": "DaysSinceUTBotBuy", "type": "number", "description": "Bars since latest UTBot buy turn", "rule": "as_of - last(UTBot_Buy)", "example": "2"},
+    {"group": "turn", "key": "days_since_hull_turn_bull", "label": "DaysSinceHullBullTurn", "type": "number", "description": "Bars since latest hull bull turn", "rule": "as_of - last(Hull_Turn_Bull)", "example": "4"},
+    {"group": "turn", "key": "days_since_hull_turn_bear", "label": "DaysSinceHullBearTurn", "type": "number", "description": "Bars since latest hull bear turn", "rule": "as_of - last(Hull_Turn_Bear)", "example": "12"},
+    {"group": "turn", "key": "system_turn_bull_last_date", "label": "SystemTurnBullLastDate", "type": "date", "description": "Latest system bull turn date", "rule": "last(System_Turn_Bull)", "example": "2026-04-20"},
+    {"group": "volume", "key": "volume_dry_up_score", "label": "VolumeDryUpScore", "type": "number", "description": "Dry-up score from volume ratio", "rule": "clip((1-R20)*100,0,100)", "example": "24"},
+    {"group": "volume", "key": "volume_expansion_score", "label": "VolumeExpansionScore", "type": "number", "description": "Expansion score from volume ratio", "rule": "clip((R20-1)*100,0,100)", "example": "37"},
+    {"group": "volume", "key": "obv_slope", "label": "OBVSlope", "type": "number", "description": "OBV slope", "rule": "OBV_Slope", "example": "0.13"},
+    {"group": "volume", "key": "cmf", "label": "CMF", "type": "number", "description": "Chaikin money flow", "rule": "CMF", "example": "0.08"},
+    {"group": "volume", "key": "volume_climax_flag", "label": "VolumeClimaxFlag", "type": "bool", "description": "Volume climax event flag", "rule": "Volume_Climax_Buy or Volume_Climax_Sell", "example": "N"},
+    {"group": "distance", "key": "dist_vwap_pct", "label": "DistVWAP(%)", "type": "number", "description": "Distance from VWAP", "rule": "(close-VWAP)/VWAP*100", "example": "1.62"},
+    {"group": "distance", "key": "dist_bb_mid_pct", "label": "DistBBMid(%)", "type": "number", "description": "Distance from Bollinger mid", "rule": "(close-BB_Mid)/BB_Mid*100", "example": "1.10"},
+    {"group": "distance", "key": "dist_bb_upper_pct", "label": "DistBBUpper(%)", "type": "number", "description": "Distance from Bollinger upper", "rule": "(close-BB_Up)/BB_Up*100", "example": "-0.85"},
+    {"group": "risk", "key": "gap_risk_2pct", "label": "GapRisk2Pct", "type": "bool", "description": "Absolute gap >= 2%", "rule": "abs((open-prev_close)/prev_close)*100 >= 2", "example": "Y"},
+    {"group": "risk", "key": "gap_risk_atr", "label": "GapRiskATR", "type": "bool", "description": "Absolute gap >= ATR", "rule": "abs(open-prev_close) >= ATR", "example": "N"},
+    {"group": "momentum", "key": "breakout_dist_20d_high_pct", "label": "BreakoutDist20DHigh(%)", "type": "number", "description": "Distance from 20-day high", "rule": "(close-20d_high)/20d_high*100", "example": "0.42"},
+    {"group": "momentum", "key": "breakout_dist_channel_up_pct", "label": "BreakoutDistChannelUp(%)", "type": "number", "description": "Distance from channel upper", "rule": "(close-Price_Channel_Up)/Price_Channel_Up*100", "example": "-0.36"},
+    {"group": "momentum", "key": "ret20_pct", "label": "Return20(%)", "type": "number", "description": "20-bar return", "rule": "(close-close_20)/close_20*100", "example": "8.4"},
+    {"group": "momentum", "key": "ret60_pct", "label": "Return60(%)", "type": "number", "description": "60-bar return", "rule": "(close-close_60)/close_60*100", "example": "16.2"},
+    {"group": "momentum", "key": "ret120_pct", "label": "Return120(%)", "type": "number", "description": "120-bar return", "rule": "(close-close_120)/close_120*100", "example": "24.1"},
+    {"group": "momentum", "key": "rs_rank_vs_index", "label": "RSRankVsIndex", "type": "number", "description": "Cross-sectional rank of RS ratio", "rule": "percentile rank of RS_Ratio", "example": "86.5"},
+    {"group": "momentum", "key": "ret20_percentile", "label": "Return20Percentile", "type": "number", "description": "Cross-sectional percentile of 20-bar return", "rule": "percentile rank of ret20_pct", "example": "82.1"},
+    {"group": "momentum", "key": "ret60_percentile", "label": "Return60Percentile", "type": "number", "description": "Cross-sectional percentile of 60-bar return", "rule": "percentile rank of ret60_pct", "example": "79.4"},
+    {"group": "momentum", "key": "ret120_percentile", "label": "Return120Percentile", "type": "number", "description": "Cross-sectional percentile of 120-bar return", "rule": "percentile rank of ret120_pct", "example": "74.8"},
+    {"group": "turn", "key": "first_close_above_ma20_after_5bars", "label": "FirstCloseAboveMA20After5Bars", "type": "bool", "description": "First MA20 reclaim after 5 bars below", "rule": "previous 5 closes <= MA20 and current close > MA20", "example": "Y"},
+    {"group": "turn", "key": "first_higher_low_pivot2", "label": "FirstHigherLowPivot2", "type": "bool", "description": "Confirmed higher-low with pivot=2", "rule": "pivot low > previous pivot low, confirmed at current bar", "example": "N"},
+    {"group": "turn", "key": "first_higher_high_pivot2", "label": "FirstHigherHighPivot2", "type": "bool", "description": "Confirmed higher-high with pivot=2", "rule": "pivot high > previous pivot high, confirmed at current bar", "example": "N"},
 )
 
 
@@ -195,6 +218,356 @@ def _recent_frame_flag(frame: Any, column: str, window: int = 5) -> bool:
         return bool(series.fillna(False).astype(bool).any())
     except Exception:
         return bool(series.any())
+
+
+def _coerce_float(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except Exception:
+        return None
+    if not math.isfinite(number):
+        return None
+    return number
+
+
+def _safe_ratio_pct(value: Any, base: Any) -> float:
+    value_num = _coerce_float(value)
+    base_num = _coerce_float(base)
+    if value_num is None or base_num is None or abs(base_num) <= 1e-10:
+        return 0.0
+    return _safe_float((value_num - base_num) / base_num * 100.0)
+
+
+def _safe_slope_pct(current: Any, previous: Any) -> float:
+    current_num = _coerce_float(current)
+    previous_num = _coerce_float(previous)
+    if current_num is None or previous_num is None or abs(previous_num) <= 1e-10:
+        return 0.0
+    return _safe_float((current_num - previous_num) / abs(previous_num) * 100.0)
+
+
+def _clip(value: float, lower: float, upper: float) -> float:
+    return min(upper, max(lower, value))
+
+
+def _series_last_true_timestamp(frame: Any, column: str) -> Any:
+    if frame is None or column not in getattr(frame, "columns", []):
+        return None
+    try:
+        series = frame[column].fillna(False).astype(bool)
+    except Exception:
+        try:
+            series = frame[column].astype(bool)
+        except Exception:
+            return None
+    try:
+        if not bool(series.any()):
+            return None
+        return series[series].index[-1]
+    except Exception:
+        return None
+
+
+def _timestamp_to_iso(ts: Any) -> str:
+    if ts is None:
+        return "없음"
+    if hasattr(ts, "date"):
+        try:
+            return ts.date().isoformat()
+        except Exception:
+            pass
+    text = str(ts or "").strip()
+    return text[:10] if text else "없음"
+
+
+def _days_since_timestamp(as_of: Any, ts: Any) -> int:
+    if as_of is None or ts is None:
+        return 0
+    try:
+        return max(0, int((as_of - ts).days))
+    except Exception:
+        return 0
+
+
+def _series_return_pct(series: Any, periods: int) -> float:
+    if series is None or periods <= 0:
+        return 0.0
+    try:
+        if len(series) <= periods:
+            return 0.0
+        current = series.iloc[-1]
+        previous = series.iloc[-(periods + 1)]
+    except Exception:
+        return 0.0
+    return _safe_ratio_pct(current, previous)
+
+
+def _compute_pivot2_first_flags(frame: Any, *, pivot: int = 2) -> tuple[bool, bool]:
+    if frame is None or pivot <= 0:
+        return False, False
+    if "High" not in getattr(frame, "columns", []) or "Low" not in getattr(frame, "columns", []):
+        return False, False
+    if len(frame) < (pivot * 2 + 3):
+        return False, False
+
+    try:
+        highs = [float(v) if math.isfinite(float(v)) else float("nan") for v in frame["High"].tolist()]
+        lows = [float(v) if math.isfinite(float(v)) else float("nan") for v in frame["Low"].tolist()]
+    except Exception:
+        return False, False
+
+    n = len(frame)
+    pivot_highs: list[tuple[int, float]] = []
+    pivot_lows: list[tuple[int, float]] = []
+    for i in range(pivot, n - pivot):
+        high_window = highs[i - pivot : i + pivot + 1]
+        low_window = lows[i - pivot : i + pivot + 1]
+        if any(not math.isfinite(v) for v in high_window) or any(not math.isfinite(v) for v in low_window):
+            continue
+        center_high = highs[i]
+        center_low = lows[i]
+        if center_high >= max(high_window) and any(center_high > v for j, v in enumerate(high_window) if j != pivot):
+            pivot_highs.append((i, center_high))
+        if center_low <= min(low_window) and any(center_low < v for j, v in enumerate(low_window) if j != pivot):
+            pivot_lows.append((i, center_low))
+
+    first_higher_low = False
+    for i in range(1, len(pivot_lows)):
+        prev_idx, prev_low = pivot_lows[i - 1]
+        cur_idx, cur_low = pivot_lows[i]
+        if cur_low > prev_low and (cur_idx + pivot) == (n - 1):
+            first_higher_low = True
+            break
+
+    first_higher_high = False
+    for i in range(1, len(pivot_highs)):
+        prev_idx, prev_high = pivot_highs[i - 1]
+        cur_idx, cur_high = pivot_highs[i]
+        if cur_high > prev_high and (cur_idx + pivot) == (n - 1):
+            first_higher_high = True
+            break
+
+    return first_higher_low, first_higher_high
+
+
+def _compute_post_close_row_metrics(frame: Any) -> dict[str, Any]:
+    metrics: dict[str, Any] = {
+        "dist_sma20_pct": 0.0,
+        "dist_sma50_pct": 0.0,
+        "dist_sma120_pct": 0.0,
+        "dist_sma200_pct": 0.0,
+        "dist_ema8_pct": 0.0,
+        "dist_ema21_pct": 0.0,
+        "dist_ema50_pct": 0.0,
+        "hma20_slope_pct": 0.0,
+        "hma60_slope_pct": 0.0,
+        "hma200_slope_pct": 0.0,
+        "adx": 0.0,
+        "ichimoku_above_cloud": False,
+        "ichimoku_below_cloud": False,
+        "drawdown_from_52w_high_pct": 0.0,
+        "drawdown_from_20d_high_pct": 0.0,
+        "pullback_from_swing_high_pct": 0.0,
+        "zscore20": 0.0,
+        "bb_percent_b": 0.0,
+        "atr_pct": 0.0,
+        "pullback_atr_multiple": 0.0,
+        "days_since_utbot_buy": 0,
+        "days_since_hull_turn_bull": 0,
+        "days_since_hull_turn_bear": 0,
+        "system_turn_bull_last_date": "없음",
+        "volume_dry_up_score": 0.0,
+        "volume_expansion_score": 0.0,
+        "obv_slope": 0.0,
+        "cmf": 0.0,
+        "volume_climax_flag": False,
+        "dist_vwap_pct": 0.0,
+        "dist_bb_mid_pct": 0.0,
+        "dist_bb_upper_pct": 0.0,
+        "gap_risk_2pct": False,
+        "gap_risk_atr": False,
+        "breakout_dist_20d_high_pct": 0.0,
+        "breakout_dist_channel_up_pct": 0.0,
+        "ret20_pct": 0.0,
+        "ret60_pct": 0.0,
+        "ret120_pct": 0.0,
+        "rs_ratio": 0.0,
+        "rs_rank_vs_index": "",
+        "ret20_percentile": "",
+        "ret60_percentile": "",
+        "ret120_percentile": "",
+        "first_close_above_ma20_after_5bars": False,
+        "first_higher_low_pivot2": False,
+        "first_higher_high_pivot2": False,
+    }
+    if frame is None or len(frame) == 0:
+        return metrics
+    if "Close" not in getattr(frame, "columns", []):
+        return metrics
+
+    latest = frame.iloc[-1]
+    previous = frame.iloc[-2] if len(frame) >= 2 else latest
+    as_of = frame.index[-1] if len(frame.index) else None
+    close_series = frame["Close"]
+    high_series = frame["High"] if "High" in frame.columns else None
+    low_series = frame["Low"] if "Low" in frame.columns else None
+
+    current_close = _safe_float(latest.get("Close", 0))
+    previous_close = _safe_float(previous.get("Close", current_close))
+    current_open = _safe_float(latest.get("Open", current_close))
+    atr = _safe_float(latest.get("ATR", 0))
+    ma20 = _safe_float(latest.get("MA20", 0))
+
+    metrics["dist_sma20_pct"] = _safe_ratio_pct(current_close, latest.get("MA20"))
+    metrics["dist_sma50_pct"] = _safe_ratio_pct(current_close, latest.get("MA50"))
+    metrics["dist_sma120_pct"] = _safe_ratio_pct(current_close, latest.get("MA120"))
+    metrics["dist_sma200_pct"] = _safe_ratio_pct(current_close, latest.get("MA200"))
+    metrics["dist_ema8_pct"] = _safe_ratio_pct(current_close, latest.get("EMA8"))
+    metrics["dist_ema21_pct"] = _safe_ratio_pct(current_close, latest.get("EMA21"))
+    metrics["dist_ema50_pct"] = _safe_ratio_pct(current_close, latest.get("EMA50"))
+    metrics["hma20_slope_pct"] = _safe_slope_pct(latest.get("HMA"), previous.get("HMA"))
+    metrics["hma60_slope_pct"] = _safe_slope_pct(latest.get("HMA60"), previous.get("HMA60"))
+    metrics["hma200_slope_pct"] = _safe_slope_pct(latest.get("HMA200"), previous.get("HMA200"))
+    metrics["adx"] = _safe_float(latest.get("ADX", 0))
+
+    senkou_a = _coerce_float(latest.get("Ichimoku_SenkouA"))
+    senkou_b = _coerce_float(latest.get("Ichimoku_SenkouB"))
+    if senkou_a is not None and senkou_b is not None:
+        cloud_top = max(senkou_a, senkou_b)
+        cloud_bottom = min(senkou_a, senkou_b)
+        metrics["ichimoku_above_cloud"] = bool(current_close > cloud_top)
+        metrics["ichimoku_below_cloud"] = bool(current_close < cloud_bottom)
+
+    high_52w = _safe_float(high_series.tail(252).max()) if high_series is not None else 0.0
+    high_20d = _safe_float(high_series.tail(20).max()) if high_series is not None else 0.0
+    swing_high = _safe_float(latest.get("Fib_Swing_High", 0))
+    metrics["drawdown_from_52w_high_pct"] = _safe_ratio_pct(current_close, high_52w)
+    metrics["drawdown_from_20d_high_pct"] = _safe_ratio_pct(current_close, high_20d)
+    metrics["pullback_from_swing_high_pct"] = _safe_ratio_pct(current_close, swing_high)
+
+    try:
+        mean20 = _safe_float(close_series.tail(20).mean())
+        std20 = _safe_float(close_series.tail(20).std(ddof=0))
+    except Exception:
+        mean20 = 0.0
+        std20 = 0.0
+    metrics["zscore20"] = _safe_float((current_close - mean20) / std20) if std20 > 1e-10 else 0.0
+    metrics["bb_percent_b"] = _safe_float(latest.get("Percent_B", 0))
+    metrics["atr_pct"] = _safe_float((atr / current_close) * 100) if current_close > 1e-10 else 0.0
+    metrics["pullback_atr_multiple"] = _safe_float((high_20d - current_close) / atr) if atr > 1e-10 else 0.0
+
+    utbot_buy_ts = _series_last_true_timestamp(frame, "UTBot_Buy")
+    hull_bull_ts = _series_last_true_timestamp(frame, "Hull_Turn_Bull")
+    hull_bear_ts = _series_last_true_timestamp(frame, "Hull_Turn_Bear")
+    system_bull_ts = _series_last_true_timestamp(frame, "System_Turn_Bull")
+    metrics["days_since_utbot_buy"] = _days_since_timestamp(as_of, utbot_buy_ts)
+    metrics["days_since_hull_turn_bull"] = _days_since_timestamp(as_of, hull_bull_ts)
+    metrics["days_since_hull_turn_bear"] = _days_since_timestamp(as_of, hull_bear_ts)
+    metrics["system_turn_bull_last_date"] = _timestamp_to_iso(system_bull_ts)
+
+    volume_ratio_20 = _safe_float(latest.get("Volume_Ratio_20", 0))
+    metrics["volume_dry_up_score"] = _safe_float(_clip((1.0 - volume_ratio_20) * 100.0, 0.0, 100.0))
+    metrics["volume_expansion_score"] = _safe_float(_clip((volume_ratio_20 - 1.0) * 100.0, 0.0, 100.0))
+    metrics["obv_slope"] = _safe_float(latest.get("OBV_Slope", 0))
+    metrics["cmf"] = _safe_float(latest.get("CMF", 0))
+    metrics["volume_climax_flag"] = bool(latest.get("Volume_Climax_Buy", False) or latest.get("Volume_Climax_Sell", False))
+
+    metrics["dist_vwap_pct"] = _safe_ratio_pct(current_close, latest.get("VWAP"))
+    metrics["dist_bb_mid_pct"] = _safe_ratio_pct(current_close, latest.get("BB_Mid"))
+    metrics["dist_bb_upper_pct"] = _safe_ratio_pct(current_close, latest.get("BB_Up"))
+
+    gap_pct = _safe_float(abs((current_open - previous_close) / previous_close) * 100) if previous_close > 1e-10 else 0.0
+    gap_abs_value = _safe_float(abs(current_open - previous_close))
+    metrics["gap_risk_2pct"] = bool(gap_pct >= 2.0)
+    metrics["gap_risk_atr"] = bool(atr > 1e-10 and gap_abs_value >= atr)
+
+    metrics["breakout_dist_20d_high_pct"] = _safe_ratio_pct(current_close, high_20d)
+    metrics["breakout_dist_channel_up_pct"] = _safe_ratio_pct(current_close, latest.get("Price_Channel_Up"))
+
+    metrics["ret20_pct"] = _series_return_pct(close_series, 20)
+    metrics["ret60_pct"] = _series_return_pct(close_series, 60)
+    metrics["ret120_pct"] = _series_return_pct(close_series, 120)
+    metrics["rs_ratio"] = _safe_float(latest.get("RS_Ratio", 0))
+
+    if len(frame) >= 6 and "MA20" in frame.columns:
+        prev5_close = close_series.iloc[-6:-1]
+        prev5_ma20 = frame["MA20"].iloc[-6:-1]
+        prev_all_below = False
+        try:
+            prev_all_below = bool((prev5_close <= prev5_ma20).fillna(False).all())
+        except Exception:
+            prev_all_below = False
+        metrics["first_close_above_ma20_after_5bars"] = bool(prev_all_below and current_close > ma20 and previous_close <= _safe_float(previous.get("MA20", ma20)))
+
+    first_hl, first_hh = _compute_pivot2_first_flags(frame, pivot=2)
+    metrics["first_higher_low_pivot2"] = bool(first_hl)
+    metrics["first_higher_high_pivot2"] = bool(first_hh)
+    return metrics
+
+
+CROSS_SECTION_OUTPUT_KEYS: tuple[str, ...] = (
+    "rs_rank_vs_index",
+    "ret20_percentile",
+    "ret60_percentile",
+    "ret120_percentile",
+)
+
+
+def _coerce_optional_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, str) and not value.strip():
+        return None
+    return _coerce_float(value)
+
+
+def _percentile_map_for_key(rows: list[dict[str, Any]], source_key: str) -> dict[int, float]:
+    values: list[tuple[int, float]] = []
+    for idx, row in enumerate(rows):
+        number = _coerce_optional_float(row.get(source_key))
+        if number is None:
+            continue
+        values.append((idx, number))
+    if not values:
+        return {}
+    sorted_values = sorted(value for _, value in values)
+    count = len(sorted_values)
+    ranked: dict[int, float] = {}
+    for idx, value in values:
+        if count == 1:
+            percentile = 100.0
+        else:
+            left = bisect.bisect_left(sorted_values, value)
+            right = bisect.bisect_right(sorted_values, value)
+            avg_rank = (left + right - 1) / 2.0
+            percentile = (avg_rank / (count - 1)) * 100.0
+        ranked[idx] = _safe_float(round(percentile, 2))
+    return ranked
+
+
+def _with_post_close_cross_section_metrics(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    enabled: bool,
+) -> list[dict[str, Any]]:
+    row_list = [dict(row or {}) for row in (rows or [])]
+    if not enabled:
+        for row in row_list:
+            for key in CROSS_SECTION_OUTPUT_KEYS:
+                row[key] = ""
+        return row_list
+
+    rs_rank_map = _percentile_map_for_key(row_list, "rs_ratio")
+    ret20_map = _percentile_map_for_key(row_list, "ret20_pct")
+    ret60_map = _percentile_map_for_key(row_list, "ret60_pct")
+    ret120_map = _percentile_map_for_key(row_list, "ret120_pct")
+
+    for idx, row in enumerate(row_list):
+        row["rs_rank_vs_index"] = rs_rank_map.get(idx, 0.0)
+        row["ret20_percentile"] = ret20_map.get(idx, 0.0)
+        row["ret60_percentile"] = ret60_map.get(idx, 0.0)
+        row["ret120_percentile"] = ret120_map.get(idx, 0.0)
+    return row_list
 
 
 def _build_sector_universe() -> list[str]:
@@ -459,6 +832,7 @@ def _build_scanner_row(ticker: str, *, bias_mode: str, recent_window: int = 5, h
             latest_bar_date = latest_bar.date().isoformat()
         else:
             latest_bar_date = str(latest_bar)[:10] if latest_bar is not None else ""
+        advanced_metrics = _compute_post_close_row_metrics(frame)
 
         row = {
             "ticker": ticker,
@@ -533,6 +907,7 @@ def _build_scanner_row(ticker: str, *, bias_mode: str, recent_window: int = 5, h
             "detected_signals": list(detected_payload.get("all_items", [])),
             "watch_buy_plus": watch_buy_plus,
             "buy_combo_present": buy_combo_present,
+            **advanced_metrics,
         }
         return {"ok": True, "ticker": ticker, "row": row, "skip_reason": "", "detail": ""}
     except Exception as exc:
@@ -800,7 +1175,7 @@ def merge_shard_scan_rows(merge_dir: Path) -> dict[str, Any]:
 
 def _parse_iso_date(value: Any) -> date | None:
     text = str(value or "").strip()
-    if not text or text in {"없음", "-", "N/A"}:
+    if not text or text in {"없음", "?놁쓬", "-", "N/A"}:
         return None
     try:
         return datetime.strptime(text, "%Y-%m-%d").date()
@@ -870,12 +1245,12 @@ def _time_adjusted_volume_threshold(
     *,
     base_threshold: float = 1.0,
 ) -> float:
-    """장 개시 후 경과 시간에 비례한 거래량 임계값 반환.
+    """장개시 후 경과 시간에 비례한 거래량 임계값 반환.
 
     보정 모델 (U-shape 반영):
-    - 처음 30분: 하루 거래량의 ~25% 집중
-    - 30~60분: 추가 ~15%
-    - 60분 이후: 나머지 ~60% 균등 분포
+    - 처음 30분: 하루 거래대금의 약 25%
+    - 30~60분: 추가 약 15%
+    - 60분 이후: 나머지 약 60% 분포
     """
     us_now = run_at_kst.astimezone(US_EASTERN)
     market_open = us_now.replace(
@@ -1010,7 +1385,7 @@ def _build_section_row_line(row: Mapping[str, Any], index: int, tag_text: str) -
     return (
         f"{index}. {row.get('ticker', '-')}"
         f" | ({_fmt_signed_number(row.get('chg_value', 0), 2)}, {_fmt_signed_number(row.get('chg', 0), 2)}%)"
-        f" | 거래량 {_fmt_ratio(row.get('volume_ratio_20', 0), 2)}"
+        f" | 거래량{_fmt_ratio(row.get('volume_ratio_20', 0), 2)}"
         f" | {row.get('jg_key', '-')}"
         f" | {str(tag_text or '-')}"
     )
@@ -1077,7 +1452,7 @@ def build_transition_summary(
     if scan_mode == "pre_market":
         lines = [
             f"[{str(scan_label or '프리마켓 스캔')}] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
-            f"- 기준: 전일 미국장 확정 데이터 ({target_us_session_date.isoformat()})",
+            f"- 기준: 전일 미국장 확정 데이터({target_us_session_date.isoformat()})",
             f"- 목적: 오늘 본장에서 주목할 종목 선점",
             f"- 유니버스: {universe_count}개 | 스캔 결과: {result_count}개",
             index_line,
@@ -1087,11 +1462,11 @@ def build_transition_summary(
         vol_text = f"{volume_threshold:.2f}x" if volume_threshold is not None else "시간비례"
         lines = [
             f"[{str(scan_label or '얼리세션 스캔')}] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
-            f"- 기준: 오늘 미국장 장중 데이터 ({target_us_session_date.isoformat()}) ⚠️ 미확정",
-            f"- 목적: 장 시작 후 강세 종목 빠른 포착",
+            f"- 기준: 당일 미국장 장중 스냅샷 데이터({target_us_session_date.isoformat()}) 추세 미확정",
+            f"- 목적: 장 시작 전 강세 종목 빠른 포착",
             f"- 거래량 기준: {vol_text} (시간비례 보정 적용)",
-            f"- 유니버스: {universe_count}개 | 스캔 결과: {result_count}개 (제외 {skip_count}개)",
-            "- ⚠️ 장중 스냅샷: 신호/거래량은 장 마감 시 변동될 수 있습니다",
+            f"- 유니버스: {universe_count}개 | 스캔 결과: {result_count}개(제외 {skip_count}개)",
+            "- 장중 추세 변동으로 신호/거래량은 장 마감 후 변경될 수 있습니다",
             index_line,
             "",
         ]
@@ -1100,12 +1475,12 @@ def build_transition_summary(
             f"[{str(scan_label or '자동 스캔')}] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
             f"- 전일 미국장 기준일: {target_us_session_date.isoformat()} (US/Eastern)",
             f"- 유니버스: {universe_count}개",
-            f"- 전체 스캔 결과: {result_count}개 (제외 {skip_count}개)",
+            f"- 전체 스캔 결과: {result_count}개(제외 {skip_count}개)",
             index_line,
             "",
         ]
 
-    vol_criteria_suffix = f" + 거래량 > {volume_threshold:.2f}x" if volume_threshold is not None and volume_threshold < 1.0 else " + 거래량 > 1.0x"
+    vol_criteria_suffix = f" + 거래량> {volume_threshold:.2f}x" if volume_threshold is not None and volume_threshold < 1.0 else " + 거래량> 1.0x"
     session_label = "장중" if scan_mode == "early_session" else "전일 미국장(US/Eastern)"
 
     sections = [
@@ -1113,10 +1488,7 @@ def build_transition_summary(
             section_index=1,
             section_total=4,
             section_name="매수전환",
-            criteria=(
-                f"{session_label} UTBot/HULL 매수전환"
-                f"{vol_criteria_suffix} (감지 {detected_count}개)"
-            ),
+            criteria=(f"{session_label} UTBot/HULL 매수전환{vol_criteria_suffix} (감지 {detected_count}개)"),
             rows=buy_rows,
             summary_limit=summary_limit,
             tag_builder=lambda row: ", ".join(list(dict(row or {}).get("transition_signals") or [])) or "-",
@@ -1350,7 +1722,7 @@ def _load_json_file(path: Path) -> Any:
 
 
 def _load_latest_scan_rows(scan_dir: Path) -> tuple[list[dict[str, Any]], Path | None]:
-    """가장 최근의 scan_rows JSON을 로드. merged 우선, 없으면 단일 shard."""
+    """가장 최근의 scan_rows JSON 로드. merged 우선, 없으면 단일 shard."""
     merged = sorted(scan_dir.glob("scan_rows_*_merged.json"), reverse=True)
     if merged:
         data = _load_json_file(merged[0])
@@ -1369,7 +1741,7 @@ def _fetch_premarket_gaps(
     *,
     max_workers: int = 8,
 ) -> dict[str, dict[str, float]]:
-    """프리마켓 가격을 수집하여 전일 종가 대비 갭 계산."""
+    """프리마켓 가격을 수집해 전일 종가 대비 갭 계산."""
 
     def _fetch_one(ticker: str) -> tuple[str, dict[str, float] | None]:
         try:
@@ -1457,7 +1829,7 @@ def _send_telegram_if_enabled(
 
 
 def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: Path) -> int:
-    """기존 05시 post_close 로직 (변경 없음)."""
+    """기존 05시 post_close 로직."""
     stamp = run_at_kst.strftime("%Y%m%d_%H%M%S")
     shard_count = int(args.shard_count or 1)
     shard_index = int(args.shard_index or 0)
@@ -1483,6 +1855,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
             f"source_sum={int(merged_payload.get('source_result_count_sum', 0))}"
         )
         csv_rows = _with_latest_session_buy_turn_flags(merged_rows, target_date=latest_session_date)
+        csv_rows = _with_post_close_cross_section_metrics(csv_rows, enabled=True)
         csv_path = write_scan_csv(
             csv_rows,
             out_dir=out_dir,
@@ -1565,6 +1938,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
         )
 
         csv_rows = _with_latest_session_buy_turn_flags(scan_result.rows, target_date=latest_session_date)
+        csv_rows = _with_post_close_cross_section_metrics(csv_rows, enabled=shard_count <= 1)
         csv_path = write_scan_csv(
             csv_rows,
             out_dir=out_dir,
@@ -1716,7 +2090,7 @@ def _run_pre_market(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
                 "Falling back to full universe scan without priority."
             )
 
-        # 2) Shard 분리
+        # 2) Shard 遺꾨━
         if prev_scan_found:
             all_tickers = [str(r.get("ticker", "")).strip().upper() for r in prev_rows if r.get("ticker")]
             shard_tickers = split_tickers_for_shard(all_tickers, shard_count, shard_index)
@@ -1733,7 +2107,7 @@ def _run_pre_market(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
         gap_data = _fetch_premarket_gaps(shard_tickers, max_workers=int(args.max_workers))
         print(f"[PRE_MARKET] Gap data collected: {len(gap_data)}/{len(shard_tickers)}")
 
-        # 4) 자기 shard ticker만 필터 + 갭 병합
+        # 4) shard 티커만 필터 + 갭 병합
         enriched_rows = _enrich_rows_with_gap(shard_rows, gap_data)
 
         # 5) 저장

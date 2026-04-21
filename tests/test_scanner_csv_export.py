@@ -158,6 +158,10 @@ class ScannerCsvExportTests(unittest.TestCase):
             "detected_core_summary": "시스템 매수 전환(2026-04-14)",
             "detected_signal_total_count": 7,
             "detected_signal_latest_date": "2026-04-17",
+            "gap_risk_2pct": True,
+            "gap_risk_atr": False,
+            "first_higher_high_pivot2": False,
+            "system_turn_bull_last_date": "2026-04-15",
         }
 
         blob = scanner_rows_to_csv_bytes([row]).decode("utf-8-sig")
@@ -177,6 +181,31 @@ class ScannerCsvExportTests(unittest.TestCase):
         self.assertEqual(data[h_index["유동성주의(thin_trade_risk)"]], "N")
         self.assertEqual(data[h_index["강한추세지속(strong_trend_persistent)"]], "Y")
         self.assertEqual(data[h_index["눌림목재진입(pullback_reentry)"]], "N")
+
+    def test_bool_and_date_normalization_for_extra_fields(self):
+        row = {
+            "ticker": "AAPL",
+            "gap_risk_2pct": True,
+            "gap_risk_atr": False,
+            "first_higher_high_pivot2": False,
+            "system_turn_bull_last_date": "",
+        }
+        extra_specs = (
+            {"group": "risk", "key": "gap_risk_2pct", "label": "GapRisk2Pct", "type": "bool", "description": "", "rule": "", "example": "Y"},
+            {"group": "risk", "key": "gap_risk_atr", "label": "GapRiskATR", "type": "bool", "description": "", "rule": "", "example": "N"},
+            {"group": "turn", "key": "first_higher_high_pivot2", "label": "FirstHigherHighPivot2", "type": "bool", "description": "", "rule": "", "example": "N"},
+            {"group": "turn", "key": "system_turn_bull_last_date", "label": "SystemTurnBullLastDate", "type": "date", "description": "", "rule": "", "example": "없음"},
+        )
+        blob = scanner_rows_to_csv_bytes([row], field_specs=extra_specs).decode("utf-8-sig")
+        parsed = list(csv.reader(io.StringIO(blob)))
+        header = parsed[0]
+        data = parsed[1]
+        h_index = {name: idx for idx, name in enumerate(header)}
+
+        self.assertEqual(data[h_index["GapRisk2Pct(gap_risk_2pct)"]], "Y")
+        self.assertEqual(data[h_index["GapRiskATR(gap_risk_atr)"]], "N")
+        self.assertEqual(data[h_index["FirstHigherHighPivot2(first_higher_high_pivot2)"]], "N")
+        self.assertEqual(data[h_index["SystemTurnBullLastDate(system_turn_bull_last_date)"]], "없음")
 
     def test_default_scanner_rows_to_csv_bytes_matches_explicit_default_field_specs(self):
         row = {
