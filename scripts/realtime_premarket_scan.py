@@ -6,9 +6,9 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from datetime import datetime, time as dt_time
+from datetime import date, datetime, time as dt_time
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable, Mapping
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -22,13 +22,44 @@ if str(PROJECT_ROOT) not in sys.path:
 from config import DEFAULT_BIAS_MODE, resolve_bias_mode
 from engine import _ensure_runtime_combo_registry, detect_all_signals
 from indicators import compute_indicators
+from localization import (
+    localize_action_label,
+    localize_context_label,
+    localize_judgment_label,
+    localize_combo,
+    localize_signal,
+)
+from scanner_csv import CORE_SIGNAL_GROUP as SCANNER_CORE_SIGNAL_CFG, build_detected_signal_payload
+from scanner_filters import WATCH_BUY_PLUS, compute_scanner_profile_flags, has_long_pullback_strategy, has_pullback_combo
 from scripts.daily_scan_and_notify import (
+    POST_CLOSE_INDEX_TITLES,
+    POST_CLOSE_SECTION_TITLES,
+    POST_CLOSE_SUMMARY_SECTION_TOTAL,
+    SCANNER_TRANSITION_CFG,
+    _build_summary_section_lines,
+    _compute_post_close_row_metrics,
+    _last_us_market_session_date,
     _safe_float,
+    _with_latest_session_buy_turn_flags,
+    _with_post_close_cross_section_metrics,
+    _with_post_close_setup_scores,
     build_scan_universe,
+    filter_turn_rows_for_telegram,
+    select_post_close_buy_turn_rows_for_telegram,
+    select_post_close_chase_rows_for_telegram,
+    select_post_close_gap_setup_rows_for_telegram,
+    select_post_close_pocket_pivot_rows_for_telegram,
+    select_post_close_pullback_rows_for_telegram,
+    select_post_close_top_5d_rows_for_telegram,
+    select_pullback_reentry_rows_for_telegram,
+    select_us_session_52w_high_rows,
+    select_us_session_hull_bear_rows,
+    select_us_session_turn_rows,
     send_telegram_document,
     send_telegram_message,
     split_tickers_for_shard,
 )
+from strategy import build_strategy_payload
 
 KST = ZoneInfo("Asia/Seoul")
 US_EASTERN = ZoneInfo("America/New_York")
@@ -39,6 +70,7 @@ DEFAULT_MIN_TURNOVER_PCT = 0.001
 DEFAULT_DOLLAR_FLOOR_EARLY = 20_000.0
 DEFAULT_DOLLAR_FLOOR_MID = 40_000.0
 DEFAULT_DOLLAR_FLOOR_LATE = 80_000.0
+DEFAULT_SUMMARY_LIMIT = 30
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("premarket_rt")
@@ -234,6 +266,78 @@ def _passes_liquidity_gate(
     return True, ""
 
 
+def _format_pm_tag(row: dict[str, Any]) -> str:
+    change_pct = _safe_float(row.get("change_pct", 0.0))
+    effective_dollar = _safe_float(row.get("effective_dollar_volume", row.get("dollar_volume", 0.0)))
+    turnover_pct = _safe_float(row.get("mcap_turnover_pct", row.get("mcap_ratio", 0.0)))
+    pm_close = _safe_float(row.get("pm_close", 0.0))
+    pm_vwap = _safe_float(row.get("pm_vwap", 0.0))
+    vwap_text = "VWAP상" if pm_close >= pm_vwap else "VWAP하"
+    return f"PM {change_pct:+.2f}% | {vwap_text} | ${effective_dollar / 1000.0:,.0f}k | 회전율{turnover_pct:.4f}%"
+
+
+def _combine_pm_tag(row: dict[str, Any], base_tag: str) -> str:
+    pm_tag = str(row.get("pm_tag") or "").strip()
+    base = str(base_tag or "").strip()
+    if pm_tag and base and base != "-":
+        return f"{pm_tag} || {base}"
+    if pm_tag:
+        return pm_tag
+    return base or "-"
+
+
+def _confirmed_signal_frame(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame is None or frame.empty:
+        return pd.DataFrame()
+    if len(frame) <= 1:
+        return frame.iloc[0:0].copy()
+    return frame.iloc[:-1].copy()
+
+
+def _recent_flag(frame: pd.DataFrame, column: str, window: int = 5) -> bool:
+    if frame is None or frame.empty or column not in frame.columns:
+        return False
+    series = frame[column].tail(window)
+    try:
+        return bool(series.fillna(False).astype(bool).any())
+    except Exception:
+        return bool(series.any())
+
+
+def _strategy_payload_or_empty(frame: pd.DataFrame) -> dict[str, Any]:
+    if frame is None or frame.empty:
+        return {"summary": {}, "results": [], "visible_results": []}
+    return build_strategy_payload(frame)
+
+
+def _build_recent_payload(frame: pd.DataFrame, *, recent_window: int) -> dict[str, Any]:
+    return build_detected_signal_payload(
+        frame=frame,
+        recent_window=recent_window,
+        combo_registry={},
+        transition_cfg=SCANNER_TRANSITION_CFG,
+        core_signal_cfg=SCANNER_CORE_SIGNAL_CFG,
+        localize_combo_fn=localize_combo,
+        localize_signal_fn=localize_signal,
+        summary_limit=8,
+    )
+
+
+def _build_full_detected_payload(frame: pd.DataFrame, *, recent_window: int) -> dict[str, Any]:
+    from config import COMBINED_SCAN_REGISTRY
+
+    return build_detected_signal_payload(
+        frame=frame,
+        recent_window=recent_window,
+        combo_registry=COMBINED_SCAN_REGISTRY,
+        transition_cfg=SCANNER_TRANSITION_CFG,
+        core_signal_cfg=SCANNER_CORE_SIGNAL_CFG,
+        localize_combo_fn=localize_combo,
+        localize_signal_fn=localize_signal,
+        summary_limit=8,
+    )
+
+
 def _build_pm_scanner_row(
     ticker: str,
     bias_mode: str,
@@ -272,23 +376,163 @@ def _build_pm_scanner_row(
         indicator_frame = compute_indicators(combined_hist)
         _ensure_runtime_combo_registry()
         signal_frame = detect_all_signals(indicator_frame, bias_mode=resolve_bias_mode(bias_mode))
+        if signal_frame is None or len(signal_frame) < 2:
+            return {"ok": False, "ticker": ticker, "skip_reason": "insufficient_signal_frame"}
+
+        recent_window = 5
+        dc_ = signal_frame.tail(63).copy()
+        confirmed_frame = _confirmed_signal_frame(dc_)
+        confirmed_metrics = _compute_post_close_row_metrics(confirmed_frame) if not confirmed_frame.empty else {}
+        advanced_metrics = _compute_post_close_row_metrics(dc_)
+        for key in (
+            "days_since_utbot_buy",
+            "days_since_hull_turn_bull",
+            "days_since_hull_turn_bear",
+            "days_since_pocket_pivot",
+            "pocket_pivot_recent",
+            "system_turn_bull_last_date",
+        ):
+            if key in confirmed_metrics:
+                advanced_metrics[key] = confirmed_metrics[key]
+
         latest = signal_frame.iloc[-1]
-        recent_real = signal_frame.iloc[-4:-1] if len(signal_frame) >= 4 else signal_frame.iloc[:-1]
         prev = signal_frame.iloc[-2] if len(signal_frame) > 1 else latest
         prev2 = signal_frame.iloc[-3] if len(signal_frame) > 2 else prev
+        confirmed_latest = confirmed_frame.iloc[-1] if not confirmed_frame.empty else prev
 
-        def _any_recent(col: str) -> bool:
-            if col not in recent_real.columns:
-                return False
-            try:
-                return bool(recent_real[col].fillna(False).astype(bool).any())
-            except Exception:
-                return False
+        strategy_payload = _strategy_payload_or_empty(dc_)
+        strategy_summary = strategy_payload.get("summary", {}) or {}
+        strategy_results = list(strategy_payload.get("visible_results") or [])
+        top_strategy = strategy_summary.get("top_strategy")
+        detected_payload_full = _build_full_detected_payload(dc_, recent_window=recent_window)
+        detected_payload_confirmed = _build_recent_payload(confirmed_frame, recent_window=recent_window)
 
-        ut_turn_bull = _any_recent("UTBot_Buy")
-        ut_turn_bear = _any_recent("UTBot_Sell")
-        hull_turn_bull = _any_recent("Hull_Turn_Bull")
-        hull_turn_bear = _any_recent("Hull_Turn_Bear")
+        combos = [
+            {
+                "icon": str(item.get("icon", "")),
+                "kor": str(item.get("label", "")),
+                "dir": str(item.get("dir", "neutral")),
+                "tier": int(item.get("tier", 9) or 9),
+                "date": str(item.get("date_short", "")),
+                "days_ago": int(item.get("days_ago", 99) or 99),
+                "key": str(item.get("key", "")),
+            }
+            for item in detected_payload_full.get("combo_items", [])
+        ]
+        latest_combo_ts = detected_payload_full.get("latest_combo_ts")
+        transitions = [
+            {
+                "icon": str(item.get("icon", "")),
+                "label": str(item.get("label", "")),
+                "dir": str(item.get("dir", "neutral")),
+                "date": str(item.get("date_short", "")),
+                "date_iso": str(item.get("date", "")),
+                "days_ago": int(item.get("days_ago", 99) or 99),
+                "key": str(item.get("key", "")),
+            }
+            for item in detected_payload_confirmed.get("transition_items", [])
+        ]
+
+        current_close = _safe_float(latest.get("Close", 0.0))
+        prev_close = _safe_float(prev.get("Close", current_close))
+        close_5d_ago = _safe_float(dc_.iloc[-6].get("Close", 0.0)) if len(dc_) >= 6 else 0.0
+        chg_value = _safe_float(current_close - prev_close)
+        chg_pct = _safe_float((current_close - prev_close) / prev_close * 100.0) if prev_close else 0.0
+        chg_5d_pct = _safe_float((current_close - close_5d_ago) / close_5d_ago * 100.0) if close_5d_ago else 0.0
+        buy_total = _safe_float(latest.get("Buy_Total", 0.0))
+        sell_total = _safe_float(latest.get("Sell_Total", 0.0))
+        buy_agree = int(_safe_float(latest.get("Buy_Agree", 0.0)))
+        sell_agree = int(_safe_float(latest.get("Sell_Agree", 0.0)))
+        es = _safe_float(latest.get("Ensemble_Score", 0.0))
+        cf = _safe_float(latest.get("Judgment_Confidence", 0.0))
+        market_bias = _safe_float(latest.get("Market_Filter_Bias", 0.0))
+        downgrade_count = _safe_float(latest.get("Downgrade_Count", 0.0))
+        flip_guard_triggered = bool(latest.get("Flip_Guard_Triggered", False))
+        continuation_buy = _safe_float(latest.get("Continuation_Buy_Score", 0.0))
+        continuation_sell = _safe_float(latest.get("Continuation_Sell_Score", 0.0))
+        thin_trade_risk = bool(latest.get("Thin_Trade_Risk", False))
+        bullish_gap_reversal = bool(latest.get("Bullish_Gap_Reversal", False))
+        bearish_gap_failure = bool(latest.get("Bearish_Gap_Failure", False))
+        raw_jg = str(latest.get("Trade_Judgment", "N/A"))
+
+        tier1_buy = sum(1 for item in combos if item["tier"] == 1 and item["dir"] == "buy")
+        tier1_sell = sum(1 for item in combos if item["tier"] == 1 and item["dir"] == "sell")
+        tier2_buy = sum(1 for item in combos if item["tier"] == 2 and item["dir"] == "buy")
+        tier2_sell = sum(1 for item in combos if item["tier"] == 2 and item["dir"] == "sell")
+        scan_score = (
+            es
+            + (buy_total - sell_total) * 0.55
+            + (buy_agree - sell_agree) * 2.5
+            + tier1_buy * 4.0
+            - tier1_sell * 4.0
+            + tier2_buy * 1.6
+            - tier2_sell * 1.6
+            + cf * 0.04
+            + market_bias * 0.55
+            + continuation_buy * 0.9
+            - continuation_sell * 0.9
+        )
+        scan_score -= downgrade_count * 2.2
+        if thin_trade_risk:
+            scan_score -= 4.0
+        if bullish_gap_reversal:
+            scan_score += 1.8
+        if bearish_gap_failure:
+            scan_score -= 2.2
+        judgment_bias = {
+            "STRONG_BUY": 10.0,
+            "BUY": 5.0,
+            "WATCH_BUY": 2.5,
+            "WATCH_SELL": -2.5,
+            "SELL": -5.0,
+            "STRONG_SELL": -10.0,
+        }.get(raw_jg, 0.0)
+        scan_score += judgment_bias
+        if raw_jg in ("NEUTRAL", "MIXED"):
+            scan_score *= 0.7
+        if flip_guard_triggered:
+            scan_score *= 0.82
+
+        strength = (
+            abs(es)
+            + (buy_total + sell_total) * 0.35
+            + abs(buy_agree - sell_agree) * 1.8
+            + (tier1_buy + tier1_sell) * 3.0
+            + cf * 0.02
+        )
+
+        multi_buy = sum(1 for item in combos if item["dir"] == "buy")
+        multi_sell = sum(1 for item in combos if item["dir"] == "sell")
+        multi_neutral = sum(1 for item in combos if item["dir"] == "neutral")
+        multi_count = len(combos)
+        multi_imbalance = multi_buy - multi_sell
+        multi_sig = bool((multi_count >= 3) or (any(item["tier"] == 1 for item in combos) and multi_count >= 2))
+        recent_hits = sorted(
+            [item for item in combos if item.get("days_ago", 99) <= 3],
+            key=lambda item: (item.get("tier", 9), item.get("days_ago", 99)),
+        )
+        multi_hits = [{"icon": h["icon"], "label": h["kor"], "dir": h["dir"], "date": h["date"]} for h in recent_hits]
+        if not multi_hits:
+            fallback_hits = sorted(combos, key=lambda item: (item.get("tier", 9), item.get("days_ago", 99)))[:6]
+            multi_hits = [{"icon": h["icon"], "label": h["kor"], "dir": h["dir"], "date": h["date"]} for h in fallback_hits]
+
+        volume_ratio_20 = _safe_float(latest.get("Volume_Ratio_20", 0.0))
+        volume_ratio_50 = _safe_float(latest.get("Volume_Ratio_50", 0.0))
+        volume_oscillator = _safe_float(latest.get("Volume_Oscillator", 0.0))
+        dollar_volume_20 = _safe_float(latest.get("Dollar_Volume_20", 0.0))
+        volume_surge = bool(latest.get("Volume_Surge", False))
+        volume_climax_buy = bool(latest.get("Volume_Climax_Buy", False))
+        volume_abnormal = bool(volume_surge or volume_ratio_20 >= 2.0)
+        volume_bullish = bool((volume_ratio_20 >= 1.2) and (volume_surge or volume_climax_buy or volume_oscillator > 0))
+
+        system_turn_bull = _recent_flag(confirmed_frame, "System_Turn_Bull", recent_window)
+        trend_inflect_bull = _recent_flag(confirmed_frame, "Trend_Inflection_Bull", recent_window)
+        ut_turn_bull = _recent_flag(confirmed_frame, "UTBot_Buy", recent_window)
+        ut_turn_bear = _recent_flag(confirmed_frame, "UTBot_Sell", recent_window)
+        hull_turn_bull = _recent_flag(confirmed_frame, "Hull_Turn_Bull", recent_window)
+        hull_turn_bear = _recent_flag(confirmed_frame, "Hull_Turn_Bear", recent_window)
+        bull_turn_recent = bool(system_turn_bull or trend_inflect_bull or ut_turn_bull or hull_turn_bull)
+
         prev_hull_bull = bool(
             prev.get("Hull_Turn_Bull", False)
             or prev.get("Hull_Trend", "") == "bullish"
@@ -296,26 +540,140 @@ def _build_pm_scanner_row(
             or prev2.get("Hull_Trend", "") == "bullish"
         )
         prev_uptrend = bool(_safe_float(prev.get("Close", 0)) > _safe_float(prev.get("MA20", 0)))
-        new_52w_high = bool(
-            latest.get("New_52W_High", False)
-            or prev.get("New_52W_High", False)
-            or prev2.get("New_52W_High", False)
+        ma20 = _safe_float(latest.get("MA20", 0.0))
+        ma50 = _safe_float(latest.get("MA50", 0.0))
+        ma20_prev = _safe_float(prev.get("MA20", ma20))
+        ma50_prev = _safe_float(prev.get("MA50", ma50))
+        uptrend_ready = bool(current_close > ma20 > ma50) if ma20 and ma50 else False
+        pullback_ready = _recent_flag(dc_, "EMA_Pullback_Buy", recent_window)
+        uptrend_or_pullback = bool(uptrend_ready or pullback_ready)
+        recent_utbot_sell = _recent_flag(confirmed_frame, "UTBot_Sell", recent_window)
+        recent_hull_bear = _recent_flag(confirmed_frame, "Hull_Turn_Bear", recent_window)
+        strategy_conflict_level = str(strategy_summary.get("conflict_level", "LOW"))
+        strategy_bias = str(strategy_summary.get("long_short_bias", "BALANCED"))
+        strategy_active_count = int(strategy_summary.get("active_count", 0) or 0)
+        buy_combo_present = any(item["dir"] == "buy" for item in combos)
+        pullback_combo_present = has_pullback_combo(detected_payload_full.get("combo_items", []))
+        long_pullback_strategy_visible = has_long_pullback_strategy(strategy_results)
+        watch_buy_plus = raw_jg in WATCH_BUY_PLUS
+        bull_strength_recent = bool(
+            watch_buy_plus
+            and (bull_turn_recent or uptrend_or_pullback)
+            and (strategy_active_count > 0 or buy_combo_present)
+            and volume_bullish
         )
+        profile_flags = compute_scanner_profile_flags(
+            current_close=current_close,
+            ma20=ma20,
+            ma50=ma50,
+            ma20_prev=ma20_prev,
+            ma50_prev=ma50_prev,
+            watch_buy_plus=watch_buy_plus,
+            strategy_bias=strategy_bias,
+            recent_utbot_sell=recent_utbot_sell,
+            recent_hull_bear=recent_hull_bear,
+            adx=_safe_float(latest.get("ADX", 0.0)),
+            es=es,
+            cf=cf,
+            volume_bullish=volume_bullish,
+            strategy_conflict_level=strategy_conflict_level,
+            pullback_ready=pullback_ready,
+            pullback_combo_present=pullback_combo_present,
+            long_pullback_strategy_visible=long_pullback_strategy_visible,
+            multi_sell=multi_sell,
+            thin_trade_risk=thin_trade_risk,
+            flip_guard_triggered=flip_guard_triggered,
+        )
+        confirmed_latest_bar = confirmed_frame.index[-1] if not confirmed_frame.empty else prev.name
+        latest_bar_date = confirmed_latest_bar.date().isoformat() if hasattr(confirmed_latest_bar, "date") else str(confirmed_latest_bar)[:10]
+        new_52w_high = bool(confirmed_latest.get("New_52W_High", False))
 
         row = {
             "ticker": ticker,
+            "price": _safe_float(current_close),
+            "chg_value": chg_value,
+            "chg": chg_pct,
+            "chg_5d": chg_5d_pct,
             **metrics,
+            "scans": sorted(combos, key=lambda item: item["tier"]),
+            "transitions": transitions,
+            "multi_sig": multi_sig,
+            "multi_cnt": multi_count,
+            "multi_buy": multi_buy,
+            "multi_sell": multi_sell,
+            "multi_neutral": multi_neutral,
+            "multi_imb": multi_imbalance,
+            "multi_hits": multi_hits,
+            "jg_key": raw_jg,
+            "jg": localize_judgment_label(raw_jg),
+            "ctx": localize_context_label(int(_safe_float(latest.get("Market_Context", 0.0)))),
+            "action": localize_action_label(str(latest.get("Action_Label", ""))),
             "ut_turn_bull": ut_turn_bull,
             "ut_turn_bear": ut_turn_bear,
             "hull_turn_bull": hull_turn_bull,
             "hull_turn_bear": hull_turn_bear,
             "prev_hull_bull": prev_hull_bull,
             "new_52w_high": new_52w_high,
-            "es": _safe_float(latest.get("Ensemble_Score", 0)),
-            "cf": _safe_float(latest.get("Judgment_Confidence", 0)),
+            "new_52w_closing_high": bool(confirmed_latest.get("New_52W_Closing_High", False)),
+            "es": es,
+            "cf": cf,
+            "scan_score": _safe_float(scan_score),
+            "strength": _safe_float(strength),
+            "latest_sig": latest_combo_ts.strftime("%Y-%m-%d") if latest_combo_ts is not None else "9999-99-99",
+            "latest_sig_ts": latest_combo_ts.timestamp() if latest_combo_ts is not None else 0.0,
+            "reason": str(latest.get("Judgment_Reason", "")),
+            "ba": buy_agree,
+            "sa": sell_agree,
+            "buy_total": buy_total,
+            "sell_total": sell_total,
+            "strategy_conflict_level": strategy_conflict_level,
+            "strategy_bias": strategy_bias,
+            "strategy_active_count": strategy_active_count,
+            "strategies": strategy_results,
+            "top_strategy": top_strategy,
+            "volume_ratio_20": volume_ratio_20,
+            "volume_ratio_50": volume_ratio_50,
+            "volume_oscillator": volume_oscillator,
+            "dollar_volume_20": dollar_volume_20,
+            "volume_surge": volume_surge,
+            "volume_abnormal": volume_abnormal,
+            "volume_bullish": volume_bullish,
+            "thin_trade_risk": thin_trade_risk,
+            "bull_turn_recent": bull_turn_recent,
+            "uptrend_or_pullback": uptrend_or_pullback,
+            "pullback_ready": pullback_ready,
+            "bull_strength_recent": bull_strength_recent,
+            "uptrend_persistent": bool(profile_flags.get("uptrend_persistent", False)),
+            "strong_trend_persistent": bool(profile_flags.get("strong_trend_persistent", False)),
+            "pullback_reentry": bool(profile_flags.get("pullback_reentry", False)),
+            "low_conflict_bullish": bool(profile_flags.get("low_conflict_bullish", False)),
+            "utbot_buy_recent": bool(detected_payload_confirmed.get("utbot_buy_recent", False)),
+            "utbot_buy_last_date": str(detected_payload_confirmed.get("utbot_buy_last_date", "?놁쓬")),
+            "utbot_sell_recent": bool(detected_payload_confirmed.get("utbot_sell_recent", False)),
+            "utbot_sell_last_date": str(detected_payload_confirmed.get("utbot_sell_last_date", "?놁쓬")),
+            "hull_turn_bull_recent": bool(detected_payload_confirmed.get("hull_turn_bull_recent", False)),
+            "hull_turn_bull_last_date": str(detected_payload_confirmed.get("hull_turn_bull_last_date", "?놁쓬")),
+            "hull_turn_bear_recent": bool(detected_payload_confirmed.get("hull_turn_bear_recent", False)),
+            "hull_turn_bear_last_date": str(detected_payload_confirmed.get("hull_turn_bear_last_date", "?놁쓬")),
+            "detected_combo_count": int(detected_payload_full.get("detected_combo_count", 0) or 0),
+            "detected_combo_summary": str(detected_payload_full.get("detected_combo_summary", "?놁쓬")),
+            "detected_transition_count": int(detected_payload_confirmed.get("detected_transition_count", 0) or 0),
+            "detected_transition_summary": str(detected_payload_confirmed.get("detected_transition_summary", "?놁쓬")),
+            "detected_core_count": int(detected_payload_full.get("detected_core_count", 0) or 0),
+            "detected_core_summary": str(detected_payload_full.get("detected_core_summary", "?놁쓬")),
+            "detected_signal_total_count": int(detected_payload_full.get("detected_signal_total_count", 0) or 0),
+            "detected_signal_latest_date": str(detected_payload_full.get("detected_signal_latest_date", "?놁쓬")),
+            "detected_signals": list(detected_payload_full.get("all_items", [])),
+            "watch_buy_plus": watch_buy_plus,
+            "buy_combo_present": buy_combo_present,
+            "latest_bar_date": str(latest_bar_date or "?놁쓬"),
             "liquidity_min_dollar": _safe_float(min_dollar_volume),
             "liquidity_min_turnover_pct": _safe_float(min_turnover_pct),
+            **advanced_metrics,
         }
+        row["pm_supports_bullish"] = not (row["pm_close"] < row["pm_vwap"] and row["change_pct"] < -1.0)
+        row["pm_supports_bearish"] = bool((row["pm_close"] < row["pm_vwap"]) or (row["change_pct"] < 0.0))
+        row["pm_tag"] = _format_pm_tag(row)
 
         is_pm_strong = (
             row["gap_pct"] > 0
@@ -423,23 +781,279 @@ def scan_universe(
     return PMScanResult(rows=results, skips=skip_reasons, perf=perf_stats)
 
 
-def _fmt_row(row: dict[str, Any]) -> str:
-    ticker = str(row.get("ticker", "UNKN"))
-    gap = _safe_float(row.get("gap_pct", 0))
-    chg = _safe_float(row.get("change_pct", 0))
-    effective_dollar = _safe_float(row.get("effective_dollar_volume", row.get("dollar_volume", 0.0)))
-    turnover_pct = _safe_float(row.get("mcap_turnover_pct", row.get("mcap_ratio", 0.0)))
-    pm_volume_effective = _safe_float(row.get("pm_volume_effective", row.get("pm_volume", 0.0)))
-    source = str(row.get("pm_volume_source", "none"))
+def _pm_combined_tag(row: Mapping[str, Any], base_tag: str) -> str:
+    return _combine_pm_tag(dict(row or {}), str(base_tag or "-"))
 
-    sign_gap = "+" if gap > 0 else ""
-    sign_chg = "+" if chg > 0 else ""
-    return (
-        f"{ticker} | 갭 {sign_gap}{gap:.1f}% / 등락 {sign_chg}{chg:.1f}%"
-        f" | 거래량 {pm_volume_effective:,.0f} ({source})"
-        f" | 거래대금 ${effective_dollar / 1000.0:,.0f}k"
-        f" | 시총대비 {turnover_pct:.4f}%"
+
+def _ensure_premarket_state_fields(row: Mapping[str, Any]) -> dict[str, Any]:
+    row_dict = dict(row or {})
+    pm_close = _safe_float(row_dict.get("pm_close", 0.0))
+    pm_vwap = _safe_float(row_dict.get("pm_vwap", 0.0))
+    change_pct = _safe_float(row_dict.get("change_pct", 0.0))
+    row_dict["pm_supports_bullish"] = bool(
+        row_dict.get("pm_supports_bullish", not (pm_close < pm_vwap and change_pct < -1.0))
     )
+    row_dict["pm_supports_bearish"] = bool(
+        row_dict.get("pm_supports_bearish", (pm_close < pm_vwap) or (change_pct < 0.0))
+    )
+    if not str(row_dict.get("pm_tag", "")).strip():
+        row_dict["pm_tag"] = _format_pm_tag(row_dict)
+    return row_dict
+
+
+def _prepare_premarket_rows(rows: Iterable[Mapping[str, Any]], *, run_at_kst: datetime) -> list[dict[str, Any]]:
+    target_date = _last_us_market_session_date(run_at_kst)
+    prepared = [_ensure_premarket_state_fields(row) for row in (rows or [])]
+    prepared = _with_latest_session_buy_turn_flags(prepared, target_date=target_date)
+    prepared = _with_post_close_cross_section_metrics(prepared, enabled=True)
+    prepared = _with_post_close_setup_scores(prepared)
+    return [_ensure_premarket_state_fields(row) for row in prepared]
+
+
+def _filter_premarket_direction(rows: Iterable[Mapping[str, Any]], *, bullish: bool) -> list[dict[str, Any]]:
+    field_name = "pm_supports_bullish" if bullish else "pm_supports_bearish"
+    filtered: list[dict[str, Any]] = []
+    for row in rows or []:
+        row_dict = _ensure_premarket_state_fields(row)
+        if bool(row_dict.get(field_name, False)):
+            filtered.append(row_dict)
+    return filtered
+
+
+def _build_premarket_summary_sections(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    run_at_kst: datetime,
+) -> dict[str, list[dict[str, Any]]]:
+    prepared_rows = _prepare_premarket_rows(rows, run_at_kst=run_at_kst)
+
+    legacy_turn_rows = _filter_premarket_direction(
+        filter_turn_rows_for_telegram(select_us_session_turn_rows(prepared_rows, run_at_kst=run_at_kst)),
+        bullish=True,
+    )
+    legacy_pullback_rows = _filter_premarket_direction(
+        select_pullback_reentry_rows_for_telegram(prepared_rows),
+        bullish=True,
+    )
+    legacy_hull_bear_rows = _filter_premarket_direction(
+        select_us_session_hull_bear_rows(prepared_rows, run_at_kst=run_at_kst),
+        bullish=False,
+    )
+    legacy_52w_high_rows = _filter_premarket_direction(
+        select_us_session_52w_high_rows(prepared_rows, run_at_kst=run_at_kst),
+        bullish=True,
+    )
+    pullback_filter_rows = _filter_premarket_direction(
+        select_post_close_pullback_rows_for_telegram(prepared_rows),
+        bullish=True,
+    )
+    chase_filter_rows = _filter_premarket_direction(
+        select_post_close_chase_rows_for_telegram(prepared_rows),
+        bullish=True,
+    )
+    buy_turn_filter_rows = _filter_premarket_direction(
+        select_post_close_buy_turn_rows_for_telegram(prepared_rows, run_at_kst=run_at_kst),
+        bullish=True,
+    )
+    gap_setup_rows = _filter_premarket_direction(
+        select_post_close_gap_setup_rows_for_telegram(prepared_rows),
+        bullish=True,
+    )
+    pocket_pivot_rows = _filter_premarket_direction(
+        select_post_close_pocket_pivot_rows_for_telegram(prepared_rows),
+        bullish=True,
+    )
+    five_day_top_rows = _filter_premarket_direction(
+        select_post_close_top_5d_rows_for_telegram(prepared_rows),
+        bullish=True,
+    )
+
+    return {
+        "prepared_rows": prepared_rows,
+        "legacy_turn_rows": legacy_turn_rows,
+        "legacy_pullback_rows": legacy_pullback_rows,
+        "legacy_hull_bear_rows": legacy_hull_bear_rows,
+        "legacy_52w_high_rows": legacy_52w_high_rows,
+        "pullback_filter_rows": pullback_filter_rows,
+        "chase_filter_rows": chase_filter_rows,
+        "buy_turn_filter_rows": buy_turn_filter_rows,
+        "gap_setup_rows": gap_setup_rows,
+        "pocket_pivot_rows": pocket_pivot_rows,
+        "five_day_top_rows": five_day_top_rows,
+    }
+
+
+def _build_premarket_index_line(section_rows: Mapping[str, list[dict[str, Any]]]) -> str:
+    return (
+        f"- 요약 인덱스: {POST_CLOSE_INDEX_TITLES['legacy_turn']} {len(section_rows['legacy_turn_rows'])}"
+        f" | {POST_CLOSE_INDEX_TITLES['legacy_pullback']} {len(section_rows['legacy_pullback_rows'])}"
+        f" | {POST_CLOSE_INDEX_TITLES['legacy_hull_bear']} {len(section_rows['legacy_hull_bear_rows'])}"
+        f" | {POST_CLOSE_INDEX_TITLES['legacy_52w_high']} {len(section_rows['legacy_52w_high_rows'])}"
+        f" | {POST_CLOSE_INDEX_TITLES['pullback_filter']} {len(section_rows['pullback_filter_rows'])}"
+        f" | {POST_CLOSE_INDEX_TITLES['chase_filter']} {len(section_rows['chase_filter_rows'])}"
+        f" | {POST_CLOSE_INDEX_TITLES['buy_turn_filter']} {len(section_rows['buy_turn_filter_rows'])}"
+        f" | {POST_CLOSE_INDEX_TITLES['gap_setup']} {len(section_rows['gap_setup_rows'])}"
+        f" | {POST_CLOSE_INDEX_TITLES['pocket_pivot']} {len(section_rows['pocket_pivot_rows'])}"
+        f" | {POST_CLOSE_INDEX_TITLES['five_day_top']} {len(section_rows['five_day_top_rows'])}"
+    )
+
+
+def _render_premarket_summary(
+    *,
+    section_rows: Mapping[str, list[dict[str, Any]]],
+    run_at_kst: datetime,
+    universe_count: int,
+    skip_count: int,
+    scan_label: str,
+    summary_limit: int,
+) -> str:
+    target_us_session_date = _last_us_market_session_date(run_at_kst)
+    prepared_rows = list(section_rows.get("prepared_rows", []))
+    total_limit = max(0, int(summary_limit))
+    effective_universe_count = int(universe_count) if int(universe_count) > 0 else len(prepared_rows)
+
+    lines = [
+        f"[{str(scan_label or DEFAULT_SCAN_LABEL)}] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
+        f"- 대상 미국 세션일: {target_us_session_date.isoformat()} (US/Eastern)",
+        "- 프리마켓 기준: 합성 프리장 일봉 + 미완성 일봉 보수 적용",
+        f"- 유니버스: {effective_universe_count}",
+        f"- 스캔 결과: {len(prepared_rows)} | 제외: {max(0, int(skip_count))}",
+        _build_premarket_index_line(section_rows),
+        "",
+    ]
+
+    sections = [
+        _build_summary_section_lines(
+            section_index=1,
+            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_name=POST_CLOSE_SECTION_TITLES["legacy_turn"],
+            criteria="legacy UTBot/HULL buy-turn + volume>1.0x + pm_supports_bullish",
+            rows=section_rows["legacy_turn_rows"],
+            summary_limit=total_limit,
+            tag_builder=lambda row: _pm_combined_tag(
+                row,
+                ", ".join(list(dict(row or {}).get("transition_signals") or [])) or "-",
+            ),
+        ),
+        _build_summary_section_lines(
+            section_index=2,
+            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_name=POST_CLOSE_SECTION_TITLES["legacy_pullback"],
+            criteria="pullback_reentry=True + volume>1.0x + pm_supports_bullish",
+            rows=section_rows["legacy_pullback_rows"],
+            summary_limit=total_limit,
+            tag_builder=lambda row: _pm_combined_tag(row, "눌림 재진입"),
+        ),
+        _build_summary_section_lines(
+            section_index=3,
+            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_name=POST_CLOSE_SECTION_TITLES["legacy_hull_bear"],
+            criteria=f"hull_turn_bear_last_date == {target_us_session_date.isoformat()} + pm_supports_bearish",
+            rows=section_rows["legacy_hull_bear_rows"],
+            summary_limit=total_limit,
+            tag_builder=lambda row: _pm_combined_tag(row, "HULL 매도전환"),
+        ),
+        _build_summary_section_lines(
+            section_index=4,
+            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_name=POST_CLOSE_SECTION_TITLES["legacy_52w_high"],
+            criteria=f"new_52w_high=True + latest_bar_date == {target_us_session_date.isoformat()} + pm_supports_bullish",
+            rows=section_rows["legacy_52w_high_rows"],
+            summary_limit=total_limit,
+            tag_builder=lambda row: _pm_combined_tag(row, "52주 신고가"),
+        ),
+        _build_summary_section_lines(
+            section_index=5,
+            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_name=POST_CLOSE_SECTION_TITLES["pullback_filter"],
+            criteria=(
+                "uptrend_persistent=Y + hma60_slope_pct>0 + pullback_from_swing_high_pct<-2 + "
+                "drawdown_from_20d_high_pct<-1 + pullback_atr_multiple<=3.5 + "
+                "(pullback_ready or pullback_reentry) + volume_dry_up_score>=1 + "
+                "no recent UT/HULL sell + pm_supports_bullish"
+            ),
+            rows=section_rows["pullback_filter_rows"],
+            summary_limit=total_limit,
+            tag_builder=lambda row: _pm_combined_tag(row, "눌림목 필터"),
+        ),
+        _build_summary_section_lines(
+            section_index=6,
+            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_name=POST_CLOSE_SECTION_TITLES["chase_filter"],
+            criteria=(
+                "bull_strength_recent=Y + uptrend_persistent=Y + hma20/60 slope>0 + volume_bullish=Y + "
+                "adx>=18 + rs_rank_vs_index>=55 + multi_buy>=2 + dist_sma20_pct<30 + "
+                "zscore20<3.5 + scan_score>=120 + pm_supports_bullish"
+            ),
+            rows=section_rows["chase_filter_rows"],
+            summary_limit=total_limit,
+            tag_builder=lambda row: _pm_combined_tag(row, "추세추종 필터"),
+        ),
+        _build_summary_section_lines(
+            section_index=7,
+            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_name=POST_CLOSE_SECTION_TITLES["buy_turn_filter"],
+            criteria=(
+                "(latest_session_turn or days<=2) + (utbot_buy_recent or hull_turn_bull_recent or bull_turn_recent) + "
+                "cmf>-0.10 + obv_slope>0 + volume_ratio_20>0.9 + no sell on target session + pm_supports_bullish"
+            ),
+            rows=section_rows["buy_turn_filter_rows"],
+            summary_limit=total_limit,
+            tag_builder=lambda row: _pm_combined_tag(
+                row,
+                str(dict(row or {}).get("buy_turn_filter_tag") or "매수전환 필터"),
+            ),
+        ),
+        _build_summary_section_lines(
+            section_index=8,
+            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_name=POST_CLOSE_SECTION_TITLES["gap_setup"],
+            criteria=(
+                "gate>=3/5 + score(sorted by score/gate/scan/es) | "
+                "DryUp + 20DHigh proximity + BB/ATR compression + RS leadership + HMA/ADX trend + pm_supports_bullish"
+            ),
+            rows=section_rows["gap_setup_rows"],
+            summary_limit=total_limit,
+            tag_builder=lambda row: _pm_combined_tag(
+                row,
+                str(dict(row or {}).get("gap_setup_tag") or "에너지 압축"),
+            ),
+        ),
+        _build_summary_section_lines(
+            section_index=9,
+            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_name=POST_CLOSE_SECTION_TITLES["pocket_pivot"],
+            criteria=(
+                "gate>=3/5 + score(sorted by score/gate/scan/es) | "
+                "Volume expansion + recent UT buy + shallow pullback + CMF/OBV accumulation + multi-buy + pm_supports_bullish"
+            ),
+            rows=section_rows["pocket_pivot_rows"],
+            summary_limit=total_limit,
+            tag_builder=lambda row: _pm_combined_tag(
+                row,
+                str(dict(row or {}).get("pocket_pivot_tag") or "기관 매집"),
+            ),
+        ),
+        _build_summary_section_lines(
+            section_index=10,
+            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_name=POST_CLOSE_SECTION_TITLES["five_day_top"],
+            criteria="chg_5d > 0 sorted by chg_5d/scan_score/es + pm_supports_bullish",
+            rows=section_rows["five_day_top_rows"],
+            summary_limit=total_limit,
+            tag_builder=lambda row: _pm_combined_tag(
+                row,
+                str(dict(row or {}).get("five_day_top_tag") or f"5일 {_safe_float(dict(row or {}).get('chg_5d', 0.0)):+.2f}%"),
+            ),
+        ),
+    ]
+    for block in sections:
+        lines.extend(block)
+        lines.append("")
+
+    if lines and not str(lines[-1]).strip():
+        lines.pop()
+    return "\n".join(lines)
 
 
 def format_telegram_summary(
@@ -447,44 +1061,59 @@ def format_telegram_summary(
     run_at_kst: datetime,
     universe_count: int,
     *,
+    skip_count: int = 0,
     scan_label: str = DEFAULT_SCAN_LABEL,
+    summary_limit: int = DEFAULT_SUMMARY_LIMIT,
 ) -> str:
-    g1 = [r for r in rows if r.get("group") == "G1_PR_STRONG"]
-    g2 = [r for r in rows if r.get("group") == "G2_BUY_TURN"]
-    g3 = [r for r in rows if r.get("group") == "G3_SELL_TURN"]
-    g4 = [r for r in rows if r.get("group") == "G4_PULLBACK_HOLD"]
-    g5 = [r for r in rows if r.get("group") == "G5_NEW_HIGH_CHALLENGE"]
-    g6 = [r for r in rows if r.get("group") == "G6_WATCHLIST"]
+    section_rows = _build_premarket_summary_sections(rows, run_at_kst=run_at_kst)
+    return _render_premarket_summary(
+        section_rows=section_rows,
+        run_at_kst=run_at_kst,
+        universe_count=universe_count,
+        skip_count=skip_count,
+        scan_label=scan_label,
+        summary_limit=summary_limit,
+    )
 
-    lines = [
-        f"[{str(scan_label or DEFAULT_SCAN_LABEL)}] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
-        "- 프리마켓 5분봉 + 실시간 거래량 보강(TradingView fallback) 기반",
-        f"- 유니버스: {universe_count}개 | 선별: {len(rows)}개",
-        "",
-    ]
 
-    sections = [
-        ("🔥 프리마켓 강세 (갭+VWAP+전고점)", g1),
-        ("🟢 매수 전환 (UTBot/HULL)", g2),
-        ("🔴 매도 전환 (UTBot/HULL)", g3),
-        ("🌙 눌림 유지 (전일 추세 + PM VWAP)", g4),
-        ("⭐ 52주 고가 도전", g5),
-        ("👀 Watchlist", g6),
-    ]
+def _merge_run_stats(merge_dir: Path) -> dict[str, Any]:
+    meta_files = sorted(Path(merge_dir).glob("**/run_meta_*.json"))
+    universe_count = 0
+    skip_count = 0
+    shard_ticker_count = 0
+    performance_summaries: list[dict[str, Any]] = []
+    for file_path in meta_files:
+        try:
+            payload = json.loads(file_path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        universe_count = max(universe_count, int(_safe_float(payload.get("universe_count", 0))))
+        shard_ticker_count += int(_safe_float(payload.get("shard_ticker_count", 0)))
+        perf = payload.get("performance") or {}
+        skip_count += int(_safe_float(perf.get("skip_count", 0)))
+        performance_summaries.append(dict(perf))
+    return {
+        "meta_file_count": len(meta_files),
+        "universe_count": universe_count,
+        "skip_count": skip_count,
+        "shard_ticker_count": shard_ticker_count,
+        "shard_performance": performance_summaries,
+    }
 
-    for title, group_rows in sections:
-        sorted_rows = sorted(group_rows, key=_group_sort_key)
-        lines.append(f"=== {title} ({len(sorted_rows)}개) ===")
-        if not sorted_rows:
-            lines.append("- 해당 종목 없음")
-        else:
-            for idx, row in enumerate(sorted_rows[:15], start=1):
-                lines.append(f"{idx}. {_fmt_row(row)}")
-            if len(sorted_rows) > 15:
-                lines.append(f"... 외 {len(sorted_rows) - 15}개")
-        lines.append("")
 
-    return "\n".join(lines).strip()
+def _premarket_section_counts(section_rows: Mapping[str, list[dict[str, Any]]]) -> dict[str, int]:
+    return {
+        "legacy_turn_count": len(section_rows.get("legacy_turn_rows", [])),
+        "legacy_pullback_count": len(section_rows.get("legacy_pullback_rows", [])),
+        "legacy_hull_bear_count": len(section_rows.get("legacy_hull_bear_rows", [])),
+        "legacy_52w_high_count": len(section_rows.get("legacy_52w_high_rows", [])),
+        "pullback_filter_count": len(section_rows.get("pullback_filter_rows", [])),
+        "chase_filter_count": len(section_rows.get("chase_filter_rows", [])),
+        "buy_turn_filter_count": len(section_rows.get("buy_turn_filter_rows", [])),
+        "gap_setup_count": len(section_rows.get("gap_setup_rows", [])),
+        "pocket_pivot_count": len(section_rows.get("pocket_pivot_rows", [])),
+        "five_day_top_count": len(section_rows.get("five_day_top_rows", [])),
+    }
 
 
 def merge_shard_scan_rows(merge_dir: Path) -> list[dict[str, Any]]:
@@ -521,6 +1150,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dollar-floor-early", type=float, default=DEFAULT_DOLLAR_FLOOR_EARLY)
     parser.add_argument("--dollar-floor-mid", type=float, default=DEFAULT_DOLLAR_FLOOR_MID)
     parser.add_argument("--dollar-floor-late", type=float, default=DEFAULT_DOLLAR_FLOOR_LATE)
+    parser.add_argument("--summary-limit", type=int, default=DEFAULT_SUMMARY_LIMIT)
     return parser.parse_args()
 
 
@@ -534,14 +1164,46 @@ def main() -> None:
         merge_dir = Path(args.merge_dir)
         logger.info("Merging shards from %s", merge_dir)
         rows = merge_shard_scan_rows(merge_dir)
-        summary_text = format_telegram_summary(rows, run_at_kst, -1, scan_label=args.scan_label)
+        merge_stats = _merge_run_stats(merge_dir)
+        summary_limit = max(0, int(args.summary_limit))
+        section_rows = _build_premarket_summary_sections(rows, run_at_kst=run_at_kst)
+        prepared_rows = list(section_rows.get("prepared_rows", []))
+        section_counts = _premarket_section_counts(section_rows)
+        effective_universe_count = int(merge_stats.get("universe_count", 0) or 0) or len(prepared_rows)
+        summary_text = _render_premarket_summary(
+            section_rows=section_rows,
+            run_at_kst=run_at_kst,
+            universe_count=effective_universe_count,
+            skip_count=int(merge_stats.get("skip_count", 0) or 0),
+            scan_label=str(args.scan_label),
+            summary_limit=summary_limit,
+        )
 
         summary_path = out_dir / "premarket_summary.txt"
         summary_path.write_text(summary_text, encoding="utf-8")
         csv_path = out_dir / "premarket_results.csv"
-        df = pd.DataFrame(rows)
+        merged_json_path = out_dir / "scan_rows_merged.json"
+        merged_json_path.write_text(json.dumps(prepared_rows, ensure_ascii=False, indent=2), encoding="utf-8")
+        df = pd.DataFrame(prepared_rows)
         if not df.empty:
             df.to_csv(csv_path, index=False)
+        merge_meta_path = out_dir / "run_meta_merged.json"
+        merge_meta_payload = {
+            "run_at_kst": run_at_kst.isoformat(),
+            "scan_label": str(args.scan_label),
+            "merge_dir": str(merge_dir),
+            "universe_count": effective_universe_count,
+            "merged_row_count": len(prepared_rows),
+            "summary_limit": summary_limit,
+            "performance": {
+                "match_count": len(prepared_rows),
+                "skip_count": int(merge_stats.get("skip_count", 0) or 0),
+                "source_meta_count": int(merge_stats.get("meta_file_count", 0) or 0),
+                "source_shard_ticker_count": int(merge_stats.get("shard_ticker_count", 0) or 0),
+            },
+            **section_counts,
+        }
+        merge_meta_path.write_text(json.dumps(merge_meta_payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
         if not args.skip_telegram:
             token = str(os.getenv("TELEGRAM_BOT_TOKEN", "")).strip()
@@ -602,6 +1264,7 @@ def main() -> None:
         "shard_ticker_count": len(tickers),
         "min_dollar_volume": _safe_float(min_dollar_volume),
         "min_turnover_pct": _safe_float(min_turnover_pct),
+        "summary_limit": max(0, int(args.summary_limit)),
         "performance": scan_result.perf,
     }
     meta_path.write_text(json.dumps(meta_payload, ensure_ascii=False, indent=2), encoding="utf-8")

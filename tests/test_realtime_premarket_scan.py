@@ -1,6 +1,7 @@
 import unittest
 from datetime import datetime
 from pathlib import Path
+import sys
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
@@ -27,10 +28,56 @@ def _base_hist(rows: int = 60) -> pd.DataFrame:
 def _signal_frame(turn_col: str | None = None) -> pd.DataFrame:
     frame = _base_hist().copy()
     frame["MA20"] = frame["Close"] - 0.5
+    frame["MA50"] = frame["Close"] - 1.0
+    frame["MA120"] = frame["Close"] - 2.0
+    frame["MA200"] = frame["Close"] - 3.0
+    frame["EMA8"] = frame["Close"] - 0.2
+    frame["EMA21"] = frame["Close"] - 0.4
+    frame["EMA50"] = frame["Close"] - 0.8
+    frame["HMA"] = frame["Close"] - 0.1
+    frame["HMA60"] = frame["Close"] - 0.3
+    frame["HMA200"] = frame["Close"] - 0.6
     frame["Hull_Trend"] = "bullish"
     frame["New_52W_High"] = False
+    frame["New_52W_Closing_High"] = False
     frame["Ensemble_Score"] = 3.0
     frame["Judgment_Confidence"] = 5.0
+    frame["Judgment_Reason"] = "test"
+    frame["Trade_Judgment"] = "WATCH_BUY"
+    frame["Action_Label"] = "WATCH"
+    frame["Market_Context"] = 2.0
+    frame["Buy_Total"] = 3.0
+    frame["Sell_Total"] = 1.0
+    frame["Buy_Agree"] = 2.0
+    frame["Sell_Agree"] = 0.0
+    frame["ADX"] = 28.0
+    frame["Ichimoku_SenkouA"] = frame["Close"] - 2.0
+    frame["Ichimoku_SenkouB"] = frame["Close"] - 2.5
+    frame["Fib_Swing_High"] = frame["Close"] + 2.0
+    frame["Percent_B"] = 0.72
+    frame["ATR"] = 1.4
+    frame.iloc[-2, frame.columns.get_loc("ATR")] = 1.8
+    frame["Volume_Ratio_20"] = 1.6
+    frame["Volume_Ratio_50"] = 1.2
+    frame["Volume_Oscillator"] = 0.8
+    frame["Dollar_Volume_20"] = 1_500_000.0
+    frame["Volume_Surge"] = True
+    frame["Volume_Climax_Buy"] = False
+    frame["Volume_Climax_Sell"] = False
+    frame["OBV_Slope"] = 0.4
+    frame["CMF"] = 0.12
+    frame["VWAP"] = frame["Close"] - 0.4
+    frame["BB_Mid"] = frame["Close"] - 0.8
+    frame["BB_Up"] = frame["Close"] + 1.2
+    frame["Price_Channel_Up"] = frame["Close"] + 0.8
+    frame["RS_Ratio"] = 1.8
+    frame["NR7"] = False
+    frame["Inside_Day"] = False
+    frame["Three_Weeks_Tight"] = False
+    frame["Pocket_Pivot"] = False
+    frame["System_Turn_Bull"] = False
+    frame["Trend_Inflection_Bull"] = False
+    frame["EMA_Pullback_Buy"] = False
     frame["UTBot_Buy"] = False
     frame["UTBot_Sell"] = False
     frame["Hull_Turn_Bull"] = False
@@ -38,6 +85,80 @@ def _signal_frame(turn_col: str | None = None) -> pd.DataFrame:
     if turn_col:
         frame.loc[frame.index[-2], turn_col] = True
     return frame
+
+
+def _mock_strategy_payload() -> dict[str, object]:
+    return {
+        "summary": {
+            "conflict_level": "LOW",
+            "long_short_bias": "LONG",
+            "active_count": 1,
+            "top_strategy": None,
+        },
+        "visible_results": [{"id": "TREND_PULLBACK", "direction": "LONG"}],
+        "results": [{"id": "TREND_PULLBACK", "direction": "LONG"}],
+    }
+
+
+def _summary_row(run_at_kst: datetime, ticker: str, **overrides: object) -> dict[str, object]:
+    target_date = pm._last_us_market_session_date(run_at_kst).isoformat()
+    row: dict[str, object] = {
+        "ticker": ticker,
+        "price": 10.5,
+        "chg_value": 0.5,
+        "chg": 5.0,
+        "chg_5d": 6.0,
+        "scan_score": 180.0,
+        "es": 6.0,
+        "jg_key": "WATCH_BUY",
+        "volume_ratio_20": 0.7,
+        "volume_ratio_50": 1.1,
+        "volume_oscillator": 0.5,
+        "dollar_volume_20": 1_000_000.0,
+        "volume_bullish": True,
+        "volume_dry_up_score": 60.0,
+        "volume_expansion_score": 70.0,
+        "drawdown_from_20d_high_pct": -1.5,
+        "pullback_from_swing_high_pct": -4.0,
+        "pullback_ready": True,
+        "pullback_reentry": False,
+        "pullback_atr_multiple": 2.0,
+        "uptrend_persistent": True,
+        "bull_strength_recent": True,
+        "low_conflict_bullish": True,
+        "multi_buy": 4,
+        "bb_percent_b": 0.7,
+        "atr_contracting": True,
+        "adx": 28.0,
+        "hma20_slope_pct": 0.8,
+        "hma60_slope_pct": 0.4,
+        "cmf": 0.12,
+        "obv_slope": 0.45,
+        "ichimoku_above_cloud": True,
+        "utbot_buy_recent": True,
+        "utbot_buy_last_date": target_date,
+        "days_since_utbot_buy": 1,
+        "hull_turn_bull_recent": False,
+        "hull_turn_bull_last_date": "없음",
+        "hull_turn_bear_recent": False,
+        "hull_turn_bear_last_date": "없음",
+        "utbot_sell_recent": False,
+        "bull_turn_recent": True,
+        "latest_bar_date": target_date,
+        "new_52w_high": True,
+        "pm_close": 10.6,
+        "pm_vwap": 10.1,
+        "change_pct": 1.5,
+        "effective_dollar_volume": 300_000.0,
+        "mcap_turnover_pct": 0.015,
+        "pm_volume_source": "tradingview",
+        "ret20_pct": 22.0,
+        "ret60_pct": 30.0,
+        "ret120_pct": 40.0,
+        "rs_ratio": 1.9,
+    }
+    row.update(overrides)
+    return row
 
 
 class RealtimePremarketScanTests(unittest.TestCase):
@@ -64,6 +185,8 @@ class RealtimePremarketScanTests(unittest.TestCase):
             pm, "compute_indicators", return_value=hist
         ), patch.object(pm, "detect_all_signals", return_value=signal), patch.object(
             pm, "_ensure_runtime_combo_registry", return_value=None
+        ), patch.object(
+            pm, "build_strategy_payload", return_value=_mock_strategy_payload()
         ):
             payload = pm._build_pm_scanner_row(
                 "AAPL",
@@ -81,6 +204,54 @@ class RealtimePremarketScanTests(unittest.TestCase):
         self.assertEqual(row["dollar_volume"], row["effective_dollar_volume"])
         self.assertEqual(row["mcap_ratio"], row["mcap_turnover_pct"])
         self.assertEqual(row["group"], "G2_BUY_TURN")
+
+    def test_build_pm_scanner_row_populates_post_close_compatible_fields_and_pm_flags(self):
+        hist = _base_hist()
+        signal = _signal_frame("UTBot_Buy")
+        metrics = {
+            "pm_open": 100.0,
+            "pm_high": 103.0,
+            "pm_low": 99.5,
+            "pm_close": 102.0,
+            "pm_vwap": 101.2,
+            "prev_close": 100.0,
+            "prev_high": 101.0,
+            "gap_pct": 2.0,
+            "change_pct": 2.0,
+            "market_cap": 2_000_000_000.0,
+            "pm_volume_yf": 10_000.0,
+            "pm_volume_tv": 0.0,
+            "pm_volume_effective": 10_000.0,
+            "pm_volume_source": "yfinance",
+        }
+        with patch.object(pm, "fetch_and_synthesize_daily", return_value=(hist, dict(metrics))), patch.object(
+            pm, "compute_indicators", return_value=hist
+        ), patch.object(pm, "detect_all_signals", return_value=signal), patch.object(
+            pm, "_ensure_runtime_combo_registry", return_value=None
+        ), patch.object(
+            pm, "build_strategy_payload", return_value=_mock_strategy_payload()
+        ):
+            payload = pm._build_pm_scanner_row(
+                "NVDA",
+                "default",
+                min_dollar_volume=1_000.0,
+                min_turnover_pct=0.001,
+                tv_volume=0.0,
+            )
+
+        self.assertTrue(payload.get("ok"))
+        row = payload["row"]
+        self.assertIn("scan_score", row)
+        self.assertIn("chg_5d", row)
+        self.assertIn("latest_bar_date", row)
+        self.assertIn("pullback_reentry", row)
+        self.assertIn("multi_buy", row)
+        self.assertIn("volume_ratio_20", row)
+        self.assertIn("cmf", row)
+        self.assertIn("obv_slope", row)
+        self.assertTrue(row["pm_supports_bullish"])
+        self.assertFalse(row["pm_supports_bearish"])
+        self.assertIn("PM +2.00%", row["pm_tag"])
 
     def test_zero_dollar_volume_cannot_pass_buy_or_pullback_groups(self):
         hist = _base_hist()
@@ -155,6 +326,159 @@ class RealtimePremarketScanTests(unittest.TestCase):
         ]
         ranked = sorted(rows, key=pm._group_sort_key)
         self.assertEqual([row["ticker"] for row in ranked], ["BBB", "CCC", "AAA"])
+
+    def test_build_premarket_summary_sections_filters_bullish_rows_when_pm_contradicts(self):
+        run_at_kst = datetime(2026, 4, 21, 21, 0, 0, tzinfo=ZoneInfo("Asia/Seoul"))
+        rows = [
+            _summary_row(run_at_kst, "GOOD", chg_5d=12.0, rs_ratio=2.0, ret20_pct=25.0),
+            _summary_row(
+                run_at_kst,
+                "BAD",
+                chg_5d=11.0,
+                rs_ratio=1.9,
+                ret20_pct=24.0,
+                pm_close=9.6,
+                pm_vwap=10.1,
+                change_pct=-2.5,
+            ),
+            _summary_row(
+                run_at_kst,
+                "WEAK",
+                chg_5d=1.0,
+                rs_ratio=0.5,
+                ret20_pct=1.0,
+                volume_ratio_20=1.4,
+                volume_dry_up_score=0.0,
+                drawdown_from_20d_high_pct=-12.0,
+                bb_percent_b=0.2,
+                atr_contracting=False,
+                adx=10.0,
+                hma20_slope_pct=0.0,
+                cmf=0.0,
+                ichimoku_above_cloud=False,
+            ),
+        ]
+
+        section_rows = pm._build_premarket_summary_sections(rows, run_at_kst=run_at_kst)
+
+        self.assertEqual([row["ticker"] for row in section_rows["gap_setup_rows"]], ["GOOD"])
+        self.assertEqual([row["ticker"] for row in section_rows["five_day_top_rows"]], ["GOOD", "WEAK"])
+
+    def test_build_premarket_summary_sections_keeps_only_bearish_support_in_hull_bear(self):
+        run_at_kst = datetime(2026, 4, 21, 21, 0, 0, tzinfo=ZoneInfo("Asia/Seoul"))
+        target_date = pm._last_us_market_session_date(run_at_kst).isoformat()
+        rows = [
+            _summary_row(
+                run_at_kst,
+                "BEAR",
+                hull_turn_bear_last_date=target_date,
+                pm_close=9.7,
+                pm_vwap=10.0,
+                change_pct=-0.8,
+            ),
+            _summary_row(
+                run_at_kst,
+                "BULL",
+                hull_turn_bear_last_date=target_date,
+                pm_close=10.8,
+                pm_vwap=10.0,
+                change_pct=1.1,
+            ),
+        ]
+
+        section_rows = pm._build_premarket_summary_sections(rows, run_at_kst=run_at_kst)
+
+        self.assertEqual([row["ticker"] for row in section_rows["legacy_hull_bear_rows"]], ["BEAR"])
+
+    def test_format_telegram_summary_uses_ten_sections_and_combines_pm_tag(self):
+        run_at_kst = datetime(2026, 4, 21, 21, 0, 0, tzinfo=ZoneInfo("Asia/Seoul"))
+        target_date = pm._last_us_market_session_date(run_at_kst).isoformat()
+        rows = [
+            _summary_row(run_at_kst, "ALFA", utbot_buy_last_date=target_date, chg_5d=13.5, rs_ratio=2.1, ret20_pct=26.0),
+            _summary_row(
+                run_at_kst,
+                "BETA",
+                hull_turn_bear_last_date=target_date,
+                pm_close=9.6,
+                pm_vwap=10.1,
+                change_pct=-1.4,
+                chg_5d=-2.0,
+                new_52w_high=False,
+                bull_strength_recent=False,
+                uptrend_persistent=False,
+            ),
+        ]
+
+        summary = pm.format_telegram_summary(
+            rows,
+            run_at_kst,
+            universe_count=50,
+            skip_count=7,
+            scan_label="프리마켓 21시 실시간 스캔",
+            summary_limit=30,
+        )
+
+        self.assertIn("[1/10] 매수전환 (이전버전)", summary)
+        self.assertIn("[8/10] 에너지 압축 → 돌파 임박", summary)
+        self.assertIn("[10/10] 5일 변동률 상위종목", summary)
+        self.assertIn("요약 인덱스:", summary)
+        self.assertIn("PM +1.50% | VWAP상", summary)
+        self.assertIn("GAP", summary)
+        self.assertIn("5일 +13.50%", summary)
+
+    def test_parse_args_summary_limit_defaults_to_30(self):
+        with patch.object(sys, "argv", ["realtime_premarket_scan"]):
+            args = pm.parse_args()
+        self.assertEqual(args.summary_limit, 30)
+
+    def test_summary_limit_truncates_section_rows(self):
+        run_at_kst = datetime(2026, 4, 21, 21, 0, 0, tzinfo=ZoneInfo("Asia/Seoul"))
+        rows = [
+            _summary_row(
+                run_at_kst,
+                f"T{index:02d}",
+                chg_5d=50.0 - index,
+                volume_ratio_20=1.2,
+                volume_dry_up_score=0.0,
+                volume_expansion_score=0.0,
+                drawdown_from_20d_high_pct=-12.0,
+                bb_percent_b=0.2,
+                atr_contracting=False,
+                adx=10.0,
+                hma20_slope_pct=0.0,
+                cmf=0.0,
+                obv_slope=0.0,
+                ichimoku_above_cloud=False,
+                utbot_buy_recent=False,
+                utbot_buy_last_date="없음",
+                days_since_utbot_buy=99,
+                pullback_from_swing_high_pct=-20.0,
+                pullback_ready=False,
+                low_conflict_bullish=False,
+                multi_buy=0,
+                uptrend_persistent=False,
+                bull_strength_recent=False,
+                volume_bullish=False,
+                new_52w_high=False,
+                rs_ratio=0.1 + (index * 0.001),
+                ret20_pct=1.0 + (index * 0.01),
+            )
+            for index in range(35)
+        ]
+
+        summary = pm.format_telegram_summary(
+            rows,
+            run_at_kst,
+            universe_count=35,
+            skip_count=0,
+            scan_label="프리마켓 21시 실시간 스캔",
+            summary_limit=30,
+        )
+
+        self.assertIn("건수: 30개", summary)
+        self.assertIn("T00", summary)
+        self.assertIn("T29", summary)
+        self.assertNotIn("T30", summary)
 
     def test_pre_market_workflow_uses_realtime_script_without_prev_scan_dependency(self):
         workflow_path = Path(".github/workflows/pre_market_scan.yml")
