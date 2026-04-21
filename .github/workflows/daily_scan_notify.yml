@@ -2,7 +2,8 @@ name: Daily Scan Notify
 
 on:
   schedule:
-    - cron: "5 20 * * 1-5"
+    # US/Eastern 16:05 = UTC 20:05(EDT) / 21:05(EST)
+    - cron: "5 20,21 * * 1-5"
   workflow_dispatch:
 
 concurrency:
@@ -10,9 +11,37 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  schedule_guard:
+    name: schedule-guard
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.guard.outputs.should_run }}
+      eastern_now: ${{ steps.guard.outputs.eastern_now }}
+    steps:
+      - name: Resolve US/Eastern window
+        id: guard
+        shell: bash
+        run: |
+          python - <<'PY'
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          import os
+
+          now = datetime.now(ZoneInfo("US/Eastern"))
+          should_run = os.getenv("GITHUB_EVENT_NAME") != "schedule" or now.hour == 16
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
+              handle.write(f"should_run={'true' if should_run else 'false'}\n")
+              handle.write(f"eastern_now={now.isoformat()}\n")
+
+          print(f"event={os.getenv('GITHUB_EVENT_NAME')} eastern_now={now.isoformat()} should_run={should_run}")
+          PY
+
   market_briefing_notify:
     name: market-briefing-notify
     runs-on: ubuntu-latest
+    needs: schedule_guard
+    if: ${{ needs.schedule_guard.outputs.should_run == 'true' }}
     continue-on-error: true
     timeout-minutes: 60
     env:
@@ -51,8 +80,10 @@ jobs:
   scan_shard:
     name: scan-shard-${{ matrix.shard_index }}
     runs-on: ubuntu-latest
-    needs: market_briefing_notify
-    if: ${{ always() }}
+    needs:
+      - schedule_guard
+      - market_briefing_notify
+    if: ${{ always() && needs.schedule_guard.outputs.should_run == 'true' }}
     timeout-minutes: 90
     strategy:
       fail-fast: false
@@ -94,8 +125,10 @@ jobs:
     name: merge-and-notify
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    needs: scan_shard
-    if: ${{ always() }}
+    needs:
+      - schedule_guard
+      - scan_shard
+    if: ${{ always() && needs.schedule_guard.outputs.should_run == 'true' }}
     env:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -139,9 +172,10 @@ jobs:
     name: extended-scan-shard-${{ matrix.shard_index }}
     runs-on: ubuntu-latest
     needs:
+      - schedule_guard
       - market_briefing_notify
       - merge_and_notify
-    if: ${{ always() }}
+    if: ${{ always() && needs.schedule_guard.outputs.should_run == 'true' }}
     timeout-minutes: 90
     strategy:
       fail-fast: false
@@ -184,8 +218,10 @@ jobs:
     name: extended-merge-and-notify
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    needs: extended_scan_shard
-    if: ${{ always() }}
+    needs:
+      - schedule_guard
+      - extended_scan_shard
+    if: ${{ always() && needs.schedule_guard.outputs.should_run == 'true' }}
     env:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

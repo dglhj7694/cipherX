@@ -2,8 +2,8 @@ name: Pre-Market Scan (21:00 KST)
 
 on:
   schedule:
-    # KST 21:00 = UTC 12:00 (월~금)
-    - cron: "0 12 * * 1-5"
+    # US/Eastern 07:00 = UTC 11:00(EDT) / 12:00(EST)
+    - cron: "0 11,12 * * 1-5"
   workflow_dispatch:
 
 concurrency:
@@ -11,9 +11,37 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  schedule_guard:
+    name: schedule-guard
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.guard.outputs.should_run }}
+      eastern_now: ${{ steps.guard.outputs.eastern_now }}
+    steps:
+      - name: Resolve US/Eastern window
+        id: guard
+        shell: bash
+        run: |
+          python - <<'PY'
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          import os
+
+          now = datetime.now(ZoneInfo("US/Eastern"))
+          should_run = os.getenv("GITHUB_EVENT_NAME") != "schedule" or now.hour == 7
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
+              handle.write(f"should_run={'true' if should_run else 'false'}\n")
+              handle.write(f"eastern_now={now.isoformat()}\n")
+
+          print(f"event={os.getenv('GITHUB_EVENT_NAME')} eastern_now={now.isoformat()} should_run={should_run}")
+          PY
+
   pre_market_shard:
     name: pre-market-shard-${{ matrix.shard_index }}
     runs-on: ubuntu-latest
+    needs: schedule_guard
+    if: ${{ needs.schedule_guard.outputs.should_run == 'true' }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -56,7 +84,10 @@ jobs:
     name: pre-market-merge-and-notify
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: pre_market_shard
+    needs:
+      - schedule_guard
+      - pre_market_shard
+    if: ${{ always() && needs.schedule_guard.outputs.should_run == 'true' }}
     env:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
