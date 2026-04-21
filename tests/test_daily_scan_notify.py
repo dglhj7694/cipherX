@@ -28,6 +28,7 @@ from scripts.daily_scan_and_notify import (
     select_post_close_gap_setup_rows_for_telegram,
     select_post_close_pocket_pivot_rows_for_telegram,
     select_post_close_pullback_rows_for_telegram,
+    select_post_close_top_5d_rows_for_telegram,
     select_pullback_reentry_rows_for_telegram,
     select_us_session_52w_high_rows,
     select_us_session_hull_bear_rows,
@@ -447,9 +448,9 @@ class DailyScanNotifyTests(unittest.TestCase):
         self.assertFalse(scored[2]["gap_setup_candidate"])
         self.assertFalse(scored[2]["pocket_pivot_candidate"])
 
-    def test_select_post_close_gap_setup_rows_for_telegram_uses_gate_and_top20(self):
+    def test_select_post_close_gap_setup_rows_for_telegram_uses_gate_and_top30(self):
         rows = []
-        for idx in range(25):
+        for idx in range(35):
             rows.append(
                 {
                     "ticker": f"G{idx:03d}",
@@ -494,14 +495,18 @@ class DailyScanNotifyTests(unittest.TestCase):
         )
 
         selected = select_post_close_gap_setup_rows_for_telegram(_with_post_close_setup_scores(rows))
-        self.assertEqual(len(selected), 20)
-        self.assertEqual(selected[0]["ticker"], "G024")
+        self.assertEqual(len(selected), 30)
+        self.assertEqual(selected[0]["ticker"], "G034")
+        self.assertEqual(selected[-1]["ticker"], "G005")
         self.assertNotIn("BAD", [row["ticker"] for row in selected])
-        self.assertIn("GAP 11/11 | G5/5", selected[0]["gap_setup_tag"])
+        self.assertEqual(
+            selected[0]["gap_setup_tag"],
+            "GAP 11/11 | G5/5 | 거래량건조, 20일고점근접, 상대강도, 밴드압축, 추세강도, HMA상승",
+        )
 
-    def test_select_post_close_pocket_pivot_rows_for_telegram_uses_gate_and_top20(self):
+    def test_select_post_close_pocket_pivot_rows_for_telegram_uses_gate_and_top30(self):
         rows = []
-        for idx in range(25):
+        for idx in range(35):
             rows.append(
                 {
                     "ticker": f"P{idx:03d}",
@@ -546,10 +551,41 @@ class DailyScanNotifyTests(unittest.TestCase):
         )
 
         selected = select_post_close_pocket_pivot_rows_for_telegram(_with_post_close_setup_scores(rows))
-        self.assertEqual(len(selected), 20)
-        self.assertEqual(selected[0]["ticker"], "P024")
+        self.assertEqual(len(selected), 30)
+        self.assertEqual(selected[0]["ticker"], "P034")
+        self.assertEqual(selected[-1]["ticker"], "P005")
         self.assertNotIn("BAD", [row["ticker"] for row in selected])
-        self.assertIn("PP 12/12 | G5/5", selected[0]["pocket_pivot_tag"])
+        self.assertEqual(
+            selected[0]["pocket_pivot_tag"],
+            "PP 12/12 | G5/5 | 거래량팽창, 20일대비1.5배, UT최근3일, 멀티매수4+, 눌림8%이내, OBV상승",
+        )
+
+    def test_select_post_close_top_5d_rows_for_telegram_uses_positive_only_and_top30(self):
+        rows = []
+        for idx in range(35):
+            rows.append(
+                {
+                    "ticker": f"F{idx:03d}",
+                    "chg_5d": float(idx + 1),
+                    "scan_score": float(100 - idx),
+                    "es": 5.0,
+                }
+            )
+        rows.extend(
+            [
+                {"ticker": "ZERO", "chg_5d": 0.0, "scan_score": 999.0, "es": 9.0},
+                {"ticker": "NEG", "chg_5d": -4.0, "scan_score": 999.0, "es": 9.0},
+            ]
+        )
+
+        selected = select_post_close_top_5d_rows_for_telegram(rows)
+
+        self.assertEqual(len(selected), 30)
+        self.assertEqual(selected[0]["ticker"], "F034")
+        self.assertEqual(selected[-1]["ticker"], "F005")
+        self.assertNotIn("ZERO", [row["ticker"] for row in selected])
+        self.assertNotIn("NEG", [row["ticker"] for row in selected])
+        self.assertEqual(selected[0]["five_day_top_tag"], "5일 +35.00%")
 
     def test_select_us_session_hull_bear_rows(self):
         rows = [
@@ -737,7 +773,7 @@ class DailyScanNotifyTests(unittest.TestCase):
         p4 = joined.index("=== [4/4] 52주 신고가 갱신 ===")
         self.assertTrue(p1 < p2 < p3 < p4)
 
-    def test_build_post_close_transition_summary_uses_nine_ordered_sections(self):
+    def test_build_post_close_transition_summary_uses_ten_ordered_sections(self):
         base_row = {
             "ticker": "AAA",
             "chg_value": 1.0,
@@ -747,9 +783,12 @@ class DailyScanNotifyTests(unittest.TestCase):
             "transition_signals": ["UTBot Buy"],
         }
         gap_row = dict(base_row)
-        gap_row["gap_setup_tag"] = "GAP 8/11 | G4/5 | DryUp, RS, BB"
+        gap_row["gap_setup_tag"] = "GAP 8/11 | G4/5 | 거래량건조, 상대강도, 밴드압축"
         pocket_row = dict(base_row)
-        pocket_row["pocket_pivot_tag"] = "PP 9/12 | G4/5 | VolExp, UT<=3"
+        pocket_row["pocket_pivot_tag"] = "PP 9/12 | G4/5 | 거래량팽창, UT최근3일"
+        five_day_row = dict(base_row)
+        five_day_row["five_day_top_tag"] = "5일 +12.34%"
+        five_day_row["chg_5d"] = 12.34
         summary = build_post_close_transition_summary(
             [dict(base_row)],
             run_at_kst=datetime(2026, 4, 17, 6, 15, 0),
@@ -766,23 +805,28 @@ class DailyScanNotifyTests(unittest.TestCase):
             buy_turn_filter_rows=[dict(base_row)],
             gap_setup_rows=[gap_row],
             pocket_pivot_rows=[pocket_row],
+            five_day_top_rows=[five_day_row],
         )
+        self.assertIn("대상 미국 세션일:", summary)
+        self.assertIn("유니버스: 1200", summary)
+        self.assertIn("스캔 결과: 980 | 제외: 220", summary)
         self.assertIn(
-            "Summary Index: LegacyTurn 1 | LegacyPullback 1 | LegacyHullBear 1 | Legacy52WHigh 1 | PullbackFilter 1 | ChaseFilter 1 | BuyTurnFilter 1 | GapSetup 1 | PocketPivot 1",
+            "요약 인덱스: 매수전환(이전버전) 1 | 눌림 재진입(이전버전) 1 | HULL 매도전환(이전버전) 1 | 52주 신고가(이전버전) 1 | 눌림목 필터 1 | 추세추종 필터 1 | 매수전환 필터 1 | 에너지 압축 → 돌파 임박 1 | 기관 매집 포착 1 | 5일 변동률 상위종목 1",
             summary,
         )
-        p1 = summary.index("=== [1/9] Legacy Turn ===")
-        p2 = summary.index("=== [2/9] Legacy Pullback Reentry ===")
-        p3 = summary.index("=== [3/9] Legacy Hull Bear ===")
-        p4 = summary.index("=== [4/9] Legacy 52W High ===")
-        p5 = summary.index("=== [5/9] Pullback Filter ===")
-        p6 = summary.index("=== [6/9] Chase Filter ===")
-        p7 = summary.index("=== [7/9] Buy Turn Filter ===")
-        p8 = summary.index("=== [8/9] Gap Setup ===")
-        p9 = summary.index("=== [9/9] Pocket Pivot ===")
-        self.assertTrue(p1 < p2 < p3 < p4 < p5 < p6 < p7 < p8 < p9)
+        p1 = summary.index("=== [1/10] 매수전환 (이전버전) ===")
+        p2 = summary.index("=== [2/10] 눌림 재진입 (이전버전) ===")
+        p3 = summary.index("=== [3/10] HULL 매도전환 (이전버전) ===")
+        p4 = summary.index("=== [4/10] 52주 신고가 (이전버전) ===")
+        p5 = summary.index("=== [5/10] 눌림목 필터 ===")
+        p6 = summary.index("=== [6/10] 추세추종 필터 ===")
+        p7 = summary.index("=== [7/10] 매수전환 필터 ===")
+        p8 = summary.index("=== [8/10] 에너지 압축 → 돌파 임박 ===")
+        p9 = summary.index("=== [9/10] 기관 매집 포착 ===")
+        p10 = summary.index("=== [10/10] 5일 변동률 상위종목 ===")
+        self.assertTrue(p1 < p2 < p3 < p4 < p5 < p6 < p7 < p8 < p9 < p10)
 
-    def test_split_telegram_message_text_preserves_section_boundaries_for_nine_sections(self):
+    def test_split_telegram_message_text_preserves_section_boundaries_for_ten_sections(self):
         base_row = {
             "ticker": "AAA",
             "chg_value": 1.0,
@@ -800,11 +844,17 @@ class DailyScanNotifyTests(unittest.TestCase):
         pocket_rows = []
         for i, row in enumerate(rows):
             gap_row = dict(row)
-            gap_row["gap_setup_tag"] = f"GAP 8/11 | G4/5 | Hit{i}"
+            gap_row["gap_setup_tag"] = f"GAP 8/11 | G4/5 | 거래량건조{i}"
             gap_rows.append(gap_row)
             pocket_row = dict(row)
-            pocket_row["pocket_pivot_tag"] = f"PP 9/12 | G4/5 | Hit{i}"
+            pocket_row["pocket_pivot_tag"] = f"PP 9/12 | G4/5 | 기관매집{i}"
             pocket_rows.append(pocket_row)
+        five_day_rows = []
+        for i, row in enumerate(rows):
+            five_day_row = dict(row)
+            five_day_row["five_day_top_tag"] = f"5일 +{20.0 - (i / 10.0):.2f}%"
+            five_day_row["chg_5d"] = 20.0 - (i / 10.0)
+            five_day_rows.append(five_day_row)
 
         summary = build_post_close_transition_summary(
             rows,
@@ -822,22 +872,24 @@ class DailyScanNotifyTests(unittest.TestCase):
             buy_turn_filter_rows=rows,
             gap_setup_rows=gap_rows,
             pocket_pivot_rows=pocket_rows,
+            five_day_top_rows=five_day_rows,
         )
         chunks = split_telegram_message_text(summary, chunk_size=500)
         self.assertGreater(len(chunks), 1)
         self.assertTrue(all(len(chunk) <= 500 for chunk in chunks))
 
         joined = "\n".join(chunks)
-        p1 = joined.index("=== [1/9] Legacy Turn ===")
-        p2 = joined.index("=== [2/9] Legacy Pullback Reentry ===")
-        p3 = joined.index("=== [3/9] Legacy Hull Bear ===")
-        p4 = joined.index("=== [4/9] Legacy 52W High ===")
-        p5 = joined.index("=== [5/9] Pullback Filter ===")
-        p6 = joined.index("=== [6/9] Chase Filter ===")
-        p7 = joined.index("=== [7/9] Buy Turn Filter ===")
-        p8 = joined.index("=== [8/9] Gap Setup ===")
-        p9 = joined.index("=== [9/9] Pocket Pivot ===")
-        self.assertTrue(p1 < p2 < p3 < p4 < p5 < p6 < p7 < p8 < p9)
+        p1 = joined.index("=== [1/10] 매수전환 (이전버전) ===")
+        p2 = joined.index("=== [2/10] 눌림 재진입 (이전버전) ===")
+        p3 = joined.index("=== [3/10] HULL 매도전환 (이전버전) ===")
+        p4 = joined.index("=== [4/10] 52주 신고가 (이전버전) ===")
+        p5 = joined.index("=== [5/10] 눌림목 필터 ===")
+        p6 = joined.index("=== [6/10] 추세추종 필터 ===")
+        p7 = joined.index("=== [7/10] 매수전환 필터 ===")
+        p8 = joined.index("=== [8/10] 에너지 압축 → 돌파 임박 ===")
+        p9 = joined.index("=== [9/10] 기관 매집 포착 ===")
+        p10 = joined.index("=== [10/10] 5일 변동률 상위종목 ===")
+        self.assertTrue(p1 < p2 < p3 < p4 < p5 < p6 < p7 < p8 < p9 < p10)
 
     def test_split_tickers_for_shard_union_and_no_overlap(self):
         tickers = [self._alpha_symbol(i) for i in range(300)]

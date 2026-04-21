@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import date, datetime, time as dt_time, timedelta
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any, Callable, Iterable, Mapping
 from zoneinfo import ZoneInfo
 
 import requests
@@ -156,9 +156,63 @@ POST_CLOSE_LATEST_SESSION_FIELD_SPECS: tuple[dict[str, str], ...] = (
     {"group": "setup", "key": "pocket_pivot_candidate", "label": "PocketPivotCandidate", "type": "bool", "description": "Pocket pivot candidate gate", "rule": "pocket_pivot_gate_count >= 3", "example": "Y"},
 )
 
-POST_CLOSE_SETUP_TOP_N = 20
+POST_CLOSE_SETUP_TOP_N = 30
 GAP_SETUP_MAX_SCORE = 11
 POCKET_PIVOT_MAX_SCORE = 12
+POST_CLOSE_SUMMARY_SECTION_TOTAL = 10
+POST_CLOSE_SECTION_TITLES = {
+    "legacy_turn": "매수전환 (이전버전)",
+    "legacy_pullback": "눌림 재진입 (이전버전)",
+    "legacy_hull_bear": "HULL 매도전환 (이전버전)",
+    "legacy_52w_high": "52주 신고가 (이전버전)",
+    "pullback_filter": "눌림목 필터",
+    "chase_filter": "추세추종 필터",
+    "buy_turn_filter": "매수전환 필터",
+    "gap_setup": "에너지 압축 → 돌파 임박",
+    "pocket_pivot": "기관 매집 포착",
+    "five_day_top": "5일 변동률 상위종목",
+}
+POST_CLOSE_INDEX_TITLES = {
+    "legacy_turn": "매수전환(이전버전)",
+    "legacy_pullback": "눌림 재진입(이전버전)",
+    "legacy_hull_bear": "HULL 매도전환(이전버전)",
+    "legacy_52w_high": "52주 신고가(이전버전)",
+    "pullback_filter": "눌림목 필터",
+    "chase_filter": "추세추종 필터",
+    "buy_turn_filter": "매수전환 필터",
+    "gap_setup": "에너지 압축 → 돌파 임박",
+    "pocket_pivot": "기관 매집 포착",
+    "five_day_top": "5일 변동률 상위종목",
+}
+GAP_SETUP_HIT_LABELS = {
+    "DryUp": "거래량건조",
+    "20D": "20일고점근접",
+    "RS": "상대강도",
+    "BB": "밴드압축",
+    "ADX": "추세강도",
+    "HMA": "HMA상승",
+    "CMF": "자금유입",
+    "Cloud": "구름상단",
+    "NR7": "NR7",
+    "Inside": "인사이드",
+    "3WT": "3주타이트",
+    "Tight3": "3일타이트",
+    "52W<2%": "52주고점-2%",
+    "WUp": "주간상승",
+}
+POCKET_PIVOT_HIT_LABELS = {
+    "VolExp": "거래량팽창",
+    "Vol1.5x": "20일대비1.5배",
+    "UT<=3": "UT최근3일",
+    "MB4": "멀티매수4+",
+    "PB<8%": "눌림8%이내",
+    "OBV": "OBV상승",
+    "CMF": "자금유입",
+    "Cloud": "구름상단",
+    "NR7": "NR7",
+    "Inside": "인사이드",
+    "WUp": "주간상승",
+}
 
 
 @dataclass
@@ -1617,16 +1671,38 @@ def _setup_sort_key(row: Mapping[str, Any], *, score_key: str, gate_key: str) ->
     )
 
 
-def _format_setup_hit_summary(core_hits: Iterable[Any], quality_hits: Iterable[Any], *, max_items: int = 6) -> str:
+def _translate_gap_setup_hit_label(label: Any) -> str:
+    text = str(label or "").strip()
+    return GAP_SETUP_HIT_LABELS.get(text, text)
+
+
+def _translate_pocket_pivot_hit_label(label: Any) -> str:
+    text = str(label or "").strip()
+    up_match = re.fullmatch(r"Up(\d+)", text)
+    if up_match:
+        return f"연속상승{up_match.group(1)}"
+    pivot_match = re.fullmatch(r"PP(\d+)", text)
+    if pivot_match:
+        return f"포켓피벗{pivot_match.group(1)}일"
+    return POCKET_PIVOT_HIT_LABELS.get(text, text)
+
+
+def _format_setup_hit_summary(
+    core_hits: Iterable[Any],
+    quality_hits: Iterable[Any],
+    *,
+    max_items: int = 6,
+    label_mapper: Callable[[Any], str] | None = None,
+) -> str:
     labels: list[str] = []
     for label in list(core_hits or []):
-        text = str(label or "").strip()
+        text = str(label_mapper(label) if label_mapper is not None else label or "").strip()
         if text and text not in labels:
             labels.append(text)
         if len(labels) >= max_items:
             return ", ".join(labels)
     for label in list(quality_hits or []):
-        text = str(label or "").strip()
+        text = str(label_mapper(label) if label_mapper is not None else label or "").strip()
         if text and text not in labels:
             labels.append(text)
         if len(labels) >= max_items:
@@ -1750,7 +1826,11 @@ def select_post_close_gap_setup_rows_for_telegram(rows: Iterable[Mapping[str, An
         row_dict = dict(row or {})
         if not _coerce_bool(row_dict.get("gap_setup_candidate", False)):
             continue
-        hit_summary = _format_setup_hit_summary(row_dict.get("gap_setup_hits"), row_dict.get("gap_setup_quality_hits"))
+        hit_summary = _format_setup_hit_summary(
+            row_dict.get("gap_setup_hits"),
+            row_dict.get("gap_setup_quality_hits"),
+            label_mapper=_translate_gap_setup_hit_label,
+        )
         row_dict["gap_setup_tag"] = (
             f"GAP {int(_safe_float(row_dict.get('gap_setup_score', 0))):d}/{GAP_SETUP_MAX_SCORE}"
             f" | G{int(_safe_float(row_dict.get('gap_setup_gate_count', 0))):d}/5"
@@ -1767,7 +1847,11 @@ def select_post_close_pocket_pivot_rows_for_telegram(rows: Iterable[Mapping[str,
         row_dict = dict(row or {})
         if not _coerce_bool(row_dict.get("pocket_pivot_candidate", False)):
             continue
-        hit_summary = _format_setup_hit_summary(row_dict.get("pocket_pivot_hits"), row_dict.get("pocket_pivot_quality_hits"))
+        hit_summary = _format_setup_hit_summary(
+            row_dict.get("pocket_pivot_hits"),
+            row_dict.get("pocket_pivot_quality_hits"),
+            label_mapper=_translate_pocket_pivot_hit_label,
+        )
         row_dict["pocket_pivot_tag"] = (
             f"PP {int(_safe_float(row_dict.get('pocket_pivot_score', 0))):d}/{POCKET_PIVOT_MAX_SCORE}"
             f" | G{int(_safe_float(row_dict.get('pocket_pivot_gate_count', 0))):d}/5"
@@ -1775,6 +1859,26 @@ def select_post_close_pocket_pivot_rows_for_telegram(rows: Iterable[Mapping[str,
         )
         selected.append(row_dict)
     selected.sort(key=lambda row: _setup_sort_key(row, score_key="pocket_pivot_score", gate_key="pocket_pivot_gate_count"))
+    return selected[:POST_CLOSE_SETUP_TOP_N]
+
+
+def select_post_close_top_5d_rows_for_telegram(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    selected: list[dict[str, Any]] = []
+    for row in rows or []:
+        row_dict = dict(row or {})
+        chg_5d = _safe_float(row_dict.get("chg_5d", 0.0))
+        if chg_5d <= 0.0:
+            continue
+        row_dict["five_day_top_tag"] = f"5일 {chg_5d:+.2f}%"
+        selected.append(row_dict)
+    selected.sort(
+        key=lambda row: (
+            -_safe_float(row.get("chg_5d", 0.0)),
+            -_safe_float(row.get("scan_score", 0.0)),
+            -_safe_float(row.get("es", 0.0)),
+            str(row.get("ticker", "")),
+        )
+    )
     return selected[:POST_CLOSE_SETUP_TOP_N]
 
 
@@ -1987,6 +2091,7 @@ def build_post_close_transition_summary(
     buy_turn_filter_rows: Iterable[Mapping[str, Any]] | None = None,
     gap_setup_rows: Iterable[Mapping[str, Any]] | None = None,
     pocket_pivot_rows: Iterable[Mapping[str, Any]] | None = None,
+    five_day_top_rows: Iterable[Mapping[str, Any]] | None = None,
 ) -> str:
     buy_rows = [dict(row or {}) for row in (turn_rows or [])]
     pullback_rows_list = [dict(row or {}) for row in (pullback_rows or [])]
@@ -1997,26 +2102,28 @@ def build_post_close_transition_summary(
     buy_turn_filter_rows_list = [dict(row or {}) for row in (buy_turn_filter_rows or [])]
     gap_setup_rows_list = [dict(row or {}) for row in (gap_setup_rows or [])]
     pocket_pivot_rows_list = [dict(row or {}) for row in (pocket_pivot_rows or [])]
+    five_day_top_rows_list = [dict(row or {}) for row in (five_day_top_rows or [])]
     detected_count = len(buy_rows) if detected_turn_count is None else max(0, int(detected_turn_count))
     target_us_session_date = _resolve_target_session_date(run_at_kst, "post_close")
 
     index_line = (
-        f"- Summary Index: LegacyTurn {len(buy_rows)}"
-        f" | LegacyPullback {len(pullback_rows_list)}"
-        f" | LegacyHullBear {len(hull_bear_rows_list)}"
-        f" | Legacy52WHigh {len(high_52w_rows_list)}"
-        f" | PullbackFilter {len(pullback_filter_rows_list)}"
-        f" | ChaseFilter {len(chase_filter_rows_list)}"
-        f" | BuyTurnFilter {len(buy_turn_filter_rows_list)}"
-        f" | GapSetup {len(gap_setup_rows_list)}"
-        f" | PocketPivot {len(pocket_pivot_rows_list)}"
+        f"- 요약 인덱스: {POST_CLOSE_INDEX_TITLES['legacy_turn']} {len(buy_rows)}"
+        f" | {POST_CLOSE_INDEX_TITLES['legacy_pullback']} {len(pullback_rows_list)}"
+        f" | {POST_CLOSE_INDEX_TITLES['legacy_hull_bear']} {len(hull_bear_rows_list)}"
+        f" | {POST_CLOSE_INDEX_TITLES['legacy_52w_high']} {len(high_52w_rows_list)}"
+        f" | {POST_CLOSE_INDEX_TITLES['pullback_filter']} {len(pullback_filter_rows_list)}"
+        f" | {POST_CLOSE_INDEX_TITLES['chase_filter']} {len(chase_filter_rows_list)}"
+        f" | {POST_CLOSE_INDEX_TITLES['buy_turn_filter']} {len(buy_turn_filter_rows_list)}"
+        f" | {POST_CLOSE_INDEX_TITLES['gap_setup']} {len(gap_setup_rows_list)}"
+        f" | {POST_CLOSE_INDEX_TITLES['pocket_pivot']} {len(pocket_pivot_rows_list)}"
+        f" | {POST_CLOSE_INDEX_TITLES['five_day_top']} {len(five_day_top_rows_list)}"
     )
 
     lines = [
         f"[{str(scan_label or 'Daily Scan')}] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
-        f"- Target US session date: {target_us_session_date.isoformat()} (US/Eastern)",
-        f"- Universe: {universe_count}",
-        f"- Scan results: {result_count} | skipped: {skip_count}",
+        f"- 대상 미국 세션일: {target_us_session_date.isoformat()} (US/Eastern)",
+        f"- 유니버스: {universe_count}",
+        f"- 스캔 결과: {result_count} | 제외: {skip_count}",
         index_line,
         "",
     ]
@@ -2024,8 +2131,8 @@ def build_post_close_transition_summary(
     sections = [
         _build_summary_section_lines(
             section_index=1,
-            section_total=9,
-            section_name="Legacy Turn",
+            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_name=POST_CLOSE_SECTION_TITLES["legacy_turn"],
             criteria=f"legacy UTBot/HULL buy-turn + volume>1.0x (detected={detected_count})",
             rows=buy_rows,
             summary_limit=summary_limit,
@@ -2033,35 +2140,35 @@ def build_post_close_transition_summary(
         ),
         _build_summary_section_lines(
             section_index=2,
-            section_total=9,
-            section_name="Legacy Pullback Reentry",
+            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_name=POST_CLOSE_SECTION_TITLES["legacy_pullback"],
             criteria="pullback_reentry=True + volume>1.0x",
             rows=pullback_rows_list,
             summary_limit=summary_limit,
-            tag_builder=lambda _row: "PULLBACK REENTRY",
+            tag_builder=lambda _row: "눌림 재진입",
         ),
         _build_summary_section_lines(
             section_index=3,
-            section_total=9,
-            section_name="Legacy Hull Bear",
+            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_name=POST_CLOSE_SECTION_TITLES["legacy_hull_bear"],
             criteria=f"hull_turn_bear_last_date == {target_us_session_date.isoformat()}",
             rows=hull_bear_rows_list,
             summary_limit=summary_limit,
-            tag_builder=lambda _row: "HULL BEAR",
+            tag_builder=lambda _row: "HULL 매도전환",
         ),
         _build_summary_section_lines(
             section_index=4,
-            section_total=9,
-            section_name="Legacy 52W High",
+            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_name=POST_CLOSE_SECTION_TITLES["legacy_52w_high"],
             criteria=f"new_52w_high=True + latest_bar_date == {target_us_session_date.isoformat()}",
             rows=high_52w_rows_list,
             summary_limit=summary_limit,
-            tag_builder=lambda _row: "52W HIGH",
+            tag_builder=lambda _row: "52주 신고가",
         ),
         _build_summary_section_lines(
             section_index=5,
-            section_total=9,
-            section_name="Pullback Filter",
+            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_name=POST_CLOSE_SECTION_TITLES["pullback_filter"],
             criteria=(
                 "uptrend_persistent=Y + hma60_slope_pct>0 + pullback_from_swing_high_pct<-2 + "
                 "drawdown_from_20d_high_pct<-1 + pullback_atr_multiple<=3.5 + "
@@ -2069,55 +2176,64 @@ def build_post_close_transition_summary(
             ),
             rows=pullback_filter_rows_list,
             summary_limit=summary_limit,
-            tag_builder=lambda _row: "PULLBACK FILTER",
+            tag_builder=lambda _row: "눌림목 필터",
         ),
         _build_summary_section_lines(
             section_index=6,
-            section_total=9,
-            section_name="Chase Filter",
+            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_name=POST_CLOSE_SECTION_TITLES["chase_filter"],
             criteria=(
                 "bull_strength_recent=Y + uptrend_persistent=Y + hma20/60 slope>0 + volume_bullish=Y + "
                 "adx>=18 + rs_rank_vs_index>=55 + multi_buy>=2 + dist_sma20_pct<30 + zscore20<3.5 + scan_score>=120"
             ),
             rows=chase_filter_rows_list,
             summary_limit=summary_limit,
-            tag_builder=lambda _row: "CHASE FILTER",
+            tag_builder=lambda _row: "추세추종 필터",
         ),
         _build_summary_section_lines(
             section_index=7,
-            section_total=9,
-            section_name="Buy Turn Filter",
+            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_name=POST_CLOSE_SECTION_TITLES["buy_turn_filter"],
             criteria=(
                 "(latest_session_turn or days<=2) + (utbot_buy_recent or hull_turn_bull_recent or bull_turn_recent) + "
                 "cmf>-0.10 + obv_slope>0 + volume_ratio_20>0.9 + no sell on target session"
             ),
             rows=buy_turn_filter_rows_list,
             summary_limit=summary_limit,
-            tag_builder=lambda row: str(dict(row or {}).get("buy_turn_filter_tag") or "BUY-TURN FILTER"),
+            tag_builder=lambda row: str(dict(row or {}).get("buy_turn_filter_tag") or "매수전환 필터"),
         ),
         _build_summary_section_lines(
             section_index=8,
-            section_total=9,
-            section_name="Gap Setup",
+            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_name=POST_CLOSE_SECTION_TITLES["gap_setup"],
             criteria=(
                 "gate>=3/5 + score(sorted by score/gate/scan/es) | "
                 "DryUp + 20DHigh proximity + BB/ATR compression + RS leadership + HMA/ADX trend"
             ),
             rows=gap_setup_rows_list,
             summary_limit=summary_limit,
-            tag_builder=lambda row: str(dict(row or {}).get("gap_setup_tag") or "GAP SETUP"),
+            tag_builder=lambda row: str(dict(row or {}).get("gap_setup_tag") or "에너지 압축"),
         ),
         _build_summary_section_lines(
             section_index=9,
-            section_total=9,
-            section_name="Pocket Pivot",
+            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_name=POST_CLOSE_SECTION_TITLES["pocket_pivot"],
             criteria=(
                 "gate>=3/5 + score(sorted by score/gate/scan/es) | "
                 "Volume expansion + recent UT buy + shallow pullback + CMF/OBV accumulation + multi-buy"
             ),
             rows=pocket_pivot_rows_list,
             summary_limit=summary_limit,
-            tag_builder=lambda row: str(dict(row or {}).get("pocket_pivot_tag") or "POCKET PIVOT"),
+            tag_builder=lambda row: str(dict(row or {}).get("pocket_pivot_tag") or "기관 매집"),
+        ),
+        _build_summary_section_lines(
+            section_index=10,
+            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_name=POST_CLOSE_SECTION_TITLES["five_day_top"],
+            criteria="chg_5d > 0 sorted by chg_5d/scan_score/es",
+            rows=five_day_top_rows_list,
+            summary_limit=summary_limit,
+            tag_builder=lambda row: str(dict(row or {}).get("five_day_top_tag") or f"5일 {_fmt_signed_number(row.get('chg_5d', 0), 2)}%"),
         ),
     ]
     for block in sections:
@@ -2474,6 +2590,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
         buy_turn_filter_rows = select_post_close_buy_turn_rows_for_telegram(csv_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
         gap_setup_rows = select_post_close_gap_setup_rows_for_telegram(csv_rows)
         pocket_pivot_rows = select_post_close_pocket_pivot_rows_for_telegram(csv_rows)
+        five_day_top_rows = select_post_close_top_5d_rows_for_telegram(csv_rows)
         summary_text = build_post_close_transition_summary(
             turn_rows,
             run_at_kst=run_at_kst,
@@ -2491,6 +2608,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
             buy_turn_filter_rows=buy_turn_filter_rows,
             gap_setup_rows=gap_setup_rows,
             pocket_pivot_rows=pocket_pivot_rows,
+            five_day_top_rows=five_day_top_rows,
         )
         missing_shard_indices = [int(_safe_float(v)) for v in (merged_payload.get("missing_shard_indices") or [])]
         if missing_shard_indices:
@@ -2522,6 +2640,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
                 "buy_turn_filter_count": len(buy_turn_filter_rows),
                 "gap_setup_count": len(gap_setup_rows),
                 "pocket_pivot_count": len(pocket_pivot_rows),
+                "five_day_top_count": len(five_day_top_rows),
                 "csv_path": str(csv_path),
                 "rows_path": str(rows_path),
                 "summary_path": str(summary_path),
@@ -2571,6 +2690,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
         buy_turn_filter_rows = select_post_close_buy_turn_rows_for_telegram(csv_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
         gap_setup_rows = select_post_close_gap_setup_rows_for_telegram(csv_rows)
         pocket_pivot_rows = select_post_close_pocket_pivot_rows_for_telegram(csv_rows)
+        five_day_top_rows = select_post_close_top_5d_rows_for_telegram(csv_rows)
         summary_text = build_post_close_transition_summary(
             turn_rows,
             run_at_kst=run_at_kst,
@@ -2588,6 +2708,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
             buy_turn_filter_rows=buy_turn_filter_rows,
             gap_setup_rows=gap_setup_rows,
             pocket_pivot_rows=pocket_pivot_rows,
+            five_day_top_rows=five_day_top_rows,
         )
         summary_path = out_dir / f"trend_turn_summary_{run_label}.txt"
         summary_path.write_text(summary_text, encoding="utf-8")
@@ -2617,6 +2738,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
                 "buy_turn_filter_count": len(buy_turn_filter_rows),
                 "gap_setup_count": len(gap_setup_rows),
                 "pocket_pivot_count": len(pocket_pivot_rows),
+                "five_day_top_count": len(five_day_top_rows),
                 "csv_path": str(csv_path),
                 "rows_path": str(rows_path),
                 "summary_path": str(summary_path),
