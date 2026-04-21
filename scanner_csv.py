@@ -47,6 +47,15 @@ BOOL_TO_YN_KEYS: set[str] = {
     "first_close_above_ma20_after_5bars",
     "first_higher_low_pivot2",
     "first_higher_high_pivot2",
+    "atr_contracting",
+    "nr7_flag",
+    "inside_day_flag",
+    "three_weeks_tight",
+    "tight_close_near_high_3d",
+    "near_52w_high_2pct",
+    "pocket_pivot_recent",
+    "gap_setup_candidate",
+    "pocket_pivot_candidate",
 }
 
 SCANNER_CSV_FIELD_SPECS: tuple[dict[str, str], ...] = (

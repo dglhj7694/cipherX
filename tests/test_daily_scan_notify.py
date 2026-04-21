@@ -15,6 +15,7 @@ from scripts.daily_scan_and_notify import (
     RUSSELL2000_UNIVERSE_ITEMS,
     _compute_post_close_row_metrics,
     _with_post_close_cross_section_metrics,
+    _with_post_close_setup_scores,
     _last_us_market_session_date,
     _with_latest_session_buy_turn_flags,
     build_post_close_transition_summary,
@@ -24,6 +25,8 @@ from scripts.daily_scan_and_notify import (
     merge_shard_scan_rows,
     select_post_close_buy_turn_rows_for_telegram,
     select_post_close_chase_rows_for_telegram,
+    select_post_close_gap_setup_rows_for_telegram,
+    select_post_close_pocket_pivot_rows_for_telegram,
     select_post_close_pullback_rows_for_telegram,
     select_pullback_reentry_rows_for_telegram,
     select_us_session_52w_high_rows,
@@ -118,6 +121,14 @@ class DailyScanNotifyTests(unittest.TestCase):
             "latest_session_hull_buy_turn": False,
             "chg_5d": 3.42,
             "gap_risk_2pct": True,
+            "atr_contracting": True,
+            "weekly_trend_context": "STRONG_UPTREND",
+            "gap_setup_score": 8,
+            "gap_setup_gate_count": 4,
+            "gap_setup_candidate": True,
+            "pocket_pivot_score": 9,
+            "pocket_pivot_gate_count": 4,
+            "pocket_pivot_candidate": False,
         }
         with tempfile.TemporaryDirectory() as temp_dir:
             out_dir = Path(temp_dir)
@@ -140,10 +151,20 @@ class DailyScanNotifyTests(unittest.TestCase):
         hull_idx = next(i for i, name in enumerate(extra_header) if str(name).endswith("(latest_session_hull_buy_turn)"))
         chg_5d_idx = next(i for i, name in enumerate(extra_header) if str(name).endswith("(chg_5d)"))
         gap_risk_idx = next(i for i, name in enumerate(extra_header) if str(name).endswith("(gap_risk_2pct)"))
+        atr_contracting_idx = next(i for i, name in enumerate(extra_header) if str(name).endswith("(atr_contracting)"))
+        weekly_trend_idx = next(i for i, name in enumerate(extra_header) if str(name).endswith("(weekly_trend_context)"))
+        gap_setup_score_idx = next(i for i, name in enumerate(extra_header) if str(name).endswith("(gap_setup_score)"))
+        gap_setup_candidate_idx = next(i for i, name in enumerate(extra_header) if str(name).endswith("(gap_setup_candidate)"))
+        pocket_pivot_candidate_idx = next(i for i, name in enumerate(extra_header) if str(name).endswith("(pocket_pivot_candidate)"))
         self.assertEqual(extra_data[utbot_idx], "Y")
         self.assertEqual(extra_data[hull_idx], "N")
         self.assertEqual(extra_data[chg_5d_idx], "3.42")
         self.assertEqual(extra_data[gap_risk_idx], "Y")
+        self.assertEqual(extra_data[atr_contracting_idx], "Y")
+        self.assertEqual(extra_data[weekly_trend_idx], "STRONG_UPTREND")
+        self.assertEqual(extra_data[gap_setup_score_idx], "8")
+        self.assertEqual(extra_data[gap_setup_candidate_idx], "Y")
+        self.assertEqual(extra_data[pocket_pivot_candidate_idx], "N")
 
         self.assertFalse(any(str(name).endswith("(latest_session_utbot_buy_turn)") for name in base_header))
         self.assertFalse(any(str(name).endswith("(latest_session_hull_buy_turn)") for name in base_header))
@@ -328,6 +349,207 @@ class DailyScanNotifyTests(unittest.TestCase):
         self.assertEqual([row["ticker"] for row in selected], ["AAA", "BBB"])
         self.assertEqual(selected[0]["buy_turn_filter_tag"], "Tier1 D0")
         self.assertEqual(selected[1]["buy_turn_filter_tag"], "Tier2 D1-2")
+
+    def test_with_post_close_setup_scores_populates_gap_and_pocket_candidates(self):
+        rows = [
+            {
+                "ticker": "AAA",
+                "volume_ratio_20": 0.7,
+                "drawdown_from_20d_high_pct": -2.0,
+                "bb_percent_b": 0.70,
+                "atr_contracting": True,
+                "rs_rank_vs_index": 81.0,
+                "ret20_percentile": 92.0,
+                "hma20_slope_pct": 0.7,
+                "adx": 30.0,
+                "volume_dry_up_score": 60.0,
+                "cmf": 0.10,
+                "ichimoku_above_cloud": True,
+                "volume_expansion_score": 70.0,
+                "days_since_utbot_buy": 1,
+                "utbot_buy_recent": True,
+                "pullback_from_swing_high_pct": -5.0,
+                "pullback_ready": True,
+                "obv_slope": 0.60,
+                "multi_buy": 5,
+                "low_conflict_bullish": True,
+                "nr7_flag": True,
+                "inside_day_flag": False,
+                "three_weeks_tight": True,
+                "tight_close_near_high_3d": True,
+                "near_52w_high_2pct": True,
+                "weekly_trend_context": "STRONG_UPTREND",
+                "pocket_pivot_recent": True,
+                "days_since_pocket_pivot": 2,
+            },
+            {
+                "ticker": "BBB",
+                "volume_ratio_20": 2.0,
+                "drawdown_from_20d_high_pct": -4.0,
+                "bb_percent_b": 0.65,
+                "atr_contracting": True,
+                "rs_rank_vs_index": 70.0,
+                "ret20_percentile": 80.0,
+                "hma20_slope_pct": 0.6,
+                "adx": 28.0,
+                "volume_dry_up_score": 0.0,
+                "cmf": 0.10,
+                "ichimoku_above_cloud": True,
+                "volume_expansion_score": 70.0,
+                "days_since_utbot_buy": 1,
+                "utbot_buy_recent": True,
+                "pullback_from_swing_high_pct": -5.0,
+                "pullback_ready": True,
+                "obv_slope": 0.60,
+                "multi_buy": 5,
+                "low_conflict_bullish": True,
+                "nr7_flag": True,
+                "inside_day_flag": False,
+                "three_weeks_tight": True,
+                "tight_close_near_high_3d": True,
+                "near_52w_high_2pct": True,
+                "weekly_trend_context": "STRONG_UPTREND",
+                "pocket_pivot_recent": True,
+                "days_since_pocket_pivot": 2,
+            },
+            {
+                "ticker": "CCC",
+                "volume_ratio_20": 1.1,
+                "drawdown_from_20d_high_pct": -7.0,
+                "bb_percent_b": 0.20,
+                "atr_contracting": False,
+                "rs_rank_vs_index": 30.0,
+                "ret20_percentile": 40.0,
+                "hma20_slope_pct": 0.1,
+                "adx": 18.0,
+                "volume_dry_up_score": 10.0,
+                "cmf": -0.05,
+                "ichimoku_above_cloud": False,
+                "volume_expansion_score": 20.0,
+                "days_since_utbot_buy": 8,
+                "utbot_buy_recent": False,
+                "pullback_from_swing_high_pct": -12.0,
+                "pullback_ready": False,
+                "obv_slope": -0.10,
+                "multi_buy": 1,
+                "low_conflict_bullish": False,
+            },
+        ]
+
+        scored = _with_post_close_setup_scores(rows)
+
+        self.assertEqual(scored[0]["gap_setup_score"], 11)
+        self.assertEqual(scored[0]["gap_setup_gate_count"], 5)
+        self.assertTrue(scored[0]["gap_setup_candidate"])
+        self.assertEqual(scored[1]["pocket_pivot_score"], 12)
+        self.assertEqual(scored[1]["pocket_pivot_gate_count"], 5)
+        self.assertTrue(scored[1]["pocket_pivot_candidate"])
+        self.assertFalse(scored[2]["gap_setup_candidate"])
+        self.assertFalse(scored[2]["pocket_pivot_candidate"])
+
+    def test_select_post_close_gap_setup_rows_for_telegram_uses_gate_and_top20(self):
+        rows = []
+        for idx in range(25):
+            rows.append(
+                {
+                    "ticker": f"G{idx:03d}",
+                    "scan_score": float(idx),
+                    "es": 5.0,
+                    "volume_ratio_20": 0.7,
+                    "drawdown_from_20d_high_pct": -2.0,
+                    "bb_percent_b": 0.70,
+                    "atr_contracting": True,
+                    "rs_rank_vs_index": 82.0,
+                    "ret20_percentile": 90.0,
+                    "hma20_slope_pct": 0.7,
+                    "adx": 30.0,
+                    "volume_dry_up_score": 60.0,
+                    "cmf": 0.12,
+                    "ichimoku_above_cloud": True,
+                    "nr7_flag": idx % 2 == 0,
+                    "inside_day_flag": False,
+                    "three_weeks_tight": False,
+                    "tight_close_near_high_3d": True,
+                    "near_52w_high_2pct": True,
+                    "weekly_trend_context": "STRONG_UPTREND",
+                }
+            )
+        rows.append(
+            {
+                "ticker": "BAD",
+                "scan_score": 999.0,
+                "es": 9.0,
+                "volume_ratio_20": 1.0,
+                "drawdown_from_20d_high_pct": -9.0,
+                "bb_percent_b": 0.10,
+                "atr_contracting": False,
+                "rs_rank_vs_index": 20.0,
+                "ret20_percentile": 20.0,
+                "hma20_slope_pct": 0.1,
+                "adx": 10.0,
+                "volume_dry_up_score": 5.0,
+                "cmf": -0.1,
+                "ichimoku_above_cloud": False,
+            }
+        )
+
+        selected = select_post_close_gap_setup_rows_for_telegram(_with_post_close_setup_scores(rows))
+        self.assertEqual(len(selected), 20)
+        self.assertEqual(selected[0]["ticker"], "G024")
+        self.assertNotIn("BAD", [row["ticker"] for row in selected])
+        self.assertIn("GAP 11/11 | G5/5", selected[0]["gap_setup_tag"])
+
+    def test_select_post_close_pocket_pivot_rows_for_telegram_uses_gate_and_top20(self):
+        rows = []
+        for idx in range(25):
+            rows.append(
+                {
+                    "ticker": f"P{idx:03d}",
+                    "scan_score": float(idx),
+                    "es": 6.0,
+                    "volume_expansion_score": 70.0,
+                    "volume_ratio_20": 2.0,
+                    "days_since_utbot_buy": 1,
+                    "utbot_buy_recent": True,
+                    "pullback_from_swing_high_pct": -5.0,
+                    "pullback_ready": True,
+                    "cmf": 0.10,
+                    "obv_slope": 0.60,
+                    "multi_buy": 5,
+                    "low_conflict_bullish": True,
+                    "ichimoku_above_cloud": True,
+                    "nr7_flag": True,
+                    "inside_day_flag": idx % 2 == 0,
+                    "up_close_streak": 3,
+                    "weekly_trend_context": "STRONG_UPTREND",
+                    "pocket_pivot_recent": True,
+                    "days_since_pocket_pivot": 2,
+                }
+            )
+        rows.append(
+            {
+                "ticker": "BAD",
+                "scan_score": 999.0,
+                "es": 9.0,
+                "volume_expansion_score": 10.0,
+                "volume_ratio_20": 1.0,
+                "days_since_utbot_buy": 8,
+                "utbot_buy_recent": False,
+                "pullback_from_swing_high_pct": -12.0,
+                "pullback_ready": False,
+                "cmf": -0.10,
+                "obv_slope": -0.20,
+                "multi_buy": 1,
+                "low_conflict_bullish": False,
+                "ichimoku_above_cloud": False,
+            }
+        )
+
+        selected = select_post_close_pocket_pivot_rows_for_telegram(_with_post_close_setup_scores(rows))
+        self.assertEqual(len(selected), 20)
+        self.assertEqual(selected[0]["ticker"], "P024")
+        self.assertNotIn("BAD", [row["ticker"] for row in selected])
+        self.assertIn("PP 12/12 | G5/5", selected[0]["pocket_pivot_tag"])
 
     def test_select_us_session_hull_bear_rows(self):
         rows = [
@@ -515,7 +737,7 @@ class DailyScanNotifyTests(unittest.TestCase):
         p4 = joined.index("=== [4/4] 52주 신고가 갱신 ===")
         self.assertTrue(p1 < p2 < p3 < p4)
 
-    def test_build_post_close_transition_summary_uses_seven_ordered_sections(self):
+    def test_build_post_close_transition_summary_uses_nine_ordered_sections(self):
         base_row = {
             "ticker": "AAA",
             "chg_value": 1.0,
@@ -524,6 +746,10 @@ class DailyScanNotifyTests(unittest.TestCase):
             "jg_key": "BUY",
             "transition_signals": ["UTBot Buy"],
         }
+        gap_row = dict(base_row)
+        gap_row["gap_setup_tag"] = "GAP 8/11 | G4/5 | DryUp, RS, BB"
+        pocket_row = dict(base_row)
+        pocket_row["pocket_pivot_tag"] = "PP 9/12 | G4/5 | VolExp, UT<=3"
         summary = build_post_close_transition_summary(
             [dict(base_row)],
             run_at_kst=datetime(2026, 4, 17, 6, 15, 0),
@@ -538,18 +764,25 @@ class DailyScanNotifyTests(unittest.TestCase):
             pullback_filter_rows=[dict(base_row)],
             chase_filter_rows=[dict(base_row)],
             buy_turn_filter_rows=[dict(base_row)],
+            gap_setup_rows=[gap_row],
+            pocket_pivot_rows=[pocket_row],
         )
-        self.assertIn("Summary Index: LegacyTurn 1 | LegacyPullback 1 | LegacyHullBear 1 | Legacy52WHigh 1 | PullbackFilter 1 | ChaseFilter 1 | BuyTurnFilter 1", summary)
-        p1 = summary.index("=== [1/7] Legacy Turn ===")
-        p2 = summary.index("=== [2/7] Legacy Pullback Reentry ===")
-        p3 = summary.index("=== [3/7] Legacy Hull Bear ===")
-        p4 = summary.index("=== [4/7] Legacy 52W High ===")
-        p5 = summary.index("=== [5/7] Pullback Filter ===")
-        p6 = summary.index("=== [6/7] Chase Filter ===")
-        p7 = summary.index("=== [7/7] Buy Turn Filter ===")
-        self.assertTrue(p1 < p2 < p3 < p4 < p5 < p6 < p7)
+        self.assertIn(
+            "Summary Index: LegacyTurn 1 | LegacyPullback 1 | LegacyHullBear 1 | Legacy52WHigh 1 | PullbackFilter 1 | ChaseFilter 1 | BuyTurnFilter 1 | GapSetup 1 | PocketPivot 1",
+            summary,
+        )
+        p1 = summary.index("=== [1/9] Legacy Turn ===")
+        p2 = summary.index("=== [2/9] Legacy Pullback Reentry ===")
+        p3 = summary.index("=== [3/9] Legacy Hull Bear ===")
+        p4 = summary.index("=== [4/9] Legacy 52W High ===")
+        p5 = summary.index("=== [5/9] Pullback Filter ===")
+        p6 = summary.index("=== [6/9] Chase Filter ===")
+        p7 = summary.index("=== [7/9] Buy Turn Filter ===")
+        p8 = summary.index("=== [8/9] Gap Setup ===")
+        p9 = summary.index("=== [9/9] Pocket Pivot ===")
+        self.assertTrue(p1 < p2 < p3 < p4 < p5 < p6 < p7 < p8 < p9)
 
-    def test_split_telegram_message_text_preserves_section_boundaries_for_seven_sections(self):
+    def test_split_telegram_message_text_preserves_section_boundaries_for_nine_sections(self):
         base_row = {
             "ticker": "AAA",
             "chg_value": 1.0,
@@ -563,6 +796,15 @@ class DailyScanNotifyTests(unittest.TestCase):
             row = dict(base_row)
             row["ticker"] = f"S{i:03d}"
             rows.append(row)
+        gap_rows = []
+        pocket_rows = []
+        for i, row in enumerate(rows):
+            gap_row = dict(row)
+            gap_row["gap_setup_tag"] = f"GAP 8/11 | G4/5 | Hit{i}"
+            gap_rows.append(gap_row)
+            pocket_row = dict(row)
+            pocket_row["pocket_pivot_tag"] = f"PP 9/12 | G4/5 | Hit{i}"
+            pocket_rows.append(pocket_row)
 
         summary = build_post_close_transition_summary(
             rows,
@@ -578,20 +820,24 @@ class DailyScanNotifyTests(unittest.TestCase):
             pullback_filter_rows=rows,
             chase_filter_rows=rows,
             buy_turn_filter_rows=rows,
+            gap_setup_rows=gap_rows,
+            pocket_pivot_rows=pocket_rows,
         )
         chunks = split_telegram_message_text(summary, chunk_size=500)
         self.assertGreater(len(chunks), 1)
         self.assertTrue(all(len(chunk) <= 500 for chunk in chunks))
 
         joined = "\n".join(chunks)
-        p1 = joined.index("=== [1/7] Legacy Turn ===")
-        p2 = joined.index("=== [2/7] Legacy Pullback Reentry ===")
-        p3 = joined.index("=== [3/7] Legacy Hull Bear ===")
-        p4 = joined.index("=== [4/7] Legacy 52W High ===")
-        p5 = joined.index("=== [5/7] Pullback Filter ===")
-        p6 = joined.index("=== [6/7] Chase Filter ===")
-        p7 = joined.index("=== [7/7] Buy Turn Filter ===")
-        self.assertTrue(p1 < p2 < p3 < p4 < p5 < p6 < p7)
+        p1 = joined.index("=== [1/9] Legacy Turn ===")
+        p2 = joined.index("=== [2/9] Legacy Pullback Reentry ===")
+        p3 = joined.index("=== [3/9] Legacy Hull Bear ===")
+        p4 = joined.index("=== [4/9] Legacy 52W High ===")
+        p5 = joined.index("=== [5/9] Pullback Filter ===")
+        p6 = joined.index("=== [6/9] Chase Filter ===")
+        p7 = joined.index("=== [7/9] Buy Turn Filter ===")
+        p8 = joined.index("=== [8/9] Gap Setup ===")
+        p9 = joined.index("=== [9/9] Pocket Pivot ===")
+        self.assertTrue(p1 < p2 < p3 < p4 < p5 < p6 < p7 < p8 < p9)
 
     def test_split_tickers_for_shard_union_and_no_overlap(self):
         tickers = [self._alpha_symbol(i) for i in range(300)]
@@ -736,6 +982,44 @@ class DailyScanNotifyTests(unittest.TestCase):
         self.assertEqual(metrics["days_since_hull_turn_bear"], 8)
         self.assertEqual(metrics["system_turn_bull_last_date"], idx[-5].date().isoformat())
         self.assertTrue(metrics["volume_climax_flag"])
+
+    def test_compute_post_close_row_metrics_accuracy_boosters(self):
+        idx = pd.date_range("2026-01-01", periods=40, freq="D")
+        close = pd.Series([100.0 + i * 0.5 for i in range(40)], index=idx, dtype=float)
+        frame = pd.DataFrame(index=idx)
+        frame["Open"] = close - 0.2
+        frame["Close"] = close
+        frame["High"] = close + 0.3
+        frame["Low"] = close - 1.0
+        frame.loc[idx[-3:], "High"] = frame.loc[idx[-3:], "Close"] + 0.1
+        frame["Volume"] = [1000.0] * 30 + [400.0] * 10
+        frame["MA20"] = close - 0.8
+        frame["ATR"] = 2.0
+        frame.loc[idx[-2], "ATR"] = 2.2
+        frame.loc[idx[-1], "ATR"] = 1.8
+        frame["Volume_Ratio_20"] = 0.7
+        frame["OBV_Slope"] = 0.4
+        frame["CMF"] = 0.09
+        frame["NR7"] = False
+        frame["Inside_Day"] = False
+        frame["Three_Weeks_Tight"] = False
+        frame["Pocket_Pivot"] = False
+        frame.loc[idx[-1], ["NR7", "Inside_Day", "Three_Weeks_Tight"]] = True
+        frame.loc[idx[-4], "Pocket_Pivot"] = True
+
+        metrics = _compute_post_close_row_metrics(frame)
+
+        self.assertTrue(metrics["atr_contracting"])
+        self.assertTrue(metrics["nr7_flag"])
+        self.assertTrue(metrics["inside_day_flag"])
+        self.assertTrue(metrics["three_weeks_tight"])
+        self.assertTrue(metrics["tight_close_near_high_3d"])
+        self.assertGreater(metrics["pin_bar_ratio"], 0.0)
+        self.assertTrue(metrics["near_52w_high_2pct"])
+        self.assertIn(metrics["weekly_trend_context"], {"UPTREND", "STRONG_UPTREND"})
+        self.assertGreater(metrics["volume_dry_up_score_10"], 0.0)
+        self.assertEqual(metrics["days_since_pocket_pivot"], 3)
+        self.assertTrue(metrics["pocket_pivot_recent"])
 
     def test_compute_post_close_row_metrics_first_close_above_ma20_after_5bars(self):
         idx = pd.date_range("2026-04-01", periods=8, freq="D")

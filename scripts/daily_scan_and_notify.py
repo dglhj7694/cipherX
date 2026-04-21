@@ -133,7 +133,32 @@ POST_CLOSE_LATEST_SESSION_FIELD_SPECS: tuple[dict[str, str], ...] = (
     {"group": "turn", "key": "first_close_above_ma20_after_5bars", "label": "FirstCloseAboveMA20After5Bars", "type": "bool", "description": "First MA20 reclaim after 5 bars below", "rule": "previous 5 closes <= MA20 and current close > MA20", "example": "Y"},
     {"group": "turn", "key": "first_higher_low_pivot2", "label": "FirstHigherLowPivot2", "type": "bool", "description": "Confirmed higher-low with pivot=2", "rule": "pivot low > previous pivot low, confirmed at current bar", "example": "N"},
     {"group": "turn", "key": "first_higher_high_pivot2", "label": "FirstHigherHighPivot2", "type": "bool", "description": "Confirmed higher-high with pivot=2", "rule": "pivot high > previous pivot high, confirmed at current bar", "example": "N"},
+    {"group": "volatility", "key": "atr_contracting", "label": "ATRContracting", "type": "bool", "description": "Latest ATR below previous ATR", "rule": "ATR[-1] < ATR[-2]", "example": "Y"},
+    {"group": "pattern", "key": "nr7_flag", "label": "NR7Flag", "type": "bool", "description": "Latest bar is NR7", "rule": "NR7", "example": "Y"},
+    {"group": "pattern", "key": "inside_day_flag", "label": "InsideDayFlag", "type": "bool", "description": "Latest bar is inside day", "rule": "Inside_Day", "example": "N"},
+    {"group": "pattern", "key": "three_weeks_tight", "label": "ThreeWeeksTight", "type": "bool", "description": "Three-weeks-tight style compression", "rule": "Three_Weeks_Tight", "example": "N"},
+    {"group": "pattern", "key": "tight_close_near_high_3d", "label": "TightCloseNearHigh3D", "type": "bool", "description": "Last 3 closes clustered near daily highs", "rule": "(high-close)/(high-low) <= 0.25 for 3 bars", "example": "Y"},
+    {"group": "pattern", "key": "pin_bar_ratio", "label": "PinBarRatio", "type": "number", "description": "Dominant wick versus body ratio", "rule": "max(upper_wick,lower_wick)/max(body,range*0.05)", "example": "2.8"},
+    {"group": "pattern", "key": "near_52w_high_2pct", "label": "Near52WHigh2Pct", "type": "bool", "description": "Within 2% of 52-week high", "rule": "drawdown_from_52w_high_pct > -2", "example": "Y"},
+    {"group": "pattern", "key": "up_close_streak", "label": "UpCloseStreak", "type": "number", "description": "Consecutive higher closes", "rule": "trailing Close > Close[-1]", "example": "3"},
+    {"group": "pattern", "key": "down_close_streak", "label": "DownCloseStreak", "type": "number", "description": "Consecutive lower closes", "rule": "trailing Close < Close[-1]", "example": "2"},
+    {"group": "pattern", "key": "weekly_trend_context", "label": "WeeklyTrendContext", "type": "text", "description": "Weekly trend regime from weekly close and moving averages", "rule": "weekly close vs weekly MA10/MA20", "example": "STRONG_UPTREND"},
+    {"group": "volume", "key": "volume_dry_up_score_3", "label": "VolumeDryUpScore3", "type": "number", "description": "3-bar dry-up score versus prior 20 bars", "rule": "clip((1-recent3/prior20)*100,0,100)", "example": "18"},
+    {"group": "volume", "key": "volume_dry_up_score_5", "label": "VolumeDryUpScore5", "type": "number", "description": "5-bar dry-up score versus prior 20 bars", "rule": "clip((1-recent5/prior20)*100,0,100)", "example": "24"},
+    {"group": "volume", "key": "volume_dry_up_score_10", "label": "VolumeDryUpScore10", "type": "number", "description": "10-bar dry-up score versus prior 20 bars", "rule": "clip((1-recent10/prior20)*100,0,100)", "example": "31"},
+    {"group": "turn", "key": "days_since_pocket_pivot", "label": "DaysSincePocketPivot", "type": "number", "description": "Bars since latest pocket pivot", "rule": "as_of - last(Pocket_Pivot)", "example": "4"},
+    {"group": "turn", "key": "pocket_pivot_recent", "label": "PocketPivotRecent", "type": "bool", "description": "Pocket pivot within last 10 bars", "rule": "days_since_pocket_pivot <= 10", "example": "Y"},
+    {"group": "setup", "key": "gap_setup_score", "label": "GapSetupScore", "type": "number", "description": "Gap setup score", "rule": "weighted literal score, max 11", "example": "8"},
+    {"group": "setup", "key": "gap_setup_gate_count", "label": "GapSetupGateCount", "type": "number", "description": "Gap setup gate hits", "rule": "sum(5 gate groups)", "example": "4"},
+    {"group": "setup", "key": "gap_setup_candidate", "label": "GapSetupCandidate", "type": "bool", "description": "Gap setup candidate gate", "rule": "gap_setup_gate_count >= 3", "example": "Y"},
+    {"group": "setup", "key": "pocket_pivot_score", "label": "PocketPivotScore", "type": "number", "description": "Pocket pivot score", "rule": "weighted literal score, max 12", "example": "9"},
+    {"group": "setup", "key": "pocket_pivot_gate_count", "label": "PocketPivotGateCount", "type": "number", "description": "Pocket pivot gate hits", "rule": "sum(5 gate groups)", "example": "4"},
+    {"group": "setup", "key": "pocket_pivot_candidate", "label": "PocketPivotCandidate", "type": "bool", "description": "Pocket pivot candidate gate", "rule": "pocket_pivot_gate_count >= 3", "example": "Y"},
 )
+
+POST_CLOSE_SETUP_TOP_N = 20
+GAP_SETUP_MAX_SCORE = 11
+POCKET_PIVOT_MAX_SCORE = 12
 
 
 @dataclass
@@ -350,6 +375,69 @@ def _compute_pivot2_first_flags(frame: Any, *, pivot: int = 2) -> tuple[bool, bo
     return first_higher_low, first_higher_high
 
 
+def _tail_mean(series: Any, periods: int) -> float:
+    if series is None or periods <= 0:
+        return 0.0
+    try:
+        return _safe_float(series.tail(periods).mean())
+    except Exception:
+        return 0.0
+
+
+def _recent_window_dry_up_score(volume_series: Any, *, recent_window: int, baseline_window: int = 20) -> float:
+    if volume_series is None or recent_window <= 0:
+        return 0.0
+    try:
+        prior_series = volume_series.iloc[:-1]
+    except Exception:
+        return 0.0
+    if prior_series is None or len(prior_series) < recent_window:
+        return 0.0
+    recent_avg = _tail_mean(prior_series, recent_window)
+    baseline_avg = _tail_mean(prior_series, max(baseline_window, recent_window))
+    if baseline_avg <= 1e-10:
+        return 0.0
+    return _safe_float(_clip((1.0 - (recent_avg / baseline_avg)) * 100.0, 0.0, 100.0))
+
+
+def _trailing_bool_streak(values: Iterable[Any]) -> int:
+    streak = 0
+    try:
+        iterable = list(values)
+    except Exception:
+        return 0
+    for value in reversed(iterable):
+        if bool(value):
+            streak += 1
+            continue
+        break
+    return streak
+
+
+def _compute_weekly_trend_context(frame: Any) -> str:
+    if frame is None or "Close" not in getattr(frame, "columns", []):
+        return "NEUTRAL"
+    try:
+        weekly_close = frame["Close"].resample("W-FRI").last().dropna()
+    except Exception:
+        return "NEUTRAL"
+    if len(weekly_close) < 5:
+        return "NEUTRAL"
+    weekly_ma10 = weekly_close.rolling(10, min_periods=3).mean()
+    weekly_ma20 = weekly_close.rolling(20, min_periods=5).mean()
+    latest_close = _safe_float(weekly_close.iloc[-1], 0.0)
+    latest_ma10 = _safe_float(weekly_ma10.iloc[-1], 0.0)
+    latest_ma20 = _safe_float(weekly_ma20.iloc[-1], 0.0)
+    prev_ma10 = _safe_float(weekly_ma10.iloc[-2] if len(weekly_ma10) >= 2 else latest_ma10, latest_ma10)
+    if latest_close > latest_ma10 > latest_ma20 and latest_ma10 >= prev_ma10:
+        return "STRONG_UPTREND"
+    if latest_close > latest_ma10 and latest_ma10 >= latest_ma20:
+        return "UPTREND"
+    if latest_close < latest_ma10 < latest_ma20 and latest_ma10 <= prev_ma10:
+        return "DOWNTREND"
+    return "NEUTRAL"
+
+
 def _compute_post_close_row_metrics(frame: Any) -> dict[str, Any]:
     metrics: dict[str, Any] = {
         "dist_sma20_pct": 0.0,
@@ -399,6 +487,27 @@ def _compute_post_close_row_metrics(frame: Any) -> dict[str, Any]:
         "first_close_above_ma20_after_5bars": False,
         "first_higher_low_pivot2": False,
         "first_higher_high_pivot2": False,
+        "atr_contracting": False,
+        "nr7_flag": False,
+        "inside_day_flag": False,
+        "three_weeks_tight": False,
+        "tight_close_near_high_3d": False,
+        "pin_bar_ratio": 0.0,
+        "near_52w_high_2pct": False,
+        "up_close_streak": 0,
+        "down_close_streak": 0,
+        "weekly_trend_context": "NEUTRAL",
+        "volume_dry_up_score_3": 0.0,
+        "volume_dry_up_score_5": 0.0,
+        "volume_dry_up_score_10": 0.0,
+        "days_since_pocket_pivot": 0,
+        "pocket_pivot_recent": False,
+        "gap_setup_score": 0,
+        "gap_setup_gate_count": 0,
+        "gap_setup_candidate": False,
+        "pocket_pivot_score": 0,
+        "pocket_pivot_gate_count": 0,
+        "pocket_pivot_candidate": False,
     }
     if frame is None or len(frame) == 0:
         return metrics
@@ -411,11 +520,15 @@ def _compute_post_close_row_metrics(frame: Any) -> dict[str, Any]:
     close_series = frame["Close"]
     high_series = frame["High"] if "High" in frame.columns else None
     low_series = frame["Low"] if "Low" in frame.columns else None
+    volume_series = frame["Volume"] if "Volume" in frame.columns else None
 
     current_close = _safe_float(latest.get("Close", 0))
     previous_close = _safe_float(previous.get("Close", current_close))
     current_open = _safe_float(latest.get("Open", current_close))
+    current_high = _safe_float(latest.get("High", current_close))
+    current_low = _safe_float(latest.get("Low", current_close))
     atr = _safe_float(latest.get("ATR", 0))
+    previous_atr = _safe_float(previous.get("ATR", atr))
     ma20 = _safe_float(latest.get("MA20", 0))
 
     metrics["dist_sma20_pct"] = _safe_ratio_pct(current_close, latest.get("MA20"))
@@ -444,6 +557,7 @@ def _compute_post_close_row_metrics(frame: Any) -> dict[str, Any]:
     metrics["drawdown_from_52w_high_pct"] = _safe_ratio_pct(current_close, high_52w)
     metrics["drawdown_from_20d_high_pct"] = _safe_ratio_pct(current_close, high_20d)
     metrics["pullback_from_swing_high_pct"] = _safe_ratio_pct(current_close, swing_high)
+    metrics["near_52w_high_2pct"] = bool(metrics["drawdown_from_52w_high_pct"] > -2.0)
 
     try:
         mean20 = _safe_float(close_series.tail(20).mean())
@@ -455,22 +569,32 @@ def _compute_post_close_row_metrics(frame: Any) -> dict[str, Any]:
     metrics["bb_percent_b"] = _safe_float(latest.get("Percent_B", 0))
     metrics["atr_pct"] = _safe_float((atr / current_close) * 100) if current_close > 1e-10 else 0.0
     metrics["pullback_atr_multiple"] = _safe_float((high_20d - current_close) / atr) if atr > 1e-10 else 0.0
+    metrics["atr_contracting"] = bool(atr > 1e-10 and previous_atr > 1e-10 and atr < previous_atr)
 
     utbot_buy_ts = _series_last_true_timestamp(frame, "UTBot_Buy")
     hull_bull_ts = _series_last_true_timestamp(frame, "Hull_Turn_Bull")
     hull_bear_ts = _series_last_true_timestamp(frame, "Hull_Turn_Bear")
     system_bull_ts = _series_last_true_timestamp(frame, "System_Turn_Bull")
+    pocket_pivot_ts = _series_last_true_timestamp(frame, "Pocket_Pivot")
     metrics["days_since_utbot_buy"] = _days_since_timestamp(as_of, utbot_buy_ts)
     metrics["days_since_hull_turn_bull"] = _days_since_timestamp(as_of, hull_bull_ts)
     metrics["days_since_hull_turn_bear"] = _days_since_timestamp(as_of, hull_bear_ts)
+    metrics["days_since_pocket_pivot"] = _days_since_timestamp(as_of, pocket_pivot_ts)
+    metrics["pocket_pivot_recent"] = bool(pocket_pivot_ts is not None and metrics["days_since_pocket_pivot"] <= 10)
     metrics["system_turn_bull_last_date"] = _timestamp_to_iso(system_bull_ts)
 
     volume_ratio_20 = _safe_float(latest.get("Volume_Ratio_20", 0))
     metrics["volume_dry_up_score"] = _safe_float(_clip((1.0 - volume_ratio_20) * 100.0, 0.0, 100.0))
     metrics["volume_expansion_score"] = _safe_float(_clip((volume_ratio_20 - 1.0) * 100.0, 0.0, 100.0))
+    metrics["volume_dry_up_score_3"] = _recent_window_dry_up_score(volume_series, recent_window=3)
+    metrics["volume_dry_up_score_5"] = _recent_window_dry_up_score(volume_series, recent_window=5)
+    metrics["volume_dry_up_score_10"] = _recent_window_dry_up_score(volume_series, recent_window=10)
     metrics["obv_slope"] = _safe_float(latest.get("OBV_Slope", 0))
     metrics["cmf"] = _safe_float(latest.get("CMF", 0))
     metrics["volume_climax_flag"] = bool(latest.get("Volume_Climax_Buy", False) or latest.get("Volume_Climax_Sell", False))
+    metrics["nr7_flag"] = bool(latest.get("NR7", False))
+    metrics["inside_day_flag"] = bool(latest.get("Inside_Day", False))
+    metrics["three_weeks_tight"] = bool(latest.get("Three_Weeks_Tight", False))
 
     metrics["dist_vwap_pct"] = _safe_ratio_pct(current_close, latest.get("VWAP"))
     metrics["dist_bb_mid_pct"] = _safe_ratio_pct(current_close, latest.get("BB_Mid"))
@@ -488,6 +612,26 @@ def _compute_post_close_row_metrics(frame: Any) -> dict[str, Any]:
     metrics["ret60_pct"] = _series_return_pct(close_series, 60)
     metrics["ret120_pct"] = _series_return_pct(close_series, 120)
     metrics["rs_ratio"] = _safe_float(latest.get("RS_Ratio", 0))
+    try:
+        close_up = close_series.diff().gt(0).fillna(False)
+        close_down = close_series.diff().lt(0).fillna(False)
+    except Exception:
+        close_up = []
+        close_down = []
+    metrics["up_close_streak"] = _trailing_bool_streak(close_up)
+    metrics["down_close_streak"] = _trailing_bool_streak(close_down)
+    metrics["weekly_trend_context"] = _compute_weekly_trend_context(frame)
+
+    candle_range = max(current_high - current_low, 0.0)
+    candle_body = abs(current_close - current_open)
+    upper_wick = max(current_high - max(current_open, current_close), 0.0)
+    lower_wick = max(min(current_open, current_close) - current_low, 0.0)
+    body_floor = max(candle_body, candle_range * 0.05, 1e-10)
+    metrics["pin_bar_ratio"] = _safe_float(max(upper_wick, lower_wick) / body_floor)
+    if high_series is not None and low_series is not None and len(frame) >= 3:
+        recent_ranges = (high_series.tail(3) - low_series.tail(3)).abs()
+        near_high_series = ((high_series.tail(3) - close_series.tail(3)) <= (recent_ranges * 0.25)).fillna(False)
+        metrics["tight_close_near_high_3d"] = bool(near_high_series.all())
 
     if len(frame) >= 6 and "MA20" in frame.columns:
         prev5_close = close_series.iloc[-6:-1]
@@ -567,6 +711,113 @@ def _with_post_close_cross_section_metrics(
         row["ret20_percentile"] = ret20_map.get(idx, 0.0)
         row["ret60_percentile"] = ret60_map.get(idx, 0.0)
         row["ret120_percentile"] = ret120_map.get(idx, 0.0)
+    return row_list
+
+
+def _with_post_close_setup_scores(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    row_list = [dict(row or {}) for row in (rows or [])]
+    for row in row_list:
+        gap_gate_hits = [
+            _safe_float(row.get("volume_ratio_20", 0.0)) < 0.8,
+            _safe_float(row.get("drawdown_from_20d_high_pct", 0.0)) > -3.0,
+            0.55 <= _safe_float(row.get("bb_percent_b", 0.0)) <= 0.90 and _coerce_bool(row.get("atr_contracting", False)),
+            _safe_float(row.get("rs_rank_vs_index", 0.0)) > 65.0 and _safe_float(row.get("ret20_percentile", 0.0)) > 75.0,
+            _safe_float(row.get("hma20_slope_pct", 0.0)) > 0.5 and _safe_float(row.get("adx", 0.0)) > 25.0,
+        ]
+        gap_score = 0
+        gap_hits: list[str] = []
+        if _safe_float(row.get("volume_dry_up_score", 0.0)) > 50.0:
+            gap_score += 2
+            gap_hits.append("DryUp")
+        if _safe_float(row.get("drawdown_from_20d_high_pct", 0.0)) > -3.0:
+            gap_score += 2
+            gap_hits.append("20D")
+        if _safe_float(row.get("rs_rank_vs_index", 0.0)) > 65.0:
+            gap_score += 2
+            gap_hits.append("RS")
+        if 0.55 <= _safe_float(row.get("bb_percent_b", 0.0)) <= 0.90:
+            gap_score += 1
+            gap_hits.append("BB")
+        if _safe_float(row.get("adx", 0.0)) > 25.0:
+            gap_score += 1
+            gap_hits.append("ADX")
+        if _safe_float(row.get("hma20_slope_pct", 0.0)) > 0.5:
+            gap_score += 1
+            gap_hits.append("HMA")
+        if _safe_float(row.get("cmf", 0.0)) > 0.05:
+            gap_score += 1
+            gap_hits.append("CMF")
+        if _coerce_bool(row.get("ichimoku_above_cloud", False)):
+            gap_score += 1
+            gap_hits.append("Cloud")
+        gap_quality_hits: list[str] = []
+        if _coerce_bool(row.get("nr7_flag", False)):
+            gap_quality_hits.append("NR7")
+        if _coerce_bool(row.get("inside_day_flag", False)):
+            gap_quality_hits.append("Inside")
+        if _coerce_bool(row.get("three_weeks_tight", False)):
+            gap_quality_hits.append("3WT")
+        if _coerce_bool(row.get("tight_close_near_high_3d", False)):
+            gap_quality_hits.append("Tight3")
+        if _coerce_bool(row.get("near_52w_high_2pct", False)):
+            gap_quality_hits.append("52W<2%")
+        if str(row.get("weekly_trend_context", "")).upper() in {"STRONG_UPTREND", "UPTREND"}:
+            gap_quality_hits.append("WUp")
+        row["gap_setup_score"] = int(gap_score)
+        row["gap_setup_gate_count"] = int(sum(1 for item in gap_gate_hits if item))
+        row["gap_setup_candidate"] = bool(row["gap_setup_gate_count"] >= 3)
+        row["gap_setup_hits"] = gap_hits
+        row["gap_setup_quality_hits"] = gap_quality_hits
+
+        pocket_gate_hits = [
+            _safe_float(row.get("volume_expansion_score", 0.0)) > 50.0 and _safe_float(row.get("volume_ratio_20", 0.0)) > 1.5,
+            _safe_float(row.get("days_since_utbot_buy", 999.0)) <= 3.0 and _coerce_bool(row.get("utbot_buy_recent", False)),
+            _safe_float(row.get("pullback_from_swing_high_pct", -999.0)) > -8.0 and _coerce_bool(row.get("pullback_ready", False)),
+            _safe_float(row.get("cmf", 0.0)) > 0.05 and _safe_float(row.get("obv_slope", 0.0)) > 0.3,
+            _safe_float(row.get("multi_buy", 0.0)) >= 4.0 and _coerce_bool(row.get("low_conflict_bullish", False)),
+        ]
+        pocket_score = 0
+        pocket_hits: list[str] = []
+        if _safe_float(row.get("volume_expansion_score", 0.0)) > 50.0:
+            pocket_score += 2
+            pocket_hits.append("VolExp")
+        if _safe_float(row.get("volume_ratio_20", 0.0)) > 1.5:
+            pocket_score += 2
+            pocket_hits.append("Vol1.5x")
+        if _safe_float(row.get("days_since_utbot_buy", 999.0)) <= 3.0:
+            pocket_score += 2
+            pocket_hits.append("UT<=3")
+        if _safe_float(row.get("multi_buy", 0.0)) >= 4.0:
+            pocket_score += 2
+            pocket_hits.append("MB4")
+        if _safe_float(row.get("pullback_from_swing_high_pct", -999.0)) > -8.0:
+            pocket_score += 1
+            pocket_hits.append("PB<8%")
+        if _safe_float(row.get("obv_slope", 0.0)) > 0.3:
+            pocket_score += 1
+            pocket_hits.append("OBV")
+        if _safe_float(row.get("cmf", 0.0)) > 0.05:
+            pocket_score += 1
+            pocket_hits.append("CMF")
+        if _coerce_bool(row.get("ichimoku_above_cloud", False)):
+            pocket_score += 1
+            pocket_hits.append("Cloud")
+        pocket_quality_hits: list[str] = []
+        if _coerce_bool(row.get("nr7_flag", False)):
+            pocket_quality_hits.append("NR7")
+        if _coerce_bool(row.get("inside_day_flag", False)):
+            pocket_quality_hits.append("Inside")
+        if _safe_float(row.get("up_close_streak", 0.0)) >= 2.0:
+            pocket_quality_hits.append(f"Up{int(_safe_float(row.get('up_close_streak', 0.0)))}")
+        if str(row.get("weekly_trend_context", "")).upper() in {"STRONG_UPTREND", "UPTREND"}:
+            pocket_quality_hits.append("WUp")
+        if _coerce_bool(row.get("pocket_pivot_recent", False)):
+            pocket_quality_hits.append(f"PP{int(_safe_float(row.get('days_since_pocket_pivot', 0.0)))}")
+        row["pocket_pivot_score"] = int(pocket_score)
+        row["pocket_pivot_gate_count"] = int(sum(1 for item in pocket_gate_hits if item))
+        row["pocket_pivot_candidate"] = bool(row["pocket_pivot_gate_count"] >= 3)
+        row["pocket_pivot_hits"] = pocket_hits
+        row["pocket_pivot_quality_hits"] = pocket_quality_hits
     return row_list
 
 
@@ -1356,6 +1607,33 @@ def _sort_telegram_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any
     return row_list
 
 
+def _setup_sort_key(row: Mapping[str, Any], *, score_key: str, gate_key: str) -> tuple[float, float, float, float, str]:
+    return (
+        -_safe_float(row.get(score_key, 0.0)),
+        -_safe_float(row.get(gate_key, 0.0)),
+        -_safe_float(row.get("scan_score", 0.0)),
+        -_safe_float(row.get("es", 0.0)),
+        str(row.get("ticker", "")),
+    )
+
+
+def _format_setup_hit_summary(core_hits: Iterable[Any], quality_hits: Iterable[Any], *, max_items: int = 6) -> str:
+    labels: list[str] = []
+    for label in list(core_hits or []):
+        text = str(label or "").strip()
+        if text and text not in labels:
+            labels.append(text)
+        if len(labels) >= max_items:
+            return ", ".join(labels)
+    for label in list(quality_hits or []):
+        text = str(label or "").strip()
+        if text and text not in labels:
+            labels.append(text)
+        if len(labels) >= max_items:
+            break
+    return ", ".join(labels) if labels else "-"
+
+
 def select_post_close_pullback_rows_for_telegram(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
     selected: list[dict[str, Any]] = []
     for row in rows or []:
@@ -1464,6 +1742,40 @@ def select_post_close_buy_turn_rows_for_telegram(
         row_dict["buy_turn_filter_tag"] = _buy_turn_tier_tag(row_dict)
         selected.append(row_dict)
     return _sort_telegram_rows(selected)
+
+
+def select_post_close_gap_setup_rows_for_telegram(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    selected: list[dict[str, Any]] = []
+    for row in rows or []:
+        row_dict = dict(row or {})
+        if not _coerce_bool(row_dict.get("gap_setup_candidate", False)):
+            continue
+        hit_summary = _format_setup_hit_summary(row_dict.get("gap_setup_hits"), row_dict.get("gap_setup_quality_hits"))
+        row_dict["gap_setup_tag"] = (
+            f"GAP {int(_safe_float(row_dict.get('gap_setup_score', 0))):d}/{GAP_SETUP_MAX_SCORE}"
+            f" | G{int(_safe_float(row_dict.get('gap_setup_gate_count', 0))):d}/5"
+            f" | {hit_summary}"
+        )
+        selected.append(row_dict)
+    selected.sort(key=lambda row: _setup_sort_key(row, score_key="gap_setup_score", gate_key="gap_setup_gate_count"))
+    return selected[:POST_CLOSE_SETUP_TOP_N]
+
+
+def select_post_close_pocket_pivot_rows_for_telegram(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    selected: list[dict[str, Any]] = []
+    for row in rows or []:
+        row_dict = dict(row or {})
+        if not _coerce_bool(row_dict.get("pocket_pivot_candidate", False)):
+            continue
+        hit_summary = _format_setup_hit_summary(row_dict.get("pocket_pivot_hits"), row_dict.get("pocket_pivot_quality_hits"))
+        row_dict["pocket_pivot_tag"] = (
+            f"PP {int(_safe_float(row_dict.get('pocket_pivot_score', 0))):d}/{POCKET_PIVOT_MAX_SCORE}"
+            f" | G{int(_safe_float(row_dict.get('pocket_pivot_gate_count', 0))):d}/5"
+            f" | {hit_summary}"
+        )
+        selected.append(row_dict)
+    selected.sort(key=lambda row: _setup_sort_key(row, score_key="pocket_pivot_score", gate_key="pocket_pivot_gate_count"))
+    return selected[:POST_CLOSE_SETUP_TOP_N]
 
 
 def select_us_session_hull_bear_rows(rows: Iterable[Mapping[str, Any]], *, run_at_kst: datetime, scan_mode: str = "post_close") -> list[dict[str, Any]]:
@@ -1673,6 +1985,8 @@ def build_post_close_transition_summary(
     pullback_filter_rows: Iterable[Mapping[str, Any]] | None = None,
     chase_filter_rows: Iterable[Mapping[str, Any]] | None = None,
     buy_turn_filter_rows: Iterable[Mapping[str, Any]] | None = None,
+    gap_setup_rows: Iterable[Mapping[str, Any]] | None = None,
+    pocket_pivot_rows: Iterable[Mapping[str, Any]] | None = None,
 ) -> str:
     buy_rows = [dict(row or {}) for row in (turn_rows or [])]
     pullback_rows_list = [dict(row or {}) for row in (pullback_rows or [])]
@@ -1681,6 +1995,8 @@ def build_post_close_transition_summary(
     pullback_filter_rows_list = [dict(row or {}) for row in (pullback_filter_rows or [])]
     chase_filter_rows_list = [dict(row or {}) for row in (chase_filter_rows or [])]
     buy_turn_filter_rows_list = [dict(row or {}) for row in (buy_turn_filter_rows or [])]
+    gap_setup_rows_list = [dict(row or {}) for row in (gap_setup_rows or [])]
+    pocket_pivot_rows_list = [dict(row or {}) for row in (pocket_pivot_rows or [])]
     detected_count = len(buy_rows) if detected_turn_count is None else max(0, int(detected_turn_count))
     target_us_session_date = _resolve_target_session_date(run_at_kst, "post_close")
 
@@ -1692,6 +2008,8 @@ def build_post_close_transition_summary(
         f" | PullbackFilter {len(pullback_filter_rows_list)}"
         f" | ChaseFilter {len(chase_filter_rows_list)}"
         f" | BuyTurnFilter {len(buy_turn_filter_rows_list)}"
+        f" | GapSetup {len(gap_setup_rows_list)}"
+        f" | PocketPivot {len(pocket_pivot_rows_list)}"
     )
 
     lines = [
@@ -1706,7 +2024,7 @@ def build_post_close_transition_summary(
     sections = [
         _build_summary_section_lines(
             section_index=1,
-            section_total=7,
+            section_total=9,
             section_name="Legacy Turn",
             criteria=f"legacy UTBot/HULL buy-turn + volume>1.0x (detected={detected_count})",
             rows=buy_rows,
@@ -1715,7 +2033,7 @@ def build_post_close_transition_summary(
         ),
         _build_summary_section_lines(
             section_index=2,
-            section_total=7,
+            section_total=9,
             section_name="Legacy Pullback Reentry",
             criteria="pullback_reentry=True + volume>1.0x",
             rows=pullback_rows_list,
@@ -1724,7 +2042,7 @@ def build_post_close_transition_summary(
         ),
         _build_summary_section_lines(
             section_index=3,
-            section_total=7,
+            section_total=9,
             section_name="Legacy Hull Bear",
             criteria=f"hull_turn_bear_last_date == {target_us_session_date.isoformat()}",
             rows=hull_bear_rows_list,
@@ -1733,7 +2051,7 @@ def build_post_close_transition_summary(
         ),
         _build_summary_section_lines(
             section_index=4,
-            section_total=7,
+            section_total=9,
             section_name="Legacy 52W High",
             criteria=f"new_52w_high=True + latest_bar_date == {target_us_session_date.isoformat()}",
             rows=high_52w_rows_list,
@@ -1742,7 +2060,7 @@ def build_post_close_transition_summary(
         ),
         _build_summary_section_lines(
             section_index=5,
-            section_total=7,
+            section_total=9,
             section_name="Pullback Filter",
             criteria=(
                 "uptrend_persistent=Y + hma60_slope_pct>0 + pullback_from_swing_high_pct<-2 + "
@@ -1755,7 +2073,7 @@ def build_post_close_transition_summary(
         ),
         _build_summary_section_lines(
             section_index=6,
-            section_total=7,
+            section_total=9,
             section_name="Chase Filter",
             criteria=(
                 "bull_strength_recent=Y + uptrend_persistent=Y + hma20/60 slope>0 + volume_bullish=Y + "
@@ -1767,7 +2085,7 @@ def build_post_close_transition_summary(
         ),
         _build_summary_section_lines(
             section_index=7,
-            section_total=7,
+            section_total=9,
             section_name="Buy Turn Filter",
             criteria=(
                 "(latest_session_turn or days<=2) + (utbot_buy_recent or hull_turn_bull_recent or bull_turn_recent) + "
@@ -1776,6 +2094,30 @@ def build_post_close_transition_summary(
             rows=buy_turn_filter_rows_list,
             summary_limit=summary_limit,
             tag_builder=lambda row: str(dict(row or {}).get("buy_turn_filter_tag") or "BUY-TURN FILTER"),
+        ),
+        _build_summary_section_lines(
+            section_index=8,
+            section_total=9,
+            section_name="Gap Setup",
+            criteria=(
+                "gate>=3/5 + score(sorted by score/gate/scan/es) | "
+                "DryUp + 20DHigh proximity + BB/ATR compression + RS leadership + HMA/ADX trend"
+            ),
+            rows=gap_setup_rows_list,
+            summary_limit=summary_limit,
+            tag_builder=lambda row: str(dict(row or {}).get("gap_setup_tag") or "GAP SETUP"),
+        ),
+        _build_summary_section_lines(
+            section_index=9,
+            section_total=9,
+            section_name="Pocket Pivot",
+            criteria=(
+                "gate>=3/5 + score(sorted by score/gate/scan/es) | "
+                "Volume expansion + recent UT buy + shallow pullback + CMF/OBV accumulation + multi-buy"
+            ),
+            rows=pocket_pivot_rows_list,
+            summary_limit=summary_limit,
+            tag_builder=lambda row: str(dict(row or {}).get("pocket_pivot_tag") or "POCKET PIVOT"),
         ),
     ]
     for block in sections:
@@ -2113,6 +2455,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
         )
         csv_rows = _with_latest_session_buy_turn_flags(merged_rows, target_date=latest_session_date)
         csv_rows = _with_post_close_cross_section_metrics(csv_rows, enabled=True)
+        csv_rows = _with_post_close_setup_scores(csv_rows)
         csv_path = write_scan_csv(
             csv_rows,
             out_dir=out_dir,
@@ -2129,6 +2472,8 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
         pullback_filter_rows = select_post_close_pullback_rows_for_telegram(csv_rows)
         chase_filter_rows = select_post_close_chase_rows_for_telegram(csv_rows)
         buy_turn_filter_rows = select_post_close_buy_turn_rows_for_telegram(csv_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
+        gap_setup_rows = select_post_close_gap_setup_rows_for_telegram(csv_rows)
+        pocket_pivot_rows = select_post_close_pocket_pivot_rows_for_telegram(csv_rows)
         summary_text = build_post_close_transition_summary(
             turn_rows,
             run_at_kst=run_at_kst,
@@ -2144,6 +2489,8 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
             pullback_filter_rows=pullback_filter_rows,
             chase_filter_rows=chase_filter_rows,
             buy_turn_filter_rows=buy_turn_filter_rows,
+            gap_setup_rows=gap_setup_rows,
+            pocket_pivot_rows=pocket_pivot_rows,
         )
         missing_shard_indices = [int(_safe_float(v)) for v in (merged_payload.get("missing_shard_indices") or [])]
         if missing_shard_indices:
@@ -2173,6 +2520,8 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
                 "pullback_filter_count": len(pullback_filter_rows),
                 "chase_filter_count": len(chase_filter_rows),
                 "buy_turn_filter_count": len(buy_turn_filter_rows),
+                "gap_setup_count": len(gap_setup_rows),
+                "pocket_pivot_count": len(pocket_pivot_rows),
                 "csv_path": str(csv_path),
                 "rows_path": str(rows_path),
                 "summary_path": str(summary_path),
@@ -2204,6 +2553,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
 
         csv_rows = _with_latest_session_buy_turn_flags(scan_result.rows, target_date=latest_session_date)
         csv_rows = _with_post_close_cross_section_metrics(csv_rows, enabled=shard_count <= 1)
+        csv_rows = _with_post_close_setup_scores(csv_rows)
         csv_path = write_scan_csv(
             csv_rows,
             out_dir=out_dir,
@@ -2219,6 +2569,8 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
         pullback_filter_rows = select_post_close_pullback_rows_for_telegram(csv_rows)
         chase_filter_rows = select_post_close_chase_rows_for_telegram(csv_rows)
         buy_turn_filter_rows = select_post_close_buy_turn_rows_for_telegram(csv_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
+        gap_setup_rows = select_post_close_gap_setup_rows_for_telegram(csv_rows)
+        pocket_pivot_rows = select_post_close_pocket_pivot_rows_for_telegram(csv_rows)
         summary_text = build_post_close_transition_summary(
             turn_rows,
             run_at_kst=run_at_kst,
@@ -2234,6 +2586,8 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
             pullback_filter_rows=pullback_filter_rows,
             chase_filter_rows=chase_filter_rows,
             buy_turn_filter_rows=buy_turn_filter_rows,
+            gap_setup_rows=gap_setup_rows,
+            pocket_pivot_rows=pocket_pivot_rows,
         )
         summary_path = out_dir / f"trend_turn_summary_{run_label}.txt"
         summary_path.write_text(summary_text, encoding="utf-8")
@@ -2261,6 +2615,8 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
                 "pullback_filter_count": len(pullback_filter_rows),
                 "chase_filter_count": len(chase_filter_rows),
                 "buy_turn_filter_count": len(buy_turn_filter_rows),
+                "gap_setup_count": len(gap_setup_rows),
+                "pocket_pivot_count": len(pocket_pivot_rows),
                 "csv_path": str(csv_path),
                 "rows_path": str(rows_path),
                 "summary_path": str(summary_path),
