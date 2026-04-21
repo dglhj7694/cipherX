@@ -17,10 +17,14 @@ from scripts.daily_scan_and_notify import (
     _with_post_close_cross_section_metrics,
     _last_us_market_session_date,
     _with_latest_session_buy_turn_flags,
+    build_post_close_transition_summary,
     build_scan_universe,
     build_transition_summary,
     filter_turn_rows_for_telegram,
     merge_shard_scan_rows,
+    select_post_close_buy_turn_rows_for_telegram,
+    select_post_close_chase_rows_for_telegram,
+    select_post_close_pullback_rows_for_telegram,
     select_pullback_reentry_rows_for_telegram,
     select_us_session_52w_high_rows,
     select_us_session_hull_bear_rows,
@@ -163,6 +167,167 @@ class DailyScanNotifyTests(unittest.TestCase):
         ]
         selected = select_pullback_reentry_rows_for_telegram(rows, min_volume_ratio_20_exclusive=1.0)
         self.assertEqual([row["ticker"] for row in selected], ["AAA"])
+
+    def test_select_post_close_pullback_rows_for_telegram(self):
+        rows = [
+            {
+                "ticker": "AAA",
+                "scan_score": 15.0,
+                "es": 7.0,
+                "uptrend_persistent": True,
+                "hma60_slope_pct": 0.5,
+                "pullback_from_swing_high_pct": -3.0,
+                "drawdown_from_20d_high_pct": -1.8,
+                "pullback_atr_multiple": 2.2,
+                "pullback_ready": True,
+                "pullback_reentry": False,
+                "volume_dry_up_score": 10.0,
+                "utbot_sell_recent": False,
+                "hull_turn_bear_recent": False,
+            },
+            {
+                "ticker": "BBB",
+                "scan_score": 20.0,
+                "es": 8.0,
+                "uptrend_persistent": True,
+                "hma60_slope_pct": 0.4,
+                "pullback_from_swing_high_pct": -2.5,
+                "drawdown_from_20d_high_pct": -1.2,
+                "pullback_atr_multiple": 2.0,
+                "pullback_ready": True,
+                "pullback_reentry": False,
+                "volume_dry_up_score": 11.0,
+                "utbot_sell_recent": True,
+                "hull_turn_bear_recent": False,
+            },
+        ]
+        selected = select_post_close_pullback_rows_for_telegram(rows)
+        self.assertEqual([row["ticker"] for row in selected], ["AAA"])
+
+    def test_select_post_close_chase_rows_for_telegram(self):
+        rows = [
+            {
+                "ticker": "AAA",
+                "scan_score": 130.0,
+                "es": 6.0,
+                "bull_strength_recent": True,
+                "uptrend_persistent": True,
+                "hma20_slope_pct": 0.3,
+                "hma60_slope_pct": 0.2,
+                "volume_bullish": True,
+                "adx": 22.0,
+                "rs_rank_vs_index": 72.0,
+                "multi_buy": 3,
+                "dist_sma20_pct": 8.0,
+                "zscore20": 1.5,
+                "utbot_sell_recent": False,
+                "hull_turn_bear_recent": False,
+            },
+            {
+                "ticker": "BBB",
+                "scan_score": 119.9,
+                "es": 7.0,
+                "bull_strength_recent": True,
+                "uptrend_persistent": True,
+                "hma20_slope_pct": 0.4,
+                "hma60_slope_pct": 0.3,
+                "volume_bullish": True,
+                "adx": 25.0,
+                "rs_rank_vs_index": 80.0,
+                "multi_buy": 3,
+                "dist_sma20_pct": 5.0,
+                "zscore20": 1.2,
+                "utbot_sell_recent": False,
+                "hull_turn_bear_recent": False,
+            },
+        ]
+        selected = select_post_close_chase_rows_for_telegram(rows)
+        self.assertEqual([row["ticker"] for row in selected], ["AAA"])
+
+    def test_select_post_close_buy_turn_rows_for_telegram(self):
+        run_at_kst = datetime(2026, 4, 17, 6, 15, 0)
+        rows = [
+            {
+                "ticker": "AAA",
+                "scan_score": 30.0,
+                "es": 8.0,
+                "latest_session_utbot_buy_turn": True,
+                "latest_session_hull_buy_turn": False,
+                "days_since_utbot_buy": 0,
+                "days_since_hull_turn_bull": 9,
+                "utbot_buy_last_date": "2026-04-16",
+                "hull_turn_bull_last_date": "2026-04-12",
+                "utbot_buy_recent": True,
+                "hull_turn_bull_recent": False,
+                "bull_turn_recent": True,
+                "cmf": 0.01,
+                "obv_slope": 0.20,
+                "volume_ratio_20": 1.1,
+                "utbot_sell_last_date": "2026-04-10",
+                "hull_turn_bear_last_date": "2026-04-11",
+            },
+            {
+                "ticker": "BBB",
+                "scan_score": 25.0,
+                "es": 7.0,
+                "latest_session_utbot_buy_turn": False,
+                "latest_session_hull_buy_turn": False,
+                "days_since_utbot_buy": 1,
+                "days_since_hull_turn_bull": 6,
+                "utbot_buy_last_date": "2026-04-15",
+                "hull_turn_bull_last_date": "2026-04-10",
+                "utbot_buy_recent": True,
+                "hull_turn_bull_recent": False,
+                "bull_turn_recent": True,
+                "cmf": 0.04,
+                "obv_slope": 0.11,
+                "volume_ratio_20": 1.0,
+                "utbot_sell_last_date": "2026-04-14",
+                "hull_turn_bear_last_date": "2026-04-14",
+            },
+            {
+                "ticker": "CCC",
+                "scan_score": 40.0,
+                "es": 9.0,
+                "latest_session_utbot_buy_turn": True,
+                "latest_session_hull_buy_turn": False,
+                "days_since_utbot_buy": 0,
+                "days_since_hull_turn_bull": 2,
+                "utbot_buy_last_date": "2026-04-16",
+                "hull_turn_bull_last_date": "2026-04-14",
+                "utbot_buy_recent": True,
+                "hull_turn_bull_recent": True,
+                "bull_turn_recent": True,
+                "cmf": 0.02,
+                "obv_slope": 0.10,
+                "volume_ratio_20": 1.2,
+                "utbot_sell_last_date": "2026-04-16",
+                "hull_turn_bear_last_date": "2026-04-10",
+            },
+            {
+                "ticker": "DDD",
+                "scan_score": 50.0,
+                "es": 9.0,
+                "latest_session_utbot_buy_turn": True,
+                "latest_session_hull_buy_turn": False,
+                "days_since_utbot_buy": 0,
+                "days_since_hull_turn_bull": 2,
+                "utbot_buy_last_date": "2026-04-16",
+                "hull_turn_bull_last_date": "2026-04-14",
+                "utbot_buy_recent": True,
+                "hull_turn_bull_recent": True,
+                "bull_turn_recent": True,
+                "cmf": 0.02,
+                "obv_slope": 0.10,
+                "volume_ratio_20": 0.9,
+                "utbot_sell_last_date": "2026-04-15",
+                "hull_turn_bear_last_date": "2026-04-10",
+            },
+        ]
+        selected = select_post_close_buy_turn_rows_for_telegram(rows, run_at_kst=run_at_kst, scan_mode="post_close")
+        self.assertEqual([row["ticker"] for row in selected], ["AAA", "BBB"])
+        self.assertEqual(selected[0]["buy_turn_filter_tag"], "Tier1 D0")
+        self.assertEqual(selected[1]["buy_turn_filter_tag"], "Tier2 D1-2")
 
     def test_select_us_session_hull_bear_rows(self):
         rows = [
@@ -349,6 +514,84 @@ class DailyScanNotifyTests(unittest.TestCase):
         p3 = joined.index("=== [3/4] 당일 HULL 매도 ===")
         p4 = joined.index("=== [4/4] 52주 신고가 갱신 ===")
         self.assertTrue(p1 < p2 < p3 < p4)
+
+    def test_build_post_close_transition_summary_uses_seven_ordered_sections(self):
+        base_row = {
+            "ticker": "AAA",
+            "chg_value": 1.0,
+            "chg": 1.0,
+            "volume_ratio_20": 1.2,
+            "jg_key": "BUY",
+            "transition_signals": ["UTBot Buy"],
+        }
+        summary = build_post_close_transition_summary(
+            [dict(base_row)],
+            run_at_kst=datetime(2026, 4, 17, 6, 15, 0),
+            universe_count=1200,
+            result_count=980,
+            skip_count=220,
+            detected_turn_count=1,
+            summary_limit=10,
+            pullback_rows=[dict(base_row)],
+            hull_bear_rows=[dict(base_row)],
+            high_52w_rows=[dict(base_row)],
+            pullback_filter_rows=[dict(base_row)],
+            chase_filter_rows=[dict(base_row)],
+            buy_turn_filter_rows=[dict(base_row)],
+        )
+        self.assertIn("Summary Index: LegacyTurn 1 | LegacyPullback 1 | LegacyHullBear 1 | Legacy52WHigh 1 | PullbackFilter 1 | ChaseFilter 1 | BuyTurnFilter 1", summary)
+        p1 = summary.index("=== [1/7] Legacy Turn ===")
+        p2 = summary.index("=== [2/7] Legacy Pullback Reentry ===")
+        p3 = summary.index("=== [3/7] Legacy Hull Bear ===")
+        p4 = summary.index("=== [4/7] Legacy 52W High ===")
+        p5 = summary.index("=== [5/7] Pullback Filter ===")
+        p6 = summary.index("=== [6/7] Chase Filter ===")
+        p7 = summary.index("=== [7/7] Buy Turn Filter ===")
+        self.assertTrue(p1 < p2 < p3 < p4 < p5 < p6 < p7)
+
+    def test_split_telegram_message_text_preserves_section_boundaries_for_seven_sections(self):
+        base_row = {
+            "ticker": "AAA",
+            "chg_value": 1.0,
+            "chg": 1.0,
+            "volume_ratio_20": 1.5,
+            "jg_key": "BUY",
+            "transition_signals": ["UTBot Buy"],
+        }
+        rows = []
+        for i in range(20):
+            row = dict(base_row)
+            row["ticker"] = f"S{i:03d}"
+            rows.append(row)
+
+        summary = build_post_close_transition_summary(
+            rows,
+            run_at_kst=datetime(2026, 4, 17, 6, 15, 0),
+            universe_count=1200,
+            result_count=980,
+            skip_count=220,
+            detected_turn_count=20,
+            summary_limit=0,
+            pullback_rows=rows,
+            hull_bear_rows=rows,
+            high_52w_rows=rows,
+            pullback_filter_rows=rows,
+            chase_filter_rows=rows,
+            buy_turn_filter_rows=rows,
+        )
+        chunks = split_telegram_message_text(summary, chunk_size=500)
+        self.assertGreater(len(chunks), 1)
+        self.assertTrue(all(len(chunk) <= 500 for chunk in chunks))
+
+        joined = "\n".join(chunks)
+        p1 = joined.index("=== [1/7] Legacy Turn ===")
+        p2 = joined.index("=== [2/7] Legacy Pullback Reentry ===")
+        p3 = joined.index("=== [3/7] Legacy Hull Bear ===")
+        p4 = joined.index("=== [4/7] Legacy 52W High ===")
+        p5 = joined.index("=== [5/7] Pullback Filter ===")
+        p6 = joined.index("=== [6/7] Chase Filter ===")
+        p7 = joined.index("=== [7/7] Buy Turn Filter ===")
+        self.assertTrue(p1 < p2 < p3 < p4 < p5 < p6 < p7)
 
     def test_split_tickers_for_shard_union_and_no_overlap(self):
         tickers = [self._alpha_symbol(i) for i in range(300)]

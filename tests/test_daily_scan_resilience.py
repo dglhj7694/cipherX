@@ -114,6 +114,7 @@ class DailyScanResilienceTests(unittest.TestCase):
             summary_text = summary_file.read_text(encoding="utf-8")
             self.assertIn("부분 결과", summary_text)
             self.assertIn("누락 index=[1]", summary_text)
+            self.assertIn("=== [7/7] Buy Turn Filter ===", summary_text)
 
     def test_run_pre_market_fallback_without_previous_artifacts(self):
         with tempfile.TemporaryDirectory() as temp_dir:

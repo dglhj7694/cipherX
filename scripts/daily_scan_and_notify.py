@@ -1339,6 +1339,133 @@ def select_pullback_reentry_rows_for_telegram(
     return selected
 
 
+def _coerce_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    text = str(value or "").strip().lower()
+    if text in {"y", "yes", "true", "1", "t"}:
+        return True
+    if text in {"n", "no", "false", "0", "", "-", "none", "n/a"}:
+        return False
+    return bool(value)
+
+
+def _sort_telegram_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    row_list = [dict(row or {}) for row in (rows or [])]
+    row_list.sort(key=lambda row: (-_safe_float(row.get("scan_score", 0)), -_safe_float(row.get("es", 0)), str(row.get("ticker", ""))))
+    return row_list
+
+
+def select_post_close_pullback_rows_for_telegram(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    selected: list[dict[str, Any]] = []
+    for row in rows or []:
+        row_dict = dict(row or {})
+        if not _coerce_bool(row_dict.get("uptrend_persistent", False)):
+            continue
+        if _safe_float(row_dict.get("hma60_slope_pct", 0)) <= 0.0:
+            continue
+        if _safe_float(row_dict.get("pullback_from_swing_high_pct", 0)) >= -2.0:
+            continue
+        if _safe_float(row_dict.get("drawdown_from_20d_high_pct", 0)) >= -1.0:
+            continue
+        if _safe_float(row_dict.get("pullback_atr_multiple", 0)) > 3.5:
+            continue
+        if not (_coerce_bool(row_dict.get("pullback_ready", False)) or _coerce_bool(row_dict.get("pullback_reentry", False))):
+            continue
+        if _safe_float(row_dict.get("volume_dry_up_score", 0)) < 1.0:
+            continue
+        if _coerce_bool(row_dict.get("utbot_sell_recent", False)) or _coerce_bool(row_dict.get("hull_turn_bear_recent", False)):
+            continue
+        selected.append(row_dict)
+    return _sort_telegram_rows(selected)
+
+
+def select_post_close_chase_rows_for_telegram(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    selected: list[dict[str, Any]] = []
+    for row in rows or []:
+        row_dict = dict(row or {})
+        if not _coerce_bool(row_dict.get("bull_strength_recent", False)):
+            continue
+        if not _coerce_bool(row_dict.get("uptrend_persistent", False)):
+            continue
+        if _safe_float(row_dict.get("hma20_slope_pct", 0)) <= 0.0 or _safe_float(row_dict.get("hma60_slope_pct", 0)) <= 0.0:
+            continue
+        if not _coerce_bool(row_dict.get("volume_bullish", False)):
+            continue
+        if _safe_float(row_dict.get("adx", 0)) < 18.0:
+            continue
+        if _safe_float(row_dict.get("rs_rank_vs_index", 0)) < 55.0:
+            continue
+        if _safe_float(row_dict.get("multi_buy", 0)) < 2.0:
+            continue
+        if _safe_float(row_dict.get("dist_sma20_pct", 0)) >= 30.0:
+            continue
+        if _safe_float(row_dict.get("zscore20", 0)) >= 3.5:
+            continue
+        if _safe_float(row_dict.get("scan_score", 0)) < 120.0:
+            continue
+        if _coerce_bool(row_dict.get("utbot_sell_recent", False)) or _coerce_bool(row_dict.get("hull_turn_bear_recent", False)):
+            continue
+        selected.append(row_dict)
+    return _sort_telegram_rows(selected)
+
+
+def _buy_turn_tier_tag(row: Mapping[str, Any]) -> str:
+    days_candidates: list[int] = []
+    utbot_buy_date = _parse_iso_date(row.get("utbot_buy_last_date"))
+    hull_buy_date = _parse_iso_date(row.get("hull_turn_bull_last_date"))
+    if utbot_buy_date is not None:
+        days_candidates.append(max(0, int(_safe_float(row.get("days_since_utbot_buy", 0)))))
+    if hull_buy_date is not None:
+        days_candidates.append(max(0, int(_safe_float(row.get("days_since_hull_turn_bull", 0)))))
+    if not days_candidates:
+        return "SessionTurn"
+    if min(days_candidates) <= 0:
+        return "Tier1 D0"
+    return "Tier2 D1-2"
+
+
+def select_post_close_buy_turn_rows_for_telegram(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    run_at_kst: datetime,
+    scan_mode: str = "post_close",
+) -> list[dict[str, Any]]:
+    target_date = _resolve_target_session_date(run_at_kst, scan_mode)
+    selected: list[dict[str, Any]] = []
+    for row in rows or []:
+        row_dict = dict(row or {})
+        latest_session_turn = _coerce_bool(row_dict.get("latest_session_utbot_buy_turn", False)) or _coerce_bool(
+            row_dict.get("latest_session_hull_buy_turn", False)
+        )
+        utbot_buy_date = _parse_iso_date(row_dict.get("utbot_buy_last_date"))
+        hull_buy_date = _parse_iso_date(row_dict.get("hull_turn_bull_last_date"))
+        days_since_utbot = max(0, int(_safe_float(row_dict.get("days_since_utbot_buy", 0))))
+        days_since_hull = max(0, int(_safe_float(row_dict.get("days_since_hull_turn_bull", 0))))
+        recent_buy_turn = (utbot_buy_date is not None and days_since_utbot <= 2) or (hull_buy_date is not None and days_since_hull <= 2)
+        if not (latest_session_turn or recent_buy_turn):
+            continue
+        if not (
+            _coerce_bool(row_dict.get("utbot_buy_recent", False))
+            or _coerce_bool(row_dict.get("hull_turn_bull_recent", False))
+            or _coerce_bool(row_dict.get("bull_turn_recent", False))
+        ):
+            continue
+        utbot_sell_date = _parse_iso_date(row_dict.get("utbot_sell_last_date"))
+        hull_bear_date = _parse_iso_date(row_dict.get("hull_turn_bear_last_date"))
+        if utbot_sell_date == target_date or hull_bear_date == target_date:
+            continue
+        if _safe_float(row_dict.get("cmf", 0)) <= -0.10:
+            continue
+        if _safe_float(row_dict.get("obv_slope", 0)) <= 0.0:
+            continue
+        if _safe_float(row_dict.get("volume_ratio_20", 0)) <= 0.9:
+            continue
+        row_dict["buy_turn_filter_tag"] = _buy_turn_tier_tag(row_dict)
+        selected.append(row_dict)
+    return _sort_telegram_rows(selected)
+
+
 def select_us_session_hull_bear_rows(rows: Iterable[Mapping[str, Any]], *, run_at_kst: datetime, scan_mode: str = "post_close") -> list[dict[str, Any]]:
     target_date = _resolve_target_session_date(run_at_kst, scan_mode)
     selected: list[dict[str, Any]] = []
@@ -1530,6 +1657,136 @@ def build_transition_summary(
     return "\n".join(lines)
 
 
+def build_post_close_transition_summary(
+    turn_rows: Iterable[Mapping[str, Any]],
+    *,
+    run_at_kst: datetime,
+    universe_count: int,
+    result_count: int,
+    skip_count: int,
+    scan_label: str = "Daily Scan",
+    detected_turn_count: int | None = None,
+    summary_limit: int = 0,
+    pullback_rows: Iterable[Mapping[str, Any]] | None = None,
+    hull_bear_rows: Iterable[Mapping[str, Any]] | None = None,
+    high_52w_rows: Iterable[Mapping[str, Any]] | None = None,
+    pullback_filter_rows: Iterable[Mapping[str, Any]] | None = None,
+    chase_filter_rows: Iterable[Mapping[str, Any]] | None = None,
+    buy_turn_filter_rows: Iterable[Mapping[str, Any]] | None = None,
+) -> str:
+    buy_rows = [dict(row or {}) for row in (turn_rows or [])]
+    pullback_rows_list = [dict(row or {}) for row in (pullback_rows or [])]
+    hull_bear_rows_list = [dict(row or {}) for row in (hull_bear_rows or [])]
+    high_52w_rows_list = [dict(row or {}) for row in (high_52w_rows or [])]
+    pullback_filter_rows_list = [dict(row or {}) for row in (pullback_filter_rows or [])]
+    chase_filter_rows_list = [dict(row or {}) for row in (chase_filter_rows or [])]
+    buy_turn_filter_rows_list = [dict(row or {}) for row in (buy_turn_filter_rows or [])]
+    detected_count = len(buy_rows) if detected_turn_count is None else max(0, int(detected_turn_count))
+    target_us_session_date = _resolve_target_session_date(run_at_kst, "post_close")
+
+    index_line = (
+        f"- Summary Index: LegacyTurn {len(buy_rows)}"
+        f" | LegacyPullback {len(pullback_rows_list)}"
+        f" | LegacyHullBear {len(hull_bear_rows_list)}"
+        f" | Legacy52WHigh {len(high_52w_rows_list)}"
+        f" | PullbackFilter {len(pullback_filter_rows_list)}"
+        f" | ChaseFilter {len(chase_filter_rows_list)}"
+        f" | BuyTurnFilter {len(buy_turn_filter_rows_list)}"
+    )
+
+    lines = [
+        f"[{str(scan_label or 'Daily Scan')}] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
+        f"- Target US session date: {target_us_session_date.isoformat()} (US/Eastern)",
+        f"- Universe: {universe_count}",
+        f"- Scan results: {result_count} | skipped: {skip_count}",
+        index_line,
+        "",
+    ]
+
+    sections = [
+        _build_summary_section_lines(
+            section_index=1,
+            section_total=7,
+            section_name="Legacy Turn",
+            criteria=f"legacy UTBot/HULL buy-turn + volume>1.0x (detected={detected_count})",
+            rows=buy_rows,
+            summary_limit=summary_limit,
+            tag_builder=lambda row: ", ".join(list(dict(row or {}).get("transition_signals") or [])) or "-",
+        ),
+        _build_summary_section_lines(
+            section_index=2,
+            section_total=7,
+            section_name="Legacy Pullback Reentry",
+            criteria="pullback_reentry=True + volume>1.0x",
+            rows=pullback_rows_list,
+            summary_limit=summary_limit,
+            tag_builder=lambda _row: "PULLBACK REENTRY",
+        ),
+        _build_summary_section_lines(
+            section_index=3,
+            section_total=7,
+            section_name="Legacy Hull Bear",
+            criteria=f"hull_turn_bear_last_date == {target_us_session_date.isoformat()}",
+            rows=hull_bear_rows_list,
+            summary_limit=summary_limit,
+            tag_builder=lambda _row: "HULL BEAR",
+        ),
+        _build_summary_section_lines(
+            section_index=4,
+            section_total=7,
+            section_name="Legacy 52W High",
+            criteria=f"new_52w_high=True + latest_bar_date == {target_us_session_date.isoformat()}",
+            rows=high_52w_rows_list,
+            summary_limit=summary_limit,
+            tag_builder=lambda _row: "52W HIGH",
+        ),
+        _build_summary_section_lines(
+            section_index=5,
+            section_total=7,
+            section_name="Pullback Filter",
+            criteria=(
+                "uptrend_persistent=Y + hma60_slope_pct>0 + pullback_from_swing_high_pct<-2 + "
+                "drawdown_from_20d_high_pct<-1 + pullback_atr_multiple<=3.5 + "
+                "(pullback_ready or pullback_reentry) + volume_dry_up_score>=1 + no recent UT/HULL sell"
+            ),
+            rows=pullback_filter_rows_list,
+            summary_limit=summary_limit,
+            tag_builder=lambda _row: "PULLBACK FILTER",
+        ),
+        _build_summary_section_lines(
+            section_index=6,
+            section_total=7,
+            section_name="Chase Filter",
+            criteria=(
+                "bull_strength_recent=Y + uptrend_persistent=Y + hma20/60 slope>0 + volume_bullish=Y + "
+                "adx>=18 + rs_rank_vs_index>=55 + multi_buy>=2 + dist_sma20_pct<30 + zscore20<3.5 + scan_score>=120"
+            ),
+            rows=chase_filter_rows_list,
+            summary_limit=summary_limit,
+            tag_builder=lambda _row: "CHASE FILTER",
+        ),
+        _build_summary_section_lines(
+            section_index=7,
+            section_total=7,
+            section_name="Buy Turn Filter",
+            criteria=(
+                "(latest_session_turn or days<=2) + (utbot_buy_recent or hull_turn_bull_recent or bull_turn_recent) + "
+                "cmf>-0.10 + obv_slope>0 + volume_ratio_20>0.9 + no sell on target session"
+            ),
+            rows=buy_turn_filter_rows_list,
+            summary_limit=summary_limit,
+            tag_builder=lambda row: str(dict(row or {}).get("buy_turn_filter_tag") or "BUY-TURN FILTER"),
+        ),
+    ]
+    for block in sections:
+        lines.extend(block)
+        lines.append("")
+
+    if lines and not str(lines[-1]).strip():
+        lines.pop()
+    return "\n".join(lines)
+
+
 def _telegram_api(token: str, method: str) -> str:
     return f"https://api.telegram.org/bot{token}/{method}"
 
@@ -1570,7 +1827,7 @@ def split_telegram_message_text(text: str, *, chunk_size: int = 3500) -> list[st
         return chunks or [raw_text]
 
     # Prefer section-aware chunking for daily scanner report blocks.
-    if "=== [1/4]" in raw:
+    if re.search(r"=== \[1/\d+\]", raw):
         lines = raw.splitlines()
         section_blocks: list[list[str]] = []
         current_block: list[str] = []
@@ -1864,12 +2121,15 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
         )
         rows_path = write_scan_rows_json(merged_rows, out_dir=out_dir, run_label=run_label)
 
-        detected_turn_rows = select_us_session_turn_rows(merged_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
+        detected_turn_rows = select_us_session_turn_rows(csv_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
         turn_rows = filter_turn_rows_for_telegram(detected_turn_rows, min_volume_ratio_20_exclusive=1.0)
-        pullback_rows = select_pullback_reentry_rows_for_telegram(merged_rows, min_volume_ratio_20_exclusive=1.0)
-        hull_bear_rows = select_us_session_hull_bear_rows(merged_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
-        high_52w_rows = select_us_session_52w_high_rows(merged_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
-        summary_text = build_transition_summary(
+        pullback_rows = select_pullback_reentry_rows_for_telegram(csv_rows, min_volume_ratio_20_exclusive=1.0)
+        hull_bear_rows = select_us_session_hull_bear_rows(csv_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
+        high_52w_rows = select_us_session_52w_high_rows(csv_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
+        pullback_filter_rows = select_post_close_pullback_rows_for_telegram(csv_rows)
+        chase_filter_rows = select_post_close_chase_rows_for_telegram(csv_rows)
+        buy_turn_filter_rows = select_post_close_buy_turn_rows_for_telegram(csv_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
+        summary_text = build_post_close_transition_summary(
             turn_rows,
             run_at_kst=run_at_kst,
             universe_count=int(_safe_float(merged_payload.get("universe_count", 0))),
@@ -1881,7 +2141,9 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
             pullback_rows=pullback_rows,
             hull_bear_rows=hull_bear_rows,
             high_52w_rows=high_52w_rows,
-            scan_mode=scan_mode,
+            pullback_filter_rows=pullback_filter_rows,
+            chase_filter_rows=chase_filter_rows,
+            buy_turn_filter_rows=buy_turn_filter_rows,
         )
         missing_shard_indices = [int(_safe_float(v)) for v in (merged_payload.get("missing_shard_indices") or [])]
         if missing_shard_indices:
@@ -1908,6 +2170,9 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
                 "pullback_reentry_count": len(pullback_rows),
                 "hull_bear_count": len(hull_bear_rows),
                 "new_52w_high_count": len(high_52w_rows),
+                "pullback_filter_count": len(pullback_filter_rows),
+                "chase_filter_count": len(chase_filter_rows),
+                "buy_turn_filter_count": len(buy_turn_filter_rows),
                 "csv_path": str(csv_path),
                 "rows_path": str(rows_path),
                 "summary_path": str(summary_path),
@@ -1946,12 +2211,15 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
             extra_field_specs=POST_CLOSE_LATEST_SESSION_FIELD_SPECS,
         )
         rows_path = write_scan_rows_json(scan_result.rows, out_dir=out_dir, run_label=run_label)
-        detected_turn_rows = select_us_session_turn_rows(scan_result.rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
+        detected_turn_rows = select_us_session_turn_rows(csv_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
         turn_rows = filter_turn_rows_for_telegram(detected_turn_rows, min_volume_ratio_20_exclusive=1.0)
-        pullback_rows = select_pullback_reentry_rows_for_telegram(scan_result.rows, min_volume_ratio_20_exclusive=1.0)
-        hull_bear_rows = select_us_session_hull_bear_rows(scan_result.rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
-        high_52w_rows = select_us_session_52w_high_rows(scan_result.rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
-        summary_text = build_transition_summary(
+        pullback_rows = select_pullback_reentry_rows_for_telegram(csv_rows, min_volume_ratio_20_exclusive=1.0)
+        hull_bear_rows = select_us_session_hull_bear_rows(csv_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
+        high_52w_rows = select_us_session_52w_high_rows(csv_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
+        pullback_filter_rows = select_post_close_pullback_rows_for_telegram(csv_rows)
+        chase_filter_rows = select_post_close_chase_rows_for_telegram(csv_rows)
+        buy_turn_filter_rows = select_post_close_buy_turn_rows_for_telegram(csv_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
+        summary_text = build_post_close_transition_summary(
             turn_rows,
             run_at_kst=run_at_kst,
             universe_count=len(tickers),
@@ -1963,7 +2231,9 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
             pullback_rows=pullback_rows,
             hull_bear_rows=hull_bear_rows,
             high_52w_rows=high_52w_rows,
-            scan_mode=scan_mode,
+            pullback_filter_rows=pullback_filter_rows,
+            chase_filter_rows=chase_filter_rows,
+            buy_turn_filter_rows=buy_turn_filter_rows,
         )
         summary_path = out_dir / f"trend_turn_summary_{run_label}.txt"
         summary_path.write_text(summary_text, encoding="utf-8")
@@ -1988,6 +2258,9 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
                 "pullback_reentry_count": len(pullback_rows),
                 "hull_bear_count": len(hull_bear_rows),
                 "new_52w_high_count": len(high_52w_rows),
+                "pullback_filter_count": len(pullback_filter_rows),
+                "chase_filter_count": len(chase_filter_rows),
+                "buy_turn_filter_count": len(buy_turn_filter_rows),
                 "csv_path": str(csv_path),
                 "rows_path": str(rows_path),
                 "summary_path": str(summary_path),
