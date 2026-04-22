@@ -1613,7 +1613,7 @@ def main() -> None:
         merged_json_path.write_text(json.dumps(prepared_rows, ensure_ascii=False, indent=2), encoding="utf-8")
         df = pd.DataFrame(prepared_rows)
         if not df.empty:
-            df.to_csv(csv_path, index=False)
+            df.to_csv(csv_path, index=False, encoding="utf-8-sig")
         merge_meta_path = out_dir / "run_meta_merged.json"
         merge_meta_payload = {
             "run_at_kst": run_at_kst.isoformat(),
