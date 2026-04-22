@@ -144,7 +144,10 @@ class DailyScanResilienceTests(unittest.TestCase):
             )
 
             args = self._base_args(scan_mode="early_session", merge_dir=str(merge_dir), shard_count=3, shard_index=0, run_stamp=run_stamp)
-            with patch("scripts.daily_scan_and_notify._send_telegram_if_enabled") as mock_send:
+            with patch("scripts.daily_scan_and_notify._send_telegram_if_enabled") as mock_send, patch(
+                "scripts.daily_scan_and_notify._fetch_tv_market_caps",
+                return_value={},
+            ):
                 result = _run_early_session(
                     args,
                     run_at_kst=datetime(2026, 4, 20, 23, 10, 0, tzinfo=KST),

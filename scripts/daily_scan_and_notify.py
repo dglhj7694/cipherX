@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import argparse
 import bisect
@@ -54,22 +54,22 @@ US_EASTERN = ZoneInfo("America/New_York")
 _SCAN_SYMBOL_PATTERN = re.compile(r"\b[A-Z]{1,6}(?:[.-][A-Z0-9]{1,4})?\b")
 
 SCAN_MODE_LABELS: dict[str, str] = {
-    "post_close": "자동 스캔",
-    "pre_market": "프리마켓 스캔",
-    "early_session": "얼리세션 스캔 장중 미확정 추세",
+    "post_close": "?먮룞 ?ㅼ틪",
+    "pre_market": "?꾨━留덉폆 ?ㅼ틪",
+    "early_session": "?쇰━?몄뀡 ?ㅼ틪 ?μ쨷 誘명솗??異붿꽭",
 }
 US_MARKET_OPEN_ET = dt_time(9, 30)
 US_MARKET_CLOSE_ET = dt_time(16, 0)
 US_REGULAR_SESSION_MINUTES = 390.0
 
 ETF_UNIVERSE_ITEMS: tuple[dict[str, str], ...] = (
-    {"requested": "러셀1000", "resolved": "IWB"},
+    {"requested": "?ъ?1000", "resolved": "IWB"},
     {"requested": "MSCI(USA)", "resolved": "EUSA"},
-    {"requested": "나스닥100", "resolved": "QQQ"},
+    {"requested": "?섏뒪??00", "resolved": "QQQ"},
     {"requested": "S&P500", "resolved": "SPY"},
 )
 RUSSELL2000_UNIVERSE_ITEMS: tuple[dict[str, str], ...] = (
-    {"requested": "러셀2000", "resolved": "IWM"},
+    {"requested": "?ъ?2000", "resolved": "IWM"},
 )
 UNIVERSE_PROFILE_ITEMS: dict[str, tuple[dict[str, str], ...]] = {
     "default": ETF_UNIVERSE_ITEMS,
@@ -77,10 +77,10 @@ UNIVERSE_PROFILE_ITEMS: dict[str, tuple[dict[str, str], ...]] = {
 }
 
 SCANNER_TRANSITION_CFG = {
-    "UTBot_Buy": {"label": "UTBot 전환↑", "icon": "▲", "dir": "buy"},
-    "UTBot_Sell": {"label": "UTBot 전환↓", "icon": "▼", "dir": "sell"},
-    "Hull_Turn_Bull": {"label": "HULL 전환↑", "icon": "▲", "dir": "buy"},
-    "Hull_Turn_Bear": {"label": "HULL 전환↓", "icon": "▼", "dir": "sell"},
+    "UTBot_Buy": {"label": "UTBot Buy Turn", "icon": "UTB", "dir": "buy"},
+    "UTBot_Sell": {"label": "UTBot Sell Turn", "icon": "UTS", "dir": "sell"},
+    "Hull_Turn_Bull": {"label": "HULL Buy Turn", "icon": "HUB", "dir": "buy"},
+    "Hull_Turn_Bear": {"label": "HULL Sell Turn", "icon": "HUS", "dir": "sell"},
 }
 
 POST_CLOSE_LATEST_SESSION_FIELD_SPECS: tuple[dict[str, str], ...] = (
@@ -161,32 +161,32 @@ GAP_SETUP_MAX_SCORE = 11
 POCKET_PIVOT_MAX_SCORE = 12
 POST_CLOSE_SUMMARY_SECTION_TOTAL = 10
 POST_CLOSE_SECTION_TITLES = {
-    "legacy_turn": "매수전환 (이전버전)",
-    "legacy_pullback": "눌림 재진입 (이전버전)",
-    "legacy_hull_bear": "HULL 매도전환 (이전버전)",
-    "legacy_52w_high": "52주 신고가 (이전버전)",
-    "pullback_filter": "눌림목 필터",
-    "chase_filter": "추세추종 필터",
-    "buy_turn_filter": "매수전환 필터",
-    "gap_setup": "에너지 압축 → 돌파 임박",
-    "pocket_pivot": "기관 매집 포착",
-    "five_day_top": "5일 변동률 상위종목",
+    "legacy_turn": "留ㅼ닔?꾪솚 (?댁쟾踰꾩쟾)",
+    "legacy_pullback": "?뚮┝ ?ъ쭊??(?댁쟾踰꾩쟾)",
+    "legacy_hull_bear": "HULL 留ㅻ룄?꾪솚 (?댁쟾踰꾩쟾)",
+    "legacy_52w_high": "52二??좉퀬媛 (?댁쟾踰꾩쟾)",
+    "pullback_filter": "?뚮┝紐??꾪꽣",
+    "chase_filter": "異붿꽭異붿쥌 ?꾪꽣",
+    "buy_turn_filter": "留ㅼ닔?꾪솚 ?꾪꽣",
+    "gap_setup": "?먮꼫吏 ?뺤텞 ???뚰뙆 ?꾨컯",
+    "pocket_pivot": "湲곌? 留ㅼ쭛 ?ъ갑",
+    "five_day_top": "5??蹂?숇쪧 ?곸쐞醫낅ぉ",
 }
 POST_CLOSE_INDEX_TITLES = {
-    "legacy_turn": "매수전환(이전버전)",
-    "legacy_pullback": "눌림 재진입(이전버전)",
-    "legacy_hull_bear": "HULL 매도전환(이전버전)",
-    "legacy_52w_high": "52주 신고가(이전버전)",
-    "pullback_filter": "눌림목 필터",
-    "chase_filter": "추세추종 필터",
-    "buy_turn_filter": "매수전환 필터",
-    "gap_setup": "에너지 압축 → 돌파 임박",
-    "pocket_pivot": "기관 매집 포착",
-    "five_day_top": "5일 변동률 상위종목",
+    "legacy_turn": "留ㅼ닔?꾪솚(?댁쟾踰꾩쟾)",
+    "legacy_pullback": "?뚮┝ ?ъ쭊???댁쟾踰꾩쟾)",
+    "legacy_hull_bear": "HULL 留ㅻ룄?꾪솚(?댁쟾踰꾩쟾)",
+    "legacy_52w_high": "52二??좉퀬媛(?댁쟾踰꾩쟾)",
+    "pullback_filter": "?뚮┝紐??꾪꽣",
+    "chase_filter": "異붿꽭異붿쥌 ?꾪꽣",
+    "buy_turn_filter": "留ㅼ닔?꾪솚 ?꾪꽣",
+    "gap_setup": "?먮꼫吏 ?뺤텞 ???뚰뙆 ?꾨컯",
+    "pocket_pivot": "湲곌? 留ㅼ쭛 ?ъ갑",
+    "five_day_top": "5??蹂?숇쪧 ?곸쐞醫낅ぉ",
 }
 POST_CLOSE_FINAL_TOP_N = 30
-POST_CLOSE_FINAL_SECTION_NAME = "오늘 진입 후보 Top30 (A/B/C 통과만)"
-POST_CLOSE_FINAL_INDEX_TITLE = "오늘 진입 후보 Top30"
+POST_CLOSE_FINAL_SECTION_NAME = "?ㅻ뒛 吏꾩엯 ?꾨낫 Top30 (A/B/C ?듦낵留?"
+POST_CLOSE_FINAL_INDEX_TITLE = "?ㅻ뒛 吏꾩엯 ?꾨낫 Top30"
 POST_CLOSE_FINAL_ENTRY_FIELD_SPECS: tuple[dict[str, str], ...] = (
     {"group": "final", "key": "a_score", "label": "AScore", "type": "number", "description": "Trend quality score (A)", "rule": "5-point score", "example": "4"},
     {"group": "final", "key": "b_score", "label": "BScore", "type": "number", "description": "Entry timing score (B)", "rule": "5-point score", "example": "3"},
@@ -195,6 +195,47 @@ POST_CLOSE_FINAL_ENTRY_FIELD_SPECS: tuple[dict[str, str], ...] = (
     {"group": "final", "key": "final_entry_rank", "label": "FinalEntryRank", "type": "number", "description": "Top-N rank among eligible rows", "rule": "1..N when selected", "example": "1"},
     {"group": "final", "key": "final_entry_selected", "label": "FinalEntrySelected", "type": "bool", "description": "Selected for final Top-N", "rule": "within final rank top N", "example": "Y"},
     {"group": "final", "key": "final_entry_reason", "label": "FinalEntryReason", "type": "text", "description": "A/B/C score summary and gate result", "rule": "A#/B#/C# + PASS/FAIL reason", "example": "A4/B3/C2 | PASS"},
+)
+EARLY_SESSION_CORE_TOP_N = 20
+EARLY_SESSION_EXTENDED_SECTION_TOTAL = 10
+EARLY_SESSION_INDEX_TITLES = {
+    "legacy_turn": "留ㅼ닔?꾪솚",
+    "legacy_pullback": "눌림목",
+    "legacy_hull_bear": "HULL留ㅻ룄",
+    "legacy_52w_high": "52W ?좉퀬媛",
+    "gap_momentum": "媛?긽??紐⑤찘?",
+    "inflow_top": "?쒖킑?鍮?吏묒쨷 ?먭툑 ?좎엯",
+    "gap_setup": "?먮꼫吏 ?뺤텞 ???뚰뙆 ?꾨컯",
+    "pocket_pivot": "湲곌? 留ㅼ쭛 ?ъ갑",
+    "five_day_top": "5??蹂?숇쪧 ?곸쐞醫낅ぉ",
+    "optimal_entry": "理쒖쟻吏꾩엯",
+}
+EARLY_SESSION_SECTION_TITLES = {
+    "legacy_turn": "留ㅼ닔?꾪솚",
+    "legacy_pullback": "눌림목 재진입",
+    "legacy_hull_bear": "?뱀씪 HULL 留ㅻ룄",
+    "legacy_52w_high": "52二??좉퀬媛 媛깆떊",
+    "gap_momentum": "媛?긽??紐⑤찘?",
+    "inflow_top": "?쒖킑?鍮?吏묒쨷 ?먭툑 ?좎엯",
+    "gap_setup": "?먮꼫吏 ?뺤텞 ???뚰뙆 ?꾨컯",
+    "pocket_pivot": "湲곌? 留ㅼ쭛 ?ъ갑",
+    "five_day_top": "5??蹂?숇쪧 ?곸쐞醫낅ぉ",
+    "optimal_entry": "?꾩떆??理쒖쟻吏꾩엯 Top20",
+}
+EARLY_SESSION_EXTRA_FIELD_SPECS: tuple[dict[str, str], ...] = (
+    {"group": "session", "key": "session_open", "label": "SessionOpen", "type": "number", "description": "Current session open", "rule": "latest open", "example": "102.35"},
+    {"group": "session", "key": "session_prev_close", "label": "SessionPrevClose", "type": "number", "description": "Previous close used for session gap", "rule": "prev close", "example": "100.12"},
+    {"group": "session", "key": "session_gap_pct", "label": "SessionGap(%)", "type": "number", "description": "Session gap percent", "rule": "(open-prev_close)/prev_close*100", "example": "2.23"},
+    {"group": "flow", "key": "market_cap", "label": "MarketCap", "type": "number", "description": "Market cap from TradingView", "rule": "market_cap_basic", "example": "1230000000"},
+    {"group": "flow", "key": "effective_dollar_volume", "label": "EffectiveDollarVolume", "type": "number", "description": "Dollar volume proxy for inflow ranking", "rule": "dollar_volume_20", "example": "254000000"},
+    {"group": "flow", "key": "mcap_turnover_pct", "label": "MCapTurnover(%)", "type": "number", "description": "Dollar volume to market cap turnover percent", "rule": "effective_dollar_volume/market_cap*100", "example": "0.21"},
+    {"group": "flow", "key": "early_inflow_score", "label": "EarlyInflowScore", "type": "number", "description": "Hybrid inflow ranking score", "rule": "turnover score or fallback proxy", "example": "78.3"},
+    {"group": "flow", "key": "early_inflow_source", "label": "EarlyInflowSource", "type": "text", "description": "Inflow score source", "rule": "turnover_or_fallback", "example": "turnover"},
+    {"group": "momentum", "key": "early_gap_momo_score", "label": "EarlyGapMomentumScore", "type": "number", "description": "Gap momentum ranking score", "rule": "gap+change+dollar weighted", "example": "84.1"},
+)
+EARLY_SESSION_LATEST_SESSION_FIELD_SPECS: tuple[dict[str, str], ...] = (
+    {"group": "session", "key": "latest_session_utbot_buy_turn", "label": "RecentSessionUTBotBuyTurn", "type": "bool", "description": "UTBot buy turn on current US session", "rule": "utbot_buy_last_date == target session", "example": "Y"},
+    {"group": "session", "key": "latest_session_hull_buy_turn", "label": "RecentSessionHULLBuyTurn", "type": "bool", "description": "Hull buy turn on current US session", "rule": "hull_turn_bull_last_date == target session", "example": "N"},
 )
 GAP_SETUP_HIT_LABELS = {
     "DryUp": "거래량건조",
@@ -209,7 +250,7 @@ GAP_SETUP_HIT_LABELS = {
     "Inside": "인사이드",
     "3WT": "3주타이트",
     "Tight3": "3일타이트",
-    "52W<2%": "52주고점-2%",
+    "52W<2%": "52주고점2%",
     "WUp": "주간상승",
 }
 POCKET_PIVOT_HIT_LABELS = {
@@ -341,6 +382,67 @@ def _clip(value: float, lower: float, upper: float) -> float:
     return min(upper, max(lower, value))
 
 
+def _chunked_symbols(symbols: list[str], chunk_size: int) -> list[list[str]]:
+    cleaned = [str(symbol or "").strip().upper() for symbol in symbols or [] if str(symbol or "").strip()]
+    size = max(1, int(chunk_size or 1))
+    return [cleaned[idx : idx + size] for idx in range(0, len(cleaned), size)]
+
+
+def _fetch_tv_market_caps(tickers: list[str]) -> dict[str, float]:
+    if not tickers:
+        return {}
+    market_caps: dict[str, float] = {}
+    for chunk in _chunked_symbols(tickers, 350):
+        try:
+            response = requests.post(
+                "https://scanner.tradingview.com/america/scan",
+                json={
+                    "filter": [{"left": "name", "operation": "in_range", "right": chunk}],
+                    "columns": ["name", "market_cap_basic"],
+                    "range": [0, len(chunk) + 50],
+                },
+                timeout=12,
+            )
+            response.raise_for_status()
+            payload = response.json()
+        except Exception:
+            continue
+        for item in list(payload.get("data") or []):
+            values = list(item.get("d") or [])
+            if len(values) < 2:
+                continue
+            symbol = str(values[0] or "").strip().upper()
+            market_cap = _safe_float(values[1], 0.0)
+            if symbol and market_cap > 0.0:
+                market_caps[symbol] = market_cap
+    return market_caps
+
+
+def _with_early_session_flow_metrics(rows: Iterable[Mapping[str, Any]]) -> tuple[list[dict[str, Any]], int]:
+    row_list = [dict(row or {}) for row in (rows or [])]
+    ticker_list = [str(row.get("ticker", "")).strip().upper() for row in row_list if str(row.get("ticker", "")).strip()]
+    market_caps = _fetch_tv_market_caps(ticker_list)
+    covered = 0
+    for row in row_list:
+        ticker = str(row.get("ticker", "")).strip().upper()
+        market_cap = _safe_float(market_caps.get(ticker, row.get("market_cap", 0.0)), 0.0)
+        if market_cap > 0.0:
+            covered += 1
+        effective_dollar = max(_safe_float(row.get("dollar_volume_20", 0.0)), 0.0)
+        turnover_pct = (effective_dollar / market_cap * 100.0) if market_cap > 0.0 else 0.0
+        cmf_norm = _clip((_safe_float(row.get("cmf", 0.0)) + 0.20) / 0.60, 0.0, 1.0)
+        obv_norm = _clip(_safe_float(row.get("obv_slope", 0.0)) / 0.50, 0.0, 1.0)
+        vol_norm = _clip(_safe_float(row.get("volume_ratio_20", 0.0)) / 2.0, 0.0, 1.0)
+        dollar_norm = _clip(math.log10(max(1.0, effective_dollar)) / 9.0, 0.0, 1.0)
+        fallback_score = (dollar_norm * 50.0) + (cmf_norm * 20.0) + (obv_norm * 20.0) + (vol_norm * 10.0)
+
+        row["market_cap"] = market_cap
+        row["effective_dollar_volume"] = effective_dollar
+        row["mcap_turnover_pct"] = turnover_pct
+        row["early_inflow_fallback_score"] = round(fallback_score, 4)
+    return row_list, covered
+
+
 def _series_last_true_timestamp(frame: Any, column: str) -> Any:
     if frame is None or column not in getattr(frame, "columns", []):
         return None
@@ -361,14 +463,14 @@ def _series_last_true_timestamp(frame: Any, column: str) -> Any:
 
 def _timestamp_to_iso(ts: Any) -> str:
     if ts is None:
-        return "없음"
+        return "?놁쓬"
     if hasattr(ts, "date"):
         try:
             return ts.date().isoformat()
         except Exception:
             pass
     text = str(ts or "").strip()
-    return text[:10] if text else "없음"
+    return text[:10] if text else "?놁쓬"
 
 
 def _days_since_timestamp(as_of: Any, ts: Any) -> int:
@@ -529,7 +631,7 @@ def _compute_post_close_row_metrics(frame: Any) -> dict[str, Any]:
         "days_since_utbot_buy": 0,
         "days_since_hull_turn_bull": 0,
         "days_since_hull_turn_bear": 0,
-        "system_turn_bull_last_date": "없음",
+        "system_turn_bull_last_date": "?놁쓬",
         "volume_dry_up_score": 0.0,
         "volume_expansion_score": 0.0,
         "obv_slope": 0.0,
@@ -906,7 +1008,7 @@ def _scan_label_for_profile(profile: str) -> str:
     normalized = _normalize_universe_profile(profile)
     if normalized == "russell2000":
         return "Extended Scan:RUSSELL2000"
-    return "자동 스캔"
+    return "?먮룞 ?ㅼ틪"
 
 
 def build_scan_universe(
@@ -1005,6 +1107,8 @@ def _build_scanner_row(ticker: str, *, bias_mode: str, recent_window: int = 5, h
         chg_value = _safe_float(current_close - prev_close)
         chg_pct = _safe_float((current_close - prev_close) / prev_close * 100) if prev_close else 0.0
         chg_5d_pct = _safe_float((current_close - close_5d_ago) / close_5d_ago * 100) if close_5d_ago else 0.0
+        session_open = _safe_float(latest.get("Open", current_close))
+        session_gap_pct = _safe_float((session_open - prev_close) / prev_close * 100) if prev_close else 0.0
         buy_total = _safe_float(latest.get("Buy_Total", 0))
         sell_total = _safe_float(latest.get("Sell_Total", 0))
         buy_agree = int(_safe_float(latest.get("Buy_Agree", 0)))
@@ -1157,6 +1261,9 @@ def _build_scanner_row(ticker: str, *, bias_mode: str, recent_window: int = 5, h
             "chg_value": chg_value,
             "chg": chg_pct,
             "chg_5d": chg_5d_pct,
+            "session_open": session_open,
+            "session_prev_close": prev_close,
+            "session_gap_pct": session_gap_pct,
             "scans": sorted(combos, key=lambda item: item["tier"]),
             "transitions": transitions,
             "multi_sig": multi_sig,
@@ -1203,25 +1310,25 @@ def _build_scanner_row(ticker: str, *, bias_mode: str, recent_window: int = 5, h
             "pullback_reentry": bool(profile_flags.get("pullback_reentry", False)),
             "low_conflict_bullish": bool(profile_flags.get("low_conflict_bullish", False)),
             "utbot_buy_recent": bool(detected_payload.get("utbot_buy_recent", False)),
-            "utbot_buy_last_date": str(detected_payload.get("utbot_buy_last_date", "없음")),
+            "utbot_buy_last_date": str(detected_payload.get("utbot_buy_last_date", "?놁쓬")),
             "utbot_sell_recent": bool(detected_payload.get("utbot_sell_recent", False)),
-            "utbot_sell_last_date": str(detected_payload.get("utbot_sell_last_date", "없음")),
+            "utbot_sell_last_date": str(detected_payload.get("utbot_sell_last_date", "?놁쓬")),
             "hull_turn_bull_recent": bool(detected_payload.get("hull_turn_bull_recent", False)),
-            "hull_turn_bull_last_date": str(detected_payload.get("hull_turn_bull_last_date", "없음")),
+            "hull_turn_bull_last_date": str(detected_payload.get("hull_turn_bull_last_date", "?놁쓬")),
             "hull_turn_bear_recent": bool(detected_payload.get("hull_turn_bear_recent", False)),
-            "hull_turn_bear_last_date": str(detected_payload.get("hull_turn_bear_last_date", "없음")),
-            "latest_bar_date": str(latest_bar_date or "없음"),
+            "hull_turn_bear_last_date": str(detected_payload.get("hull_turn_bear_last_date", "?놁쓬")),
+            "latest_bar_date": str(latest_bar_date or "?놁쓬"),
             "new_52w_high": bool(latest.get("New_52W_High", False)),
             "new_52w_closing_high": bool(latest.get("New_52W_Closing_High", False)),
             "detected_combo_count": int(detected_payload.get("detected_combo_count", 0) or 0),
-            "detected_combo_summary": str(detected_payload.get("detected_combo_summary", "없음")),
+            "detected_combo_summary": str(detected_payload.get("detected_combo_summary", "?놁쓬")),
             "detected_transition_count": int(detected_payload.get("detected_transition_count", 0) or 0),
-            "detected_transition_summary": str(detected_payload.get("detected_transition_summary", "없음")),
+            "detected_transition_summary": str(detected_payload.get("detected_transition_summary", "?놁쓬")),
             "detected_core_count": int(detected_payload.get("detected_core_count", 0) or 0),
-            "detected_core_summary": str(detected_payload.get("detected_core_summary", "없음")),
+            "detected_core_summary": str(detected_payload.get("detected_core_summary", "?놁쓬")),
             "detected_signal_total_count": int(detected_payload.get("detected_signal_total_count", 0) or 0),
-            "detected_buy_signal_latest_date": str(detected_payload.get("detected_buy_signal_latest_date", "없음")),
-            "detected_signal_latest_date": str(detected_payload.get("detected_signal_latest_date", "없음")),
+            "detected_buy_signal_latest_date": str(detected_payload.get("detected_buy_signal_latest_date", "?놁쓬")),
+            "detected_signal_latest_date": str(detected_payload.get("detected_signal_latest_date", "?놁쓬")),
             "detected_signals": list(detected_payload.get("all_items", [])),
             "watch_buy_plus": watch_buy_plus,
             "buy_combo_present": buy_combo_present,
@@ -1535,7 +1642,7 @@ def merge_shard_scan_rows(merge_dir: Path, *, required_run_stamp: str | None = N
 
 def _parse_iso_date(value: Any) -> date | None:
     text = str(value or "").strip()
-    if not text or text in {"없음", "?놁쓬", "-", "N/A"}:
+    if not text or text in {"?놁쓬", "??곸벉", "-", "N/A"}:
         return None
     try:
         return datetime.strptime(text, "%Y-%m-%d").date()
@@ -1568,7 +1675,7 @@ def _last_us_market_session_date(run_at_kst: datetime) -> date:
 
 
 def _current_us_session_date(run_at_kst: datetime) -> date:
-    """현재 진행 중이거나 가장 가까운 미국장 세션 날짜 반환 (early_session용)."""
+    """?꾩옱 吏꾪뻾 以묒씠嫄곕굹 媛??媛源뚯슫 誘멸뎅???몄뀡 ?좎쭨 諛섑솚 (early_session??."""
     us_now = run_at_kst.astimezone(US_EASTERN)
     session_date = us_now.date()
     while session_date.weekday() >= 5:
@@ -1577,22 +1684,22 @@ def _current_us_session_date(run_at_kst: datetime) -> date:
 
 
 def _resolve_target_session_date(run_at_kst: datetime, scan_mode: str) -> date:
-    """scan_mode에 따라 적절한 타겟 세션 날짜 반환."""
+    """scan_mode???곕씪 ?곸젅???寃??몄뀡 ?좎쭨 諛섑솚."""
     if scan_mode == "early_session":
         return _current_us_session_date(run_at_kst)
     return _last_us_market_session_date(run_at_kst)
 
 
 def _scan_label_for_mode(scan_mode: str, universe_profile: str) -> str:
-    """scan_mode와 universe_profile을 조합하여 라벨 생성."""
-    base = SCAN_MODE_LABELS.get(scan_mode, "자동 스캔")
+    """scan_mode? universe_profile??議고빀?섏뿬 ?쇰꺼 ?앹꽦."""
+    base = SCAN_MODE_LABELS.get(scan_mode, "?먮룞 ?ㅼ틪")
     if _normalize_universe_profile(universe_profile) == "russell2000":
         return f"{base}:RUSSELL2000"
     return base
 
 
 def _history_period_for_mode(scan_mode: str) -> str:
-    """scan_mode에 따라 yfinance history period 결정."""
+    """scan_mode별 yfinance history period 결정."""
     if scan_mode == "pre_market":
         return "5d"
     if scan_mode == "early_session":
@@ -1605,12 +1712,12 @@ def _time_adjusted_volume_threshold(
     *,
     base_threshold: float = 1.0,
 ) -> float:
-    """장개시 후 경과 시간에 비례한 거래량 임계값 반환.
+    """?κ컻????寃쎄낵 ?쒓컙??鍮꾨???嫄곕옒???꾧퀎媛?諛섑솚.
 
-    보정 모델 (U-shape 반영):
-    - 처음 30분: 하루 거래대금의 약 25%
-    - 30~60분: 추가 약 15%
-    - 60분 이후: 나머지 약 60% 분포
+    蹂댁젙 紐⑤뜽 (U-shape 諛섏쁺):
+    - 泥섏쓬 30遺? ?섎（ 嫄곕옒?湲덉쓽 ??25%
+    - 30~60遺? 異붽? ??15%
+    - 60遺??댄썑: ?섎㉧吏 ??60% 遺꾪룷
     """
     us_now = run_at_kst.astimezone(US_EASTERN)
     market_open = us_now.replace(
@@ -1645,9 +1752,9 @@ def _transition_signals_on_date(row: Mapping[str, Any], target_date: date) -> li
     utbot_buy_date = _parse_iso_date(row.get("utbot_buy_last_date"))
     hull_buy_date = _parse_iso_date(row.get("hull_turn_bull_last_date"))
     if utbot_buy_date == target_date:
-        signals.append("UTBot 매수")
+        signals.append("UTBot 留ㅼ닔")
     if hull_buy_date == target_date:
-        signals.append("HULL 매수")
+        signals.append("HULL 留ㅼ닔")
     return signals
 
 
@@ -1736,6 +1843,7 @@ def _with_post_close_final_top20_scores(
     run_at_kst: datetime,
     scan_mode: str = "post_close",
     top_n: int = POST_CLOSE_FINAL_TOP_N,
+    apply_gate: bool = True,
 ) -> list[dict[str, Any]]:
     row_list: list[dict[str, Any]] = [dict(row or {}) for row in (rows or [])]
     target_date = _resolve_target_session_date(run_at_kst, scan_mode)
@@ -1821,7 +1929,8 @@ def _with_post_close_final_top20_scores(
         if eligible:
             eligible_rows.append(row_dict)
 
-    selected_rows = sorted(eligible_rows, key=_final_entry_sort_key)[:top_limit]
+    selection_pool = eligible_rows if bool(apply_gate) else row_list
+    selected_rows = sorted(selection_pool, key=_final_entry_sort_key)[:top_limit]
     for rank, row_dict in enumerate(selected_rows, start=1):
         row_dict["final_entry_rank"] = rank
         row_dict["final_entry_selected"] = True
@@ -1874,10 +1983,10 @@ def _translate_pocket_pivot_hit_label(label: Any) -> str:
     text = str(label or "").strip()
     up_match = re.fullmatch(r"Up(\d+)", text)
     if up_match:
-        return f"연속상승{up_match.group(1)}"
+        return f"UpTrend{up_match.group(1)}"
     pivot_match = re.fullmatch(r"PP(\d+)", text)
     if pivot_match:
-        return f"포켓피벗{pivot_match.group(1)}일"
+        return f"PocketPivot{pivot_match.group(1)}"
     return POCKET_PIVOT_HIT_LABELS.get(text, text)
 
 
@@ -2074,7 +2183,7 @@ def select_post_close_top_5d_rows_for_telegram(rows: Iterable[Mapping[str, Any]]
         chg_5d = _safe_float(row_dict.get("chg_5d", 0.0))
         if chg_5d <= 0.0:
             continue
-        row_dict["five_day_top_tag"] = f"5일 {chg_5d:+.2f}%"
+        row_dict["five_day_top_tag"] = f"5??{chg_5d:+.2f}%"
         selected.append(row_dict)
     selected.sort(
         key=lambda row: (
@@ -2085,6 +2194,98 @@ def select_post_close_top_5d_rows_for_telegram(rows: Iterable[Mapping[str, Any]]
         )
     )
     return selected[:POST_CLOSE_SETUP_TOP_N]
+
+
+def _with_early_session_gap_momentum_scores(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    top_n: int = EARLY_SESSION_CORE_TOP_N,
+) -> list[dict[str, Any]]:
+    selected: list[dict[str, Any]] = []
+    for row in rows or []:
+        row_dict = dict(row or {})
+        row_dict["early_gap_momo_score"] = 0.0
+        if _coerce_bool(row_dict.get("thin_trade_risk", False)):
+            continue
+        gap_pct = _safe_float(row_dict.get("session_gap_pct", row_dict.get("gap_pct", 0.0)))
+        change_pct = _safe_float(row_dict.get("chg", 0.0))
+        effective_dollar = _safe_float(row_dict.get("effective_dollar_volume", row_dict.get("dollar_volume_20", 0.0)))
+        if gap_pct <= 0.0 or change_pct <= 0.0:
+            continue
+        gap_norm = _clip(gap_pct / 8.0, 0.0, 1.0)
+        change_norm = _clip(change_pct / 6.0, 0.0, 1.0)
+        dollar_norm = _clip(math.log10(max(1.0, effective_dollar)) / 9.0, 0.0, 1.0)
+        score = (gap_norm * 60.0) + (change_norm * 30.0) + (dollar_norm * 10.0)
+        row_dict["early_gap_momo_score"] = round(score, 4)
+        row_dict["early_gap_momo_tag"] = f"GAP{gap_pct:+.2f}% | ?μ쨷{change_pct:+.2f}%"
+        selected.append(row_dict)
+    selected.sort(
+        key=lambda row: (
+            -_safe_float(row.get("early_gap_momo_score", 0.0)),
+            -_safe_float(row.get("session_gap_pct", row.get("gap_pct", 0.0))),
+            -_safe_float(row.get("chg", 0.0)),
+            -_safe_float(row.get("effective_dollar_volume", row.get("dollar_volume_20", 0.0))),
+            str(row.get("ticker", "")),
+        )
+    )
+    return selected[: max(0, int(top_n or 0))]
+
+
+def _with_early_session_inflow_scores(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    top_n: int = EARLY_SESSION_CORE_TOP_N,
+) -> list[dict[str, Any]]:
+    selected: list[dict[str, Any]] = []
+    for row in rows or []:
+        row_dict = dict(row or {})
+        row_dict["early_inflow_score"] = 0.0
+        row_dict["early_inflow_source"] = "none"
+        if _coerce_bool(row_dict.get("thin_trade_risk", False)):
+            continue
+        turnover_pct = _safe_float(row_dict.get("mcap_turnover_pct", 0.0))
+        effective_dollar = _safe_float(row_dict.get("effective_dollar_volume", row_dict.get("dollar_volume_20", 0.0)))
+        dollar_norm = _clip(math.log10(max(1.0, effective_dollar)) / 9.0, 0.0, 1.0)
+        fallback_score = _safe_float(row_dict.get("early_inflow_fallback_score", 0.0))
+        if turnover_pct > 0.0 and effective_dollar > 0.0:
+            turnover_norm = _clip(turnover_pct / 0.08, 0.0, 1.0)
+            score = (turnover_norm * 80.0) + (dollar_norm * 20.0)
+            source = "turnover"
+        else:
+            score = fallback_score
+            source = "fallback"
+        if score <= 0.0:
+            continue
+        row_dict["early_inflow_score"] = round(score, 4)
+        row_dict["early_inflow_source"] = source
+        row_dict["early_inflow_tag"] = f"{source} | turnover{turnover_pct:.3f}%"
+        selected.append(row_dict)
+    selected.sort(
+        key=lambda row: (
+            -_safe_float(row.get("early_inflow_score", 0.0)),
+            -_safe_float(row.get("mcap_turnover_pct", 0.0)),
+            -_safe_float(row.get("effective_dollar_volume", row.get("dollar_volume_20", 0.0))),
+            -_safe_float(row.get("cmf", 0.0)),
+            str(row.get("ticker", "")),
+        )
+    )
+    return selected[: max(0, int(top_n or 0))]
+
+
+def _select_early_session_optimal_entry_rows(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    top_n: int = EARLY_SESSION_CORE_TOP_N,
+) -> list[dict[str, Any]]:
+    selected = select_post_close_final_top_rows_for_telegram(rows, top_n=top_n)
+    for row in selected:
+        row_dict = dict(row or {})
+        row_dict["early_optimal_entry_tag"] = (
+            f"{str(row_dict.get('final_entry_reason') or '-')}"
+            f" | ?먯닔 {_safe_float(row_dict.get('final_entry_score', 0.0)):.2f}"
+        )
+        row.update(row_dict)
+    return selected
 
 
 def select_us_session_hull_bear_rows(rows: Iterable[Mapping[str, Any]], *, run_at_kst: datetime, scan_mode: str = "post_close") -> list[dict[str, Any]]:
@@ -2133,7 +2334,7 @@ def _is_buy_turn_signal(signal: Any, *, engine: str) -> bool:
     text = str(signal or "").strip().lower()
     if engine not in text:
         return False
-    return "buy" in text or "매수" in str(signal or "")
+    return "buy" in text or "留ㅼ닔" in str(signal or "")
 
 
 def _post_close_buy_turn_label(row: Mapping[str, Any]) -> str:
@@ -2201,11 +2402,11 @@ def _build_summary_section_lines(
     limited_rows = all_rows if int(summary_limit) <= 0 else all_rows[: int(summary_limit)]
     lines = [
         f"=== [{section_index}/{section_total}] {section_name} ===",
-        f"기준: {criteria}",
+        f"湲곗?: {criteria}",
         f"건수: {len(all_rows)}개",
     ]
     if not all_rows:
-        lines.append("- 해당 없음")
+        lines.append("- ?대떦 ?놁쓬")
         return lines
     for idx, row in enumerate(limited_rows, start=1):
         if row_builder is not None:
@@ -2225,7 +2426,7 @@ def build_transition_summary(
     universe_count: int,
     result_count: int,
     skip_count: int,
-    scan_label: str = "자동 스캔",
+    scan_label: str = "?먮룞 ?ㅼ틪",
     detected_turn_count: int | None = None,
     summary_limit: int = 0,
     pullback_rows: Iterable[Mapping[str, Any]] | None = None,
@@ -2233,72 +2434,98 @@ def build_transition_summary(
     high_52w_rows: Iterable[Mapping[str, Any]] | None = None,
     scan_mode: str = "post_close",
     volume_threshold: float | None = None,
+    gap_momentum_rows: Iterable[Mapping[str, Any]] | None = None,
+    inflow_top_rows: Iterable[Mapping[str, Any]] | None = None,
+    gap_setup_rows: Iterable[Mapping[str, Any]] | None = None,
+    pocket_pivot_rows: Iterable[Mapping[str, Any]] | None = None,
+    five_day_top_rows: Iterable[Mapping[str, Any]] | None = None,
+    optimal_entry_rows: Iterable[Mapping[str, Any]] | None = None,
 ) -> str:
     buy_rows = [dict(row or {}) for row in (turn_rows or [])]
     pullback_rows_list = [dict(row or {}) for row in (pullback_rows or [])]
     hull_bear_rows_list = [dict(row or {}) for row in (hull_bear_rows or [])]
     high_52w_rows_list = [dict(row or {}) for row in (high_52w_rows or [])]
+    gap_momentum_rows_list = [dict(row or {}) for row in (gap_momentum_rows or [])]
+    inflow_top_rows_list = [dict(row or {}) for row in (inflow_top_rows or [])]
+    gap_setup_rows_list = [dict(row or {}) for row in (gap_setup_rows or [])]
+    pocket_pivot_rows_list = [dict(row or {}) for row in (pocket_pivot_rows or [])]
+    five_day_top_rows_list = [dict(row or {}) for row in (five_day_top_rows or [])]
+    optimal_entry_rows_list = [dict(row or {}) for row in (optimal_entry_rows or [])]
     detected_count = len(buy_rows) if detected_turn_count is None else max(0, int(detected_turn_count))
     target_us_session_date = _resolve_target_session_date(run_at_kst, scan_mode)
 
     index_line = (
-        f"- 요약 인덱스: 매수전환 {len(buy_rows)}"
-        f" | 눌림목 {len(pullback_rows_list)}"
-        f" | HULL매도 {len(hull_bear_rows_list)}"
-        f" | 52W 신고가 {len(high_52w_rows_list)}"
+        f"- ?붿빟 ?몃뜳?? 留ㅼ닔?꾪솚 {len(buy_rows)}"
+        f" | ?뚮┝紐?{len(pullback_rows_list)}"
+        f" | HULL留ㅻ룄 {len(hull_bear_rows_list)}"
+        f" | 52W ?좉퀬媛 {len(high_52w_rows_list)}"
     )
+    if scan_mode == "early_session":
+        index_line = (
+            f"- ?붿빟 ?몃뜳?? {EARLY_SESSION_INDEX_TITLES['legacy_turn']} {len(buy_rows)}"
+            f" | {EARLY_SESSION_INDEX_TITLES['legacy_pullback']} {len(pullback_rows_list)}"
+            f" | {EARLY_SESSION_INDEX_TITLES['legacy_hull_bear']} {len(hull_bear_rows_list)}"
+            f" | {EARLY_SESSION_INDEX_TITLES['legacy_52w_high']} {len(high_52w_rows_list)}"
+            f" | {EARLY_SESSION_INDEX_TITLES['gap_momentum']} {len(gap_momentum_rows_list)}"
+            f" | {EARLY_SESSION_INDEX_TITLES['inflow_top']} {len(inflow_top_rows_list)}"
+            f" | {EARLY_SESSION_INDEX_TITLES['gap_setup']} {len(gap_setup_rows_list)}"
+            f" | {EARLY_SESSION_INDEX_TITLES['pocket_pivot']} {len(pocket_pivot_rows_list)}"
+            f" | {EARLY_SESSION_INDEX_TITLES['five_day_top']} {len(five_day_top_rows_list)}"
+            f" | {EARLY_SESSION_INDEX_TITLES['optimal_entry']} {len(optimal_entry_rows_list)}"
+        )
 
     if scan_mode == "pre_market":
         lines = [
-            f"[{str(scan_label or '프리마켓 스캔')}] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
-            f"- 기준: 전일 미국장 확정 데이터({target_us_session_date.isoformat()})",
-            f"- 목적: 오늘 본장에서 주목할 종목 선점",
+            f"[{str(scan_label or '?꾨━留덉폆 ?ㅼ틪')}] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
+            f"- 湲곗?: ?꾩씪 誘멸뎅???뺤젙 ?곗씠??{target_us_session_date.isoformat()})",
+            f"- 紐⑹쟻: ?ㅻ뒛 蹂몄옣?먯꽌 二쇰ぉ??醫낅ぉ ?좎젏",
             f"- 유니버스: {universe_count}개 | 스캔 결과: {result_count}개",
             index_line,
             "",
         ]
     elif scan_mode == "early_session":
-        vol_text = f"{volume_threshold:.3f}x" if volume_threshold is not None else "시간비례"
+        vol_text = f"{volume_threshold:.3f}x" if volume_threshold is not None else "?쒓컙鍮꾨?"
         lines = [
-            f"[{str(scan_label or '얼리세션 스캔')}] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
-            f"- 기준: 당일 미국장 장중 스냅샷 데이터({target_us_session_date.isoformat()}) 추세 미확정",
-            f"- 목적: 장 시작 전 강세 종목 빠른 포착",
-            f"- 거래량 기준: {vol_text} (시간비례 보정 적용)",
-            f"- 유니버스: {universe_count}개 | 스캔 결과: {result_count}개(제외 {skip_count}개)",
-            "- 장중 추세 변동으로 신호/거래량은 장 마감 후 변경될 수 있습니다",
+            f"[{str(scan_label or '?쇰━?몄뀡 ?ㅼ틪')}] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
+            f"- 기준: 당일 미국장 장중 스냅샷({target_us_session_date.isoformat()}) 추세 미확정",
+            f"- 紐⑹쟻: ???쒖옉 ??媛뺤꽭 醫낅ぉ 鍮좊Ⅸ ?ъ갑",
+            f"- 嫄곕옒??湲곗?: {vol_text} (?쒓컙鍮꾨? 蹂댁젙 ?곸슜)",
+            f"- ?좊땲踰꾩뒪: {universe_count}媛?| ?ㅼ틪 寃곌낵: {result_count}媛??쒖쇅 {skip_count}媛?",
+            "- ?μ쨷 異붿꽭 蹂?숈쑝濡??좏샇/嫄곕옒?됱? ??留덇컧 ??蹂寃쎈맆 ???덉뒿?덈떎",
             index_line,
             "",
         ]
     else:
         lines = [
-            f"[{str(scan_label or '자동 스캔')}] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
-            f"- 전일 미국장 기준일: {target_us_session_date.isoformat()} (US/Eastern)",
+            f"[{str(scan_label or '?먮룞 ?ㅼ틪')}] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
+            f"- ?꾩씪 誘멸뎅??湲곗??? {target_us_session_date.isoformat()} (US/Eastern)",
             f"- 유니버스: {universe_count}개",
-            f"- 전체 스캔 결과: {result_count}개(제외 {skip_count}개)",
+            f"- ?꾩껜 ?ㅼ틪 寃곌낵: {result_count}媛??쒖쇅 {skip_count}媛?",
             index_line,
             "",
         ]
 
     if volume_threshold is not None and volume_threshold < 1.0:
         vol_precision = ".3f" if scan_mode == "early_session" else ".2f"
-        vol_criteria_suffix = f" + 거래량> {format(volume_threshold, vol_precision)}x"
+        vol_criteria_suffix = f" + 嫄곕옒?? {format(volume_threshold, vol_precision)}x"
     else:
-        vol_criteria_suffix = " + 거래량> 1.0x"
-    session_label = "장중" if scan_mode == "early_session" else "전일 미국장(US/Eastern)"
+        vol_criteria_suffix = " + 嫄곕옒?? 1.0x"
+    session_label = "?μ쨷" if scan_mode == "early_session" else "?꾩씪 誘멸뎅??US/Eastern)"
+    section_total = EARLY_SESSION_EXTENDED_SECTION_TOTAL if scan_mode == "early_session" else 4
 
     sections = [
         _build_summary_section_lines(
             section_index=1,
-            section_total=4,
-            section_name="매수전환",
-            criteria=(f"{session_label} UTBot/HULL 매수전환{vol_criteria_suffix} (감지 {detected_count}개)"),
+            section_total=section_total,
+            section_name="留ㅼ닔?꾪솚",
+            criteria=(f"{session_label} UTBot/HULL 留ㅼ닔?꾪솚{vol_criteria_suffix} (媛먯? {detected_count}媛?"),
             rows=buy_rows,
             summary_limit=summary_limit,
             tag_builder=lambda row: ", ".join(list(dict(row or {}).get("transition_signals") or [])) or "-",
         ),
         _build_summary_section_lines(
             section_index=2,
-            section_total=4,
+            section_total=section_total,
             section_name="눌림목 재진입",
             criteria=f"pullback_reentry=True{vol_criteria_suffix}",
             rows=pullback_rows_list,
@@ -2307,23 +2534,82 @@ def build_transition_summary(
         ),
         _build_summary_section_lines(
             section_index=3,
-            section_total=4,
-            section_name="당일 HULL 매도",
+            section_total=section_total,
+            section_name="?뱀씪 HULL 留ㅻ룄",
             criteria=f"hull_turn_bear_last_date == {target_us_session_date.isoformat()}",
             rows=hull_bear_rows_list,
             summary_limit=summary_limit,
-            tag_builder=lambda _row: "HULL 매도",
+            tag_builder=lambda _row: "HULL 留ㅻ룄",
         ),
         _build_summary_section_lines(
             section_index=4,
-            section_total=4,
-            section_name="52주 신고가 갱신",
+            section_total=section_total,
+            section_name="52二??좉퀬媛 媛깆떊",
             criteria=f"New_52W_High=True + latest_bar_date == {target_us_session_date.isoformat()}",
             rows=high_52w_rows_list,
             summary_limit=summary_limit,
-            tag_builder=lambda _row: "52W 신고가",
+            tag_builder=lambda _row: "52W ?좉퀬媛",
         ),
     ]
+    if scan_mode == "early_session":
+        sections.extend(
+            [
+                _build_summary_section_lines(
+                    section_index=5,
+                    section_total=section_total,
+                    section_name=EARLY_SESSION_SECTION_TITLES["gap_momentum"],
+                    criteria=f"session_gap_pct > 0 and chg > 0 (Top{EARLY_SESSION_CORE_TOP_N})",
+                    rows=gap_momentum_rows_list,
+                    summary_limit=summary_limit,
+                    tag_builder=lambda row: str(dict(row or {}).get("early_gap_momo_tag") or "-"),
+                ),
+                _build_summary_section_lines(
+                    section_index=6,
+                    section_total=section_total,
+                    section_name=EARLY_SESSION_SECTION_TITLES["inflow_top"],
+                    criteria=f"hybrid inflow score (Top{EARLY_SESSION_CORE_TOP_N})",
+                    rows=inflow_top_rows_list,
+                    summary_limit=summary_limit,
+                    tag_builder=lambda row: str(dict(row or {}).get("early_inflow_tag") or "-"),
+                ),
+                _build_summary_section_lines(
+                    section_index=7,
+                    section_total=section_total,
+                    section_name=EARLY_SESSION_SECTION_TITLES["gap_setup"],
+                    criteria="gap_setup_candidate=True",
+                    rows=gap_setup_rows_list,
+                    summary_limit=summary_limit,
+                    tag_builder=lambda row: str(dict(row or {}).get("gap_setup_tag") or "GAP_SETUP"),
+                ),
+                _build_summary_section_lines(
+                    section_index=8,
+                    section_total=section_total,
+                    section_name=EARLY_SESSION_SECTION_TITLES["pocket_pivot"],
+                    criteria="pocket_pivot_candidate=True",
+                    rows=pocket_pivot_rows_list,
+                    summary_limit=summary_limit,
+                    tag_builder=lambda row: str(dict(row or {}).get("pocket_pivot_tag") or "POCKET_PIVOT"),
+                ),
+                _build_summary_section_lines(
+                    section_index=9,
+                    section_total=section_total,
+                    section_name=EARLY_SESSION_SECTION_TITLES["five_day_top"],
+                    criteria="chg_5d > 0",
+                    rows=five_day_top_rows_list,
+                    summary_limit=summary_limit,
+                    tag_builder=lambda row: str(dict(row or {}).get("five_day_top_tag") or "-"),
+                ),
+                _build_summary_section_lines(
+                    section_index=10,
+                    section_total=section_total,
+                    section_name=EARLY_SESSION_SECTION_TITLES["optimal_entry"],
+                    criteria=f"final_entry_score top {EARLY_SESSION_CORE_TOP_N} (gate off)",
+                    rows=optimal_entry_rows_list,
+                    summary_limit=summary_limit,
+                    tag_builder=lambda row: str(dict(row or {}).get("early_optimal_entry_tag") or "-"),
+                ),
+            ]
+        )
     for block in sections:
         lines.extend(block)
         lines.append("")
@@ -2369,7 +2655,7 @@ def build_post_close_transition_summary(
     target_us_session_date = _resolve_target_session_date(run_at_kst, "post_close")
 
     index_line = (
-        f"- 요약 인덱스: {POST_CLOSE_INDEX_TITLES['legacy_turn']} {len(buy_rows)}"
+        f"- ?붿빟 ?몃뜳?? {POST_CLOSE_INDEX_TITLES['legacy_turn']} {len(buy_rows)}"
         f" | {POST_CLOSE_INDEX_TITLES['legacy_pullback']} {len(pullback_rows_list)}"
         f" | {POST_CLOSE_INDEX_TITLES['legacy_hull_bear']} {len(hull_bear_rows_list)}"
         f" | {POST_CLOSE_INDEX_TITLES['legacy_52w_high']} {len(high_52w_rows_list)}"
@@ -2385,9 +2671,9 @@ def build_post_close_transition_summary(
 
     lines = [
         f"[{str(scan_label or 'Daily Scan')}] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
-        f"- 대상 미국 세션일: {target_us_session_date.isoformat()} (US/Eastern)",
-        f"- 유니버스: {universe_count}",
-        f"- 스캔 결과: {result_count} | 제외: {skip_count}",
+        f"- ???誘멸뎅 ?몄뀡?? {target_us_session_date.isoformat()} (US/Eastern)",
+        f"- ?좊땲踰꾩뒪: {universe_count}",
+        f"- ?ㅼ틪 寃곌낵: {result_count} | ?쒖쇅: {skip_count}",
         index_line,
         "",
     ]
@@ -2422,7 +2708,7 @@ def build_post_close_transition_summary(
             criteria=f"hull_turn_bear_last_date == {target_us_session_date.isoformat()}",
             rows=hull_bear_rows_list,
             summary_limit=summary_limit,
-            tag_builder=lambda _row: "HULL 매도전환",
+            tag_builder=lambda _row: "HULL 留ㅻ룄?꾪솚",
             row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx),
         ),
         _build_summary_section_lines(
@@ -2432,7 +2718,7 @@ def build_post_close_transition_summary(
             criteria=f"new_52w_high=True + latest_bar_date == {target_us_session_date.isoformat()}",
             rows=high_52w_rows_list,
             summary_limit=summary_limit,
-            tag_builder=lambda _row: "52주 신고가",
+            tag_builder=lambda _row: "52二??좉퀬媛",
             row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx),
         ),
         _build_summary_section_lines(
@@ -2446,7 +2732,7 @@ def build_post_close_transition_summary(
             ),
             rows=pullback_filter_rows_list,
             summary_limit=summary_limit,
-            tag_builder=lambda _row: "눌림목 필터",
+            tag_builder=lambda _row: "?뚮┝紐??꾪꽣",
             row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx),
         ),
         _build_summary_section_lines(
@@ -2459,7 +2745,7 @@ def build_post_close_transition_summary(
             ),
             rows=chase_filter_rows_list,
             summary_limit=summary_limit,
-            tag_builder=lambda _row: "추세추종 필터",
+            tag_builder=lambda _row: "異붿꽭異붿쥌 ?꾪꽣",
             row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx),
         ),
         _build_summary_section_lines(
@@ -2472,7 +2758,7 @@ def build_post_close_transition_summary(
             ),
             rows=buy_turn_filter_rows_list,
             summary_limit=summary_limit,
-            tag_builder=lambda row: str(dict(row or {}).get("buy_turn_filter_tag") or "매수전환 필터"),
+            tag_builder=lambda row: str(dict(row or {}).get("buy_turn_filter_tag") or "留ㅼ닔?꾪솚 ?꾪꽣"),
             row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx, include_buy_label=True),
         ),
         _build_summary_section_lines(
@@ -2485,7 +2771,7 @@ def build_post_close_transition_summary(
             ),
             rows=gap_setup_rows_list,
             summary_limit=summary_limit,
-            tag_builder=lambda row: str(dict(row or {}).get("gap_setup_tag") or "에너지 압축"),
+            tag_builder=lambda row: str(dict(row or {}).get("gap_setup_tag") or "?먮꼫吏 ?뺤텞"),
             row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx),
         ),
         _build_summary_section_lines(
@@ -2498,7 +2784,7 @@ def build_post_close_transition_summary(
             ),
             rows=pocket_pivot_rows_list,
             summary_limit=summary_limit,
-            tag_builder=lambda row: str(dict(row or {}).get("pocket_pivot_tag") or "기관 매집"),
+            tag_builder=lambda row: str(dict(row or {}).get("pocket_pivot_tag") or "湲곌? 留ㅼ쭛"),
             row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx),
         ),
         _build_summary_section_lines(
@@ -2508,7 +2794,7 @@ def build_post_close_transition_summary(
             criteria="chg_5d > 0 sorted by chg_5d/scan_score/es",
             rows=five_day_top_rows_list,
             summary_limit=summary_limit,
-            tag_builder=lambda row: str(dict(row or {}).get("five_day_top_tag") or f"5일 {_fmt_signed_number(row.get('chg_5d', 0), 2)}%"),
+            tag_builder=lambda row: str(dict(row or {}).get("five_day_top_tag") or f"5??{_fmt_signed_number(row.get('chg_5d', 0), 2)}%"),
             row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx),
         ),
     ]
@@ -2526,7 +2812,7 @@ def build_post_close_transition_summary(
                 summary_limit=summary_limit,
                 tag_builder=lambda row: (
                     f"{str(dict(row or {}).get('final_entry_reason') or '-')}"
-                    f" | 점수 {_safe_float(dict(row or {}).get('final_entry_score', 0.0)):.2f}"
+                    f" | ?먯닔 {_safe_float(dict(row or {}).get('final_entry_score', 0.0)):.2f}"
                 ),
                 row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx),
             )
@@ -2712,12 +2998,12 @@ def parse_args() -> argparse.Namespace:
         "--scan-mode",
         default="post_close",
         choices=["post_close", "pre_market", "early_session"],
-        help="post_close(05시 장마감), pre_market(21시 프리마켓), early_session(23시 장초반)",
+        help="post_close(05???λ쭏媛?, pre_market(21???꾨━留덉폆), early_session(23???μ큹諛?",
     )
     parser.add_argument(
         "--prev-scan-dir",
         default="",
-        help="pre_market 모드: 이전 post_close 스캔 결과를 로드할 디렉토리",
+        help="pre_market 紐⑤뱶: ?댁쟾 post_close ?ㅼ틪 寃곌낵瑜?濡쒕뱶???붾젆?좊━",
     )
     return parser.parse_args()
 
@@ -2727,13 +3013,13 @@ def parse_args() -> argparse.Namespace:
 # ---------------------------------------------------------------------------
 
 def _load_json_file(path: Path) -> Any:
-    """JSON 파일 로드 유틸."""
+    """JSON ?뚯씪 濡쒕뱶 ?좏떥."""
     with path.open("r", encoding="utf-8") as fp:
         return json.load(fp)
 
 
 def _load_latest_scan_rows(scan_dir: Path) -> tuple[list[dict[str, Any]], Path | None]:
-    """가장 최근의 scan_rows JSON 로드. merged 우선, 없으면 단일 shard."""
+    """媛??理쒓렐??scan_rows JSON 濡쒕뱶. merged ?곗꽑, ?놁쑝硫??⑥씪 shard."""
     merged = sorted(scan_dir.glob("scan_rows_*_merged.json"), reverse=True)
     if merged:
         data = _load_json_file(merged[0])
@@ -2752,7 +3038,7 @@ def _fetch_premarket_gaps(
     *,
     max_workers: int = 8,
 ) -> dict[str, dict[str, float]]:
-    """프리마켓 가격을 수집해 전일 종가 대비 갭 계산."""
+    """?꾨━留덉폆 媛寃⑹쓣 ?섏쭛???꾩씪 醫낃? ?鍮?媛?怨꾩궛."""
 
     def _fetch_one(ticker: str) -> tuple[str, dict[str, float] | None]:
         try:
@@ -2787,7 +3073,7 @@ def _enrich_rows_with_gap(
     rows: list[dict[str, Any]],
     gap_data: dict[str, dict[str, float]],
 ) -> list[dict[str, Any]]:
-    """기존 스캔 결과에 프리마켓 갭 데이터를 주입."""
+    """湲곗〈 ?ㅼ틪 寃곌낵???꾨━留덉폆 媛??곗씠?곕? 二쇱엯."""
     enriched = []
     for row in rows:
         row_dict = dict(row)
@@ -2817,7 +3103,7 @@ def _send_telegram_if_enabled(
     scan_label: str,
     run_at_kst: datetime,
 ) -> None:
-    """Telegram 전송 공통 로직."""
+    """Telegram ?꾩넚 怨듯넻 濡쒖쭅."""
     if args.dry_run or args.skip_telegram:
         print("[SCAN] Telegram send skipped by option.")
         return
@@ -2846,8 +3132,63 @@ def _resolve_cli_run_stamp(args: argparse.Namespace, *, run_at_kst: datetime) ->
     return run_at_kst.strftime("%Y%m%d_%H%M%S")
 
 
+def _build_early_session_sections(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    run_at_kst: datetime,
+    volume_threshold: float,
+    top_n: int = EARLY_SESSION_CORE_TOP_N,
+    cross_section_enabled: bool = True,
+) -> dict[str, Any]:
+    row_list = [dict(row or {}) for row in (rows or [])]
+    target_session_date = _resolve_target_session_date(run_at_kst, "early_session")
+    row_list = _with_latest_session_buy_turn_flags(row_list, target_date=target_session_date)
+    row_list = _with_post_close_cross_section_metrics(row_list, enabled=bool(cross_section_enabled))
+    row_list = _with_post_close_setup_scores(row_list)
+    row_list = _with_post_close_final_top20_scores(
+        row_list,
+        run_at_kst=run_at_kst,
+        scan_mode="early_session",
+        top_n=max(0, int(top_n or 0)),
+        apply_gate=False,
+    )
+    row_list, market_cap_covered_count = _with_early_session_flow_metrics(row_list)
+
+    detected_turn_rows = select_us_session_turn_rows(row_list, run_at_kst=run_at_kst, scan_mode="early_session")
+    turn_rows = filter_turn_rows_for_telegram(detected_turn_rows, min_volume_ratio_20_exclusive=volume_threshold)
+    pullback_rows = select_pullback_reentry_rows_for_telegram(row_list, min_volume_ratio_20_exclusive=volume_threshold)
+    hull_bear_rows = select_us_session_hull_bear_rows(row_list, run_at_kst=run_at_kst, scan_mode="early_session")
+    high_52w_rows = select_us_session_52w_high_rows(row_list, run_at_kst=run_at_kst, scan_mode="early_session")
+    gap_momentum_rows = _with_early_session_gap_momentum_scores(row_list, top_n=top_n)
+    inflow_top_rows = _with_early_session_inflow_scores(row_list, top_n=top_n)
+    gap_setup_rows = select_post_close_gap_setup_rows_for_telegram(row_list)
+    pocket_pivot_rows = select_post_close_pocket_pivot_rows_for_telegram(row_list)
+    five_day_top_rows = select_post_close_top_5d_rows_for_telegram(row_list)
+    optimal_entry_rows = _select_early_session_optimal_entry_rows(row_list, top_n=top_n)
+
+    result_count = len(row_list)
+    market_cap_coverage_ratio = (_safe_float(market_cap_covered_count) / float(result_count)) if result_count > 0 else 0.0
+
+    return {
+        "rows": row_list,
+        "detected_turn_rows": detected_turn_rows,
+        "turn_rows": turn_rows,
+        "pullback_rows": pullback_rows,
+        "hull_bear_rows": hull_bear_rows,
+        "high_52w_rows": high_52w_rows,
+        "gap_momentum_rows": gap_momentum_rows,
+        "inflow_top_rows": inflow_top_rows,
+        "gap_setup_rows": gap_setup_rows,
+        "pocket_pivot_rows": pocket_pivot_rows,
+        "five_day_top_rows": five_day_top_rows,
+        "optimal_entry_rows": optimal_entry_rows,
+        "market_cap_covered_count": int(market_cap_covered_count),
+        "market_cap_coverage_ratio": _safe_float(market_cap_coverage_ratio),
+    }
+
+
 def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: Path) -> int:
-    """기존 05시 post_close 로직."""
+    """湲곗〈 05??post_close 濡쒖쭅."""
     run_stamp = _resolve_cli_run_stamp(args, run_at_kst=run_at_kst)
     shard_count = int(args.shard_count or 1)
     shard_index = int(args.shard_index or 0)
@@ -3092,7 +3433,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
 
 
 def _run_pre_market(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: Path) -> int:
-    """21시 프리마켓 모드: 05시 결과 로드 + 프리마켓 갭 수집."""
+    """21???꾨━留덉폆 紐⑤뱶: 05??寃곌낵 濡쒕뱶 + ?꾨━留덉폆 媛??섏쭛."""
     stamp = run_at_kst.strftime("%Y%m%d_%H%M%S")
     shard_count = int(args.shard_count or 1)
     shard_index = int(args.shard_index or 0)
@@ -3136,7 +3477,7 @@ def _run_pre_market(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
         if "empty_fallback" in priority_modes:
             summary_text = _prepend_summary_warning(
                 summary_text,
-                "※ 안내: 전일 daily-scan 결과 부재로 priority 비활성(전체 유니버스 fallback) 샤드가 포함되었습니다.",
+                "???덈궡: ?꾩씪 daily-scan 寃곌낵 遺?щ줈 priority 鍮꾪솢???꾩껜 ?좊땲踰꾩뒪 fallback) ?ㅻ뱶媛 ?ы븿?섏뿀?듬땲??",
             )
         summary_path = out_dir / f"trend_turn_summary_{run_label}.txt"
         summary_path.write_text(summary_text, encoding="utf-8")
@@ -3163,7 +3504,7 @@ def _run_pre_market(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
         _send_telegram_if_enabled(args, summary_text=summary_text, csv_path=csv_path, scan_label=scan_label, run_at_kst=run_at_kst)
     else:
         run_label = f"{stamp}_pre_market_shard{shard_index}of{shard_count}"
-        # 1) 이전 post_close 결과 로드
+        # 1) ?댁쟾 post_close 寃곌낵 濡쒕뱶
         prev_rows, prev_path = _load_latest_scan_rows(Path(prev_scan_dir))
         prev_scan_found = bool(prev_rows)
         priority_mode = "from_prev_scan"
@@ -3178,7 +3519,7 @@ def _run_pre_market(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
                 "Falling back to full universe scan without priority."
             )
 
-        # 2) Shard 遺꾨━
+        # 2) Shard ?브쑬??
         if prev_scan_found:
             all_tickers = [str(r.get("ticker", "")).strip().upper() for r in prev_rows if r.get("ticker")]
             shard_tickers = split_tickers_for_shard(all_tickers, shard_count, shard_index)
@@ -3191,14 +3532,14 @@ def _run_pre_market(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
             shard_rows = _build_premarket_fallback_rows(shard_tickers)
         print(f"[PRE_MARKET] Shard {shard_index}/{shard_count - 1}: {len(shard_tickers)} tickers for gap collection")
 
-        # 3) 프리마켓 갭 수집
+        # 3) ?꾨━留덉폆 媛??섏쭛
         gap_data = _fetch_premarket_gaps(shard_tickers, max_workers=int(args.max_workers))
         print(f"[PRE_MARKET] Gap data collected: {len(gap_data)}/{len(shard_tickers)}")
 
-        # 4) shard 티커만 필터 + 갭 병합
+        # 4) shard ?곗빱留??꾪꽣 + 媛?蹂묓빀
         enriched_rows = _enrich_rows_with_gap(shard_rows, gap_data)
 
-        # 5) 저장
+        # 5) ???
         write_scan_rows_json(enriched_rows, out_dir=out_dir, run_label=run_label)
         write_json(
             {
@@ -3227,7 +3568,7 @@ def _run_pre_market(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
 
 
 def _run_early_session(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: Path) -> int:
-    """23시 얼리세션 모드: period=1y 풀스캔 + 시간비례 거래량 보정."""
+    """23시 얼리세션 모드: period=1y + 시간비례 거래량 기준 적용."""
     explicit_run_stamp = str(getattr(args, "run_stamp", "") or "").strip()
     run_stamp = explicit_run_stamp or _resolve_cli_run_stamp(args, run_at_kst=run_at_kst)
     run_stamp_key = f"{run_stamp}_early_session"
@@ -3259,20 +3600,46 @@ def _run_early_session(args: argparse.Namespace, *, run_at_kst: datetime, out_di
             f"[EARLY_SESSION:MERGE] Completed: merged={len(merged_rows)} "
             f"source_rows={int(merged_payload.get('source_row_count', 0))}"
         )
-        csv_path = write_scan_csv(merged_rows, out_dir=out_dir, run_label=run_label)
-        rows_path = write_scan_rows_json(merged_rows, out_dir=out_dir, run_label=run_label)
 
-        detected_turn_rows = select_us_session_turn_rows(merged_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
-        pullback_detected_raw_count = count_pullback_reentry_detected_rows(merged_rows)
-        turn_rows = filter_turn_rows_for_telegram(detected_turn_rows, min_volume_ratio_20_exclusive=vol_threshold)
-        pullback_rows = select_pullback_reentry_rows_for_telegram(merged_rows, min_volume_ratio_20_exclusive=vol_threshold)
-        hull_bear_rows = select_us_session_hull_bear_rows(merged_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
-        high_52w_rows = select_us_session_52w_high_rows(merged_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
+        sections_payload = _build_early_session_sections(
+            merged_rows,
+            run_at_kst=run_at_kst,
+            volume_threshold=vol_threshold,
+            top_n=EARLY_SESSION_CORE_TOP_N,
+            cross_section_enabled=True,
+        )
+        csv_rows = list(sections_payload.get("rows") or [])
+        detected_turn_rows = list(sections_payload.get("detected_turn_rows") or [])
+        turn_rows = list(sections_payload.get("turn_rows") or [])
+        pullback_rows = list(sections_payload.get("pullback_rows") or [])
+        hull_bear_rows = list(sections_payload.get("hull_bear_rows") or [])
+        high_52w_rows = list(sections_payload.get("high_52w_rows") or [])
+        gap_momentum_rows = list(sections_payload.get("gap_momentum_rows") or [])
+        inflow_top_rows = list(sections_payload.get("inflow_top_rows") or [])
+        gap_setup_rows = list(sections_payload.get("gap_setup_rows") or [])
+        pocket_pivot_rows = list(sections_payload.get("pocket_pivot_rows") or [])
+        five_day_top_rows = list(sections_payload.get("five_day_top_rows") or [])
+        optimal_entry_rows = list(sections_payload.get("optimal_entry_rows") or [])
+        pullback_detected_raw_count = count_pullback_reentry_detected_rows(csv_rows)
+        market_cap_covered_count = int(_safe_float(sections_payload.get("market_cap_covered_count", 0)))
+        market_cap_coverage_ratio = _safe_float(sections_payload.get("market_cap_coverage_ratio", 0.0))
+
+        csv_path = write_scan_csv(
+            csv_rows,
+            out_dir=out_dir,
+            run_label=run_label,
+            extra_field_specs=[
+                *EARLY_SESSION_LATEST_SESSION_FIELD_SPECS,
+                *POST_CLOSE_FINAL_ENTRY_FIELD_SPECS,
+                *EARLY_SESSION_EXTRA_FIELD_SPECS,
+            ],
+        )
+        rows_path = write_scan_rows_json(merged_rows, out_dir=out_dir, run_label=run_label)
         summary_text = build_transition_summary(
             turn_rows,
             run_at_kst=run_at_kst,
             universe_count=int(_safe_float(merged_payload.get("universe_count", 0))),
-            result_count=len(merged_rows),
+            result_count=len(csv_rows),
             skip_count=int(_safe_float(merged_payload.get("skip_count_sum", 0))),
             scan_label=scan_label,
             detected_turn_count=len(detected_turn_rows),
@@ -3282,6 +3649,12 @@ def _run_early_session(args: argparse.Namespace, *, run_at_kst: datetime, out_di
             high_52w_rows=high_52w_rows,
             scan_mode=scan_mode,
             volume_threshold=vol_threshold,
+            gap_momentum_rows=gap_momentum_rows,
+            inflow_top_rows=inflow_top_rows,
+            gap_setup_rows=gap_setup_rows,
+            pocket_pivot_rows=pocket_pivot_rows,
+            five_day_top_rows=five_day_top_rows,
+            optimal_entry_rows=optimal_entry_rows,
         )
         summary_path = out_dir / f"trend_turn_summary_{run_label}.txt"
         summary_path.write_text(summary_text, encoding="utf-8")
@@ -3304,13 +3677,21 @@ def _run_early_session(args: argparse.Namespace, *, run_at_kst: datetime, out_di
             "expected_shard_count": int(_safe_float(merged_payload.get("expected_shard_count", 0))),
             "found_shard_count": int(_safe_float(merged_payload.get("found_shard_count", 0))),
             "missing_shard_indices": missing_shard_indices,
-            "result_count": len(merged_rows),
+            "result_count": len(csv_rows),
             "detected_turn_count": len(detected_turn_rows),
             "trend_turn_count": len(turn_rows),
             "pullback_detected_raw_count": pullback_detected_raw_count,
             "pullback_reentry_count": len(pullback_rows),
             "hull_bear_count": len(hull_bear_rows),
             "new_52w_high_count": len(high_52w_rows),
+            "gap_momentum_count": len(gap_momentum_rows),
+            "inflow_top_count": len(inflow_top_rows),
+            "gap_setup_count": len(gap_setup_rows),
+            "pocket_pivot_count": len(pocket_pivot_rows),
+            "five_day_top_count": len(five_day_top_rows),
+            "optimal_entry_top20_count": len(optimal_entry_rows),
+            "market_cap_covered_count": market_cap_covered_count,
+            "market_cap_coverage_ratio": market_cap_coverage_ratio,
             "csv_path": str(csv_path),
             "rows_path": str(rows_path),
             "summary_path": str(summary_path),
@@ -3341,26 +3722,55 @@ def _run_early_session(args: argparse.Namespace, *, run_at_kst: datetime, out_di
             print("[EARLY_SESSION] ETF resolve errors:", " | ".join(universe_payload["etf_errors"]))
 
         scan_result = scan_universe(
-            tickers, max_workers=int(args.max_workers), bias_mode=str(args.bias_mode), history_period=history_period,
+            tickers,
+            max_workers=int(args.max_workers),
+            bias_mode=str(args.bias_mode),
+            history_period=history_period,
         )
         print(
             f"[EARLY_SESSION] Completed: results={len(scan_result.rows)} "
             f"skips={len(scan_result.skips)} total_sec={_safe_float(scan_result.perf.get('total_seconds', 0)):.1f}"
         )
 
-        csv_path = write_scan_csv(scan_result.rows, out_dir=out_dir, run_label=run_label)
+        sections_payload = _build_early_session_sections(
+            scan_result.rows,
+            run_at_kst=run_at_kst,
+            volume_threshold=vol_threshold,
+            top_n=EARLY_SESSION_CORE_TOP_N,
+            cross_section_enabled=shard_count <= 1,
+        )
+        csv_rows = list(sections_payload.get("rows") or [])
+        detected_turn_rows = list(sections_payload.get("detected_turn_rows") or [])
+        turn_rows = list(sections_payload.get("turn_rows") or [])
+        pullback_rows = list(sections_payload.get("pullback_rows") or [])
+        hull_bear_rows = list(sections_payload.get("hull_bear_rows") or [])
+        high_52w_rows = list(sections_payload.get("high_52w_rows") or [])
+        gap_momentum_rows = list(sections_payload.get("gap_momentum_rows") or [])
+        inflow_top_rows = list(sections_payload.get("inflow_top_rows") or [])
+        gap_setup_rows = list(sections_payload.get("gap_setup_rows") or [])
+        pocket_pivot_rows = list(sections_payload.get("pocket_pivot_rows") or [])
+        five_day_top_rows = list(sections_payload.get("five_day_top_rows") or [])
+        optimal_entry_rows = list(sections_payload.get("optimal_entry_rows") or [])
+        pullback_detected_raw_count = count_pullback_reentry_detected_rows(csv_rows)
+        market_cap_covered_count = int(_safe_float(sections_payload.get("market_cap_covered_count", 0)))
+        market_cap_coverage_ratio = _safe_float(sections_payload.get("market_cap_coverage_ratio", 0.0))
+
+        csv_path = write_scan_csv(
+            csv_rows,
+            out_dir=out_dir,
+            run_label=run_label,
+            extra_field_specs=[
+                *EARLY_SESSION_LATEST_SESSION_FIELD_SPECS,
+                *POST_CLOSE_FINAL_ENTRY_FIELD_SPECS,
+                *EARLY_SESSION_EXTRA_FIELD_SPECS,
+            ],
+        )
         rows_path = write_scan_rows_json(scan_result.rows, out_dir=out_dir, run_label=run_label)
-        detected_turn_rows = select_us_session_turn_rows(scan_result.rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
-        pullback_detected_raw_count = count_pullback_reentry_detected_rows(scan_result.rows)
-        turn_rows = filter_turn_rows_for_telegram(detected_turn_rows, min_volume_ratio_20_exclusive=vol_threshold)
-        pullback_rows = select_pullback_reentry_rows_for_telegram(scan_result.rows, min_volume_ratio_20_exclusive=vol_threshold)
-        hull_bear_rows = select_us_session_hull_bear_rows(scan_result.rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
-        high_52w_rows = select_us_session_52w_high_rows(scan_result.rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
         summary_text = build_transition_summary(
             turn_rows,
             run_at_kst=run_at_kst,
             universe_count=len(tickers),
-            result_count=len(scan_result.rows),
+            result_count=len(csv_rows),
             skip_count=len(scan_result.skips),
             scan_label=scan_label,
             detected_turn_count=len(detected_turn_rows),
@@ -3370,6 +3780,12 @@ def _run_early_session(args: argparse.Namespace, *, run_at_kst: datetime, out_di
             high_52w_rows=high_52w_rows,
             scan_mode=scan_mode,
             volume_threshold=vol_threshold,
+            gap_momentum_rows=gap_momentum_rows,
+            inflow_top_rows=inflow_top_rows,
+            gap_setup_rows=gap_setup_rows,
+            pocket_pivot_rows=pocket_pivot_rows,
+            five_day_top_rows=five_day_top_rows,
+            optimal_entry_rows=optimal_entry_rows,
         )
         summary_path = out_dir / f"trend_turn_summary_{run_label}.txt"
         summary_path.write_text(summary_text, encoding="utf-8")
@@ -3392,13 +3808,21 @@ def _run_early_session(args: argparse.Namespace, *, run_at_kst: datetime, out_di
                 "etf_errors": list(universe_payload.get("etf_errors") or []),
                 "performance": scan_result.perf,
                 "skip_reasons": scan_result.skips,
-                "result_count": len(scan_result.rows),
+                "result_count": len(csv_rows),
                 "detected_turn_count": len(detected_turn_rows),
                 "trend_turn_count": len(turn_rows),
                 "pullback_detected_raw_count": pullback_detected_raw_count,
                 "pullback_reentry_count": len(pullback_rows),
                 "hull_bear_count": len(hull_bear_rows),
                 "new_52w_high_count": len(high_52w_rows),
+                "gap_momentum_count": len(gap_momentum_rows),
+                "inflow_top_count": len(inflow_top_rows),
+                "gap_setup_count": len(gap_setup_rows),
+                "pocket_pivot_count": len(pocket_pivot_rows),
+                "five_day_top_count": len(five_day_top_rows),
+                "optimal_entry_top20_count": len(optimal_entry_rows),
+                "market_cap_covered_count": market_cap_covered_count,
+                "market_cap_coverage_ratio": market_cap_coverage_ratio,
                 "csv_path": str(csv_path),
                 "rows_path": str(rows_path),
                 "summary_path": str(summary_path),
