@@ -1,6 +1,7 @@
 import argparse
 import json
 import logging
+import math
 import os
 import sys
 import time
@@ -34,7 +35,6 @@ from scanner_filters import WATCH_BUY_PLUS, compute_scanner_profile_flags, has_l
 from scripts.daily_scan_and_notify import (
     POST_CLOSE_INDEX_TITLES,
     POST_CLOSE_SECTION_TITLES,
-    POST_CLOSE_SUMMARY_SECTION_TOTAL,
     SCANNER_TRANSITION_CFG,
     _build_summary_section_lines,
     _compute_post_close_row_metrics,
@@ -71,6 +71,14 @@ DEFAULT_DOLLAR_FLOOR_EARLY = 20_000.0
 DEFAULT_DOLLAR_FLOOR_MID = 40_000.0
 DEFAULT_DOLLAR_FLOOR_LATE = 80_000.0
 DEFAULT_SUMMARY_LIMIT = 30
+PREMARKET_CORE_TOP_N = 20
+PREMARKET_SUMMARY_SECTION_TOTAL = 13
+PREMARKET_GAP_MOMENTUM_SECTION_NAME = "갭상승 모멘텀 Top20"
+PREMARKET_INFLOW_SECTION_NAME = "시총대비 집중 자금 유입 Top20"
+PREMARKET_OPTIMAL_ENTRY_SECTION_NAME = "현시점 최적진입 Top20 (21시 전용)"
+PREMARKET_GAP_MOMENTUM_INDEX_TITLE = "갭상승모멘텀"
+PREMARKET_INFLOW_INDEX_TITLE = "집중유입"
+PREMARKET_OPTIMAL_ENTRY_INDEX_TITLE = "최적진입"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("premarket_rt")
@@ -108,6 +116,39 @@ def _group_sort_key(row: dict[str, Any]) -> tuple[float, float, float, str]:
     gap_abs = abs(_safe_float(row.get("gap_pct", 0.0)))
     ticker = str(row.get("ticker", "")).strip().upper()
     return (-effective_dollar, -turnover_pct, -gap_abs, ticker)
+
+
+def _clip(value: float, low: float, high: float) -> float:
+    if value < low:
+        return low
+    if value > high:
+        return high
+    return value
+
+
+def _coerce_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    text = str(value or "").strip().lower()
+    if text in {"y", "yes", "true", "1", "t"}:
+        return True
+    if text in {"n", "no", "false", "0", "", "-", "none", "n/a"}:
+        return False
+    return bool(value)
+
+
+def _parse_iso_date(value: Any) -> date | None:
+    if isinstance(value, date):
+        return value
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if "T" in text:
+        text = text.split("T", 1)[0]
+    try:
+        return date.fromisoformat(text)
+    except ValueError:
+        return None
 
 
 def fetch_and_synthesize_daily(ticker: str) -> tuple[pd.DataFrame | None, dict[str, Any] | None]:
@@ -273,7 +314,7 @@ def _format_pm_tag(row: dict[str, Any]) -> str:
     pm_close = _safe_float(row.get("pm_close", 0.0))
     pm_vwap = _safe_float(row.get("pm_vwap", 0.0))
     vwap_text = "VWAP상" if pm_close >= pm_vwap else "VWAP하"
-    return f"PM {change_pct:+.2f}% | {vwap_text} | ${effective_dollar / 1000.0:,.0f}k | 회전율{turnover_pct:.4f}%"
+    return f"PM {change_pct:+.2f}% | {vwap_text} | ${effective_dollar / 1000.0:,.0f}k | 회전율 {turnover_pct:.4f}%"
 
 
 def _combine_pm_tag(row: dict[str, Any], base_tag: str) -> str:
@@ -648,25 +689,26 @@ def _build_pm_scanner_row(
             "pullback_reentry": bool(profile_flags.get("pullback_reentry", False)),
             "low_conflict_bullish": bool(profile_flags.get("low_conflict_bullish", False)),
             "utbot_buy_recent": bool(detected_payload_confirmed.get("utbot_buy_recent", False)),
-            "utbot_buy_last_date": str(detected_payload_confirmed.get("utbot_buy_last_date", "?놁쓬")),
+            "utbot_buy_last_date": str(detected_payload_confirmed.get("utbot_buy_last_date", "없음")),
             "utbot_sell_recent": bool(detected_payload_confirmed.get("utbot_sell_recent", False)),
-            "utbot_sell_last_date": str(detected_payload_confirmed.get("utbot_sell_last_date", "?놁쓬")),
+            "utbot_sell_last_date": str(detected_payload_confirmed.get("utbot_sell_last_date", "없음")),
             "hull_turn_bull_recent": bool(detected_payload_confirmed.get("hull_turn_bull_recent", False)),
-            "hull_turn_bull_last_date": str(detected_payload_confirmed.get("hull_turn_bull_last_date", "?놁쓬")),
+            "hull_turn_bull_last_date": str(detected_payload_confirmed.get("hull_turn_bull_last_date", "없음")),
             "hull_turn_bear_recent": bool(detected_payload_confirmed.get("hull_turn_bear_recent", False)),
-            "hull_turn_bear_last_date": str(detected_payload_confirmed.get("hull_turn_bear_last_date", "?놁쓬")),
+            "hull_turn_bear_last_date": str(detected_payload_confirmed.get("hull_turn_bear_last_date", "없음")),
             "detected_combo_count": int(detected_payload_full.get("detected_combo_count", 0) or 0),
-            "detected_combo_summary": str(detected_payload_full.get("detected_combo_summary", "?놁쓬")),
+            "detected_combo_summary": str(detected_payload_full.get("detected_combo_summary", "없음")),
             "detected_transition_count": int(detected_payload_confirmed.get("detected_transition_count", 0) or 0),
-            "detected_transition_summary": str(detected_payload_confirmed.get("detected_transition_summary", "?놁쓬")),
+            "detected_transition_summary": str(detected_payload_confirmed.get("detected_transition_summary", "없음")),
             "detected_core_count": int(detected_payload_full.get("detected_core_count", 0) or 0),
-            "detected_core_summary": str(detected_payload_full.get("detected_core_summary", "?놁쓬")),
+            "detected_core_summary": str(detected_payload_full.get("detected_core_summary", "없음")),
             "detected_signal_total_count": int(detected_payload_full.get("detected_signal_total_count", 0) or 0),
-            "detected_signal_latest_date": str(detected_payload_full.get("detected_signal_latest_date", "?놁쓬")),
+            "detected_buy_signal_latest_date": str(detected_payload_full.get("detected_buy_signal_latest_date", "없음")),
+            "detected_signal_latest_date": str(detected_payload_full.get("detected_signal_latest_date", "없음")),
             "detected_signals": list(detected_payload_full.get("all_items", [])),
             "watch_buy_plus": watch_buy_plus,
             "buy_combo_present": buy_combo_present,
-            "latest_bar_date": str(latest_bar_date or "?놁쓬"),
+            "latest_bar_date": str(latest_bar_date or "없음"),
             "liquidity_min_dollar": _safe_float(min_dollar_volume),
             "liquidity_min_turnover_pct": _safe_float(min_turnover_pct),
             **advanced_metrics,
@@ -820,12 +862,275 @@ def _filter_premarket_direction(rows: Iterable[Mapping[str, Any]], *, bullish: b
     return filtered
 
 
+def _is_buy_turn_signal(signal: Any, *, engine: str) -> bool:
+    text = str(signal or "").strip().lower()
+    if engine not in text:
+        return False
+    return "buy" in text or "매수" in str(signal or "")
+
+
+def _premarket_buy_turn_label(row: Mapping[str, Any]) -> str:
+    row_dict = dict(row or {})
+    signals = list(row_dict.get("transition_signals") or [])
+    utbot = (
+        any(_is_buy_turn_signal(signal, engine="utbot") for signal in signals)
+        or _coerce_bool(row_dict.get("latest_session_utbot_buy_turn", False))
+        or _coerce_bool(row_dict.get("utbot_buy_recent", False))
+    )
+    hull = (
+        any(_is_buy_turn_signal(signal, engine="hull") for signal in signals)
+        or _coerce_bool(row_dict.get("latest_session_hull_buy_turn", False))
+        or _coerce_bool(row_dict.get("hull_turn_bull_recent", False))
+    )
+    if utbot and hull:
+        return "UTBOT+HULL"
+    if utbot:
+        return "UTBOT"
+    if hull:
+        return "HULL"
+    return ""
+
+
+def _build_premarket_core_row_line(
+    row: Mapping[str, Any],
+    index: int,
+    *,
+    include_intersect: bool = False,
+    include_buy_label: bool = False,
+) -> str:
+    parts = [
+        f"{index}. {str(row.get('ticker', '-')).upper()}",
+        f"GAP{_safe_float(row.get('gap_pct', 0.0)):+.2f}%",
+        f"PM{_safe_float(row.get('change_pct', 0.0)):+.2f}%",
+        f"${_safe_float(row.get('effective_dollar_volume', row.get('dollar_volume', 0.0))):,.0f}",
+        f"회전율{_safe_float(row.get('mcap_turnover_pct', row.get('mcap_ratio', 0.0))):.3f}%",
+    ]
+    if include_intersect and _coerce_bool(row.get("pm_core_intersect", False)):
+        parts.append("INTERSECT")
+    if include_buy_label:
+        buy_label = _premarket_buy_turn_label(row)
+        if buy_label:
+            parts.append(buy_label)
+    return " | ".join(parts)
+
+
+def _with_premarket_gap_momentum_scores(rows: list[dict[str, Any]], *, top_n: int = PREMARKET_CORE_TOP_N) -> list[dict[str, Any]]:
+    selected: list[dict[str, Any]] = []
+    for row_dict in rows:
+        row_dict["pm_gap_momo_score"] = 0.0
+        if _coerce_bool(row_dict.get("thin_trade_risk", False)):
+            continue
+        if not _coerce_bool(row_dict.get("pm_supports_bullish", False)):
+            continue
+        gap_pct = _safe_float(row_dict.get("gap_pct", 0.0))
+        change_pct = _safe_float(row_dict.get("change_pct", 0.0))
+        pm_close = _safe_float(row_dict.get("pm_close", 0.0))
+        pm_vwap = _safe_float(row_dict.get("pm_vwap", 0.0))
+        if gap_pct <= 0.0 or change_pct <= 0.0 or pm_close < pm_vwap:
+            continue
+        effective_dollar = _safe_float(row_dict.get("effective_dollar_volume", row_dict.get("dollar_volume", 0.0)))
+        gap_norm = _clip(gap_pct / 10.0, 0.0, 1.0)
+        change_norm = _clip(change_pct / 8.0, 0.0, 1.0)
+        dollar_norm = _clip(math.log10(max(1.0, effective_dollar)) / 7.0, 0.0, 1.0)
+        score = (gap_norm * 70.0) + (change_norm * 20.0) + (dollar_norm * 10.0)
+        row_dict["pm_gap_momo_score"] = round(score, 4)
+        selected.append(row_dict)
+    selected.sort(
+        key=lambda row: (
+            -_safe_float(row.get("pm_gap_momo_score", 0.0)),
+            -_safe_float(row.get("gap_pct", 0.0)),
+            -_safe_float(row.get("change_pct", 0.0)),
+            -_safe_float(row.get("effective_dollar_volume", row.get("dollar_volume", 0.0))),
+            str(row.get("ticker", "")),
+        )
+    )
+    return selected[: max(0, int(top_n))]
+
+
+def _with_premarket_inflow_scores(rows: list[dict[str, Any]], *, top_n: int = PREMARKET_CORE_TOP_N) -> list[dict[str, Any]]:
+    selected: list[dict[str, Any]] = []
+    for row_dict in rows:
+        row_dict["pm_inflow_score"] = 0.0
+        if _coerce_bool(row_dict.get("thin_trade_risk", False)):
+            continue
+        if not _coerce_bool(row_dict.get("pm_supports_bullish", False)):
+            continue
+        turnover_pct = _safe_float(row_dict.get("mcap_turnover_pct", row_dict.get("mcap_ratio", 0.0)))
+        effective_dollar = _safe_float(row_dict.get("effective_dollar_volume", row_dict.get("dollar_volume", 0.0)))
+        if turnover_pct <= 0.0 or effective_dollar <= 0.0:
+            continue
+        turnover_norm = _clip(turnover_pct / 0.08, 0.0, 1.0)
+        dollar_norm = _clip(math.log10(max(1.0, effective_dollar)) / 7.0, 0.0, 1.0)
+        score = (turnover_norm * 80.0) + (dollar_norm * 20.0)
+        row_dict["pm_inflow_score"] = round(score, 4)
+        selected.append(row_dict)
+    selected.sort(
+        key=lambda row: (
+            -_safe_float(row.get("pm_inflow_score", 0.0)),
+            -_safe_float(row.get("mcap_turnover_pct", row.get("mcap_ratio", 0.0))),
+            -_safe_float(row.get("effective_dollar_volume", row.get("dollar_volume", 0.0))),
+            -_safe_float(row.get("gap_pct", 0.0)),
+            str(row.get("ticker", "")),
+        )
+    )
+    return selected[: max(0, int(top_n))]
+
+
+def _premarket_optimal_entry_sort_key(row: Mapping[str, Any]) -> tuple[float, float, float, float, float, str]:
+    return (
+        -_safe_float(row.get("pm_entry_score", 0.0)),
+        -_safe_float(row.get("pm_entry_b_score", 0.0)),
+        -_safe_float(row.get("pm_entry_c_score", 0.0)),
+        -_safe_float(row.get("scan_score", 0.0)),
+        -_safe_float(row.get("es", 0.0)),
+        str(row.get("ticker", "")),
+    )
+
+
+def _with_premarket_optimal_entry_scores(
+    rows: list[dict[str, Any]],
+    *,
+    run_at_kst: datetime,
+    top_n: int = PREMARKET_CORE_TOP_N,
+) -> list[dict[str, Any]]:
+    target_date = _last_us_market_session_date(run_at_kst)
+    selected_limit = max(0, int(top_n or 0))
+    eligible_rows: list[dict[str, Any]] = []
+
+    for row_dict in rows:
+        a_score = int(
+            sum(
+                [
+                    str(row_dict.get("weekly_trend_context", "")).strip().upper() in {"STRONG_UPTREND", "UPTREND"},
+                    _coerce_bool(row_dict.get("ichimoku_above_cloud", False)),
+                    _safe_float(row_dict.get("drawdown_from_52w_high_pct", -999.0)) >= -20.0,
+                    _safe_float(row_dict.get("adx", 0.0)) >= 20.0,
+                    _safe_float(row_dict.get("hma60_slope_pct", 0.0)) > 0.0,
+                ]
+            )
+        )
+
+        latest_buy_date = _parse_iso_date(row_dict.get("detected_buy_signal_latest_date"))
+        latest_buy_within_2d = bool(latest_buy_date is not None and 0 <= int((target_date - latest_buy_date).days) <= 2)
+        b_score = int(
+            sum(
+                [
+                    _coerce_bool(row_dict.get("pullback_reentry", False))
+                    or _coerce_bool(row_dict.get("pocket_pivot_candidate", False))
+                    or _coerce_bool(row_dict.get("gap_setup_candidate", False)),
+                    _safe_float(row_dict.get("pm_close", 0.0)) >= _safe_float(row_dict.get("pm_vwap", 0.0)),
+                    _safe_float(row_dict.get("gap_pct", 0.0)) > 0.0 and _safe_float(row_dict.get("change_pct", 0.0)) > 0.0,
+                    latest_buy_within_2d,
+                    _coerce_bool(row_dict.get("latest_session_utbot_buy_turn", False))
+                    or _coerce_bool(row_dict.get("latest_session_hull_buy_turn", False))
+                    or _coerce_bool(row_dict.get("utbot_buy_recent", False))
+                    or _coerce_bool(row_dict.get("hull_turn_bull_recent", False)),
+                ]
+            )
+        )
+
+        c_score = int(
+            sum(
+                [
+                    _safe_float(row_dict.get("mcap_turnover_pct", row_dict.get("mcap_ratio", 0.0))) >= 0.005,
+                    _safe_float(row_dict.get("effective_dollar_volume", row_dict.get("dollar_volume", 0.0))) >= 150_000.0,
+                    _safe_float(row_dict.get("cmf", 0.0)) > 0.05,
+                    _safe_float(row_dict.get("obv_slope", 0.0)) > 0.1,
+                ]
+            )
+        )
+
+        hard_gate_pass = (not _coerce_bool(row_dict.get("thin_trade_risk", False))) and _coerce_bool(
+            row_dict.get("pm_supports_bullish", False)
+        )
+        freshness_pass = latest_buy_within_2d
+        a_pass = a_score >= 4
+        b_pass = b_score >= 3
+        c_pass = c_score >= 2
+        eligible = bool(hard_gate_pass and freshness_pass and a_pass and b_pass and c_pass)
+
+        abc_norm = ((_safe_float(a_score) / 5.0) + (_safe_float(b_score) / 5.0) + (_safe_float(c_score) / 4.0)) / 3.0
+        scan_norm = _clip(_safe_float(row_dict.get("scan_score", 0.0)) / 200.0, 0.0, 1.0)
+        es_norm = _clip(_safe_float(row_dict.get("es", 0.0)) / 100.0, 0.0, 1.0)
+        pm_change_norm = _clip(_safe_float(row_dict.get("change_pct", 0.0)) / 8.0, 0.0, 1.0)
+        turnover_norm = _clip(_safe_float(row_dict.get("mcap_turnover_pct", row_dict.get("mcap_ratio", 0.0))) / 0.08, 0.0, 1.0)
+        final_score = (abc_norm * 100.0) + (scan_norm * 8.0) + (es_norm * 4.0) + (pm_change_norm * 6.0) + (turnover_norm * 4.0)
+
+        row_dict["pm_entry_a_score"] = a_score
+        row_dict["pm_entry_b_score"] = b_score
+        row_dict["pm_entry_c_score"] = c_score
+        row_dict["pm_entry_score"] = round(final_score, 4)
+        row_dict["pm_entry_rank"] = 0
+        row_dict["pm_entry_selected"] = False
+
+        score_text = f"A{a_score}/B{b_score}/C{c_score}"
+        if not hard_gate_pass:
+            row_dict["pm_entry_reason"] = f"{score_text} | HARD_FAIL:thin_trade_or_pm_bearish"
+        elif eligible:
+            row_dict["pm_entry_reason"] = f"{score_text} | PASS"
+        else:
+            failed_dims: list[str] = []
+            if not freshness_pass:
+                failed_dims.append("FRESH")
+            if not a_pass:
+                failed_dims.append("A")
+            if not b_pass:
+                failed_dims.append("B")
+            if not c_pass:
+                failed_dims.append("C")
+            row_dict["pm_entry_reason"] = f"{score_text} | GATE_FAIL:{'/'.join(failed_dims) if failed_dims else '-'}"
+
+        if eligible:
+            eligible_rows.append(row_dict)
+
+    selected_rows = sorted(eligible_rows, key=_premarket_optimal_entry_sort_key)[:selected_limit]
+    for rank, row_dict in enumerate(selected_rows, start=1):
+        row_dict["pm_entry_rank"] = rank
+        row_dict["pm_entry_selected"] = True
+
+    return rows
+
+
+def _select_premarket_optimal_entry_rows(rows: Iterable[Mapping[str, Any]], *, top_n: int = PREMARKET_CORE_TOP_N) -> list[dict[str, Any]]:
+    selected = [dict(row or {}) for row in (rows or []) if _coerce_bool(dict(row or {}).get("pm_entry_selected", False))]
+    if not selected:
+        return []
+    selected.sort(
+        key=lambda row: (
+            _safe_float(row.get("pm_entry_rank", 0.0)) if _safe_float(row.get("pm_entry_rank", 0.0)) > 0.0 else 1e9,
+            str(row.get("ticker", "")),
+        )
+    )
+    return selected[: max(0, int(top_n))]
+
+
+def _mark_core_intersections(
+    gap_rows: list[dict[str, Any]],
+    inflow_rows: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    gap_tickers = {str(row.get("ticker", "")).strip().upper() for row in gap_rows}
+    inflow_tickers = {str(row.get("ticker", "")).strip().upper() for row in inflow_rows}
+    intersection = {ticker for ticker in gap_tickers.intersection(inflow_tickers) if ticker}
+    for row_dict in gap_rows:
+        ticker = str(row_dict.get("ticker", "")).strip().upper()
+        row_dict["pm_core_intersect"] = ticker in intersection
+    for row_dict in inflow_rows:
+        ticker = str(row_dict.get("ticker", "")).strip().upper()
+        row_dict["pm_core_intersect"] = ticker in intersection
+    return gap_rows, inflow_rows
+
+
 def _build_premarket_summary_sections(
     rows: Iterable[Mapping[str, Any]],
     *,
     run_at_kst: datetime,
 ) -> dict[str, list[dict[str, Any]]]:
     prepared_rows = _prepare_premarket_rows(rows, run_at_kst=run_at_kst)
+    gap_momentum_rows = _with_premarket_gap_momentum_scores(prepared_rows, top_n=PREMARKET_CORE_TOP_N)
+    inflow_top_rows = _with_premarket_inflow_scores(prepared_rows, top_n=PREMARKET_CORE_TOP_N)
+    gap_momentum_rows, inflow_top_rows = _mark_core_intersections(gap_momentum_rows, inflow_top_rows)
+    _with_premarket_optimal_entry_scores(prepared_rows, run_at_kst=run_at_kst, top_n=PREMARKET_CORE_TOP_N)
+    optimal_entry_rows = _select_premarket_optimal_entry_rows(prepared_rows, top_n=PREMARKET_CORE_TOP_N)
 
     legacy_turn_rows = _filter_premarket_direction(
         filter_turn_rows_for_telegram(select_us_session_turn_rows(prepared_rows, run_at_kst=run_at_kst)),
@@ -870,6 +1175,9 @@ def _build_premarket_summary_sections(
 
     return {
         "prepared_rows": prepared_rows,
+        "gap_momentum_rows": gap_momentum_rows,
+        "inflow_top_rows": inflow_top_rows,
+        "optimal_entry_rows": optimal_entry_rows,
         "legacy_turn_rows": legacy_turn_rows,
         "legacy_pullback_rows": legacy_pullback_rows,
         "legacy_hull_bear_rows": legacy_hull_bear_rows,
@@ -885,7 +1193,10 @@ def _build_premarket_summary_sections(
 
 def _build_premarket_index_line(section_rows: Mapping[str, list[dict[str, Any]]]) -> str:
     return (
-        f"- 요약 인덱스: {POST_CLOSE_INDEX_TITLES['legacy_turn']} {len(section_rows['legacy_turn_rows'])}"
+        f"- 요약 인덱스: {PREMARKET_GAP_MOMENTUM_INDEX_TITLE} {len(section_rows['gap_momentum_rows'])}"
+        f" | {PREMARKET_INFLOW_INDEX_TITLE} {len(section_rows['inflow_top_rows'])}"
+        f" | {PREMARKET_OPTIMAL_ENTRY_INDEX_TITLE} {len(section_rows['optimal_entry_rows'])}"
+        f" | {POST_CLOSE_INDEX_TITLES['legacy_turn']} {len(section_rows['legacy_turn_rows'])}"
         f" | {POST_CLOSE_INDEX_TITLES['legacy_pullback']} {len(section_rows['legacy_pullback_rows'])}"
         f" | {POST_CLOSE_INDEX_TITLES['legacy_hull_bear']} {len(section_rows['legacy_hull_bear_rows'])}"
         f" | {POST_CLOSE_INDEX_TITLES['legacy_52w_high']} {len(section_rows['legacy_52w_high_rows'])}"
@@ -925,7 +1236,37 @@ def _render_premarket_summary(
     sections = [
         _build_summary_section_lines(
             section_index=1,
-            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_total=PREMARKET_SUMMARY_SECTION_TOTAL,
+            section_name=PREMARKET_GAP_MOMENTUM_SECTION_NAME,
+            criteria="thin_trade_risk=N + pm_supports_bullish=Y + gap>0 + PM>0 + pm_close>=pm_vwap | score=gap 중심 + PM + dollar 보조",
+            rows=section_rows["gap_momentum_rows"],
+            summary_limit=total_limit,
+            tag_builder=lambda row: "-",
+            row_builder=lambda row, idx: _build_premarket_core_row_line(row, idx, include_intersect=True),
+        ),
+        _build_summary_section_lines(
+            section_index=2,
+            section_total=PREMARKET_SUMMARY_SECTION_TOTAL,
+            section_name=PREMARKET_INFLOW_SECTION_NAME,
+            criteria="thin_trade_risk=N + pm_supports_bullish=Y + turnover>0 + dollar>0 | score=turnover 중심 + dollar 보조",
+            rows=section_rows["inflow_top_rows"],
+            summary_limit=total_limit,
+            tag_builder=lambda row: "-",
+            row_builder=lambda row, idx: _build_premarket_core_row_line(row, idx, include_intersect=True),
+        ),
+        _build_summary_section_lines(
+            section_index=3,
+            section_total=PREMARKET_SUMMARY_SECTION_TOTAL,
+            section_name=PREMARKET_OPTIMAL_ENTRY_SECTION_NAME,
+            criteria="A>=4/5 + B>=3/5 + C>=2/4 + thin_trade_risk=N + pm_supports_bullish=Y",
+            rows=section_rows["optimal_entry_rows"],
+            summary_limit=total_limit,
+            tag_builder=lambda row: "-",
+            row_builder=lambda row, idx: _build_premarket_core_row_line(row, idx, include_buy_label=True),
+        ),
+        _build_summary_section_lines(
+            section_index=4,
+            section_total=PREMARKET_SUMMARY_SECTION_TOTAL,
             section_name=POST_CLOSE_SECTION_TITLES["legacy_turn"],
             criteria="legacy UTBot/HULL buy-turn + volume>1.0x + pm_supports_bullish",
             rows=section_rows["legacy_turn_rows"],
@@ -936,35 +1277,35 @@ def _render_premarket_summary(
             ),
         ),
         _build_summary_section_lines(
-            section_index=2,
-            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_index=5,
+            section_total=PREMARKET_SUMMARY_SECTION_TOTAL,
             section_name=POST_CLOSE_SECTION_TITLES["legacy_pullback"],
             criteria="pullback_reentry=True + volume>1.0x + pm_supports_bullish",
             rows=section_rows["legacy_pullback_rows"],
             summary_limit=total_limit,
-            tag_builder=lambda row: _pm_combined_tag(row, "눌림 재진입"),
+            tag_builder=lambda row: _pm_combined_tag(row, "Pullback reentry"),
         ),
         _build_summary_section_lines(
-            section_index=3,
-            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_index=6,
+            section_total=PREMARKET_SUMMARY_SECTION_TOTAL,
             section_name=POST_CLOSE_SECTION_TITLES["legacy_hull_bear"],
             criteria=f"hull_turn_bear_last_date == {target_us_session_date.isoformat()} + pm_supports_bearish",
             rows=section_rows["legacy_hull_bear_rows"],
             summary_limit=total_limit,
-            tag_builder=lambda row: _pm_combined_tag(row, "HULL 매도전환"),
+            tag_builder=lambda row: _pm_combined_tag(row, "HULL sell turn"),
         ),
         _build_summary_section_lines(
-            section_index=4,
-            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_index=7,
+            section_total=PREMARKET_SUMMARY_SECTION_TOTAL,
             section_name=POST_CLOSE_SECTION_TITLES["legacy_52w_high"],
             criteria=f"new_52w_high=True + latest_bar_date == {target_us_session_date.isoformat()} + pm_supports_bullish",
             rows=section_rows["legacy_52w_high_rows"],
             summary_limit=total_limit,
-            tag_builder=lambda row: _pm_combined_tag(row, "52주 신고가"),
+            tag_builder=lambda row: _pm_combined_tag(row, "52W high"),
         ),
         _build_summary_section_lines(
-            section_index=5,
-            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_index=8,
+            section_total=PREMARKET_SUMMARY_SECTION_TOTAL,
             section_name=POST_CLOSE_SECTION_TITLES["pullback_filter"],
             criteria=(
                 "uptrend_persistent=Y + hma60_slope_pct>0 + pullback_from_swing_high_pct<-2 + "
@@ -974,11 +1315,11 @@ def _render_premarket_summary(
             ),
             rows=section_rows["pullback_filter_rows"],
             summary_limit=total_limit,
-            tag_builder=lambda row: _pm_combined_tag(row, "눌림목 필터"),
+            tag_builder=lambda row: _pm_combined_tag(row, "Pullback filter"),
         ),
         _build_summary_section_lines(
-            section_index=6,
-            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_index=9,
+            section_total=PREMARKET_SUMMARY_SECTION_TOTAL,
             section_name=POST_CLOSE_SECTION_TITLES["chase_filter"],
             criteria=(
                 "bull_strength_recent=Y + uptrend_persistent=Y + hma20/60 slope>0 + volume_bullish=Y + "
@@ -987,11 +1328,11 @@ def _render_premarket_summary(
             ),
             rows=section_rows["chase_filter_rows"],
             summary_limit=total_limit,
-            tag_builder=lambda row: _pm_combined_tag(row, "추세추종 필터"),
+            tag_builder=lambda row: _pm_combined_tag(row, "Chase filter"),
         ),
         _build_summary_section_lines(
-            section_index=7,
-            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_index=10,
+            section_total=PREMARKET_SUMMARY_SECTION_TOTAL,
             section_name=POST_CLOSE_SECTION_TITLES["buy_turn_filter"],
             criteria=(
                 "(latest_session_turn or days<=2) + (utbot_buy_recent or hull_turn_bull_recent or bull_turn_recent) + "
@@ -1001,12 +1342,12 @@ def _render_premarket_summary(
             summary_limit=total_limit,
             tag_builder=lambda row: _pm_combined_tag(
                 row,
-                str(dict(row or {}).get("buy_turn_filter_tag") or "매수전환 필터"),
+                str(dict(row or {}).get("buy_turn_filter_tag") or "Buy turn filter"),
             ),
         ),
         _build_summary_section_lines(
-            section_index=8,
-            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_index=11,
+            section_total=PREMARKET_SUMMARY_SECTION_TOTAL,
             section_name=POST_CLOSE_SECTION_TITLES["gap_setup"],
             criteria=(
                 "gate>=3/5 + score(sorted by score/gate/scan/es) | "
@@ -1016,12 +1357,12 @@ def _render_premarket_summary(
             summary_limit=total_limit,
             tag_builder=lambda row: _pm_combined_tag(
                 row,
-                str(dict(row or {}).get("gap_setup_tag") or "에너지 압축"),
+                str(dict(row or {}).get("gap_setup_tag") or "Gap setup"),
             ),
         ),
         _build_summary_section_lines(
-            section_index=9,
-            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_index=12,
+            section_total=PREMARKET_SUMMARY_SECTION_TOTAL,
             section_name=POST_CLOSE_SECTION_TITLES["pocket_pivot"],
             criteria=(
                 "gate>=3/5 + score(sorted by score/gate/scan/es) | "
@@ -1031,19 +1372,19 @@ def _render_premarket_summary(
             summary_limit=total_limit,
             tag_builder=lambda row: _pm_combined_tag(
                 row,
-                str(dict(row or {}).get("pocket_pivot_tag") or "기관 매집"),
+                str(dict(row or {}).get("pocket_pivot_tag") or "Pocket pivot"),
             ),
         ),
         _build_summary_section_lines(
-            section_index=10,
-            section_total=POST_CLOSE_SUMMARY_SECTION_TOTAL,
+            section_index=13,
+            section_total=PREMARKET_SUMMARY_SECTION_TOTAL,
             section_name=POST_CLOSE_SECTION_TITLES["five_day_top"],
             criteria="chg_5d > 0 sorted by chg_5d/scan_score/es + pm_supports_bullish",
             rows=section_rows["five_day_top_rows"],
             summary_limit=total_limit,
             tag_builder=lambda row: _pm_combined_tag(
                 row,
-                str(dict(row or {}).get("five_day_top_tag") or f"5일 {_safe_float(dict(row or {}).get('chg_5d', 0.0)):+.2f}%"),
+                str(dict(row or {}).get("five_day_top_tag") or f"5D {_safe_float(dict(row or {}).get('chg_5d', 0.0)):+.2f}%"),
             ),
         ),
     ]
@@ -1103,6 +1444,9 @@ def _merge_run_stats(merge_dir: Path) -> dict[str, Any]:
 
 def _premarket_section_counts(section_rows: Mapping[str, list[dict[str, Any]]]) -> dict[str, int]:
     return {
+        "gap_momo_count": len(section_rows.get("gap_momentum_rows", [])),
+        "inflow_top_count": len(section_rows.get("inflow_top_rows", [])),
+        "optimal_entry_count": len(section_rows.get("optimal_entry_rows", [])),
         "legacy_turn_count": len(section_rows.get("legacy_turn_rows", [])),
         "legacy_pullback_count": len(section_rows.get("legacy_pullback_rows", [])),
         "legacy_hull_bear_count": len(section_rows.get("legacy_hull_bear_rows", [])),
@@ -1272,3 +1616,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+

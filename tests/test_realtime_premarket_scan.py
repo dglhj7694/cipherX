@@ -1,5 +1,5 @@
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 import sys
 from unittest.mock import patch
@@ -107,6 +107,7 @@ def _summary_row(run_at_kst: datetime, ticker: str, **overrides: object) -> dict
         "price": 10.5,
         "chg_value": 0.5,
         "chg": 5.0,
+        "gap_pct": 1.2,
         "chg_5d": 6.0,
         "scan_score": 180.0,
         "es": 6.0,
@@ -121,7 +122,7 @@ def _summary_row(run_at_kst: datetime, ticker: str, **overrides: object) -> dict
         "drawdown_from_20d_high_pct": -1.5,
         "pullback_from_swing_high_pct": -4.0,
         "pullback_ready": True,
-        "pullback_reentry": False,
+        "pullback_reentry": True,
         "pullback_atr_multiple": 2.0,
         "uptrend_persistent": True,
         "bull_strength_recent": True,
@@ -134,6 +135,7 @@ def _summary_row(run_at_kst: datetime, ticker: str, **overrides: object) -> dict
         "hma60_slope_pct": 0.4,
         "cmf": 0.12,
         "obv_slope": 0.45,
+        "weekly_trend_context": "UPTREND",
         "ichimoku_above_cloud": True,
         "utbot_buy_recent": True,
         "utbot_buy_last_date": target_date,
@@ -149,6 +151,8 @@ def _summary_row(run_at_kst: datetime, ticker: str, **overrides: object) -> dict
         "pm_close": 10.6,
         "pm_vwap": 10.1,
         "change_pct": 1.5,
+        "detected_buy_signal_latest_date": target_date,
+        "detected_signal_latest_date": target_date,
         "effective_dollar_volume": 300_000.0,
         "mcap_turnover_pct": 0.015,
         "pm_volume_source": "tradingview",
@@ -390,7 +394,7 @@ class RealtimePremarketScanTests(unittest.TestCase):
 
         self.assertEqual([row["ticker"] for row in section_rows["legacy_hull_bear_rows"]], ["BEAR"])
 
-    def test_format_telegram_summary_uses_ten_sections_and_combines_pm_tag(self):
+    def test_format_telegram_summary_uses_thirteen_sections_with_core_briefing_rows(self):
         run_at_kst = datetime(2026, 4, 21, 21, 0, 0, tzinfo=ZoneInfo("Asia/Seoul"))
         target_date = pm._last_us_market_session_date(run_at_kst).isoformat()
         rows = [
@@ -418,13 +422,121 @@ class RealtimePremarketScanTests(unittest.TestCase):
             summary_limit=30,
         )
 
-        self.assertIn("[1/10] 매수전환 (이전버전)", summary)
-        self.assertIn("[8/10] 에너지 압축 → 돌파 임박", summary)
-        self.assertIn("[10/10] 5일 변동률 상위종목", summary)
+        self.assertIn(f"[1/13] {pm.PREMARKET_GAP_MOMENTUM_SECTION_NAME}", summary)
+        self.assertIn(f"[2/13] {pm.PREMARKET_INFLOW_SECTION_NAME}", summary)
+        self.assertIn(f"[3/13] {pm.PREMARKET_OPTIMAL_ENTRY_SECTION_NAME}", summary)
+        self.assertIn("[4/13] 매수전환 (이전버전)", summary)
+        self.assertIn("[11/13] 에너지 압축 → 돌파 임박", summary)
+        self.assertIn("[13/13] 5일 변동률 상위종목", summary)
         self.assertIn("요약 인덱스:", summary)
-        self.assertIn("PM +1.50% | VWAP상", summary)
-        self.assertIn("GAP", summary)
+        self.assertIn("GAP+1.20%", summary)
+        self.assertIn("PM+1.50%", summary)
+        self.assertIn("$300,000", summary)
         self.assertIn("5일 +13.50%", summary)
+
+    def test_build_premarket_summary_sections_adds_core_sections_and_intersection(self):
+        run_at_kst = datetime(2026, 4, 21, 21, 0, 0, tzinfo=ZoneInfo("Asia/Seoul"))
+        rows = [
+            _summary_row(run_at_kst, "AAA", gap_pct=3.0, change_pct=2.5, effective_dollar_volume=700_000.0, mcap_turnover_pct=0.030),
+            _summary_row(run_at_kst, "BBB", gap_pct=2.1, change_pct=1.2, effective_dollar_volume=450_000.0, mcap_turnover_pct=0.0),
+            _summary_row(run_at_kst, "CCC", gap_pct=-0.4, change_pct=0.8, effective_dollar_volume=900_000.0, mcap_turnover_pct=0.040),
+        ]
+
+        section_rows = pm._build_premarket_summary_sections(rows, run_at_kst=run_at_kst)
+
+        gap_tickers = [row["ticker"] for row in section_rows["gap_momentum_rows"]]
+        inflow_tickers = [row["ticker"] for row in section_rows["inflow_top_rows"]]
+        self.assertEqual(gap_tickers, ["AAA", "BBB"])
+        self.assertEqual(inflow_tickers, ["CCC", "AAA"])
+
+        gap_intersection = {row["ticker"] for row in section_rows["gap_momentum_rows"] if row.get("pm_core_intersect")}
+        inflow_intersection = {row["ticker"] for row in section_rows["inflow_top_rows"] if row.get("pm_core_intersect")}
+        self.assertEqual(gap_intersection, {"AAA"})
+        self.assertEqual(inflow_intersection, {"AAA"})
+
+    def test_optimal_entry_uses_buy_signal_freshness_and_priority_sort(self):
+        run_at_kst = datetime(2026, 4, 21, 21, 0, 0, tzinfo=ZoneInfo("Asia/Seoul"))
+        target_date = pm._last_us_market_session_date(run_at_kst)
+        old_buy_date = (target_date - timedelta(days=4)).isoformat()
+        rows = [
+            _summary_row(
+                run_at_kst,
+                "AFAST",
+                gap_pct=3.2,
+                change_pct=2.1,
+                mcap_turnover_pct=0.035,
+                effective_dollar_volume=900_000.0,
+                pullback_reentry=True,
+                latest_session_utbot_buy_turn=True,
+                detected_buy_signal_latest_date=target_date.isoformat(),
+            ),
+            _summary_row(
+                run_at_kst,
+                "BMED",
+                gap_pct=2.0,
+                change_pct=1.4,
+                mcap_turnover_pct=0.020,
+                effective_dollar_volume=500_000.0,
+                pullback_reentry=True,
+                latest_session_hull_buy_turn=True,
+                detected_buy_signal_latest_date=target_date.isoformat(),
+            ),
+            _summary_row(
+                run_at_kst,
+                "CSTALE",
+                gap_pct=2.8,
+                change_pct=1.9,
+                mcap_turnover_pct=0.030,
+                effective_dollar_volume=750_000.0,
+                pullback_reentry=True,
+                latest_session_utbot_buy_turn=True,
+                detected_buy_signal_latest_date=old_buy_date,
+                detected_signal_latest_date=target_date.isoformat(),
+            ),
+        ]
+
+        section_rows = pm._build_premarket_summary_sections(rows, run_at_kst=run_at_kst)
+        optimal_tickers = [row["ticker"] for row in section_rows["optimal_entry_rows"]]
+
+        self.assertEqual(optimal_tickers[:2], ["AFAST", "BMED"])
+        self.assertNotIn("CSTALE", optimal_tickers)
+        selected_map = {row["ticker"]: row for row in section_rows["optimal_entry_rows"]}
+        self.assertEqual(selected_map["AFAST"]["pm_entry_reason"], "A4/B5/C4 | PASS")
+        self.assertEqual(selected_map["BMED"]["pm_entry_reason"], "A4/B5/C4 | PASS")
+
+    def test_core_row_format_includes_intersect_and_buy_labels_conditionally(self):
+        run_at_kst = datetime(2026, 4, 21, 21, 0, 0, tzinfo=ZoneInfo("Asia/Seoul"))
+        target_date = pm._last_us_market_session_date(run_at_kst).isoformat()
+        rows = [
+            _summary_row(
+                run_at_kst,
+                "DUAL",
+                gap_pct=2.4,
+                change_pct=1.8,
+                effective_dollar_volume=800_000.0,
+                mcap_turnover_pct=0.033,
+                utbot_buy_recent=True,
+                hull_turn_bull_recent=True,
+                utbot_buy_last_date=target_date,
+                hull_turn_bull_last_date=target_date,
+                latest_session_utbot_buy_turn=True,
+                latest_session_hull_buy_turn=True,
+                detected_buy_signal_latest_date=target_date,
+                pullback_reentry=True,
+            )
+        ]
+
+        summary = pm.format_telegram_summary(
+            rows,
+            run_at_kst,
+            universe_count=1,
+            skip_count=0,
+            scan_label="프리마켓 21시 실시간 스캔",
+            summary_limit=30,
+        )
+
+        self.assertIn("1. DUAL | GAP+2.40% | PM+1.80% | $800,000 | 회전율0.033% | INTERSECT", summary)
+        self.assertIn("1. DUAL | GAP+2.40% | PM+1.80% | $800,000 | 회전율0.033% | UTBOT+HULL", summary)
 
     def test_parse_args_summary_limit_defaults_to_30(self):
         with patch.object(sys, "argv", ["realtime_premarket_scan"]):
