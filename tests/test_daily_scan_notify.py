@@ -22,6 +22,7 @@ from scripts.daily_scan_and_notify import (
     _with_post_close_setup_scores,
     _last_us_market_session_date,
     _run_post_close,
+    _run_early_session,
     _with_latest_session_buy_turn_flags,
     build_post_close_transition_summary,
     build_scan_universe,
@@ -1507,6 +1508,78 @@ class DailyScanNotifyTests(unittest.TestCase):
             self.assertEqual(meta["telegram_skipped_reason"], "requires_merge_for_ranked_post_close_summary")
             self.assertTrue(Path(meta["summary_path"]).exists())
 
+    def test_run_early_session_writes_relaxed_volume_threshold_and_pullback_raw_count(self):
+        from datetime import timedelta, timezone
+
+        args = SimpleNamespace(
+            shard_count=1,
+            shard_index=0,
+            merge_dir="",
+            universe_profile="default",
+            summary_limit=0,
+            max_workers=1,
+            bias_mode="default",
+            dry_run=False,
+            skip_telegram=True,
+        )
+        run_at_kst = datetime(2026, 4, 22, 23, 10, 25, tzinfo=timezone(timedelta(hours=9)))
+        target_date = "2026-04-22"
+        rows = [
+            {
+                "ticker": "AAA",
+                "price": 100.0,
+                "chg_value": 1.5,
+                "chg": 1.5,
+                "scan_score": 200.0,
+                "es": 75.0,
+                "jg_key": "NEUTRAL",
+                "volume_ratio_20": 0.20,
+                "pullback_reentry": True,
+                "utbot_buy_last_date": target_date,
+                "hull_turn_bull_last_date": "N/A",
+                "hull_turn_bear_last_date": "N/A",
+                "latest_bar_date": target_date,
+                "new_52w_high": False,
+            },
+            {
+                "ticker": "BBB",
+                "price": 50.0,
+                "chg_value": 0.2,
+                "chg": 0.4,
+                "scan_score": 150.0,
+                "es": 60.0,
+                "jg_key": "NEUTRAL",
+                "volume_ratio_20": 0.01,
+                "pullback_reentry": "Y",
+                "utbot_buy_last_date": "N/A",
+                "hull_turn_bull_last_date": "N/A",
+                "hull_turn_bear_last_date": "N/A",
+                "latest_bar_date": target_date,
+                "new_52w_high": False,
+            },
+        ]
+
+        with tempfile.TemporaryDirectory() as temp_dir, patch(
+            "scripts.daily_scan_and_notify.build_scan_universe",
+            return_value={"tickers": ["AAA", "BBB"], "sector_count": 1, "etf_count": 0, "etf_errors": []},
+        ), patch(
+            "scripts.daily_scan_and_notify.split_tickers_for_shard",
+            return_value=["AAA", "BBB"],
+        ), patch(
+            "scripts.daily_scan_and_notify.scan_universe",
+            return_value=ScanRunResult(rows=rows, skips=[], perf={"total_seconds": 0.0}),
+        ):
+            out_dir = Path(temp_dir)
+            result = _run_early_session(args, run_at_kst=run_at_kst, out_dir=out_dir)
+
+            self.assertEqual(result, 0)
+            meta_path = next(out_dir.glob("run_meta_*.json"))
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            expected_threshold = _time_adjusted_volume_threshold(run_at_kst, base_threshold=0.5)
+            self.assertAlmostEqual(float(meta["volume_threshold"]), float(expected_threshold), places=6)
+            self.assertEqual(meta["pullback_detected_raw_count"], 2)
+            self.assertEqual(meta["pullback_reentry_count"], 1)
+
     def test_compute_post_close_row_metrics_core_values(self):
         idx = pd.date_range("2026-01-01", periods=130, freq="D")
         close = pd.Series(range(1, 131), index=idx, dtype=float)
@@ -1826,7 +1899,7 @@ class ScanModeExpansionTests(unittest.TestCase):
         )
         self.assertIn("미확정", summary)
         self.assertIn("장중 스냅샷", summary)
-        self.assertIn("0.25x", summary)
+        self.assertIn("0.250x", summary)
 
     def test_summary_early_session_volume_criteria(self):
         """얼리세션 요약에 시간비례 거래량 기준이 포함되는지 확인."""
@@ -1836,6 +1909,16 @@ class ScanModeExpansionTests(unittest.TestCase):
             skip_count=5, scan_mode="early_session", volume_threshold=0.30,
         )
         self.assertIn("시간비례 보정", summary)
+        self.assertIn("0.300x", summary)
+
+    def test_summary_post_close_volume_criteria_keeps_two_decimal_precision(self):
+        kst_time = datetime(2026, 4, 17, 6, 0, 0, tzinfo=KST)
+        summary = build_transition_summary(
+            [], run_at_kst=kst_time, universe_count=100, result_count=50,
+            skip_count=5, scan_mode="post_close", volume_threshold=0.30,
+        )
+        self.assertIn("0.30x", summary)
+        self.assertNotIn("0.300x", summary)
 
 
 if __name__ == "__main__":

@@ -1699,6 +1699,15 @@ def select_pullback_reentry_rows_for_telegram(
     return selected
 
 
+def count_pullback_reentry_detected_rows(rows: Iterable[Mapping[str, Any]]) -> int:
+    count = 0
+    for row in rows or []:
+        row_dict = dict(row or {})
+        if _coerce_bool(row_dict.get("pullback_reentry", False)):
+            count += 1
+    return count
+
+
 def _coerce_bool(value: Any) -> bool:
     if isinstance(value, bool):
         return value
@@ -2249,7 +2258,7 @@ def build_transition_summary(
             "",
         ]
     elif scan_mode == "early_session":
-        vol_text = f"{volume_threshold:.2f}x" if volume_threshold is not None else "시간비례"
+        vol_text = f"{volume_threshold:.3f}x" if volume_threshold is not None else "시간비례"
         lines = [
             f"[{str(scan_label or '얼리세션 스캔')}] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
             f"- 기준: 당일 미국장 장중 스냅샷 데이터({target_us_session_date.isoformat()}) 추세 미확정",
@@ -2270,7 +2279,11 @@ def build_transition_summary(
             "",
         ]
 
-    vol_criteria_suffix = f" + 거래량> {volume_threshold:.2f}x" if volume_threshold is not None and volume_threshold < 1.0 else " + 거래량> 1.0x"
+    if volume_threshold is not None and volume_threshold < 1.0:
+        vol_precision = ".3f" if scan_mode == "early_session" else ".2f"
+        vol_criteria_suffix = f" + 거래량> {format(volume_threshold, vol_precision)}x"
+    else:
+        vol_criteria_suffix = " + 거래량> 1.0x"
     session_label = "장중" if scan_mode == "early_session" else "전일 미국장(US/Eastern)"
 
     sections = [
@@ -3224,7 +3237,7 @@ def _run_early_session(args: argparse.Namespace, *, run_at_kst: datetime, out_di
     scan_mode = "early_session"
     scan_label = _scan_label_for_mode(scan_mode, universe_profile)
     history_period = _history_period_for_mode(scan_mode)
-    vol_threshold = _time_adjusted_volume_threshold(run_at_kst, base_threshold=1.0)
+    vol_threshold = _time_adjusted_volume_threshold(run_at_kst, base_threshold=0.5)
     print(f"[EARLY_SESSION] Volume threshold: {vol_threshold:.3f}x (time-adjusted), period={history_period}")
 
     if merge_dir:
@@ -3244,6 +3257,7 @@ def _run_early_session(args: argparse.Namespace, *, run_at_kst: datetime, out_di
         rows_path = write_scan_rows_json(merged_rows, out_dir=out_dir, run_label=run_label)
 
         detected_turn_rows = select_us_session_turn_rows(merged_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
+        pullback_detected_raw_count = count_pullback_reentry_detected_rows(merged_rows)
         turn_rows = filter_turn_rows_for_telegram(detected_turn_rows, min_volume_ratio_20_exclusive=vol_threshold)
         pullback_rows = select_pullback_reentry_rows_for_telegram(merged_rows, min_volume_ratio_20_exclusive=vol_threshold)
         hull_bear_rows = select_us_session_hull_bear_rows(merged_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
@@ -3278,6 +3292,7 @@ def _run_early_session(args: argparse.Namespace, *, run_at_kst: datetime, out_di
                 "result_count": len(merged_rows),
                 "detected_turn_count": len(detected_turn_rows),
                 "trend_turn_count": len(turn_rows),
+                "pullback_detected_raw_count": pullback_detected_raw_count,
                 "pullback_reentry_count": len(pullback_rows),
                 "hull_bear_count": len(hull_bear_rows),
                 "new_52w_high_count": len(high_52w_rows),
@@ -3316,6 +3331,7 @@ def _run_early_session(args: argparse.Namespace, *, run_at_kst: datetime, out_di
         csv_path = write_scan_csv(scan_result.rows, out_dir=out_dir, run_label=run_label)
         rows_path = write_scan_rows_json(scan_result.rows, out_dir=out_dir, run_label=run_label)
         detected_turn_rows = select_us_session_turn_rows(scan_result.rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
+        pullback_detected_raw_count = count_pullback_reentry_detected_rows(scan_result.rows)
         turn_rows = filter_turn_rows_for_telegram(detected_turn_rows, min_volume_ratio_20_exclusive=vol_threshold)
         pullback_rows = select_pullback_reentry_rows_for_telegram(scan_result.rows, min_volume_ratio_20_exclusive=vol_threshold)
         hull_bear_rows = select_us_session_hull_bear_rows(scan_result.rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
@@ -3357,6 +3373,7 @@ def _run_early_session(args: argparse.Namespace, *, run_at_kst: datetime, out_di
                 "result_count": len(scan_result.rows),
                 "detected_turn_count": len(detected_turn_rows),
                 "trend_turn_count": len(turn_rows),
+                "pullback_detected_raw_count": pullback_detected_raw_count,
                 "pullback_reentry_count": len(pullback_rows),
                 "hull_bear_count": len(hull_bear_rows),
                 "new_52w_high_count": len(high_52w_rows),
