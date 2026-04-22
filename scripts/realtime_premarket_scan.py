@@ -1,4 +1,5 @@
 import argparse
+from collections import Counter
 import json
 import logging
 import math
@@ -40,6 +41,7 @@ from scripts.daily_scan_and_notify import (
     _compute_post_close_row_metrics,
     _last_us_market_session_date,
     _safe_float,
+    _time_adjusted_volume_threshold,
     _with_latest_session_buy_turn_flags,
     _with_post_close_cross_section_metrics,
     _with_post_close_setup_scores,
@@ -124,6 +126,22 @@ def _clip(value: float, low: float, high: float) -> float:
     if value > high:
         return high
     return value
+
+
+def _premarket_time_adjusted_volume_threshold(run_at_kst: datetime | None, *, base_threshold: float) -> float:
+    reference = run_at_kst if isinstance(run_at_kst, datetime) else datetime.now(KST)
+    if reference.tzinfo is None:
+        reference = reference.replace(tzinfo=KST)
+    return _safe_float(_time_adjusted_volume_threshold(reference, base_threshold=base_threshold))
+
+
+def _sync_latest_bar_effective_volume(combined_hist: pd.DataFrame, metrics: Mapping[str, Any]) -> None:
+    if combined_hist is None or combined_hist.empty:
+        return
+    if "Volume" not in combined_hist.columns:
+        combined_hist["Volume"] = 0.0
+    latest_idx = combined_hist.index[-1]
+    combined_hist.at[latest_idx, "Volume"] = _safe_float(metrics.get("pm_volume_effective", 0.0))
 
 
 def _coerce_bool(value: Any) -> bool:
@@ -386,6 +404,7 @@ def _build_pm_scanner_row(
     min_dollar_volume: float = 0.0,
     min_turnover_pct: float = DEFAULT_MIN_TURNOVER_PCT,
     tv_volume: float = 0.0,
+    run_at_kst: datetime | None = None,
 ) -> dict[str, Any]:
     ticker = str(ticker or "").strip().upper()
     if not ticker:
@@ -397,6 +416,7 @@ def _build_pm_scanner_row(
         return {"ok": False, "ticker": ticker, "skip_reason": err}
 
     _apply_tv_volume_fallback(metrics, tv_volume)
+    _sync_latest_bar_effective_volume(combined_hist, metrics)
     if len(combined_hist) < 50:
         return {
             "ok": False,
@@ -563,8 +583,12 @@ def _build_pm_scanner_row(
         dollar_volume_20 = _safe_float(latest.get("Dollar_Volume_20", 0.0))
         volume_surge = bool(latest.get("Volume_Surge", False))
         volume_climax_buy = bool(latest.get("Volume_Climax_Buy", False))
+        volume_bullish_threshold = _premarket_time_adjusted_volume_threshold(run_at_kst, base_threshold=1.2)
         volume_abnormal = bool(volume_surge or volume_ratio_20 >= 2.0)
-        volume_bullish = bool((volume_ratio_20 >= 1.2) and (volume_surge or volume_climax_buy or volume_oscillator > 0))
+        volume_bullish = bool(
+            (volume_ratio_20 >= volume_bullish_threshold)
+            and (volume_surge or volume_climax_buy or volume_oscillator > 0)
+        )
 
         system_turn_bull = _recent_flag(confirmed_frame, "System_Turn_Bull", recent_window)
         trend_inflect_bull = _recent_flag(confirmed_frame, "Trend_Inflection_Bull", recent_window)
@@ -749,6 +773,7 @@ def _scan_ticker_worker(
     min_dollar_volume: float,
     min_turnover_pct: float,
     tv_volume: float,
+    run_at_kst: datetime | None,
 ) -> dict[str, Any]:
     started = time.perf_counter()
     payload = _build_pm_scanner_row(
@@ -757,6 +782,7 @@ def _scan_ticker_worker(
         min_dollar_volume=min_dollar_volume,
         min_turnover_pct=min_turnover_pct,
         tv_volume=tv_volume,
+        run_at_kst=run_at_kst,
     )
     payload["elapsed_sec"] = _safe_float(time.perf_counter() - started)
     return payload
@@ -768,6 +794,7 @@ def scan_universe(
     bias_mode: str,
     min_dollar_volume: float,
     min_turnover_pct: float,
+    run_at_kst: datetime | None = None,
 ) -> PMScanResult:
     run_started = time.perf_counter()
     results: list[dict[str, Any]] = []
@@ -776,6 +803,9 @@ def scan_universe(
         return PMScanResult(rows=[], skips=[], perf={"workers": 0, "total_seconds": 0.0, "ticker_count": 0})
 
     effective_workers = min(max_workers, max(1, len(tickers)))
+    run_reference = run_at_kst if isinstance(run_at_kst, datetime) else datetime.now(KST)
+    if run_reference.tzinfo is None:
+        run_reference = run_reference.replace(tzinfo=KST)
     logger.info("Fetching TradingView fallback volumes for %s tickers...", len(tickers))
     tv_volumes = fetch_tv_pm_volumes(tickers)
     tv_nonzero_count = sum(1 for value in tv_volumes.values() if _safe_float(value) > 0)
@@ -789,6 +819,7 @@ def scan_universe(
                 min_dollar_volume,
                 min_turnover_pct,
                 tv_volumes.get(ticker, 0.0),
+                run_reference,
             ): ticker
             for ticker in tickers
         }
@@ -1125,6 +1156,8 @@ def _build_premarket_summary_sections(
     *,
     run_at_kst: datetime,
 ) -> dict[str, list[dict[str, Any]]]:
+    legacy_volume_threshold = _premarket_time_adjusted_volume_threshold(run_at_kst, base_threshold=1.0)
+    buy_turn_volume_threshold = _premarket_time_adjusted_volume_threshold(run_at_kst, base_threshold=0.9)
     prepared_rows = _prepare_premarket_rows(rows, run_at_kst=run_at_kst)
     gap_momentum_rows = _with_premarket_gap_momentum_scores(prepared_rows, top_n=PREMARKET_CORE_TOP_N)
     inflow_top_rows = _with_premarket_inflow_scores(prepared_rows, top_n=PREMARKET_CORE_TOP_N)
@@ -1133,11 +1166,17 @@ def _build_premarket_summary_sections(
     optimal_entry_rows = _select_premarket_optimal_entry_rows(prepared_rows, top_n=PREMARKET_CORE_TOP_N)
 
     legacy_turn_rows = _filter_premarket_direction(
-        filter_turn_rows_for_telegram(select_us_session_turn_rows(prepared_rows, run_at_kst=run_at_kst)),
+        filter_turn_rows_for_telegram(
+            select_us_session_turn_rows(prepared_rows, run_at_kst=run_at_kst),
+            min_volume_ratio_20_exclusive=legacy_volume_threshold,
+        ),
         bullish=True,
     )
     legacy_pullback_rows = _filter_premarket_direction(
-        select_pullback_reentry_rows_for_telegram(prepared_rows),
+        select_pullback_reentry_rows_for_telegram(
+            prepared_rows,
+            min_volume_ratio_20_exclusive=legacy_volume_threshold,
+        ),
         bullish=True,
     )
     legacy_hull_bear_rows = _filter_premarket_direction(
@@ -1157,7 +1196,11 @@ def _build_premarket_summary_sections(
         bullish=True,
     )
     buy_turn_filter_rows = _filter_premarket_direction(
-        select_post_close_buy_turn_rows_for_telegram(prepared_rows, run_at_kst=run_at_kst),
+        select_post_close_buy_turn_rows_for_telegram(
+            prepared_rows,
+            run_at_kst=run_at_kst,
+            min_volume_ratio_20_exclusive=buy_turn_volume_threshold,
+        ),
         bullish=True,
     )
     gap_setup_rows = _filter_premarket_direction(
@@ -1219,6 +1262,8 @@ def _render_premarket_summary(
     summary_limit: int,
 ) -> str:
     target_us_session_date = _last_us_market_session_date(run_at_kst)
+    legacy_volume_threshold = _premarket_time_adjusted_volume_threshold(run_at_kst, base_threshold=1.0)
+    buy_turn_volume_threshold = _premarket_time_adjusted_volume_threshold(run_at_kst, base_threshold=0.9)
     prepared_rows = list(section_rows.get("prepared_rows", []))
     total_limit = max(0, int(summary_limit))
     effective_universe_count = int(universe_count) if int(universe_count) > 0 else len(prepared_rows)
@@ -1268,7 +1313,7 @@ def _render_premarket_summary(
             section_index=4,
             section_total=PREMARKET_SUMMARY_SECTION_TOTAL,
             section_name=POST_CLOSE_SECTION_TITLES["legacy_turn"],
-            criteria="legacy UTBot/HULL buy-turn + volume>1.0x + pm_supports_bullish",
+            criteria=f"legacy UTBot/HULL buy-turn + volume>{legacy_volume_threshold:.2f}x(time-adjusted) + pm_supports_bullish",
             rows=section_rows["legacy_turn_rows"],
             summary_limit=total_limit,
             tag_builder=lambda row: _pm_combined_tag(
@@ -1280,7 +1325,7 @@ def _render_premarket_summary(
             section_index=5,
             section_total=PREMARKET_SUMMARY_SECTION_TOTAL,
             section_name=POST_CLOSE_SECTION_TITLES["legacy_pullback"],
-            criteria="pullback_reentry=True + volume>1.0x + pm_supports_bullish",
+            criteria=f"pullback_reentry=True + volume>{legacy_volume_threshold:.2f}x(time-adjusted) + pm_supports_bullish",
             rows=section_rows["legacy_pullback_rows"],
             summary_limit=total_limit,
             tag_builder=lambda row: _pm_combined_tag(row, "Pullback reentry"),
@@ -1336,7 +1381,7 @@ def _render_premarket_summary(
             section_name=POST_CLOSE_SECTION_TITLES["buy_turn_filter"],
             criteria=(
                 "(latest_session_turn or days<=2) + (utbot_buy_recent or hull_turn_bull_recent or bull_turn_recent) + "
-                "cmf>-0.10 + obv_slope>0 + volume_ratio_20>0.9 + no sell on target session + pm_supports_bullish"
+                f"cmf>-0.10 + obv_slope>0 + volume_ratio_20>{buy_turn_volume_threshold:.2f} + no sell on target session + pm_supports_bullish"
             ),
             rows=section_rows["buy_turn_filter_rows"],
             summary_limit=total_limit,
@@ -1433,13 +1478,51 @@ def _merge_run_stats(merge_dir: Path) -> dict[str, Any]:
         perf = payload.get("performance") or {}
         skip_count += int(_safe_float(perf.get("skip_count", 0)))
         performance_summaries.append(dict(perf))
+    skip_reason_counts = _merge_skip_reason_counts(merge_dir)
+    if not skip_reason_counts:
+        fallback_counter: Counter[str] = Counter()
+        for file_path in meta_files:
+            try:
+                payload = json.loads(file_path.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            raw_counts = payload.get("skip_reason_counts") or {}
+            if isinstance(raw_counts, Mapping):
+                for reason, value in raw_counts.items():
+                    reason_text = str(reason).strip() or "unknown"
+                    fallback_counter[reason_text] += int(_safe_float(value))
+        skip_reason_counts = dict(sorted(fallback_counter.items(), key=lambda item: (-item[1], item[0])))
     return {
         "meta_file_count": len(meta_files),
         "universe_count": universe_count,
         "skip_count": skip_count,
         "shard_ticker_count": shard_ticker_count,
         "shard_performance": performance_summaries,
+        "skip_reason_counts": skip_reason_counts,
     }
+
+
+def _count_skip_reasons(skips: Iterable[Mapping[str, Any]]) -> dict[str, int]:
+    counter: Counter[str] = Counter()
+    for item in skips or []:
+        reason_text = str(dict(item or {}).get("reason", "")).strip() or "unknown"
+        counter[reason_text] += 1
+    return dict(sorted(counter.items(), key=lambda entry: (-entry[1], entry[0])))
+
+
+def _merge_skip_reason_counts(merge_dir: Path) -> dict[str, int]:
+    merged_counter: Counter[str] = Counter()
+    skip_files = sorted(Path(merge_dir).glob("**/scan_skips_*.json"))
+    for file_path in skip_files:
+        try:
+            payload = json.loads(file_path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if not isinstance(payload, list):
+            continue
+        for reason, count in _count_skip_reasons(payload).items():
+            merged_counter[reason] += int(count)
+    return dict(sorted(merged_counter.items(), key=lambda entry: (-entry[1], entry[0])))
 
 
 def _premarket_section_counts(section_rows: Mapping[str, list[dict[str, Any]]]) -> dict[str, int]:
@@ -1539,6 +1622,7 @@ def main() -> None:
             "universe_count": effective_universe_count,
             "merged_row_count": len(prepared_rows),
             "summary_limit": summary_limit,
+            "skip_reason_counts": dict(merge_stats.get("skip_reason_counts", {}) or {}),
             "performance": {
                 "match_count": len(prepared_rows),
                 "skip_count": int(merge_stats.get("skip_count", 0) or 0),
@@ -1585,6 +1669,7 @@ def main() -> None:
         bias_mode=args.bias_mode,
         min_dollar_volume=min_dollar_volume,
         min_turnover_pct=min_turnover_pct,
+        run_at_kst=run_at_kst,
     )
     logger.info(
         "Completed scan. Matches=%s Skips=%s TV_nonzero=%s TV_fallback=%s",
@@ -1597,6 +1682,9 @@ def main() -> None:
     json_path = out_dir / f"scan_rows_shard{args.shard_index}.json"
     with json_path.open("w", encoding="utf-8") as handle:
         json.dump(scan_result.rows, handle, ensure_ascii=False, indent=2)
+    skip_json_path = out_dir / f"scan_skips_shard{args.shard_index}.json"
+    with skip_json_path.open("w", encoding="utf-8") as handle:
+        json.dump(scan_result.skips, handle, ensure_ascii=False, indent=2)
 
     meta_path = out_dir / f"run_meta_shard{args.shard_index}.json"
     meta_payload = {
@@ -1609,6 +1697,7 @@ def main() -> None:
         "min_dollar_volume": _safe_float(min_dollar_volume),
         "min_turnover_pct": _safe_float(min_turnover_pct),
         "summary_limit": max(0, int(args.summary_limit)),
+        "skip_reason_counts": _count_skip_reasons(scan_result.skips),
         "performance": scan_result.perf,
     }
     meta_path.write_text(json.dumps(meta_payload, ensure_ascii=False, indent=2), encoding="utf-8")

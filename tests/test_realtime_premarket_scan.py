@@ -1,3 +1,5 @@
+import json
+import tempfile
 import unittest
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -208,6 +210,49 @@ class RealtimePremarketScanTests(unittest.TestCase):
         self.assertEqual(row["dollar_volume"], row["effective_dollar_volume"])
         self.assertEqual(row["mcap_ratio"], row["mcap_turnover_pct"])
         self.assertEqual(row["group"], "G2_BUY_TURN")
+
+    def test_tv_fallback_updates_synthetic_bar_volume_before_indicator_compute(self):
+        hist = _base_hist()
+        signal = _signal_frame("UTBot_Buy")
+        metrics = {
+            "pm_open": 100.0,
+            "pm_high": 102.0,
+            "pm_low": 99.5,
+            "pm_close": 101.0,
+            "pm_vwap": 101.0,
+            "prev_close": 100.0,
+            "prev_high": 105.0,
+            "gap_pct": 1.0,
+            "change_pct": 1.0,
+            "market_cap": 1_000_000_000.0,
+            "pm_volume_yf": 0.0,
+            "pm_volume_tv": 0.0,
+            "pm_volume_effective": 0.0,
+            "pm_volume_source": "none",
+        }
+        captured: dict[str, object] = {}
+
+        def _capture_indicator_input(frame: pd.DataFrame) -> pd.DataFrame:
+            captured["latest_volume"] = float(frame.iloc[-1]["Volume"])
+            return frame
+
+        with patch.object(pm, "fetch_and_synthesize_daily", return_value=(hist, dict(metrics))), patch.object(
+            pm, "compute_indicators", side_effect=_capture_indicator_input
+        ), patch.object(pm, "detect_all_signals", return_value=signal), patch.object(
+            pm, "_ensure_runtime_combo_registry", return_value=None
+        ), patch.object(
+            pm, "build_strategy_payload", return_value=_mock_strategy_payload()
+        ):
+            payload = pm._build_pm_scanner_row(
+                "AAPL",
+                "default",
+                min_dollar_volume=1_000.0,
+                min_turnover_pct=0.001,
+                tv_volume=500.0,
+            )
+
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(captured.get("latest_volume"), 500.0)
 
     def test_build_pm_scanner_row_populates_post_close_compatible_fields_and_pm_flags(self):
         hist = _base_hist()
@@ -454,6 +499,28 @@ class RealtimePremarketScanTests(unittest.TestCase):
         self.assertEqual(gap_intersection, {"AAA"})
         self.assertEqual(inflow_intersection, {"AAA"})
 
+    def test_build_premarket_summary_sections_uses_time_adjusted_volume_thresholds(self):
+        run_at_kst = datetime(2026, 4, 21, 21, 3, 0, tzinfo=ZoneInfo("Asia/Seoul"))
+        target_date = pm._last_us_market_session_date(run_at_kst).isoformat()
+        rows = [
+            _summary_row(
+                run_at_kst,
+                "SOFTVOL",
+                volume_ratio_20=0.06,
+                latest_session_utbot_buy_turn=True,
+                utbot_buy_last_date=target_date,
+                detected_buy_signal_latest_date=target_date,
+                cmf=0.2,
+                obv_slope=0.3,
+            )
+        ]
+
+        section_rows = pm._build_premarket_summary_sections(rows, run_at_kst=run_at_kst)
+
+        self.assertEqual([row["ticker"] for row in section_rows["legacy_turn_rows"]], ["SOFTVOL"])
+        self.assertEqual([row["ticker"] for row in section_rows["legacy_pullback_rows"]], ["SOFTVOL"])
+        self.assertEqual([row["ticker"] for row in section_rows["buy_turn_filter_rows"]], ["SOFTVOL"])
+
     def test_optimal_entry_uses_buy_signal_freshness_and_priority_sort(self):
         run_at_kst = datetime(2026, 4, 21, 21, 0, 0, tzinfo=ZoneInfo("Asia/Seoul"))
         target_date = pm._last_us_market_session_date(run_at_kst)
@@ -591,6 +658,32 @@ class RealtimePremarketScanTests(unittest.TestCase):
         self.assertIn("T00", summary)
         self.assertIn("T29", summary)
         self.assertNotIn("T30", summary)
+
+    def test_merge_run_stats_collects_skip_reason_counts_from_skip_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "run_meta_shard0.json").write_text(
+                json.dumps(
+                    {
+                        "universe_count": 10,
+                        "shard_ticker_count": 10,
+                        "performance": {"skip_count": 3},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (root / "scan_skips_shard0.json").write_text(
+                json.dumps(
+                    [
+                        {"ticker": "AAA", "reason": "no_group_matched"},
+                        {"ticker": "BBB", "reason": "no_group_matched"},
+                        {"ticker": "CCC", "reason": "engine_error"},
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            stats = pm._merge_run_stats(root)
+        self.assertEqual(stats["skip_reason_counts"], {"no_group_matched": 2, "engine_error": 1})
 
     def test_pre_market_workflow_uses_realtime_script_without_prev_scan_dependency(self):
         workflow_path = Path(".github/workflows/pre_market_scan.yml")

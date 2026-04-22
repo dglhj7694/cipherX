@@ -395,6 +395,39 @@ class DailyScanNotifyTests(unittest.TestCase):
         self.assertEqual(selected[0]["buy_turn_filter_tag"], "Tier1 D0")
         self.assertEqual(selected[1]["buy_turn_filter_tag"], "Tier2 D1-2")
 
+    def test_select_post_close_buy_turn_rows_for_telegram_accepts_custom_volume_threshold(self):
+        run_at_kst = datetime(2026, 4, 17, 21, 3, 0)
+        rows = [
+            {
+                "ticker": "LOWVOL",
+                "scan_score": 20.0,
+                "es": 6.0,
+                "latest_session_utbot_buy_turn": True,
+                "latest_session_hull_buy_turn": False,
+                "days_since_utbot_buy": 0,
+                "days_since_hull_turn_bull": 9,
+                "utbot_buy_last_date": "2026-04-16",
+                "hull_turn_bull_last_date": "2026-04-12",
+                "utbot_buy_recent": True,
+                "hull_turn_bull_recent": False,
+                "bull_turn_recent": True,
+                "cmf": 0.05,
+                "obv_slope": 0.15,
+                "volume_ratio_20": 0.06,
+                "utbot_sell_last_date": "2026-04-10",
+                "hull_turn_bear_last_date": "2026-04-11",
+            }
+        ]
+        strict_selected = select_post_close_buy_turn_rows_for_telegram(rows, run_at_kst=run_at_kst, scan_mode="post_close")
+        relaxed_selected = select_post_close_buy_turn_rows_for_telegram(
+            rows,
+            run_at_kst=run_at_kst,
+            scan_mode="post_close",
+            min_volume_ratio_20_exclusive=0.05,
+        )
+        self.assertEqual(strict_selected, [])
+        self.assertEqual([row["ticker"] for row in relaxed_selected], ["LOWVOL"])
+
     def test_actionable_post_close_sections_exclude_thin_trade_risk(self):
         run_at_kst = datetime(2026, 4, 17, 6, 15, 0)
 

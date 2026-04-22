@@ -1973,6 +1973,7 @@ def select_post_close_buy_turn_rows_for_telegram(
     *,
     run_at_kst: datetime,
     scan_mode: str = "post_close",
+    min_volume_ratio_20_exclusive: float = 0.9,
 ) -> list[dict[str, Any]]:
     target_date = _resolve_target_session_date(run_at_kst, scan_mode)
     selected: list[dict[str, Any]] = []
@@ -2004,7 +2005,7 @@ def select_post_close_buy_turn_rows_for_telegram(
             continue
         if _safe_float(row_dict.get("obv_slope", 0)) <= 0.0:
             continue
-        if _safe_float(row_dict.get("volume_ratio_20", 0)) <= 0.9:
+        if _safe_float(row_dict.get("volume_ratio_20", 0)) <= float(min_volume_ratio_20_exclusive):
             continue
         row_dict["buy_turn_filter_tag"] = _buy_turn_tier_tag(row_dict)
         selected.append(row_dict)
