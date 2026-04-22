@@ -54,22 +54,22 @@ US_EASTERN = ZoneInfo("America/New_York")
 _SCAN_SYMBOL_PATTERN = re.compile(r"\b[A-Z]{1,6}(?:[.-][A-Z0-9]{1,4})?\b")
 
 SCAN_MODE_LABELS: dict[str, str] = {
-    "post_close": "?먮룞 ?ㅼ틪",
-    "pre_market": "?꾨━留덉폆 ?ㅼ틪",
-    "early_session": "?쇰━?몄뀡 ?ㅼ틪 ?μ쨷 誘명솗??異붿꽭",
+    "post_close": "자동 스캔",
+    "pre_market": "프리마켓 스캔",
+    "early_session": "얼리세션 스캔 장중 미확정 추세",
 }
 US_MARKET_OPEN_ET = dt_time(9, 30)
 US_MARKET_CLOSE_ET = dt_time(16, 0)
 US_REGULAR_SESSION_MINUTES = 390.0
 
 ETF_UNIVERSE_ITEMS: tuple[dict[str, str], ...] = (
-    {"requested": "?ъ?1000", "resolved": "IWB"},
+    {"requested": "러셀1000", "resolved": "IWB"},
     {"requested": "MSCI(USA)", "resolved": "EUSA"},
-    {"requested": "?섏뒪??00", "resolved": "QQQ"},
+    {"requested": "나스닥100", "resolved": "QQQ"},
     {"requested": "S&P500", "resolved": "SPY"},
 )
 RUSSELL2000_UNIVERSE_ITEMS: tuple[dict[str, str], ...] = (
-    {"requested": "?ъ?2000", "resolved": "IWM"},
+    {"requested": "러셀2000", "resolved": "IWM"},
 )
 UNIVERSE_PROFILE_ITEMS: dict[str, tuple[dict[str, str], ...]] = {
     "default": ETF_UNIVERSE_ITEMS,
@@ -161,32 +161,32 @@ GAP_SETUP_MAX_SCORE = 11
 POCKET_PIVOT_MAX_SCORE = 12
 POST_CLOSE_SUMMARY_SECTION_TOTAL = 10
 POST_CLOSE_SECTION_TITLES = {
-    "legacy_turn": "留ㅼ닔?꾪솚 (?댁쟾踰꾩쟾)",
-    "legacy_pullback": "?뚮┝ ?ъ쭊??(?댁쟾踰꾩쟾)",
-    "legacy_hull_bear": "HULL 留ㅻ룄?꾪솚 (?댁쟾踰꾩쟾)",
-    "legacy_52w_high": "52二??좉퀬媛 (?댁쟾踰꾩쟾)",
-    "pullback_filter": "?뚮┝紐??꾪꽣",
-    "chase_filter": "異붿꽭異붿쥌 ?꾪꽣",
-    "buy_turn_filter": "留ㅼ닔?꾪솚 ?꾪꽣",
-    "gap_setup": "?먮꼫吏 ?뺤텞 ???뚰뙆 ?꾨컯",
-    "pocket_pivot": "湲곌? 留ㅼ쭛 ?ъ갑",
-    "five_day_top": "5??蹂?숇쪧 ?곸쐞醫낅ぉ",
+    "legacy_turn": "매수전환 (이전버전)",
+    "legacy_pullback": "눌림 재진입 (이전버전)",
+    "legacy_hull_bear": "HULL 매도전환 (이전버전)",
+    "legacy_52w_high": "52주 신고가 (이전버전)",
+    "pullback_filter": "눌림목 필터",
+    "chase_filter": "추세추종 필터",
+    "buy_turn_filter": "매수전환 필터",
+    "gap_setup": "에너지 압축 → 돌파 임박",
+    "pocket_pivot": "기관 매집 포착",
+    "five_day_top": "5일 변동률 상위종목",
 }
 POST_CLOSE_INDEX_TITLES = {
-    "legacy_turn": "留ㅼ닔?꾪솚(?댁쟾踰꾩쟾)",
-    "legacy_pullback": "?뚮┝ ?ъ쭊???댁쟾踰꾩쟾)",
-    "legacy_hull_bear": "HULL 留ㅻ룄?꾪솚(?댁쟾踰꾩쟾)",
-    "legacy_52w_high": "52二??좉퀬媛(?댁쟾踰꾩쟾)",
-    "pullback_filter": "?뚮┝紐??꾪꽣",
-    "chase_filter": "異붿꽭異붿쥌 ?꾪꽣",
-    "buy_turn_filter": "留ㅼ닔?꾪솚 ?꾪꽣",
-    "gap_setup": "?먮꼫吏 ?뺤텞 ???뚰뙆 ?꾨컯",
-    "pocket_pivot": "湲곌? 留ㅼ쭛 ?ъ갑",
-    "five_day_top": "5??蹂?숇쪧 ?곸쐞醫낅ぉ",
+    "legacy_turn": "매수전환(이전버전)",
+    "legacy_pullback": "눌림 재진입(이전버전)",
+    "legacy_hull_bear": "HULL 매도전환(이전버전)",
+    "legacy_52w_high": "52주 신고가(이전버전)",
+    "pullback_filter": "눌림목 필터",
+    "chase_filter": "추세추종 필터",
+    "buy_turn_filter": "매수전환 필터",
+    "gap_setup": "에너지 압축 → 돌파 임박",
+    "pocket_pivot": "기관 매집 포착",
+    "five_day_top": "5일 변동률 상위종목",
 }
 POST_CLOSE_FINAL_TOP_N = 30
-POST_CLOSE_FINAL_SECTION_NAME = "?ㅻ뒛 吏꾩엯 ?꾨낫 Top30 (A/B/C ?듦낵留?"
-POST_CLOSE_FINAL_INDEX_TITLE = "?ㅻ뒛 吏꾩엯 ?꾨낫 Top30"
+POST_CLOSE_FINAL_SECTION_NAME = "오늘 진입 후보 Top30 (A/B/C 통과만)"
+POST_CLOSE_FINAL_INDEX_TITLE = "오늘 진입 후보 Top30"
 POST_CLOSE_FINAL_ENTRY_FIELD_SPECS: tuple[dict[str, str], ...] = (
     {"group": "final", "key": "a_score", "label": "AScore", "type": "number", "description": "Trend quality score (A)", "rule": "5-point score", "example": "4"},
     {"group": "final", "key": "b_score", "label": "BScore", "type": "number", "description": "Entry timing score (B)", "rule": "5-point score", "example": "3"},
@@ -199,28 +199,28 @@ POST_CLOSE_FINAL_ENTRY_FIELD_SPECS: tuple[dict[str, str], ...] = (
 EARLY_SESSION_CORE_TOP_N = 20
 EARLY_SESSION_EXTENDED_SECTION_TOTAL = 10
 EARLY_SESSION_INDEX_TITLES = {
-    "legacy_turn": "留ㅼ닔?꾪솚",
+    "legacy_turn": "매수전환",
     "legacy_pullback": "눌림목",
-    "legacy_hull_bear": "HULL留ㅻ룄",
-    "legacy_52w_high": "52W ?좉퀬媛",
-    "gap_momentum": "媛?긽??紐⑤찘?",
-    "inflow_top": "?쒖킑?鍮?吏묒쨷 ?먭툑 ?좎엯",
-    "gap_setup": "?먮꼫吏 ?뺤텞 ???뚰뙆 ?꾨컯",
-    "pocket_pivot": "湲곌? 留ㅼ쭛 ?ъ갑",
-    "five_day_top": "5??蹂?숇쪧 ?곸쐞醫낅ぉ",
-    "optimal_entry": "理쒖쟻吏꾩엯",
+    "legacy_hull_bear": "HULL매도",
+    "legacy_52w_high": "52W 신고가",
+    "gap_momentum": "갭상승 모멘텀",
+    "inflow_top": "시총대비 집중 자금 유입",
+    "gap_setup": "에너지 압축 → 돌파 임박",
+    "pocket_pivot": "기관 매집 포착",
+    "five_day_top": "5일 변동률 상위종목",
+    "optimal_entry": "최적진입",
 }
 EARLY_SESSION_SECTION_TITLES = {
-    "legacy_turn": "留ㅼ닔?꾪솚",
+    "legacy_turn": "매수전환",
     "legacy_pullback": "눌림목 재진입",
-    "legacy_hull_bear": "?뱀씪 HULL 留ㅻ룄",
-    "legacy_52w_high": "52二??좉퀬媛 媛깆떊",
-    "gap_momentum": "媛?긽??紐⑤찘?",
-    "inflow_top": "?쒖킑?鍮?吏묒쨷 ?먭툑 ?좎엯",
-    "gap_setup": "?먮꼫吏 ?뺤텞 ???뚰뙆 ?꾨컯",
-    "pocket_pivot": "湲곌? 留ㅼ쭛 ?ъ갑",
-    "five_day_top": "5??蹂?숇쪧 ?곸쐞醫낅ぉ",
-    "optimal_entry": "?꾩떆??理쒖쟻吏꾩엯 Top20",
+    "legacy_hull_bear": "당일 HULL 매도",
+    "legacy_52w_high": "52주 신고가 갱신",
+    "gap_momentum": "갭상승 모멘텀",
+    "inflow_top": "시총대비 집중 자금 유입",
+    "gap_setup": "에너지 압축 → 돌파 임박",
+    "pocket_pivot": "기관 매집 포착",
+    "five_day_top": "5일 변동률 상위종목",
+    "optimal_entry": "임시 최적진입 Top20",
 }
 EARLY_SESSION_EXTRA_FIELD_SPECS: tuple[dict[str, str], ...] = (
     {"group": "session", "key": "session_open", "label": "SessionOpen", "type": "number", "description": "Current session open", "rule": "latest open", "example": "102.35"},
@@ -463,14 +463,14 @@ def _series_last_true_timestamp(frame: Any, column: str) -> Any:
 
 def _timestamp_to_iso(ts: Any) -> str:
     if ts is None:
-        return "?놁쓬"
+        return "없음"
     if hasattr(ts, "date"):
         try:
             return ts.date().isoformat()
         except Exception:
             pass
     text = str(ts or "").strip()
-    return text[:10] if text else "?놁쓬"
+    return text[:10] if text else "없음"
 
 
 def _days_since_timestamp(as_of: Any, ts: Any) -> int:
@@ -631,7 +631,7 @@ def _compute_post_close_row_metrics(frame: Any) -> dict[str, Any]:
         "days_since_utbot_buy": 0,
         "days_since_hull_turn_bull": 0,
         "days_since_hull_turn_bear": 0,
-        "system_turn_bull_last_date": "?놁쓬",
+        "system_turn_bull_last_date": "없음",
         "volume_dry_up_score": 0.0,
         "volume_expansion_score": 0.0,
         "obv_slope": 0.0,
@@ -1008,7 +1008,7 @@ def _scan_label_for_profile(profile: str) -> str:
     normalized = _normalize_universe_profile(profile)
     if normalized == "russell2000":
         return "Extended Scan:RUSSELL2000"
-    return "?먮룞 ?ㅼ틪"
+    return "자동 스캔"
 
 
 def build_scan_universe(
@@ -1310,25 +1310,25 @@ def _build_scanner_row(ticker: str, *, bias_mode: str, recent_window: int = 5, h
             "pullback_reentry": bool(profile_flags.get("pullback_reentry", False)),
             "low_conflict_bullish": bool(profile_flags.get("low_conflict_bullish", False)),
             "utbot_buy_recent": bool(detected_payload.get("utbot_buy_recent", False)),
-            "utbot_buy_last_date": str(detected_payload.get("utbot_buy_last_date", "?놁쓬")),
+            "utbot_buy_last_date": str(detected_payload.get("utbot_buy_last_date", "없음")),
             "utbot_sell_recent": bool(detected_payload.get("utbot_sell_recent", False)),
-            "utbot_sell_last_date": str(detected_payload.get("utbot_sell_last_date", "?놁쓬")),
+            "utbot_sell_last_date": str(detected_payload.get("utbot_sell_last_date", "없음")),
             "hull_turn_bull_recent": bool(detected_payload.get("hull_turn_bull_recent", False)),
-            "hull_turn_bull_last_date": str(detected_payload.get("hull_turn_bull_last_date", "?놁쓬")),
+            "hull_turn_bull_last_date": str(detected_payload.get("hull_turn_bull_last_date", "없음")),
             "hull_turn_bear_recent": bool(detected_payload.get("hull_turn_bear_recent", False)),
-            "hull_turn_bear_last_date": str(detected_payload.get("hull_turn_bear_last_date", "?놁쓬")),
-            "latest_bar_date": str(latest_bar_date or "?놁쓬"),
+            "hull_turn_bear_last_date": str(detected_payload.get("hull_turn_bear_last_date", "없음")),
+            "latest_bar_date": str(latest_bar_date or "없음"),
             "new_52w_high": bool(latest.get("New_52W_High", False)),
             "new_52w_closing_high": bool(latest.get("New_52W_Closing_High", False)),
             "detected_combo_count": int(detected_payload.get("detected_combo_count", 0) or 0),
-            "detected_combo_summary": str(detected_payload.get("detected_combo_summary", "?놁쓬")),
+            "detected_combo_summary": str(detected_payload.get("detected_combo_summary", "없음")),
             "detected_transition_count": int(detected_payload.get("detected_transition_count", 0) or 0),
-            "detected_transition_summary": str(detected_payload.get("detected_transition_summary", "?놁쓬")),
+            "detected_transition_summary": str(detected_payload.get("detected_transition_summary", "없음")),
             "detected_core_count": int(detected_payload.get("detected_core_count", 0) or 0),
-            "detected_core_summary": str(detected_payload.get("detected_core_summary", "?놁쓬")),
+            "detected_core_summary": str(detected_payload.get("detected_core_summary", "없음")),
             "detected_signal_total_count": int(detected_payload.get("detected_signal_total_count", 0) or 0),
-            "detected_buy_signal_latest_date": str(detected_payload.get("detected_buy_signal_latest_date", "?놁쓬")),
-            "detected_signal_latest_date": str(detected_payload.get("detected_signal_latest_date", "?놁쓬")),
+            "detected_buy_signal_latest_date": str(detected_payload.get("detected_buy_signal_latest_date", "없음")),
+            "detected_signal_latest_date": str(detected_payload.get("detected_signal_latest_date", "없음")),
             "detected_signals": list(detected_payload.get("all_items", [])),
             "watch_buy_plus": watch_buy_plus,
             "buy_combo_present": buy_combo_present,
@@ -1642,7 +1642,7 @@ def merge_shard_scan_rows(merge_dir: Path, *, required_run_stamp: str | None = N
 
 def _parse_iso_date(value: Any) -> date | None:
     text = str(value or "").strip()
-    if not text or text in {"?놁쓬", "??곸벉", "-", "N/A"}:
+    if not text or text in {"없음", "미확정", "-", "N/A"}:
         return None
     try:
         return datetime.strptime(text, "%Y-%m-%d").date()
@@ -1675,7 +1675,7 @@ def _last_us_market_session_date(run_at_kst: datetime) -> date:
 
 
 def _current_us_session_date(run_at_kst: datetime) -> date:
-    """?꾩옱 吏꾪뻾 以묒씠嫄곕굹 媛??媛源뚯슫 誘멸뎅???몄뀡 ?좎쭨 諛섑솚 (early_session??."""
+    """현재 진행 중이거나 가장 가까운 미국장 세션 날짜 반환 (early_session용)."""
     us_now = run_at_kst.astimezone(US_EASTERN)
     session_date = us_now.date()
     while session_date.weekday() >= 5:
@@ -1684,15 +1684,15 @@ def _current_us_session_date(run_at_kst: datetime) -> date:
 
 
 def _resolve_target_session_date(run_at_kst: datetime, scan_mode: str) -> date:
-    """scan_mode???곕씪 ?곸젅???寃??몄뀡 ?좎쭨 諛섑솚."""
+    """scan_mode별로 타겟 세션 날짜를 반환한다."""
     if scan_mode == "early_session":
         return _current_us_session_date(run_at_kst)
     return _last_us_market_session_date(run_at_kst)
 
 
 def _scan_label_for_mode(scan_mode: str, universe_profile: str) -> str:
-    """scan_mode? universe_profile??議고빀?섏뿬 ?쇰꺼 ?앹꽦."""
-    base = SCAN_MODE_LABELS.get(scan_mode, "?먮룞 ?ㅼ틪")
+    """scan_mode와 universe_profile을 조합해 표시 라벨을 생성한다."""
+    base = SCAN_MODE_LABELS.get(scan_mode, "자동 스캔")
     if _normalize_universe_profile(universe_profile) == "russell2000":
         return f"{base}:RUSSELL2000"
     return base
@@ -1712,12 +1712,12 @@ def _time_adjusted_volume_threshold(
     *,
     base_threshold: float = 1.0,
 ) -> float:
-    """?κ컻????寃쎄낵 ?쒓컙??鍮꾨???嫄곕옒???꾧퀎媛?諛섑솚.
+    """장개시 후 경과 시간 비례로 거래량 임계값을 반환한다.
 
-    蹂댁젙 紐⑤뜽 (U-shape 諛섏쁺):
-    - 泥섏쓬 30遺? ?섎（ 嫄곕옒?湲덉쓽 ??25%
-    - 30~60遺? 異붽? ??15%
-    - 60遺??댄썑: ?섎㉧吏 ??60% 遺꾪룷
+    보정 모델 (U-shape 반영):
+    - 처음 30분: 하루 거래대금의 약 25%
+    - 30~60분: 추가 약 15%
+    - 60분 이후: 나머지 약 60% 분포
     """
     us_now = run_at_kst.astimezone(US_EASTERN)
     market_open = us_now.replace(
@@ -1752,9 +1752,9 @@ def _transition_signals_on_date(row: Mapping[str, Any], target_date: date) -> li
     utbot_buy_date = _parse_iso_date(row.get("utbot_buy_last_date"))
     hull_buy_date = _parse_iso_date(row.get("hull_turn_bull_last_date"))
     if utbot_buy_date == target_date:
-        signals.append("UTBot 留ㅼ닔")
+        signals.append("UTBot 매수")
     if hull_buy_date == target_date:
-        signals.append("HULL 留ㅼ닔")
+        signals.append("HULL 매수")
     return signals
 
 
@@ -2183,7 +2183,7 @@ def select_post_close_top_5d_rows_for_telegram(rows: Iterable[Mapping[str, Any]]
         chg_5d = _safe_float(row_dict.get("chg_5d", 0.0))
         if chg_5d <= 0.0:
             continue
-        row_dict["five_day_top_tag"] = f"5??{chg_5d:+.2f}%"
+        row_dict["five_day_top_tag"] = f"5일 {chg_5d:+.2f}%"
         selected.append(row_dict)
     selected.sort(
         key=lambda row: (
@@ -2217,7 +2217,7 @@ def _with_early_session_gap_momentum_scores(
         dollar_norm = _clip(math.log10(max(1.0, effective_dollar)) / 9.0, 0.0, 1.0)
         score = (gap_norm * 60.0) + (change_norm * 30.0) + (dollar_norm * 10.0)
         row_dict["early_gap_momo_score"] = round(score, 4)
-        row_dict["early_gap_momo_tag"] = f"GAP{gap_pct:+.2f}% | ?μ쨷{change_pct:+.2f}%"
+        row_dict["early_gap_momo_tag"] = f"GAP{gap_pct:+.2f}% | 세션{change_pct:+.2f}%"
         selected.append(row_dict)
     selected.sort(
         key=lambda row: (
@@ -2282,7 +2282,7 @@ def _select_early_session_optimal_entry_rows(
         row_dict = dict(row or {})
         row_dict["early_optimal_entry_tag"] = (
             f"{str(row_dict.get('final_entry_reason') or '-')}"
-            f" | ?먯닔 {_safe_float(row_dict.get('final_entry_score', 0.0)):.2f}"
+            f" | 점수 {_safe_float(row_dict.get('final_entry_score', 0.0)):.2f}"
         )
         row.update(row_dict)
     return selected
@@ -2334,7 +2334,7 @@ def _is_buy_turn_signal(signal: Any, *, engine: str) -> bool:
     text = str(signal or "").strip().lower()
     if engine not in text:
         return False
-    return "buy" in text or "留ㅼ닔" in str(signal or "")
+    return "buy" in text or "매수" in str(signal or "")
 
 
 def _post_close_buy_turn_label(row: Mapping[str, Any]) -> str:
@@ -2402,11 +2402,11 @@ def _build_summary_section_lines(
     limited_rows = all_rows if int(summary_limit) <= 0 else all_rows[: int(summary_limit)]
     lines = [
         f"=== [{section_index}/{section_total}] {section_name} ===",
-        f"湲곗?: {criteria}",
+        f"기준: {criteria}",
         f"건수: {len(all_rows)}개",
     ]
     if not all_rows:
-        lines.append("- ?대떦 ?놁쓬")
+        lines.append("- 해당 없음")
         return lines
     for idx, row in enumerate(limited_rows, start=1):
         if row_builder is not None:
@@ -2426,7 +2426,7 @@ def build_transition_summary(
     universe_count: int,
     result_count: int,
     skip_count: int,
-    scan_label: str = "?먮룞 ?ㅼ틪",
+    scan_label: str = "자동 스캔",
     detected_turn_count: int | None = None,
     summary_limit: int = 0,
     pullback_rows: Iterable[Mapping[str, Any]] | None = None,
@@ -2455,14 +2455,14 @@ def build_transition_summary(
     target_us_session_date = _resolve_target_session_date(run_at_kst, scan_mode)
 
     index_line = (
-        f"- ?붿빟 ?몃뜳?? 留ㅼ닔?꾪솚 {len(buy_rows)}"
-        f" | ?뚮┝紐?{len(pullback_rows_list)}"
-        f" | HULL留ㅻ룄 {len(hull_bear_rows_list)}"
-        f" | 52W ?좉퀬媛 {len(high_52w_rows_list)}"
+        f"- 요약 인덱스: 매수전환 {len(buy_rows)}"
+        f" | 눌림목 {len(pullback_rows_list)}"
+        f" | HULL매도 {len(hull_bear_rows_list)}"
+        f" | 52W 신고가 {len(high_52w_rows_list)}"
     )
     if scan_mode == "early_session":
         index_line = (
-            f"- ?붿빟 ?몃뜳?? {EARLY_SESSION_INDEX_TITLES['legacy_turn']} {len(buy_rows)}"
+            f"- 요약 인덱스: {EARLY_SESSION_INDEX_TITLES['legacy_turn']} {len(buy_rows)}"
             f" | {EARLY_SESSION_INDEX_TITLES['legacy_pullback']} {len(pullback_rows_list)}"
             f" | {EARLY_SESSION_INDEX_TITLES['legacy_hull_bear']} {len(hull_bear_rows_list)}"
             f" | {EARLY_SESSION_INDEX_TITLES['legacy_52w_high']} {len(high_52w_rows_list)}"
@@ -2476,49 +2476,49 @@ def build_transition_summary(
 
     if scan_mode == "pre_market":
         lines = [
-            f"[{str(scan_label or '?꾨━留덉폆 ?ㅼ틪')}] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
-            f"- 湲곗?: ?꾩씪 誘멸뎅???뺤젙 ?곗씠??{target_us_session_date.isoformat()})",
-            f"- 紐⑹쟻: ?ㅻ뒛 蹂몄옣?먯꽌 二쇰ぉ??醫낅ぉ ?좎젏",
+            f"[{str(scan_label or '프리마켓 스캔')}] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
+            f"- 기준: 전일 미국장 확정 데이터({target_us_session_date.isoformat()})",
+            f"- 목적: 오늘 본장에서 주목할 종목 선점",
             f"- 유니버스: {universe_count}개 | 스캔 결과: {result_count}개",
             index_line,
             "",
         ]
     elif scan_mode == "early_session":
-        vol_text = f"{volume_threshold:.3f}x" if volume_threshold is not None else "?쒓컙鍮꾨?"
+        vol_text = f"{volume_threshold:.3f}x" if volume_threshold is not None else "시간비례"
         lines = [
-            f"[{str(scan_label or '?쇰━?몄뀡 ?ㅼ틪')}] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
+            f"[{str(scan_label or '얼리세션 스캔')}] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
             f"- 기준: 당일 미국장 장중 스냅샷({target_us_session_date.isoformat()}) 추세 미확정",
-            f"- 紐⑹쟻: ???쒖옉 ??媛뺤꽭 醫낅ぉ 鍮좊Ⅸ ?ъ갑",
-            f"- 嫄곕옒??湲곗?: {vol_text} (?쒓컙鍮꾨? 蹂댁젙 ?곸슜)",
-            f"- ?좊땲踰꾩뒪: {universe_count}媛?| ?ㅼ틪 寃곌낵: {result_count}媛??쒖쇅 {skip_count}媛?",
-            "- ?μ쨷 異붿꽭 蹂?숈쑝濡??좏샇/嫄곕옒?됱? ??留덇컧 ??蹂寃쎈맆 ???덉뒿?덈떎",
+            f"- 목적: 장 시작 후 강세 종목 빠른 포착",
+            f"- 거래량 기준: {vol_text} (시간비례 보정 적용)",
+            f"- 유니버스: {universe_count}개 | 스캔 결과: {result_count}개 / 제외 {skip_count}개",
+            "- 장중 추세 변동으로 신호/거래대금은 마감 후 변경될 수 있습니다",
             index_line,
             "",
         ]
     else:
         lines = [
-            f"[{str(scan_label or '?먮룞 ?ㅼ틪')}] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
-            f"- ?꾩씪 誘멸뎅??湲곗??? {target_us_session_date.isoformat()} (US/Eastern)",
+            f"[{str(scan_label or '자동 스캔')}] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
+            f"- 전일 미국장 기준: {target_us_session_date.isoformat()} (US/Eastern)",
             f"- 유니버스: {universe_count}개",
-            f"- ?꾩껜 ?ㅼ틪 寃곌낵: {result_count}媛??쒖쇅 {skip_count}媛?",
+            f"- 전체 스캔 결과: {result_count}개 / 제외 {skip_count}개",
             index_line,
             "",
         ]
 
     if volume_threshold is not None and volume_threshold < 1.0:
         vol_precision = ".3f" if scan_mode == "early_session" else ".2f"
-        vol_criteria_suffix = f" + 嫄곕옒?? {format(volume_threshold, vol_precision)}x"
+        vol_criteria_suffix = f" + 거래량 {format(volume_threshold, vol_precision)}x"
     else:
-        vol_criteria_suffix = " + 嫄곕옒?? 1.0x"
-    session_label = "?μ쨷" if scan_mode == "early_session" else "?꾩씪 誘멸뎅??US/Eastern)"
+        vol_criteria_suffix = " + 거래량 1.0x"
+    session_label = "세션" if scan_mode == "early_session" else "전일 미국장(US/Eastern)"
     section_total = EARLY_SESSION_EXTENDED_SECTION_TOTAL if scan_mode == "early_session" else 4
 
     sections = [
         _build_summary_section_lines(
             section_index=1,
             section_total=section_total,
-            section_name="留ㅼ닔?꾪솚",
-            criteria=(f"{session_label} UTBot/HULL 留ㅼ닔?꾪솚{vol_criteria_suffix} (媛먯? {detected_count}媛?"),
+            section_name="매수전환",
+            criteria=(f"{session_label} UTBot/HULL 매수전환{vol_criteria_suffix} (감지 {detected_count}개)"),
             rows=buy_rows,
             summary_limit=summary_limit,
             tag_builder=lambda row: ", ".join(list(dict(row or {}).get("transition_signals") or [])) or "-",
@@ -2535,20 +2535,20 @@ def build_transition_summary(
         _build_summary_section_lines(
             section_index=3,
             section_total=section_total,
-            section_name="?뱀씪 HULL 留ㅻ룄",
+            section_name="당일 HULL 매도",
             criteria=f"hull_turn_bear_last_date == {target_us_session_date.isoformat()}",
             rows=hull_bear_rows_list,
             summary_limit=summary_limit,
-            tag_builder=lambda _row: "HULL 留ㅻ룄",
+            tag_builder=lambda _row: "HULL 매도",
         ),
         _build_summary_section_lines(
             section_index=4,
             section_total=section_total,
-            section_name="52二??좉퀬媛 媛깆떊",
+            section_name="52주 신고가 갱신",
             criteria=f"New_52W_High=True + latest_bar_date == {target_us_session_date.isoformat()}",
             rows=high_52w_rows_list,
             summary_limit=summary_limit,
-            tag_builder=lambda _row: "52W ?좉퀬媛",
+            tag_builder=lambda _row: "52W 신고가",
         ),
     ]
     if scan_mode == "early_session":
@@ -2655,7 +2655,7 @@ def build_post_close_transition_summary(
     target_us_session_date = _resolve_target_session_date(run_at_kst, "post_close")
 
     index_line = (
-        f"- ?붿빟 ?몃뜳?? {POST_CLOSE_INDEX_TITLES['legacy_turn']} {len(buy_rows)}"
+        f"- 요약 인덱스: {POST_CLOSE_INDEX_TITLES['legacy_turn']} {len(buy_rows)}"
         f" | {POST_CLOSE_INDEX_TITLES['legacy_pullback']} {len(pullback_rows_list)}"
         f" | {POST_CLOSE_INDEX_TITLES['legacy_hull_bear']} {len(hull_bear_rows_list)}"
         f" | {POST_CLOSE_INDEX_TITLES['legacy_52w_high']} {len(high_52w_rows_list)}"
@@ -2671,9 +2671,9 @@ def build_post_close_transition_summary(
 
     lines = [
         f"[{str(scan_label or 'Daily Scan')}] {run_at_kst.strftime('%Y-%m-%d %H:%M:%S')} KST",
-        f"- ???誘멸뎅 ?몄뀡?? {target_us_session_date.isoformat()} (US/Eastern)",
-        f"- ?좊땲踰꾩뒪: {universe_count}",
-        f"- ?ㅼ틪 寃곌낵: {result_count} | ?쒖쇅: {skip_count}",
+        f"- 대상 미국 세션일: {target_us_session_date.isoformat()} (US/Eastern)",
+        f"- 유니버스: {universe_count}",
+        f"- 스캔 결과: {result_count} | 제외: {skip_count}",
         index_line,
         "",
     ]
@@ -2708,7 +2708,7 @@ def build_post_close_transition_summary(
             criteria=f"hull_turn_bear_last_date == {target_us_session_date.isoformat()}",
             rows=hull_bear_rows_list,
             summary_limit=summary_limit,
-            tag_builder=lambda _row: "HULL 留ㅻ룄?꾪솚",
+            tag_builder=lambda _row: "HULL 매도전환",
             row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx),
         ),
         _build_summary_section_lines(
@@ -2718,7 +2718,7 @@ def build_post_close_transition_summary(
             criteria=f"new_52w_high=True + latest_bar_date == {target_us_session_date.isoformat()}",
             rows=high_52w_rows_list,
             summary_limit=summary_limit,
-            tag_builder=lambda _row: "52二??좉퀬媛",
+            tag_builder=lambda _row: "52주 신고가",
             row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx),
         ),
         _build_summary_section_lines(
@@ -2732,7 +2732,7 @@ def build_post_close_transition_summary(
             ),
             rows=pullback_filter_rows_list,
             summary_limit=summary_limit,
-            tag_builder=lambda _row: "?뚮┝紐??꾪꽣",
+            tag_builder=lambda _row: "눌림목 필터",
             row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx),
         ),
         _build_summary_section_lines(
@@ -2745,7 +2745,7 @@ def build_post_close_transition_summary(
             ),
             rows=chase_filter_rows_list,
             summary_limit=summary_limit,
-            tag_builder=lambda _row: "異붿꽭異붿쥌 ?꾪꽣",
+            tag_builder=lambda _row: "추세추종 필터",
             row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx),
         ),
         _build_summary_section_lines(
@@ -2758,7 +2758,7 @@ def build_post_close_transition_summary(
             ),
             rows=buy_turn_filter_rows_list,
             summary_limit=summary_limit,
-            tag_builder=lambda row: str(dict(row or {}).get("buy_turn_filter_tag") or "留ㅼ닔?꾪솚 ?꾪꽣"),
+            tag_builder=lambda row: str(dict(row or {}).get("buy_turn_filter_tag") or "매수전환 필터"),
             row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx, include_buy_label=True),
         ),
         _build_summary_section_lines(
@@ -2771,7 +2771,7 @@ def build_post_close_transition_summary(
             ),
             rows=gap_setup_rows_list,
             summary_limit=summary_limit,
-            tag_builder=lambda row: str(dict(row or {}).get("gap_setup_tag") or "?먮꼫吏 ?뺤텞"),
+            tag_builder=lambda row: str(dict(row or {}).get("gap_setup_tag") or "에너지 압축"),
             row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx),
         ),
         _build_summary_section_lines(
@@ -2784,7 +2784,7 @@ def build_post_close_transition_summary(
             ),
             rows=pocket_pivot_rows_list,
             summary_limit=summary_limit,
-            tag_builder=lambda row: str(dict(row or {}).get("pocket_pivot_tag") or "湲곌? 留ㅼ쭛"),
+            tag_builder=lambda row: str(dict(row or {}).get("pocket_pivot_tag") or "기관 매집"),
             row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx),
         ),
         _build_summary_section_lines(
@@ -2794,7 +2794,7 @@ def build_post_close_transition_summary(
             criteria="chg_5d > 0 sorted by chg_5d/scan_score/es",
             rows=five_day_top_rows_list,
             summary_limit=summary_limit,
-            tag_builder=lambda row: str(dict(row or {}).get("five_day_top_tag") or f"5??{_fmt_signed_number(row.get('chg_5d', 0), 2)}%"),
+            tag_builder=lambda row: str(dict(row or {}).get("five_day_top_tag") or f"5일 {_fmt_signed_number(row.get('chg_5d', 0), 2)}%"),
             row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx),
         ),
     ]
@@ -2812,7 +2812,7 @@ def build_post_close_transition_summary(
                 summary_limit=summary_limit,
                 tag_builder=lambda row: (
                     f"{str(dict(row or {}).get('final_entry_reason') or '-')}"
-                    f" | ?먯닔 {_safe_float(dict(row or {}).get('final_entry_score', 0.0)):.2f}"
+                    f" | 점수 {_safe_float(dict(row or {}).get('final_entry_score', 0.0)):.2f}"
                 ),
                 row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx),
             )
@@ -3007,12 +3007,12 @@ def parse_args() -> argparse.Namespace:
         "--scan-mode",
         default="post_close",
         choices=["post_close", "pre_market", "early_session"],
-        help="post_close(05???λ쭏媛?, pre_market(21???꾨━留덉폆), early_session(23???μ큹諛?",
+        help="post_close(05시 장마감), pre_market(21시 프리마켓), early_session(23시 장초반)",
     )
     parser.add_argument(
         "--prev-scan-dir",
         default="",
-        help="pre_market 紐⑤뱶: ?댁쟾 post_close ?ㅼ틪 寃곌낵瑜?濡쒕뱶???붾젆?좊━",
+        help="pre_market 모드: 이전 post_close 스캔 결과를 로드할 디렉토리",
     )
     return parser.parse_args()
 
@@ -3022,13 +3022,13 @@ def parse_args() -> argparse.Namespace:
 # ---------------------------------------------------------------------------
 
 def _load_json_file(path: Path) -> Any:
-    """JSON ?뚯씪 濡쒕뱶 ?좏떥."""
+    """JSON 파일 로드 유틸."""
     with path.open("r", encoding="utf-8") as fp:
         return json.load(fp)
 
 
 def _load_latest_scan_rows(scan_dir: Path) -> tuple[list[dict[str, Any]], Path | None]:
-    """媛??理쒓렐??scan_rows JSON 濡쒕뱶. merged ?곗꽑, ?놁쑝硫??⑥씪 shard."""
+    """가장 최근의 scan_rows JSON 로드. merged 우선, 없으면 단일 shard."""
     merged = sorted(scan_dir.glob("scan_rows_*_merged.json"), reverse=True)
     if merged:
         data = _load_json_file(merged[0])
@@ -3047,7 +3047,7 @@ def _fetch_premarket_gaps(
     *,
     max_workers: int = 8,
 ) -> dict[str, dict[str, float]]:
-    """?꾨━留덉폆 媛寃⑹쓣 ?섏쭛???꾩씪 醫낃? ?鍮?媛?怨꾩궛."""
+    """프리마켓 가격을 수집해 전일 종가 대비 갭을 계산한다."""
 
     def _fetch_one(ticker: str) -> tuple[str, dict[str, float] | None]:
         try:
@@ -3082,7 +3082,7 @@ def _enrich_rows_with_gap(
     rows: list[dict[str, Any]],
     gap_data: dict[str, dict[str, float]],
 ) -> list[dict[str, Any]]:
-    """湲곗〈 ?ㅼ틪 寃곌낵???꾨━留덉폆 媛??곗씠?곕? 二쇱엯."""
+    """기존 스캔 결과에 프리마켓 갭 데이터를 주입한다."""
     enriched = []
     for row in rows:
         row_dict = dict(row)
@@ -3112,7 +3112,7 @@ def _send_telegram_if_enabled(
     scan_label: str,
     run_at_kst: datetime,
 ) -> None:
-    """Telegram ?꾩넚 怨듯넻 濡쒖쭅."""
+    """Telegram 전송 공통 로직."""
     if args.dry_run or args.skip_telegram:
         print("[SCAN] Telegram send skipped by option.")
         return
@@ -3197,7 +3197,7 @@ def _build_early_session_sections(
 
 
 def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: Path) -> int:
-    """湲곗〈 05??post_close 濡쒖쭅."""
+    """기존 05시 post_close 로직."""
     run_stamp = _resolve_cli_run_stamp(args, run_at_kst=run_at_kst)
     shard_count = int(args.shard_count or 1)
     shard_index = int(args.shard_index or 0)
@@ -3442,7 +3442,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
 
 
 def _run_pre_market(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: Path) -> int:
-    """21???꾨━留덉폆 紐⑤뱶: 05??寃곌낵 濡쒕뱶 + ?꾨━留덉폆 媛??섏쭛."""
+    """21시 프리마켓 모드: 05시 결과 로드 + 프리마켓 갭 수집."""
     stamp = run_at_kst.strftime("%Y%m%d_%H%M%S")
     shard_count = int(args.shard_count or 1)
     shard_index = int(args.shard_index or 0)
@@ -3486,7 +3486,7 @@ def _run_pre_market(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
         if "empty_fallback" in priority_modes:
             summary_text = _prepend_summary_warning(
                 summary_text,
-                "???덈궡: ?꾩씪 daily-scan 寃곌낵 遺?щ줈 priority 鍮꾪솢???꾩껜 ?좊땲踰꾩뒪 fallback) ?ㅻ뱶媛 ?ы븿?섏뿀?듬땲??",
+                "안내: 전일 daily-scan 결과 부재로 priority 비활성(전체 유니버스 fallback) 모드가 포함되었습니다.",
             )
         summary_path = out_dir / f"trend_turn_summary_{run_label}.txt"
         summary_path.write_text(summary_text, encoding="utf-8")
@@ -3513,7 +3513,7 @@ def _run_pre_market(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
         _send_telegram_if_enabled(args, summary_text=summary_text, csv_path=csv_path, scan_label=scan_label, run_at_kst=run_at_kst)
     else:
         run_label = f"{stamp}_pre_market_shard{shard_index}of{shard_count}"
-        # 1) ?댁쟾 post_close 寃곌낵 濡쒕뱶
+        # 1) 이전 post_close 결과 로드
         prev_rows, prev_path = _load_latest_scan_rows(Path(prev_scan_dir))
         prev_scan_found = bool(prev_rows)
         priority_mode = "from_prev_scan"
@@ -3528,7 +3528,7 @@ def _run_pre_market(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
                 "Falling back to full universe scan without priority."
             )
 
-        # 2) Shard ?브쑬??
+        # 2) Shard 분할
         if prev_scan_found:
             all_tickers = [str(r.get("ticker", "")).strip().upper() for r in prev_rows if r.get("ticker")]
             shard_tickers = split_tickers_for_shard(all_tickers, shard_count, shard_index)
@@ -3541,14 +3541,14 @@ def _run_pre_market(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
             shard_rows = _build_premarket_fallback_rows(shard_tickers)
         print(f"[PRE_MARKET] Shard {shard_index}/{shard_count - 1}: {len(shard_tickers)} tickers for gap collection")
 
-        # 3) ?꾨━留덉폆 媛??섏쭛
+        # 3) 프리마켓 갭 수집
         gap_data = _fetch_premarket_gaps(shard_tickers, max_workers=int(args.max_workers))
         print(f"[PRE_MARKET] Gap data collected: {len(gap_data)}/{len(shard_tickers)}")
 
-        # 4) shard ?곗빱留??꾪꽣 + 媛?蹂묓빀
+        # 4) shard 결과만 필터 + 갭 병합
         enriched_rows = _enrich_rows_with_gap(shard_rows, gap_data)
 
-        # 5) ???
+        # 5) 저장
         write_scan_rows_json(enriched_rows, out_dir=out_dir, run_label=run_label)
         write_json(
             {
