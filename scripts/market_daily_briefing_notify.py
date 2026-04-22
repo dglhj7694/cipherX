@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import os
 import re
@@ -48,6 +49,14 @@ def _safe_float(value: Any, default: float | None = None) -> float | None:
 
 
 def _coerce_text(value: Any) -> str:
+    if isinstance(value, (bytes, bytearray)):
+        raw = bytes(value)
+        for encoding in ("utf-8", "cp949", "euc-kr"):
+            try:
+                return raw.decode(encoding).strip()
+            except UnicodeDecodeError:
+                continue
+        return raw.decode("utf-8", errors="replace").strip()
     if isinstance(value, str):
         return value.strip()
     return str(value or "").strip()
@@ -611,6 +620,14 @@ def _telegram_api(token: str, method: str) -> str:
     return f"https://api.telegram.org/bot{token}/{method}"
 
 
+def _telegram_send_message_payload(chat_id: str, text: str) -> bytes:
+    payload = {
+        "chat_id": _coerce_text(chat_id),
+        "text": _coerce_text(text),
+    }
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+
 def send_telegram_message(token: str, chat_id: str, text: str, *, chunk_size: int = DEFAULT_CHUNK_SIZE) -> None:
     chunks = split_telegram_message_text(text, chunk_size=chunk_size)
     for chunk_idx, chunk in enumerate(chunks, start=1):
@@ -622,7 +639,8 @@ def send_telegram_message(token: str, chat_id: str, text: str, *, chunk_size: in
             try:
                 response = requests.post(
                     _telegram_api(token, "sendMessage"),
-                    json={"chat_id": chat_id, "text": chunk},
+                    data=_telegram_send_message_payload(chat_id, chunk),
+                    headers={"Content-Type": "application/json; charset=utf-8"},
                     timeout=30,
                 )
                 response.raise_for_status()

@@ -2830,6 +2830,14 @@ def _telegram_api(token: str, method: str) -> str:
     return f"https://api.telegram.org/bot{token}/{method}"
 
 
+def _telegram_send_message_payload(chat_id: str, text: str) -> bytes:
+    payload = {
+        "chat_id": str(chat_id or "").strip(),
+        "text": str(text or ""),
+    }
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+
 def split_telegram_message_text(text: str, *, chunk_size: int = 3500) -> list[str]:
     raw = str(text or "")
     limit = max(1, int(chunk_size))
@@ -2927,7 +2935,8 @@ def send_telegram_message(token: str, chat_id: str, text: str, *, chunk_size: in
             try:
                 response = requests.post(
                     _telegram_api(token, "sendMessage"),
-                    json={"chat_id": chat_id, "text": chunk},
+                    data=_telegram_send_message_payload(chat_id, chunk),
+                    headers={"Content-Type": "application/json; charset=utf-8"},
                     timeout=30,
                 )
                 response.raise_for_status()

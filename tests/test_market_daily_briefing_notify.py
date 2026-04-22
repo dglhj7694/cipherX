@@ -1,4 +1,5 @@
 ﻿import unittest
+import json
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
@@ -318,7 +319,10 @@ class MarketDailyBriefingNotifyTests(unittest.TestCase):
         send_telegram_message("token", "chat", text, chunk_size=140)
 
         self.assertEqual(mock_post.call_count, len(expected_chunks))
-        sent_chunks = [call.kwargs["json"]["text"] for call in mock_post.call_args_list]
+        sent_chunks = [json.loads(call.kwargs["data"].decode("utf-8"))["text"] for call in mock_post.call_args_list]
+        self.assertTrue(
+            all(call.kwargs["headers"]["Content-Type"] == "application/json; charset=utf-8" for call in mock_post.call_args_list)
+        )
         self.assertEqual(sent_chunks, expected_chunks)
 
     def test_failure_text_contains_notice(self):

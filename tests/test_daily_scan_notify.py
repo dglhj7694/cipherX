@@ -7,7 +7,7 @@ import unittest
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
 
@@ -44,6 +44,7 @@ from scripts.daily_scan_and_notify import (
     select_us_session_52w_high_rows,
     select_us_session_hull_bear_rows,
     select_us_session_turn_rows,
+    send_telegram_message,
     split_telegram_message_text,
     split_tickers_for_shard,
     write_scan_csv,
@@ -1221,6 +1222,24 @@ class DailyScanNotifyTests(unittest.TestCase):
         p3 = joined.index("=== [3/4]")
         p4 = joined.index("=== [4/4]")
         self.assertTrue(p1 < p2 < p3 < p4)
+
+    @patch("scripts.daily_scan_and_notify.requests.post")
+    def test_send_telegram_message_posts_utf8_json_payload(self, mock_post: MagicMock):
+        response = MagicMock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {"ok": True}
+        mock_post.return_value = response
+
+        send_telegram_message("token", "chat", "한글 메시지 테스트", chunk_size=4000)
+
+        self.assertEqual(mock_post.call_count, 1)
+        payload = json.loads(mock_post.call_args.kwargs["data"].decode("utf-8"))
+        self.assertEqual(payload["chat_id"], "chat")
+        self.assertEqual(payload["text"], "한글 메시지 테스트")
+        self.assertEqual(
+            mock_post.call_args.kwargs["headers"]["Content-Type"],
+            "application/json; charset=utf-8",
+        )
 
     def test_build_post_close_transition_summary_uses_ten_ordered_sections(self):
         base_row = {
