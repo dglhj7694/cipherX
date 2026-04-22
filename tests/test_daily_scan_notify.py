@@ -660,7 +660,7 @@ class DailyScanNotifyTests(unittest.TestCase):
             }
 
         rows: list[dict[str, object]] = []
-        for idx in range(25):
+        for idx in range(35):
             rows.append(_base_row(f"P{idx:03d}", scan_score=180.0 - idx, es=70.0 - float(idx % 5)))
 
         rows[5]["pullback_reentry"] = False
@@ -678,12 +678,12 @@ class DailyScanNotifyTests(unittest.TestCase):
         )
         rows.append(_base_row("HARD_FAIL", scan_score=396.0, es=80.0) | {"thin_trade_risk": True})
 
-        scored = _with_post_close_final_top20_scores(rows, run_at_kst=run_at_kst, scan_mode="post_close", top_n=20)
-        selected = select_post_close_final_top_rows_for_telegram(scored, top_n=20)
+        scored = _with_post_close_final_top20_scores(rows, run_at_kst=run_at_kst, scan_mode="post_close", top_n=30)
+        selected = select_post_close_final_top_rows_for_telegram(scored, top_n=30)
         by_ticker = {str(row.get("ticker")): row for row in scored}
 
-        self.assertEqual(len(selected), 20)
-        self.assertEqual([int(row["final_entry_rank"]) for row in selected], list(range(1, 21)))
+        self.assertEqual(len(selected), 30)
+        self.assertEqual([int(row["final_entry_rank"]) for row in selected], list(range(1, 31)))
         self.assertTrue(bool(by_ticker["P005"]["final_entry_selected"]))
         self.assertGreaterEqual(int(by_ticker["BOUND_PASS"]["b_score"]), 3)
         self.assertFalse(bool(by_ticker["BOUND_FAIL"]["final_entry_selected"]))
@@ -701,7 +701,7 @@ class DailyScanNotifyTests(unittest.TestCase):
             {"ticker": "DDD", "final_entry_selected": True, "final_entry_score": 90.0, "b_score": 4, "c_score": 2, "scan_score": 130.0, "es": 40.0},
             {"ticker": "EEE", "final_entry_selected": True, "final_entry_score": 90.0, "b_score": 4, "c_score": 2, "scan_score": 130.0, "es": 60.0},
         ]
-        selected = select_post_close_final_top_rows_for_telegram(rows, top_n=20)
+        selected = select_post_close_final_top_rows_for_telegram(rows, top_n=30)
         self.assertEqual([row["ticker"] for row in selected], ["BBB", "CCC", "EEE", "DDD", "AAA"])
 
     def test_select_us_session_hull_bear_rows(self):
@@ -976,8 +976,8 @@ class DailyScanNotifyTests(unittest.TestCase):
         )
 
         self.assertIn("요약 인덱스:", summary)
-        self.assertIn("오늘 진입 후보 Top20 1", summary)
-        self.assertIn("=== [11/11] 오늘 진입 후보 Top20 (A/B/C 통과만) ===", summary)
+        self.assertIn("오늘 진입 후보 Top30 1", summary)
+        self.assertIn("=== [11/11] 오늘 진입 후보 Top30 (A/B/C 통과만) ===", summary)
         self.assertIn("A4/B3/C2 | PASS", summary)
         self.assertIn("점수 97.50", summary)
 

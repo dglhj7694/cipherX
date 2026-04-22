@@ -184,9 +184,9 @@ POST_CLOSE_INDEX_TITLES = {
     "pocket_pivot": "기관 매집 포착",
     "five_day_top": "5일 변동률 상위종목",
 }
-POST_CLOSE_FINAL_TOP_N = 20
-POST_CLOSE_FINAL_SECTION_NAME = "오늘 진입 후보 Top20 (A/B/C 통과만)"
-POST_CLOSE_FINAL_INDEX_TITLE = "오늘 진입 후보 Top20"
+POST_CLOSE_FINAL_TOP_N = 30
+POST_CLOSE_FINAL_SECTION_NAME = "오늘 진입 후보 Top30 (A/B/C 통과만)"
+POST_CLOSE_FINAL_INDEX_TITLE = "오늘 진입 후보 Top30"
 POST_CLOSE_FINAL_ENTRY_FIELD_SPECS: tuple[dict[str, str], ...] = (
     {"group": "final", "key": "a_score", "label": "AScore", "type": "number", "description": "Trend quality score (A)", "rule": "5-point score", "example": "4"},
     {"group": "final", "key": "b_score", "label": "BScore", "type": "number", "description": "Entry timing score (B)", "rule": "5-point score", "example": "3"},
