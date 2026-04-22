@@ -3228,7 +3228,9 @@ def _run_pre_market(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
 
 def _run_early_session(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: Path) -> int:
     """23시 얼리세션 모드: period=1y 풀스캔 + 시간비례 거래량 보정."""
-    stamp = run_at_kst.strftime("%Y%m%d_%H%M%S")
+    explicit_run_stamp = str(getattr(args, "run_stamp", "") or "").strip()
+    run_stamp = explicit_run_stamp or _resolve_cli_run_stamp(args, run_at_kst=run_at_kst)
+    run_stamp_key = f"{run_stamp}_early_session"
     shard_count = int(args.shard_count or 1)
     shard_index = int(args.shard_index or 0)
     merge_dir_arg = str(args.merge_dir or "").strip()
@@ -3241,9 +3243,13 @@ def _run_early_session(args: argparse.Namespace, *, run_at_kst: datetime, out_di
     print(f"[EARLY_SESSION] Volume threshold: {vol_threshold:.3f}x (time-adjusted), period={history_period}")
 
     if merge_dir:
-        run_label = f"{stamp}_early_session_merged"
         print(f"[EARLY_SESSION:MERGE] Loading shard artifacts from {merge_dir}")
-        merged_payload = merge_shard_scan_rows(merge_dir)
+        merged_payload = merge_shard_scan_rows(
+            merge_dir,
+            required_run_stamp=(f"{explicit_run_stamp}_early_session" if explicit_run_stamp else None),
+        )
+        selected_run_stamp_key = str(merged_payload.get("run_stamp") or run_stamp_key)
+        run_label = f"{selected_run_stamp_key}_merged"
         merged_rows = list(merged_payload.get("rows") or [])
         profile_candidates = list(merged_payload.get("universe_profiles") or [])
         if universe_profile == "default" and len(profile_candidates) == 1:
@@ -3280,35 +3286,49 @@ def _run_early_session(args: argparse.Namespace, *, run_at_kst: datetime, out_di
         summary_path = out_dir / f"trend_turn_summary_{run_label}.txt"
         summary_path.write_text(summary_text, encoding="utf-8")
 
-        write_json(
-            {
-                "run_at_kst": run_at_kst.isoformat(),
-                "mode": "merge",
-                "scan_mode": scan_mode,
-                "universe_profile": universe_profile,
-                "volume_threshold": vol_threshold,
-                "history_period": history_period,
-                "merged_payload": merged_payload,
-                "result_count": len(merged_rows),
-                "detected_turn_count": len(detected_turn_rows),
-                "trend_turn_count": len(turn_rows),
-                "pullback_detected_raw_count": pullback_detected_raw_count,
-                "pullback_reentry_count": len(pullback_rows),
-                "hull_bear_count": len(hull_bear_rows),
-                "new_52w_high_count": len(high_52w_rows),
-                "csv_path": str(csv_path),
-                "rows_path": str(rows_path),
-                "summary_path": str(summary_path),
-            },
-            out_dir=out_dir,
-            filename=f"run_meta_{run_label}.json",
-        )
+        merge_ready = bool(merged_payload.get("merge_ready", False))
+        merge_block_reason = str(merged_payload.get("merge_block_reason") or "").strip()
+        missing_shard_indices = [int(_safe_float(v)) for v in (merged_payload.get("missing_shard_indices") or [])]
+        meta_payload = {
+            "run_at_kst": run_at_kst.isoformat(),
+            "run_stamp": run_stamp,
+            "run_stamp_key": selected_run_stamp_key,
+            "mode": "merge",
+            "scan_mode": scan_mode,
+            "universe_profile": universe_profile,
+            "volume_threshold": vol_threshold,
+            "history_period": history_period,
+            "merged_payload": merged_payload,
+            "merge_ready": merge_ready,
+            "merge_block_reason": merge_block_reason,
+            "expected_shard_count": int(_safe_float(merged_payload.get("expected_shard_count", 0))),
+            "found_shard_count": int(_safe_float(merged_payload.get("found_shard_count", 0))),
+            "missing_shard_indices": missing_shard_indices,
+            "result_count": len(merged_rows),
+            "detected_turn_count": len(detected_turn_rows),
+            "trend_turn_count": len(turn_rows),
+            "pullback_detected_raw_count": pullback_detected_raw_count,
+            "pullback_reentry_count": len(pullback_rows),
+            "hull_bear_count": len(hull_bear_rows),
+            "new_52w_high_count": len(high_52w_rows),
+            "csv_path": str(csv_path),
+            "rows_path": str(rows_path),
+            "summary_path": str(summary_path),
+        }
+        if not merge_ready:
+            telegram_skipped_reason = merge_block_reason or "incomplete_shards"
+            meta_payload["telegram_skipped_reason"] = telegram_skipped_reason
+
+        write_json(meta_payload, out_dir=out_dir, filename=f"run_meta_{run_label}.json")
         print(f"[EARLY_SESSION:MERGE] CSV saved: {csv_path}")
         print(f"[EARLY_SESSION:MERGE] Summary saved: {summary_path}")
+        if not merge_ready:
+            print(f"[EARLY_SESSION:MERGE] Blocked: {telegram_skipped_reason} missing={missing_shard_indices}")
+            return 1
 
         _send_telegram_if_enabled(args, summary_text=summary_text, csv_path=csv_path, scan_label=scan_label, run_at_kst=run_at_kst)
     else:
-        run_label = f"{stamp}_early_session_shard{shard_index}of{shard_count}"
+        run_label = f"{run_stamp_key}_shard{shard_index}of{shard_count}"
         print("[EARLY_SESSION] Building universe...")
         universe_payload = build_scan_universe(universe_profile=universe_profile)
         full_tickers = list(universe_payload.get("tickers") or [])
@@ -3357,6 +3377,8 @@ def _run_early_session(args: argparse.Namespace, *, run_at_kst: datetime, out_di
         write_json(
             {
                 "run_at_kst": run_at_kst.isoformat(),
+                "run_stamp": run_stamp,
+                "run_stamp_key": run_stamp_key,
                 "mode": "scan",
                 "scan_mode": scan_mode,
                 "universe_profile": universe_profile,

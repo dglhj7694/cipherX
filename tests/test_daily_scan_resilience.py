@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from scripts.daily_scan_and_notify import (
     KST,
+    _run_early_session,
     _run_post_close,
     _run_pre_market,
     merge_shard_scan_rows,
@@ -120,6 +121,50 @@ class DailyScanResilienceTests(unittest.TestCase):
             self.assertTrue(summary_file.exists())
             meta_file = next(out_dir.glob(f"run_meta_{run_stamp}_merged.json"))
             meta = json.loads(meta_file.read_text(encoding="utf-8")); self.assertEqual(meta["run_stamp"], run_stamp); self.assertFalse(meta["merge_ready"]); self.assertEqual(meta["merge_block_reason"], "incomplete_shards"); self.assertEqual(meta["found_shard_count"], 2); self.assertEqual(meta["expected_shard_count"], 3); self.assertEqual(meta["missing_shard_indices"], [1]); self.assertEqual(meta["telegram_skipped_reason"], "incomplete_shards")
+
+    def test_run_early_session_merge_blocks_incomplete_shards(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            merge_dir = root / "merge_inputs"
+            out_dir = root / "final"
+            merge_dir.mkdir(parents=True, exist_ok=True)
+            run_stamp = "batch-es-7"
+
+            rows_a = [{"ticker": "AAA", "scan_score": 3.0, "es": 1.0, "volume_ratio_20": 0.8}]
+            rows_b = [{"ticker": "BBB", "scan_score": 2.0, "es": 0.5, "volume_ratio_20": 0.9}]
+            (merge_dir / f"scan_rows_{run_stamp}_early_session_shard0of3.json").write_text(json.dumps(rows_a), encoding="utf-8")
+            (merge_dir / f"scan_rows_{run_stamp}_early_session_shard2of3.json").write_text(json.dumps(rows_b), encoding="utf-8")
+            (merge_dir / f"run_meta_{run_stamp}_early_session_shard0of3.json").write_text(
+                json.dumps({"mode": "scan", "scan_mode": "early_session", "shard_count": 3, "shard_index": 0, "result_count": 1, "performance": {"skip_count": 0}}),
+                encoding="utf-8",
+            )
+            (merge_dir / f"run_meta_{run_stamp}_early_session_shard2of3.json").write_text(
+                json.dumps({"mode": "scan", "scan_mode": "early_session", "shard_count": 3, "shard_index": 2, "result_count": 1, "performance": {"skip_count": 0}}),
+                encoding="utf-8",
+            )
+
+            args = self._base_args(scan_mode="early_session", merge_dir=str(merge_dir), shard_count=3, shard_index=0, run_stamp=run_stamp)
+            with patch("scripts.daily_scan_and_notify._send_telegram_if_enabled") as mock_send:
+                result = _run_early_session(
+                    args,
+                    run_at_kst=datetime(2026, 4, 20, 23, 10, 0, tzinfo=KST),
+                    out_dir=out_dir,
+                )
+
+            self.assertEqual(result, 1)
+            mock_send.assert_not_called()
+            summary_file = next(out_dir.glob(f"trend_turn_summary_{run_stamp}_early_session_merged.txt"))
+            self.assertTrue(summary_file.exists())
+            meta_file = next(out_dir.glob(f"run_meta_{run_stamp}_early_session_merged.json"))
+            meta = json.loads(meta_file.read_text(encoding="utf-8"))
+            self.assertEqual(meta["run_stamp"], run_stamp)
+            self.assertFalse(meta["merge_ready"])
+            self.assertEqual(meta["merge_block_reason"], "incomplete_shards")
+            self.assertEqual(meta["found_shard_count"], 2)
+            self.assertEqual(meta["expected_shard_count"], 3)
+            self.assertEqual(meta["missing_shard_indices"], [1])
+            self.assertEqual(meta["telegram_skipped_reason"], "incomplete_shards")
+
     def test_run_pre_market_fallback_without_previous_artifacts(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -216,6 +261,11 @@ class DailyScanResilienceTests(unittest.TestCase):
             workflow_text,
             r"extended_merge_and_notify:\s+name:\s+extended-merge-and-notify[\s\S]*?needs:\s+[\s\S]*?-\s+extended_scan_shard\s+if:\s+\$\{\{\s*always\(\)\s*&&",
         )
+
+    def test_early_session_workflow_uses_shared_run_stamp(self):
+        workflow_text = Path(".github/workflows/early_session_scan.yml").read_text(encoding="utf-8")
+        self.assertGreaterEqual(workflow_text.count('--run-stamp "$RUN_STAMP"'), 2)
+        self.assertGreaterEqual(workflow_text.count("RUN_STAMP: ${{ github.run_id }}-${{ github.run_attempt }}"), 2)
 
 
 if __name__ == "__main__":
