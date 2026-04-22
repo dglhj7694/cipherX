@@ -29,6 +29,7 @@ class DailyScanResilienceTests(unittest.TestCase):
             "shard_count": 2,
             "shard_index": 0,
             "merge_dir": "",
+            "run_stamp": "",
             "universe_profile": "default",
             "scan_mode": "post_close",
             "prev_scan_dir": "",
@@ -80,42 +81,45 @@ class DailyScanResilienceTests(unittest.TestCase):
         self.assertEqual(merged["found_shard_count"], 2)
         self.assertEqual(merged["found_shard_indices"], [0, 2])
         self.assertEqual(merged["missing_shard_indices"], [1, 3, 4, 5, 6, 7])
+        self.assertFalse(merged["merge_ready"])
+        self.assertEqual(merged["merge_block_reason"], "incomplete_shards")
         self.assertEqual(set(merged["priority_modes"]), {"from_prev_scan", "empty_fallback"})
 
-    def test_run_post_close_merge_prepends_partial_result_warning(self):
+    def test_run_post_close_merge_blocks_incomplete_shards(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             merge_dir = root / "merge_inputs"
             out_dir = root / "final"
             merge_dir.mkdir(parents=True, exist_ok=True)
+            run_stamp = "batch-42"
 
             rows_a = [{"ticker": "AAA", "scan_score": 3.0, "es": 1.0, "volume_ratio_20": 1.2}]
             rows_b = [{"ticker": "BBB", "scan_score": 2.0, "es": 0.5, "volume_ratio_20": 1.3}]
-            (merge_dir / "scan_rows_20260420_010101_shard0of3.json").write_text(json.dumps(rows_a), encoding="utf-8")
-            (merge_dir / "scan_rows_20260420_010101_shard2of3.json").write_text(json.dumps(rows_b), encoding="utf-8")
-            (merge_dir / "run_meta_20260420_010101_shard0of3.json").write_text(
+            (merge_dir / f"scan_rows_{run_stamp}_shard0of3.json").write_text(json.dumps(rows_a), encoding="utf-8")
+            (merge_dir / f"scan_rows_{run_stamp}_shard2of3.json").write_text(json.dumps(rows_b), encoding="utf-8")
+            (merge_dir / f"run_meta_{run_stamp}_shard0of3.json").write_text(
                 json.dumps({"mode": "scan", "shard_count": 3, "shard_index": 0, "result_count": 1, "performance": {"skip_count": 0}}),
                 encoding="utf-8",
             )
-            (merge_dir / "run_meta_20260420_010101_shard2of3.json").write_text(
+            (merge_dir / f"run_meta_{run_stamp}_shard2of3.json").write_text(
                 json.dumps({"mode": "scan", "shard_count": 3, "shard_index": 2, "result_count": 1, "performance": {"skip_count": 0}}),
                 encoding="utf-8",
             )
 
-            args = self._base_args(merge_dir=str(merge_dir), shard_count=3, shard_index=0)
-            result = _run_post_close(
-                args,
-                run_at_kst=datetime(2026, 4, 20, 5, 0, 0, tzinfo=KST),
-                out_dir=out_dir,
-            )
+            args = self._base_args(merge_dir=str(merge_dir), shard_count=3, shard_index=0, run_stamp=run_stamp)
+            with patch("scripts.daily_scan_and_notify._send_telegram_if_enabled") as mock_send:
+                result = _run_post_close(
+                    args,
+                    run_at_kst=datetime(2026, 4, 20, 5, 0, 0, tzinfo=KST),
+                    out_dir=out_dir,
+                )
 
-            self.assertEqual(result, 0)
-            summary_file = next(out_dir.glob("trend_turn_summary_*_merged.txt"))
-            summary_text = summary_file.read_text(encoding="utf-8")
-            self.assertIn("부분 결과", summary_text)
-            self.assertIn("누락 index=[1]", summary_text)
-            self.assertIn("=== [7/7] Buy Turn Filter ===", summary_text)
-
+            self.assertEqual(result, 1)
+            mock_send.assert_not_called()
+            summary_file = next(out_dir.glob(f"trend_turn_summary_{run_stamp}_merged.txt"))
+            self.assertTrue(summary_file.exists())
+            meta_file = next(out_dir.glob(f"run_meta_{run_stamp}_merged.json"))
+            meta = json.loads(meta_file.read_text(encoding="utf-8")); self.assertEqual(meta["run_stamp"], run_stamp); self.assertFalse(meta["merge_ready"]); self.assertEqual(meta["merge_block_reason"], "incomplete_shards"); self.assertEqual(meta["found_shard_count"], 2); self.assertEqual(meta["expected_shard_count"], 3); self.assertEqual(meta["missing_shard_indices"], [1]); self.assertEqual(meta["telegram_skipped_reason"], "incomplete_shards")
     def test_run_pre_market_fallback_without_previous_artifacts(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -201,14 +205,16 @@ class DailyScanResilienceTests(unittest.TestCase):
         workflow_text = Path(".github/workflows/daily_scan_notify.yml").read_text(encoding="utf-8")
         self.assertGreaterEqual(workflow_text.count("shard_index: [0, 1, 2, 3, 4, 5, 6, 7]"), 2)
         self.assertGreaterEqual(workflow_text.count("--shard-count 8"), 2)
+        self.assertGreaterEqual(workflow_text.count('--run-stamp "$RUN_STAMP"'), 4)
+        self.assertGreaterEqual(workflow_text.count("RUN_STAMP: ${{ github.run_id }}-${{ github.run_attempt }}"), 4)
 
         self.assertRegex(
             workflow_text,
-            r"merge_and_notify:\s+name:\s+merge-and-notify[\s\S]*?needs:\s+scan_shard\s+if:\s+\$\{\{\s*always\(\)\s*\}\}",
+            r"merge_and_notify:\s+name:\s+merge-and-notify[\s\S]*?needs:\s+[\s\S]*?-\s+scan_shard\s+if:\s+\$\{\{\s*always\(\)\s*&&",
         )
         self.assertRegex(
             workflow_text,
-            r"extended_merge_and_notify:\s+name:\s+extended-merge-and-notify[\s\S]*?needs:\s+extended_scan_shard\s+if:\s+\$\{\{\s*always\(\)\s*\}\}",
+            r"extended_merge_and_notify:\s+name:\s+extended-merge-and-notify[\s\S]*?needs:\s+[\s\S]*?-\s+extended_scan_shard\s+if:\s+\$\{\{\s*always\(\)\s*&&",
         )
 
 

@@ -91,6 +91,7 @@ jobs:
         shard_index: [0, 1, 2, 3, 4, 5, 6, 7]
     env:
       PYTHONPATH: ${{ github.workspace }}
+      RUN_STAMP: ${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -111,7 +112,8 @@ jobs:
             --out-dir artifacts/daily_scan/shard_${{ matrix.shard_index }} \
             --skip-telegram \
             --shard-count 8 \
-            --shard-index ${{ matrix.shard_index }}
+            --shard-index ${{ matrix.shard_index }} \
+            --run-stamp "$RUN_STAMP"
 
       - name: Upload shard artifacts
         if: always()
@@ -133,6 +135,7 @@ jobs:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       PYTHONPATH: ${{ github.workspace }}
+      RUN_STAMP: ${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -158,7 +161,8 @@ jobs:
         run: |
           python -m scripts.daily_scan_and_notify \
             --out-dir artifacts/daily_scan/final \
-            --merge-dir artifacts/daily_scan/merge_inputs
+            --merge-dir artifacts/daily_scan/merge_inputs \
+            --run-stamp "$RUN_STAMP"
 
       - name: Upload merged artifacts
         if: always()
@@ -183,6 +187,7 @@ jobs:
         shard_index: [0, 1, 2, 3, 4, 5, 6, 7]
     env:
       PYTHONPATH: ${{ github.workspace }}
+      RUN_STAMP: ${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -204,6 +209,7 @@ jobs:
             --skip-telegram \
             --shard-count 8 \
             --shard-index ${{ matrix.shard_index }} \
+            --run-stamp "$RUN_STAMP" \
             --universe-profile russell2000
 
       - name: Upload extended shard artifacts
@@ -226,6 +232,7 @@ jobs:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       PYTHONPATH: ${{ github.workspace }}
+      RUN_STAMP: ${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -252,6 +259,7 @@ jobs:
           python -m scripts.daily_scan_and_notify \
             --out-dir artifacts/daily_scan_ext/final \
             --merge-dir artifacts/daily_scan_ext/merge_inputs \
+            --run-stamp "$RUN_STAMP" \
             --universe-profile russell2000
 
       - name: Upload extended merged artifacts

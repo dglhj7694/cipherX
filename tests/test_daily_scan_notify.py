@@ -1047,6 +1047,10 @@ class DailyScanNotifyTests(unittest.TestCase):
             "volume_ratio_20": 1.2,
             "jg_key": "BUY",
             "transition_signals": ["UTBot Buy"],
+            "latest_session_utbot_buy_turn": True,
+            "latest_session_hull_buy_turn": False,
+            "utbot_buy_recent": True,
+            "hull_turn_bull_recent": False,
         }
         gap_row = dict(base_row)
         gap_row["gap_setup_tag"] = "GAP 8/11 | G4/5 | 거래량건조, 상대강도, 밴드압축"
@@ -1055,6 +1059,12 @@ class DailyScanNotifyTests(unittest.TestCase):
         five_day_row = dict(base_row)
         five_day_row["five_day_top_tag"] = "5일 +12.34%"
         five_day_row["chg_5d"] = 12.34
+        buy_turn_filter_row = dict(base_row)
+        buy_turn_filter_row["transition_signals"] = []
+        buy_turn_filter_row["latest_session_utbot_buy_turn"] = False
+        buy_turn_filter_row["latest_session_hull_buy_turn"] = False
+        buy_turn_filter_row["utbot_buy_recent"] = True
+        buy_turn_filter_row["hull_turn_bull_recent"] = True
         summary = build_post_close_transition_summary(
             [dict(base_row)],
             run_at_kst=datetime(2026, 4, 17, 6, 15, 0),
@@ -1068,7 +1078,7 @@ class DailyScanNotifyTests(unittest.TestCase):
             high_52w_rows=[dict(base_row)],
             pullback_filter_rows=[dict(base_row)],
             chase_filter_rows=[dict(base_row)],
-            buy_turn_filter_rows=[dict(base_row)],
+            buy_turn_filter_rows=[buy_turn_filter_row],
             gap_setup_rows=[gap_row],
             pocket_pivot_rows=[pocket_row],
             five_day_top_rows=[five_day_row],
@@ -1080,7 +1090,7 @@ class DailyScanNotifyTests(unittest.TestCase):
             "요약 인덱스: 매수전환(이전버전) 1 | 눌림 재진입(이전버전) 1 | HULL 매도전환(이전버전) 1 | 52주 신고가(이전버전) 1 | 눌림목 필터 1 | 추세추종 필터 1 | 매수전환 필터 1 | 에너지 압축 → 돌파 임박 1 | 기관 매집 포착 1 | 5일 변동률 상위종목 1",
             summary,
         )
-        p1 = summary.index("=== [1/10] 매수전환 (이전버전) ===")
+        self.assertRegex(summary, r"1\. AAA \| \(\+1\.00, \+1\.00%\) \| [^\n]*1\.20x \| UTBOT"); self.assertRegex(summary, r"1\. AAA \| \(\+1\.00, \+1\.00%\) \| [^\n]*1\.20x \| UTBOT\+HULL"); self.assertRegex(summary, r"1\. AAA \| \(\+1\.00, \+1\.00%\) \| [^\n]*1\.20x(?:\n|$)"); self.assertNotIn(" | BUY | ", summary); self.assertNotIn("GAP 8/11", summary); self.assertNotIn("PP 9/12", summary); self.assertNotIn("12.34%", summary); p1 = summary.index("=== [1/10]")
         p2 = summary.index("=== [2/10] 눌림 재진입 (이전버전) ===")
         p3 = summary.index("=== [3/10] HULL 매도전환 (이전버전) ===")
         p4 = summary.index("=== [4/10] 52주 신고가 (이전버전) ===")
@@ -1127,8 +1137,9 @@ class DailyScanNotifyTests(unittest.TestCase):
         self.assertIn("요약 인덱스:", summary)
         self.assertIn("오늘 진입 후보 Top30 1", summary)
         self.assertIn("=== [11/11] 오늘 진입 후보 Top30 (A/B/C 통과만) ===", summary)
-        self.assertIn("A4/B3/C2 | PASS", summary)
-        self.assertIn("점수 97.50", summary)
+        self.assertRegex(summary, r"1\. AAA \| \(\+1\.00, \+1\.00%\) \| [^\n]*1\.20x(?:\n|$)")
+        self.assertNotIn("A4/B3/C2 | PASS", summary)
+        self.assertNotIn("97.50", summary)
 
     def test_split_telegram_message_text_preserves_section_boundaries_for_ten_sections(self):
         base_row = {
@@ -1285,6 +1296,8 @@ class DailyScanNotifyTests(unittest.TestCase):
         self.assertEqual(merged["skip_count_sum"], 7)
         self.assertEqual(merged["universe_count"], 500)
         self.assertEqual(merged["run_stamp"], "20260422_060000")
+        self.assertTrue(merged["merge_ready"])
+        self.assertEqual(merged["merge_block_reason"], "")
 
     def test_merge_shard_scan_rows_uses_latest_stamp_and_excludes_merged_artifacts(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1345,6 +1358,47 @@ class DailyScanNotifyTests(unittest.TestCase):
         self.assertEqual(merged["universe_count"], 500)
         self.assertTrue(all("_merged" not in str(path) for path in merged["row_files"]))
         self.assertTrue(all(new_stamp in str(path) for path in merged["row_files"]))
+        self.assertTrue(merged["merge_ready"])
+        self.assertEqual(merged["merge_block_reason"], "")
+
+    def test_merge_shard_scan_rows_uses_required_run_stamp_for_custom_batch_id(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            old_stamp = "20260422_060000"
+            requested_run_stamp = "123456789-2"
+
+            (root / f"scan_rows_{old_stamp}_shard0of2.json").write_text(
+                json.dumps([{"ticker": "OLD", "scan_score": 99.0, "strength": 9.0, "latest_sig_ts": 10.0}]),
+                encoding="utf-8",
+            )
+            (root / f"run_meta_{old_stamp}_shard0of2.json").write_text(
+                json.dumps({"shard_count": 2, "shard_index": 0, "full_universe_count": 100, "result_count": 1, "performance": {"skip_count": 9}}),
+                encoding="utf-8",
+            )
+            (root / f"scan_rows_{requested_run_stamp}_shard0of2.json").write_text(
+                json.dumps([{"ticker": "AAA", "scan_score": 10.0, "strength": 3.0, "latest_sig_ts": 5.0}]),
+                encoding="utf-8",
+            )
+            (root / f"scan_rows_{requested_run_stamp}_shard1of2.json").write_text(
+                json.dumps([{"ticker": "BBB", "scan_score": 8.0, "strength": 2.0, "latest_sig_ts": 4.0}]),
+                encoding="utf-8",
+            )
+            (root / f"run_meta_{requested_run_stamp}_shard0of2.json").write_text(
+                json.dumps({"shard_count": 2, "shard_index": 0, "full_universe_count": 500, "result_count": 1, "performance": {"skip_count": 2}}),
+                encoding="utf-8",
+            )
+            (root / f"run_meta_{requested_run_stamp}_shard1of2.json").write_text(
+                json.dumps({"shard_count": 2, "shard_index": 1, "full_universe_count": 500, "result_count": 1, "performance": {"skip_count": 3}}),
+                encoding="utf-8",
+            )
+
+            merged = merge_shard_scan_rows(root, required_run_stamp=requested_run_stamp)
+
+        self.assertEqual(merged["run_stamp"], requested_run_stamp)
+        self.assertEqual([row["ticker"] for row in merged["rows"]], ["AAA", "BBB"])
+        self.assertTrue(merged["merge_ready"])
+        self.assertEqual(merged["merge_block_reason"], "")
+        self.assertTrue(all(requested_run_stamp in str(path) for path in merged["row_files"]))
 
     def test_run_post_close_sharded_scan_skips_telegram_until_merge(self):
         args = SimpleNamespace(

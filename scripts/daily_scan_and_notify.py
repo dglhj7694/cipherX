@@ -1346,7 +1346,10 @@ def _load_json_file(path: Path) -> Any:
 
 
 _SHARD_MARKER_PATTERN = re.compile(r"shard(?P<index>\d+)of(?P<count>\d+)", re.IGNORECASE)
-_RUN_STAMP_PATTERN = re.compile(r"(?P<stamp>\d{8}_\d{6})")
+_ARTIFACT_RUN_STAMP_PATTERN = re.compile(
+    r"^(?:scan_rows|run_meta)_(?P<run_stamp>.+?)(?:_merged|_shard\d+of\d+)\.json$",
+    re.IGNORECASE,
+)
 
 
 def _parse_shard_marker(value: Any) -> tuple[int, int] | None:
@@ -1364,10 +1367,12 @@ def _parse_shard_marker(value: Any) -> tuple[int, int] | None:
 
 
 def _extract_run_stamp(value: Any) -> str | None:
-    match = _RUN_STAMP_PATTERN.search(str(value or ""))
+    name = Path(str(value or "")).name
+    match = _ARTIFACT_RUN_STAMP_PATTERN.match(name)
     if not match:
         return None
-    return str(match.group("stamp"))
+    run_stamp = str(match.group("run_stamp") or "").strip()
+    return run_stamp or None
 
 
 def _is_merged_artifact(value: Any) -> bool:
@@ -1409,7 +1414,7 @@ def _build_premarket_fallback_rows(tickers: Iterable[str]) -> list[dict[str, Any
     return fallback_rows
 
 
-def merge_shard_scan_rows(merge_dir: Path) -> dict[str, Any]:
+def merge_shard_scan_rows(merge_dir: Path, *, required_run_stamp: str | None = None) -> dict[str, Any]:
     all_row_files = sorted(Path(merge_dir).glob("**/scan_rows_*.json"))
     candidate_row_files = [
         path
@@ -1418,8 +1423,15 @@ def merge_shard_scan_rows(merge_dir: Path) -> dict[str, Any]:
     ]
     if not candidate_row_files:
         raise RuntimeError(f"No shard row files found in {merge_dir}")
-    selected_run_stamp = max(str(_extract_run_stamp(path.name) or "") for path in candidate_row_files)
-    files = [path for path in candidate_row_files if _extract_run_stamp(path.name) == selected_run_stamp]
+    requested_run_stamp = str(required_run_stamp or "").strip()
+    if requested_run_stamp:
+        selected_run_stamp = requested_run_stamp
+        files = [path for path in candidate_row_files if _extract_run_stamp(path.name) == selected_run_stamp]
+        if not files:
+            raise RuntimeError(f"No shard row files found in {merge_dir} for run_stamp={selected_run_stamp}")
+    else:
+        selected_run_stamp = max(str(_extract_run_stamp(path.name) or "") for path in candidate_row_files)
+        files = [path for path in candidate_row_files if _extract_run_stamp(path.name) == selected_run_stamp]
 
     all_rows: list[dict[str, Any]] = []
     expected_shard_count = 0
@@ -1496,6 +1508,8 @@ def merge_shard_scan_rows(merge_dir: Path) -> dict[str, Any]:
         if expected_shard_count > 0
         else []
     )
+    merge_ready = expected_shard_count > 0 and not missing_indices
+    merge_block_reason = "" if merge_ready else "incomplete_shards"
     return {
         "rows": merged_rows,
         "run_stamp": selected_run_stamp,
@@ -1513,6 +1527,8 @@ def merge_shard_scan_rows(merge_dir: Path) -> dict[str, Any]:
         "found_shard_count": len(found_indices_sorted),
         "found_shard_indices": found_indices_sorted,
         "missing_shard_indices": missing_indices,
+        "merge_ready": merge_ready,
+        "merge_block_reason": merge_block_reason,
         "priority_modes": priority_modes,
     }
 
@@ -2103,6 +2119,53 @@ def _fmt_ratio(value: Any, decimals: int = 2) -> str:
         return "--"
 
 
+def _is_buy_turn_signal(signal: Any, *, engine: str) -> bool:
+    text = str(signal or "").strip().lower()
+    if engine not in text:
+        return False
+    return "buy" in text or "매수" in str(signal or "")
+
+
+def _post_close_buy_turn_label(row: Mapping[str, Any]) -> str:
+    row_dict = dict(row or {})
+    signals = list(row_dict.get("transition_signals") or [])
+    utbot = (
+        any(_is_buy_turn_signal(signal, engine="utbot") for signal in signals)
+        or _coerce_bool(row_dict.get("latest_session_utbot_buy_turn", False))
+        or _coerce_bool(row_dict.get("utbot_buy_recent", False))
+    )
+    hull = (
+        any(_is_buy_turn_signal(signal, engine="hull") for signal in signals)
+        or _coerce_bool(row_dict.get("latest_session_hull_buy_turn", False))
+        or _coerce_bool(row_dict.get("hull_turn_bull_recent", False))
+    )
+    if utbot and hull:
+        return "UTBOT+HULL"
+    if utbot:
+        return "UTBOT"
+    if hull:
+        return "HULL"
+    return ""
+
+
+def _build_post_close_section_row_line(
+    row: Mapping[str, Any],
+    index: int,
+    *,
+    include_buy_label: bool = False,
+) -> str:
+    parts = [
+        f"{index}. {row.get('ticker', '-')}",
+        f"({_fmt_signed_number(row.get('chg_value', 0), 2)}, {_fmt_signed_number(row.get('chg', 0), 2)}%)",
+        f"거래량{_fmt_ratio(row.get('volume_ratio_20', 0), 2)}",
+    ]
+    if include_buy_label:
+        buy_label = _post_close_buy_turn_label(row)
+        if buy_label:
+            parts.append(buy_label)
+    return " | ".join(parts)
+
+
 def _build_section_row_line(row: Mapping[str, Any], index: int, tag_text: str) -> str:
     return (
         f"{index}. {row.get('ticker', '-')}"
@@ -2122,6 +2185,7 @@ def _build_summary_section_lines(
     rows: Iterable[Mapping[str, Any]],
     summary_limit: int,
     tag_builder: Any,
+    row_builder: Callable[[Mapping[str, Any], int], str] | None = None,
 ) -> list[str]:
     all_rows = [dict(row or {}) for row in (rows or [])]
     limited_rows = all_rows if int(summary_limit) <= 0 else all_rows[: int(summary_limit)]
@@ -2134,7 +2198,10 @@ def _build_summary_section_lines(
         lines.append("- 해당 없음")
         return lines
     for idx, row in enumerate(limited_rows, start=1):
-        lines.append(_build_section_row_line(row, idx, str(tag_builder(row) or "-")))
+        if row_builder is not None:
+            lines.append(row_builder(row, idx))
+        else:
+            lines.append(_build_section_row_line(row, idx, str(tag_builder(row) or "-")))
     remain = len(all_rows) - len(limited_rows)
     if remain > 0:
         lines.append(f"... 외 {remain}개")
@@ -2322,6 +2389,7 @@ def build_post_close_transition_summary(
             rows=buy_rows,
             summary_limit=summary_limit,
             tag_builder=lambda row: ", ".join(list(dict(row or {}).get("transition_signals") or [])) or "-",
+            row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx, include_buy_label=True),
         ),
         _build_summary_section_lines(
             section_index=2,
@@ -2331,6 +2399,7 @@ def build_post_close_transition_summary(
             rows=pullback_rows_list,
             summary_limit=summary_limit,
             tag_builder=lambda _row: "눌림 재진입",
+            row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx),
         ),
         _build_summary_section_lines(
             section_index=3,
@@ -2340,6 +2409,7 @@ def build_post_close_transition_summary(
             rows=hull_bear_rows_list,
             summary_limit=summary_limit,
             tag_builder=lambda _row: "HULL 매도전환",
+            row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx),
         ),
         _build_summary_section_lines(
             section_index=4,
@@ -2349,6 +2419,7 @@ def build_post_close_transition_summary(
             rows=high_52w_rows_list,
             summary_limit=summary_limit,
             tag_builder=lambda _row: "52주 신고가",
+            row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx),
         ),
         _build_summary_section_lines(
             section_index=5,
@@ -2362,6 +2433,7 @@ def build_post_close_transition_summary(
             rows=pullback_filter_rows_list,
             summary_limit=summary_limit,
             tag_builder=lambda _row: "눌림목 필터",
+            row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx),
         ),
         _build_summary_section_lines(
             section_index=6,
@@ -2374,6 +2446,7 @@ def build_post_close_transition_summary(
             rows=chase_filter_rows_list,
             summary_limit=summary_limit,
             tag_builder=lambda _row: "추세추종 필터",
+            row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx),
         ),
         _build_summary_section_lines(
             section_index=7,
@@ -2386,6 +2459,7 @@ def build_post_close_transition_summary(
             rows=buy_turn_filter_rows_list,
             summary_limit=summary_limit,
             tag_builder=lambda row: str(dict(row or {}).get("buy_turn_filter_tag") or "매수전환 필터"),
+            row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx, include_buy_label=True),
         ),
         _build_summary_section_lines(
             section_index=8,
@@ -2398,6 +2472,7 @@ def build_post_close_transition_summary(
             rows=gap_setup_rows_list,
             summary_limit=summary_limit,
             tag_builder=lambda row: str(dict(row or {}).get("gap_setup_tag") or "에너지 압축"),
+            row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx),
         ),
         _build_summary_section_lines(
             section_index=9,
@@ -2410,6 +2485,7 @@ def build_post_close_transition_summary(
             rows=pocket_pivot_rows_list,
             summary_limit=summary_limit,
             tag_builder=lambda row: str(dict(row or {}).get("pocket_pivot_tag") or "기관 매집"),
+            row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx),
         ),
         _build_summary_section_lines(
             section_index=10,
@@ -2419,6 +2495,7 @@ def build_post_close_transition_summary(
             rows=five_day_top_rows_list,
             summary_limit=summary_limit,
             tag_builder=lambda row: str(dict(row or {}).get("five_day_top_tag") or f"5일 {_fmt_signed_number(row.get('chg_5d', 0), 2)}%"),
+            row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx),
         ),
     ]
     if final_top_rows is not None:
@@ -2437,6 +2514,7 @@ def build_post_close_transition_summary(
                     f"{str(dict(row or {}).get('final_entry_reason') or '-')}"
                     f" | 점수 {_safe_float(dict(row or {}).get('final_entry_score', 0.0)):.2f}"
                 ),
+                row_builder=lambda row, idx: _build_post_close_section_row_line(row, idx),
             )
         )
     for block in sections:
@@ -2609,6 +2687,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--shard-count", type=int, default=1, help="Total number of shards")
     parser.add_argument("--shard-index", type=int, default=0, help="Current shard index")
     parser.add_argument("--merge-dir", default="", help="Directory that contains shard artifacts to merge")
+    parser.add_argument("--run-stamp", default="", help="Shared batch id for shard/merge grouping")
     parser.add_argument(
         "--universe-profile",
         default="default",
@@ -2746,9 +2825,16 @@ def _send_telegram_if_enabled(
     print("[SCAN] Telegram notification completed.")
 
 
+def _resolve_cli_run_stamp(args: argparse.Namespace, *, run_at_kst: datetime) -> str:
+    explicit_run_stamp = str(getattr(args, "run_stamp", "") or "").strip()
+    if explicit_run_stamp:
+        return explicit_run_stamp
+    return run_at_kst.strftime("%Y%m%d_%H%M%S")
+
+
 def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: Path) -> int:
     """기존 05시 post_close 로직."""
-    stamp = run_at_kst.strftime("%Y%m%d_%H%M%S")
+    run_stamp = _resolve_cli_run_stamp(args, run_at_kst=run_at_kst)
     shard_count = int(args.shard_count or 1)
     shard_index = int(args.shard_index or 0)
     merge_dir_arg = str(args.merge_dir or "").strip()
@@ -2760,9 +2846,12 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
     telegram_skipped_reason = ""
 
     if merge_dir:
-        run_label = f"{stamp}_merged"
+        explicit_run_stamp = str(getattr(args, "run_stamp", "") or "").strip()
+        if not explicit_run_stamp:
+            raise RuntimeError("--run-stamp is required when --merge-dir is used in post_close mode")
+        run_label = f"{run_stamp}_merged"
         print(f"[MERGE] Loading shard artifacts from {merge_dir}")
-        merged_payload = merge_shard_scan_rows(merge_dir)
+        merged_payload = merge_shard_scan_rows(merge_dir, required_run_stamp=run_stamp)
         merged_rows = list(merged_payload.get("rows") or [])
         profile_candidates = list(merged_payload.get("universe_profiles") or [])
         if universe_profile == "default" and len(profile_candidates) == 1:
@@ -2822,49 +2911,52 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
             five_day_top_rows=five_day_top_rows,
             final_top_rows=final_top_rows,
         )
-        missing_shard_indices = [int(_safe_float(v)) for v in (merged_payload.get("missing_shard_indices") or [])]
-        if missing_shard_indices:
-            found_shard_count = int(_safe_float(merged_payload.get("found_shard_count", 0)))
-            expected_shard_count = int(_safe_float(merged_payload.get("expected_shard_count", 0)))
-            missing_text = ", ".join(str(idx) for idx in missing_shard_indices)
-            summary_text = _prepend_summary_warning(
-                summary_text,
-                f"※ 부분 결과: 샤드 {found_shard_count}/{expected_shard_count} 수집 완료, 누락 index=[{missing_text}]",
-            )
         summary_path = out_dir / f"trend_turn_summary_{run_label}.txt"
         summary_path.write_text(summary_text, encoding="utf-8")
+        merge_ready = bool(merged_payload.get("merge_ready", False))
+        merge_block_reason = str(merged_payload.get("merge_block_reason") or "").strip()
+        missing_shard_indices = [int(_safe_float(v)) for v in (merged_payload.get("missing_shard_indices") or [])]
+        meta_payload = {
+            "run_at_kst": run_at_kst.isoformat(),
+            "run_stamp": run_stamp,
+            "mode": "merge",
+            "scan_mode": scan_mode,
+            "universe_profile": universe_profile,
+            "merged_payload": merged_payload,
+            "merge_ready": merge_ready,
+            "merge_block_reason": merge_block_reason,
+            "expected_shard_count": int(_safe_float(merged_payload.get("expected_shard_count", 0))),
+            "found_shard_count": int(_safe_float(merged_payload.get("found_shard_count", 0))),
+            "missing_shard_indices": missing_shard_indices,
+            "result_count": len(merged_rows),
+            "detected_turn_count": len(detected_turn_rows),
+            "trend_turn_count": len(turn_rows),
+            "pullback_reentry_count": len(pullback_rows),
+            "hull_bear_count": len(hull_bear_rows),
+            "new_52w_high_count": len(high_52w_rows),
+            "pullback_filter_count": len(pullback_filter_rows),
+            "chase_filter_count": len(chase_filter_rows),
+            "buy_turn_filter_count": len(buy_turn_filter_rows),
+            "gap_setup_count": len(gap_setup_rows),
+            "pocket_pivot_count": len(pocket_pivot_rows),
+            "five_day_top_count": len(five_day_top_rows),
+            "final_top_count": len(final_top_rows),
+            "csv_path": str(csv_path),
+            "rows_path": str(rows_path),
+            "summary_path": str(summary_path),
+        }
+        if not merge_ready:
+            telegram_skipped_reason = merge_block_reason or "incomplete_shards"
+            meta_payload["telegram_skipped_reason"] = telegram_skipped_reason
 
-        write_json(
-            {
-                "run_at_kst": run_at_kst.isoformat(),
-                "mode": "merge",
-                "scan_mode": scan_mode,
-                "universe_profile": universe_profile,
-                "merged_payload": merged_payload,
-                "result_count": len(merged_rows),
-                "detected_turn_count": len(detected_turn_rows),
-                "trend_turn_count": len(turn_rows),
-                "pullback_reentry_count": len(pullback_rows),
-                "hull_bear_count": len(hull_bear_rows),
-                "new_52w_high_count": len(high_52w_rows),
-                "pullback_filter_count": len(pullback_filter_rows),
-                "chase_filter_count": len(chase_filter_rows),
-                "buy_turn_filter_count": len(buy_turn_filter_rows),
-                "gap_setup_count": len(gap_setup_rows),
-                "pocket_pivot_count": len(pocket_pivot_rows),
-                "five_day_top_count": len(five_day_top_rows),
-                "final_top_count": len(final_top_rows),
-                "csv_path": str(csv_path),
-                "rows_path": str(rows_path),
-                "summary_path": str(summary_path),
-            },
-            out_dir=out_dir,
-            filename=f"run_meta_{run_label}.json",
-        )
+        write_json(meta_payload, out_dir=out_dir, filename=f"run_meta_{run_label}.json")
         print(f"[MERGE] CSV saved: {csv_path}")
         print(f"[MERGE] Summary saved: {summary_path}")
+        if not merge_ready:
+            print(f"[MERGE] Blocked: {telegram_skipped_reason} missing={missing_shard_indices}")
+            return 1
     else:
-        run_label = f"{stamp}_shard{shard_index}of{shard_count}"
+        run_label = f"{run_stamp}_shard{shard_index}of{shard_count}"
         print("[SCAN] Building universe...")
         universe_payload = build_scan_universe(universe_profile=universe_profile)
         full_tickers = list(universe_payload.get("tickers") or [])
@@ -2938,6 +3030,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
 
         meta_payload = {
             "run_at_kst": run_at_kst.isoformat(),
+            "run_stamp": run_stamp,
             "mode": "scan",
             "scan_mode": scan_mode,
             "universe_profile": universe_profile,
