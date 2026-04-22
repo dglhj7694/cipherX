@@ -105,6 +105,7 @@ SCANNER_CSV_FIELD_SPECS: tuple[dict[str, str], ...] = (
     {"group": "탐지", "key": "detected_core_count", "label": "탐지핵심수", "type": "number", "description": "최근 5봉 핵심 시그널 탐지 개수", "rule": "System/Trend/UTBot/Hull/EMA/Volume", "example": "3"},
     {"group": "탐지", "key": "detected_core_summary", "label": "탐지핵심요약", "type": "text", "description": "탐지된 핵심 시그널 요약", "rule": "라벨(YYYY-MM-DD) | ...", "example": "초기 강세 전환(2026-04-14)"},
     {"group": "탐지", "key": "detected_signal_total_count", "label": "탐지시그널총수", "type": "number", "description": "탐지 시그널 총개수", "rule": "combo/transition/core 전체", "example": "9"},
+    {"group": "탐지", "key": "detected_buy_signal_latest_date", "label": "매수탐지최근일", "type": "date", "description": "매수 방향 탐지 시그널 중 가장 최근 날짜", "rule": "최근 5봉 기준 direction=buy", "example": "2026-04-14"},
     {"group": "탐지", "key": "detected_signal_latest_date", "label": "탐지최근일", "type": "date", "description": "탐지 시그널 중 가장 최근 날짜", "rule": "최근 5봉 기준", "example": "2026-04-14"},
 )
 
@@ -199,6 +200,7 @@ def build_detected_signal_payload(
             "detected_core_count": 0,
             "detected_core_summary": "없음",
             "detected_signal_total_count": 0,
+            "detected_buy_signal_latest_date": "없음",
             "detected_signal_latest_date": "없음",
             "latest_combo_ts": None,
             "utbot_buy_recent": False,
@@ -276,6 +278,10 @@ def build_detected_signal_payload(
 
     all_items = [*combo_items, *transition_items, *core_items]
     unique_pairs = {(str(item.get("key", "")), str(item.get("date", ""))) for item in all_items}
+    latest_buy_date = max(
+        (str(item.get("date", "")) for item in all_items if str(item.get("dir", "")).strip().lower() == "buy"),
+        default="없음",
+    )
     latest_date = max((str(item.get("date", "")) for item in all_items), default="없음")
 
     transition_map = {str(item.get("key")): item for item in transition_items}
@@ -292,6 +298,7 @@ def build_detected_signal_payload(
         "detected_core_count": len(core_items),
         "detected_core_summary": summarize_detected_signal_items(core_items, limit=summary_limit),
         "detected_signal_total_count": len(unique_pairs),
+        "detected_buy_signal_latest_date": latest_buy_date if latest_buy_date else "없음",
         "detected_signal_latest_date": latest_date if latest_date else "없음",
         "latest_combo_ts": latest_combo_ts,
         "utbot_buy_recent": "UTBot_Buy" in transition_map,
@@ -323,6 +330,7 @@ def _normalized_csv_row(row: Mapping[str, Any]) -> dict[str, Any]:
         "hull_turn_bull_last_date",
         "hull_turn_bear_last_date",
         "system_turn_bull_last_date",
+        "detected_buy_signal_latest_date",
         "detected_signal_latest_date",
     ):
         value = str(normalized.get(key) or "").strip()

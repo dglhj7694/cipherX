@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pandas as pd
@@ -14,11 +15,13 @@ from scripts.daily_scan_and_notify import (
     POST_CLOSE_FINAL_ENTRY_FIELD_SPECS,
     POST_CLOSE_LATEST_SESSION_FIELD_SPECS,
     RUSSELL2000_UNIVERSE_ITEMS,
+    ScanRunResult,
     _compute_post_close_row_metrics,
     _with_post_close_final_top20_scores,
     _with_post_close_cross_section_metrics,
     _with_post_close_setup_scores,
     _last_us_market_session_date,
+    _run_post_close,
     _with_latest_session_buy_turn_flags,
     build_post_close_transition_summary,
     build_scan_universe,
@@ -392,6 +395,94 @@ class DailyScanNotifyTests(unittest.TestCase):
         self.assertEqual(selected[0]["buy_turn_filter_tag"], "Tier1 D0")
         self.assertEqual(selected[1]["buy_turn_filter_tag"], "Tier2 D1-2")
 
+    def test_actionable_post_close_sections_exclude_thin_trade_risk(self):
+        run_at_kst = datetime(2026, 4, 17, 6, 15, 0)
+
+        pullback_row = {
+            "ticker": "PULL",
+            "thin_trade_risk": True,
+            "uptrend_persistent": True,
+            "hma60_slope_pct": 0.2,
+            "pullback_from_swing_high_pct": -5.0,
+            "drawdown_from_20d_high_pct": -3.0,
+            "pullback_atr_multiple": 2.0,
+            "pullback_ready": True,
+            "pullback_reentry": False,
+            "volume_dry_up_score": 10.0,
+            "utbot_sell_recent": False,
+            "hull_turn_bear_recent": False,
+        }
+        chase_row = {
+            "ticker": "CHASE",
+            "thin_trade_risk": True,
+            "bull_strength_recent": True,
+            "uptrend_persistent": True,
+            "hma20_slope_pct": 0.5,
+            "hma60_slope_pct": 0.4,
+            "volume_bullish": True,
+            "adx": 20.0,
+            "rs_rank_vs_index": 70.0,
+            "multi_buy": 3.0,
+            "dist_sma20_pct": 5.0,
+            "zscore20": 1.0,
+            "scan_score": 130.0,
+            "utbot_sell_recent": False,
+            "hull_turn_bear_recent": False,
+        }
+        buy_turn_row = {
+            "ticker": "TURN",
+            "thin_trade_risk": True,
+            "latest_session_utbot_buy_turn": True,
+            "latest_session_hull_buy_turn": False,
+            "days_since_utbot_buy": 0,
+            "days_since_hull_turn_bull": 3,
+            "utbot_buy_last_date": "2026-04-16",
+            "hull_turn_bull_last_date": "2026-04-10",
+            "utbot_buy_recent": True,
+            "hull_turn_bull_recent": False,
+            "bull_turn_recent": True,
+            "utbot_sell_last_date": "2026-04-10",
+            "hull_turn_bear_last_date": "2026-04-11",
+            "cmf": 0.01,
+            "obv_slope": 0.20,
+            "volume_ratio_20": 1.1,
+        }
+        gap_row = {
+            "ticker": "GAP",
+            "thin_trade_risk": True,
+            "gap_setup_candidate": True,
+            "gap_setup_score": 8,
+            "gap_setup_gate_count": 4,
+            "gap_setup_hits": ["DryUp"],
+            "gap_setup_quality_hits": ["WUp"],
+        }
+        pocket_row = {
+            "ticker": "POCKET",
+            "thin_trade_risk": True,
+            "pocket_pivot_candidate": True,
+            "pocket_pivot_score": 9,
+            "pocket_pivot_gate_count": 4,
+            "pocket_pivot_hits": ["VolExp"],
+            "pocket_pivot_quality_hits": ["WUp"],
+        }
+
+        self.assertEqual(select_post_close_pullback_rows_for_telegram([pullback_row]), [])
+        self.assertEqual(select_post_close_chase_rows_for_telegram([chase_row]), [])
+        self.assertEqual(select_post_close_buy_turn_rows_for_telegram([buy_turn_row], run_at_kst=run_at_kst, scan_mode="post_close"), [])
+        self.assertEqual(select_post_close_gap_setup_rows_for_telegram([gap_row]), [])
+        self.assertEqual(select_post_close_pocket_pivot_rows_for_telegram([pocket_row]), [])
+
+    def test_legacy_post_close_sections_keep_thin_trade_risk_rows(self):
+        turn_rows = filter_turn_rows_for_telegram(
+            [{"ticker": "AAA", "scan_score": 20.0, "es": 5.0, "volume_ratio_20": 1.2, "thin_trade_risk": True}]
+        )
+        pullback_rows = select_pullback_reentry_rows_for_telegram(
+            [{"ticker": "BBB", "scan_score": 20.0, "es": 5.0, "volume_ratio_20": 1.2, "thin_trade_risk": True, "pullback_reentry": True}]
+        )
+
+        self.assertEqual([row["ticker"] for row in turn_rows], ["AAA"])
+        self.assertEqual([row["ticker"] for row in pullback_rows], ["BBB"])
+
     def test_with_post_close_setup_scores_populates_gap_and_pocket_candidates(self):
         rows = [
             {
@@ -650,6 +741,7 @@ class DailyScanNotifyTests(unittest.TestCase):
                 "pocket_pivot_candidate": False,
                 "gap_setup_candidate": True,
                 "pullback_atr_multiple": 1.0,
+                "detected_buy_signal_latest_date": "2026-04-21",
                 "detected_signal_latest_date": "2026-04-21",
                 "latest_session_utbot_buy_turn": True,
                 "latest_session_hull_buy_turn": False,
@@ -666,8 +758,14 @@ class DailyScanNotifyTests(unittest.TestCase):
         rows[5]["pullback_reentry"] = False
         rows[5]["pocket_pivot_candidate"] = True  # B dimension OR gate
 
-        rows.append(_base_row("BOUND_PASS", scan_score=400.0, es=80.0) | {"detected_signal_latest_date": "2026-04-19"})
-        rows.append(_base_row("BOUND_FAIL", scan_score=399.0, es=80.0) | {"detected_signal_latest_date": "2026-04-18"})
+        rows.append(
+            _base_row("BOUND_PASS", scan_score=400.0, es=80.0)
+            | {"detected_buy_signal_latest_date": "2026-04-19", "detected_signal_latest_date": "2026-04-19"}
+        )
+        rows.append(
+            _base_row("BOUND_FAIL", scan_score=399.0, es=80.0)
+            | {"detected_buy_signal_latest_date": "2026-04-18", "detected_signal_latest_date": "2026-04-18"}
+        )
         rows.append(
             _base_row("FAIL_A", scan_score=398.0, es=80.0)
             | {"ichimoku_above_cloud": False, "drawdown_from_52w_high_pct": -25.0, "adx": 10.0, "hma60_slope_pct": -0.1}
@@ -692,6 +790,57 @@ class DailyScanNotifyTests(unittest.TestCase):
         self.assertFalse(bool(by_ticker["HARD_FAIL"]["final_entry_selected"]))
         self.assertIn("HARD_FAIL:thin_trade_risk", str(by_ticker["HARD_FAIL"]["final_entry_reason"]))
         self.assertRegex(str(by_ticker["P000"]["final_entry_reason"]), r"A\d+/B\d+/C\d+")
+
+    def test_with_post_close_final_top20_scores_uses_buy_direction_freshness(self):
+        run_at_kst = datetime(2026, 4, 22, 6, 15, 0)
+
+        base = {
+            "ticker": "BASE",
+            "scan_score": 190.0,
+            "es": 70.0,
+            "jg_key": "BUY",
+            "chg_value": 1.0,
+            "chg": 1.0,
+            "volume_ratio_20": 1.2,
+            "thin_trade_risk": False,
+            "weekly_trend_context": "STRONG_UPTREND",
+            "ichimoku_above_cloud": True,
+            "drawdown_from_52w_high_pct": -10.0,
+            "adx": 25.0,
+            "hma60_slope_pct": 0.2,
+            "pullback_reentry": True,
+            "pocket_pivot_candidate": False,
+            "gap_setup_candidate": False,
+            "pullback_atr_multiple": 1.0,
+            "latest_session_utbot_buy_turn": False,
+            "latest_session_hull_buy_turn": False,
+            "cmf": 0.10,
+            "obv_slope": 0.20,
+            "volume_bullish": True,
+            "volume_abnormal": False,
+        }
+        sell_only_recent = dict(base)
+        sell_only_recent["ticker"] = "SELL_ONLY"
+        sell_only_recent["detected_signal_latest_date"] = "2026-04-21"
+        sell_only_recent["detected_buy_signal_latest_date"] = "2026-04-18"
+
+        buy_recent = dict(base)
+        buy_recent["ticker"] = "BUY_RECENT"
+        buy_recent["detected_signal_latest_date"] = "2026-04-21"
+        buy_recent["detected_buy_signal_latest_date"] = "2026-04-21"
+
+        scored = _with_post_close_final_top20_scores(
+            [sell_only_recent, buy_recent],
+            run_at_kst=run_at_kst,
+            scan_mode="post_close",
+            top_n=30,
+        )
+        by_ticker = {str(row.get("ticker")): row for row in scored}
+
+        self.assertEqual(int(by_ticker["SELL_ONLY"]["b_score"]), 2)
+        self.assertFalse(bool(by_ticker["SELL_ONLY"]["final_entry_selected"]))
+        self.assertEqual(int(by_ticker["BUY_RECENT"]["b_score"]), 3)
+        self.assertTrue(bool(by_ticker["BUY_RECENT"]["final_entry_selected"]))
 
     def test_select_post_close_final_top_rows_for_telegram_uses_tie_breaker_order(self):
         rows = [
@@ -1086,6 +1235,7 @@ class DailyScanNotifyTests(unittest.TestCase):
     def test_merge_shard_scan_rows_dedupes_and_sorts(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
+            stamp = "20260422_060000"
             rows_a = [
                 {"ticker": "AAA", "scan_score": 8.0, "strength": 3.0, "latest_sig_ts": 10.0, "bull_turn_recent": True},
                 {"ticker": "BBB", "scan_score": 4.0, "strength": 2.0, "latest_sig_ts": 9.0, "bull_turn_recent": False},
@@ -1095,24 +1245,28 @@ class DailyScanNotifyTests(unittest.TestCase):
                 {"ticker": "CCC", "scan_score": 7.0, "strength": 5.0, "latest_sig_ts": 11.0, "bull_turn_recent": True},
             ]
 
-            (root / "scan_rows_1.json").write_text(json.dumps(rows_a), encoding="utf-8")
-            (root / "scan_rows_2.json").write_text(json.dumps(rows_b), encoding="utf-8")
-            (root / "run_meta_1.json").write_text(
+            (root / f"scan_rows_{stamp}_shard0of2.json").write_text(json.dumps(rows_a), encoding="utf-8")
+            (root / f"scan_rows_{stamp}_shard1of2.json").write_text(json.dumps(rows_b), encoding="utf-8")
+            (root / f"run_meta_{stamp}_shard0of2.json").write_text(
                 json.dumps(
                     {
                         "full_universe_count": 500,
                         "shard_ticker_count": 250,
+                        "shard_count": 2,
+                        "shard_index": 0,
                         "result_count": 2,
                         "performance": {"skip_count": 3},
                     }
                 ),
                 encoding="utf-8",
             )
-            (root / "run_meta_2.json").write_text(
+            (root / f"run_meta_{stamp}_shard1of2.json").write_text(
                 json.dumps(
                     {
                         "full_universe_count": 500,
                         "shard_ticker_count": 250,
+                        "shard_count": 2,
+                        "shard_index": 1,
                         "result_count": 2,
                         "performance": {"skip_count": 4},
                     }
@@ -1130,6 +1284,141 @@ class DailyScanNotifyTests(unittest.TestCase):
         self.assertEqual(merged["source_result_count_sum"], 4)
         self.assertEqual(merged["skip_count_sum"], 7)
         self.assertEqual(merged["universe_count"], 500)
+        self.assertEqual(merged["run_stamp"], "20260422_060000")
+
+    def test_merge_shard_scan_rows_uses_latest_stamp_and_excludes_merged_artifacts(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            old_stamp = "20260421_060000"
+            new_stamp = "20260422_060000"
+
+            (root / f"scan_rows_{old_stamp}_shard0of2.json").write_text(
+                json.dumps([{"ticker": "AAA", "scan_score": 999.0, "strength": 9.0, "latest_sig_ts": 20.0}]),
+                encoding="utf-8",
+            )
+            (root / f"scan_rows_{old_stamp}_shard1of2.json").write_text(
+                json.dumps([{"ticker": "OLD", "scan_score": 50.0, "strength": 5.0, "latest_sig_ts": 10.0}]),
+                encoding="utf-8",
+            )
+            (root / f"scan_rows_{old_stamp}_merged.json").write_text(
+                json.dumps([{"ticker": "MERGED", "scan_score": 1000.0, "strength": 10.0, "latest_sig_ts": 30.0}]),
+                encoding="utf-8",
+            )
+            (root / f"scan_rows_{new_stamp}_shard0of2.json").write_text(
+                json.dumps([{"ticker": "AAA", "scan_score": 10.0, "strength": 3.0, "latest_sig_ts": 5.0}]),
+                encoding="utf-8",
+            )
+            (root / f"scan_rows_{new_stamp}_shard1of2.json").write_text(
+                json.dumps([{"ticker": "BBB", "scan_score": 8.0, "strength": 2.0, "latest_sig_ts": 4.0}]),
+                encoding="utf-8",
+            )
+
+            (root / f"run_meta_{old_stamp}_shard0of2.json").write_text(
+                json.dumps({"shard_count": 2, "shard_index": 0, "full_universe_count": 400, "result_count": 1, "performance": {"skip_count": 8}}),
+                encoding="utf-8",
+            )
+            (root / f"run_meta_{old_stamp}_shard1of2.json").write_text(
+                json.dumps({"shard_count": 2, "shard_index": 1, "full_universe_count": 400, "result_count": 1, "performance": {"skip_count": 9}}),
+                encoding="utf-8",
+            )
+            (root / f"run_meta_{old_stamp}_merged.json").write_text(
+                json.dumps({"full_universe_count": 999, "result_count": 999, "performance": {"skip_count": 999}}),
+                encoding="utf-8",
+            )
+            (root / f"run_meta_{new_stamp}_shard0of2.json").write_text(
+                json.dumps({"shard_count": 2, "shard_index": 0, "full_universe_count": 500, "result_count": 1, "performance": {"skip_count": 2}}),
+                encoding="utf-8",
+            )
+            (root / f"run_meta_{new_stamp}_shard1of2.json").write_text(
+                json.dumps({"shard_count": 2, "shard_index": 1, "full_universe_count": 500, "result_count": 1, "performance": {"skip_count": 3}}),
+                encoding="utf-8",
+            )
+
+            merged = merge_shard_scan_rows(root)
+
+        self.assertEqual(merged["run_stamp"], new_stamp)
+        self.assertEqual([row["ticker"] for row in merged["rows"]], ["AAA", "BBB"])
+        self.assertEqual(float(merged["rows"][0]["scan_score"]), 10.0)
+        self.assertEqual(merged["source_row_count"], 2)
+        self.assertEqual(merged["source_result_count_sum"], 2)
+        self.assertEqual(merged["skip_count_sum"], 5)
+        self.assertEqual(merged["universe_count"], 500)
+        self.assertTrue(all("_merged" not in str(path) for path in merged["row_files"]))
+        self.assertTrue(all(new_stamp in str(path) for path in merged["row_files"]))
+
+    def test_run_post_close_sharded_scan_skips_telegram_until_merge(self):
+        args = SimpleNamespace(
+            shard_count=2,
+            shard_index=0,
+            merge_dir="",
+            universe_profile="default",
+            summary_limit=0,
+            max_workers=1,
+            bias_mode="default",
+            dry_run=False,
+            skip_telegram=False,
+        )
+        run_at_kst = datetime(2026, 4, 22, 6, 15, 0)
+        row = {
+            "ticker": "AAA",
+            "price": 100.0,
+            "chg_value": 1.0,
+            "chg": 1.0,
+            "scan_score": 180.0,
+            "strength": 20.0,
+            "latest_sig_ts": 1.0,
+            "es": 70.0,
+            "volume_ratio_20": 1.2,
+            "thin_trade_risk": False,
+            "weekly_trend_context": "STRONG_UPTREND",
+            "ichimoku_above_cloud": True,
+            "drawdown_from_52w_high_pct": -10.0,
+            "drawdown_from_20d_high_pct": -3.0,
+            "pullback_from_swing_high_pct": -5.0,
+            "pullback_atr_multiple": 1.0,
+            "adx": 25.0,
+            "hma20_slope_pct": 0.6,
+            "hma60_slope_pct": 0.2,
+            "cmf": 0.10,
+            "obv_slope": 0.20,
+            "volume_bullish": True,
+            "volume_abnormal": False,
+            "pullback_reentry": True,
+            "pocket_pivot_candidate": False,
+            "gap_setup_candidate": True,
+            "utbot_buy_last_date": "2026-04-21",
+            "hull_turn_bull_last_date": "없음",
+            "utbot_sell_last_date": "없음",
+            "hull_turn_bear_last_date": "없음",
+            "utbot_buy_recent": True,
+            "hull_turn_bull_recent": False,
+            "bull_turn_recent": True,
+            "detected_buy_signal_latest_date": "2026-04-21",
+            "detected_signal_latest_date": "2026-04-21",
+            "latest_bar_date": "2026-04-21",
+            "new_52w_high": False,
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir, patch(
+            "scripts.daily_scan_and_notify.build_scan_universe",
+            return_value={"tickers": ["AAA"], "sector_count": 1, "etf_count": 0, "etf_errors": []},
+        ), patch(
+            "scripts.daily_scan_and_notify.split_tickers_for_shard",
+            return_value=["AAA"],
+        ), patch(
+            "scripts.daily_scan_and_notify.scan_universe",
+            return_value=ScanRunResult(rows=[row], skips=[], perf={"total_seconds": 0.0}),
+        ), patch("scripts.daily_scan_and_notify._send_telegram_if_enabled") as mock_send:
+            out_dir = Path(temp_dir)
+            result = _run_post_close(args, run_at_kst=run_at_kst, out_dir=out_dir)
+
+            self.assertEqual(result, 0)
+            mock_send.assert_not_called()
+
+            meta_path = next(out_dir.glob("run_meta_*.json"))
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            self.assertEqual(meta["telegram_skipped_reason"], "requires_merge_for_ranked_post_close_summary")
+            self.assertTrue(Path(meta["summary_path"]).exists())
 
     def test_compute_post_close_row_metrics_core_values(self):
         idx = pd.date_range("2026-01-01", periods=130, freq="D")

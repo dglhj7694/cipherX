@@ -91,6 +91,7 @@ class ScannerCsvExportTests(unittest.TestCase):
         self.assertEqual(payload["detected_transition_count"], 2)
         self.assertEqual(payload["detected_core_count"], 5)
         self.assertEqual(payload["detected_signal_total_count"], 7)
+        self.assertEqual(payload["detected_buy_signal_latest_date"], "2026-04-17")
         self.assertEqual(payload["detected_signal_latest_date"], "2026-04-17")
         self.assertTrue(payload["utbot_buy_recent"])
         self.assertEqual(payload["utbot_buy_last_date"], "2026-04-17")
@@ -157,6 +158,7 @@ class ScannerCsvExportTests(unittest.TestCase):
             "detected_core_count": 5,
             "detected_core_summary": "시스템 매수 전환(2026-04-14)",
             "detected_signal_total_count": 7,
+            "detected_buy_signal_latest_date": "2026-04-17",
             "detected_signal_latest_date": "2026-04-17",
             "gap_risk_2pct": True,
             "gap_risk_atr": False,
@@ -171,6 +173,7 @@ class ScannerCsvExportTests(unittest.TestCase):
         header = parsed[0]
         self.assertIn("티커(ticker)", header)
         self.assertIn("탐지전환요약(detected_transition_summary)", header)
+        self.assertIn("매수탐지최근일(detected_buy_signal_latest_date)", header)
         self.assertIn("UTBot매수전환(utbot_buy_recent)", header)
         self.assertIn("우상향지속(uptrend_persistent)", header)
         self.assertIn("강한추세지속(strong_trend_persistent)", header)

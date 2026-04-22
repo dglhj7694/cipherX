@@ -1220,6 +1220,7 @@ def _build_scanner_row(ticker: str, *, bias_mode: str, recent_window: int = 5, h
             "detected_core_count": int(detected_payload.get("detected_core_count", 0) or 0),
             "detected_core_summary": str(detected_payload.get("detected_core_summary", "없음")),
             "detected_signal_total_count": int(detected_payload.get("detected_signal_total_count", 0) or 0),
+            "detected_buy_signal_latest_date": str(detected_payload.get("detected_buy_signal_latest_date", "없음")),
             "detected_signal_latest_date": str(detected_payload.get("detected_signal_latest_date", "없음")),
             "detected_signals": list(detected_payload.get("all_items", [])),
             "watch_buy_plus": watch_buy_plus,
@@ -1345,6 +1346,7 @@ def _load_json_file(path: Path) -> Any:
 
 
 _SHARD_MARKER_PATTERN = re.compile(r"shard(?P<index>\d+)of(?P<count>\d+)", re.IGNORECASE)
+_RUN_STAMP_PATTERN = re.compile(r"(?P<stamp>\d{8}_\d{6})")
 
 
 def _parse_shard_marker(value: Any) -> tuple[int, int] | None:
@@ -1359,6 +1361,17 @@ def _parse_shard_marker(value: Any) -> tuple[int, int] | None:
     if index < 0 or count <= 0:
         return None
     return index, count
+
+
+def _extract_run_stamp(value: Any) -> str | None:
+    match = _RUN_STAMP_PATTERN.search(str(value or ""))
+    if not match:
+        return None
+    return str(match.group("stamp"))
+
+
+def _is_merged_artifact(value: Any) -> bool:
+    return "_merged" in str(value or "").strip().lower()
 
 
 def _prepend_summary_warning(summary_text: str, warning_line: str) -> str:
@@ -1397,9 +1410,16 @@ def _build_premarket_fallback_rows(tickers: Iterable[str]) -> list[dict[str, Any
 
 
 def merge_shard_scan_rows(merge_dir: Path) -> dict[str, Any]:
-    files = sorted(Path(merge_dir).glob("**/scan_rows_*.json"))
-    if not files:
+    all_row_files = sorted(Path(merge_dir).glob("**/scan_rows_*.json"))
+    candidate_row_files = [
+        path
+        for path in all_row_files
+        if not _is_merged_artifact(path.name) and _parse_shard_marker(path.name) is not None and _extract_run_stamp(path.name)
+    ]
+    if not candidate_row_files:
         raise RuntimeError(f"No shard row files found in {merge_dir}")
+    selected_run_stamp = max(str(_extract_run_stamp(path.name) or "") for path in candidate_row_files)
+    files = [path for path in candidate_row_files if _extract_run_stamp(path.name) == selected_run_stamp]
 
     all_rows: list[dict[str, Any]] = []
     expected_shard_count = 0
@@ -1424,7 +1444,13 @@ def merge_shard_scan_rows(merge_dir: Path) -> dict[str, Any]:
 
     merged_rows = _dedupe_rows_by_ticker(all_rows)
 
-    meta_files = sorted(Path(merge_dir).glob("**/run_meta_*.json"))
+    meta_files = [
+        path
+        for path in sorted(Path(merge_dir).glob("**/run_meta_*.json"))
+        if not _is_merged_artifact(path.name)
+        and _parse_shard_marker(path.name) is not None
+        and _extract_run_stamp(path.name) == selected_run_stamp
+    ]
     shard_universe_sum = 0
     full_universe_max = 0
     skip_count_sum = 0
@@ -1472,6 +1498,7 @@ def merge_shard_scan_rows(merge_dir: Path) -> dict[str, Any]:
     )
     return {
         "rows": merged_rows,
+        "run_stamp": selected_run_stamp,
         "row_files": [str(path) for path in files],
         "meta_files": [str(path) for path in meta_files],
         "source_row_count": len(all_rows),
@@ -1705,7 +1732,7 @@ def _with_post_close_final_top20_scores(
             )
         )
 
-        latest_detected_date = _parse_iso_date(row_dict.get("detected_signal_latest_date"))
+        latest_detected_date = _parse_iso_date(row_dict.get("detected_buy_signal_latest_date"))
         latest_detected_within_2d = bool(
             latest_detected_date is not None and 0 <= int((target_date - latest_detected_date).days) <= 2
         )
@@ -1856,6 +1883,8 @@ def select_post_close_pullback_rows_for_telegram(rows: Iterable[Mapping[str, Any
     selected: list[dict[str, Any]] = []
     for row in rows or []:
         row_dict = dict(row or {})
+        if _coerce_bool(row_dict.get("thin_trade_risk", False)):
+            continue
         if not _coerce_bool(row_dict.get("uptrend_persistent", False)):
             continue
         if _safe_float(row_dict.get("hma60_slope_pct", 0)) <= 0.0:
@@ -1880,6 +1909,8 @@ def select_post_close_chase_rows_for_telegram(rows: Iterable[Mapping[str, Any]])
     selected: list[dict[str, Any]] = []
     for row in rows or []:
         row_dict = dict(row or {})
+        if _coerce_bool(row_dict.get("thin_trade_risk", False)):
+            continue
         if not _coerce_bool(row_dict.get("bull_strength_recent", False)):
             continue
         if not _coerce_bool(row_dict.get("uptrend_persistent", False)):
@@ -1931,6 +1962,8 @@ def select_post_close_buy_turn_rows_for_telegram(
     selected: list[dict[str, Any]] = []
     for row in rows or []:
         row_dict = dict(row or {})
+        if _coerce_bool(row_dict.get("thin_trade_risk", False)):
+            continue
         latest_session_turn = _coerce_bool(row_dict.get("latest_session_utbot_buy_turn", False)) or _coerce_bool(
             row_dict.get("latest_session_hull_buy_turn", False)
         )
@@ -1966,6 +1999,8 @@ def select_post_close_gap_setup_rows_for_telegram(rows: Iterable[Mapping[str, An
     selected: list[dict[str, Any]] = []
     for row in rows or []:
         row_dict = dict(row or {})
+        if _coerce_bool(row_dict.get("thin_trade_risk", False)):
+            continue
         if not _coerce_bool(row_dict.get("gap_setup_candidate", False)):
             continue
         hit_summary = _format_setup_hit_summary(
@@ -1987,6 +2022,8 @@ def select_post_close_pocket_pivot_rows_for_telegram(rows: Iterable[Mapping[str,
     selected: list[dict[str, Any]] = []
     for row in rows or []:
         row_dict = dict(row or {})
+        if _coerce_bool(row_dict.get("thin_trade_risk", False)):
+            continue
         if not _coerce_bool(row_dict.get("pocket_pivot_candidate", False)):
             continue
         hit_summary = _format_setup_hit_summary(
@@ -2720,6 +2757,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
     scan_label = _scan_label_for_profile(universe_profile)
     scan_mode = "post_close"
     latest_session_date = _last_us_market_session_date(run_at_kst)
+    telegram_skipped_reason = ""
 
     if merge_dir:
         run_label = f"{stamp}_merged"
@@ -2895,38 +2933,43 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
         )
         summary_path = out_dir / f"trend_turn_summary_{run_label}.txt"
         summary_path.write_text(summary_text, encoding="utf-8")
+        if shard_count > 1:
+            telegram_skipped_reason = "requires_merge_for_ranked_post_close_summary"
 
+        meta_payload = {
+            "run_at_kst": run_at_kst.isoformat(),
+            "mode": "scan",
+            "scan_mode": scan_mode,
+            "universe_profile": universe_profile,
+            "full_universe_count": len(full_tickers),
+            "shard_ticker_count": len(tickers),
+            "shard_count": shard_count,
+            "shard_index": shard_index,
+            "universe": universe_payload,
+            "etf_errors": list(universe_payload.get("etf_errors") or []),
+            "performance": scan_result.perf,
+            "skip_reasons": scan_result.skips,
+            "result_count": len(scan_result.rows),
+            "detected_turn_count": len(detected_turn_rows),
+            "trend_turn_count": len(turn_rows),
+            "pullback_reentry_count": len(pullback_rows),
+            "hull_bear_count": len(hull_bear_rows),
+            "new_52w_high_count": len(high_52w_rows),
+            "pullback_filter_count": len(pullback_filter_rows),
+            "chase_filter_count": len(chase_filter_rows),
+            "buy_turn_filter_count": len(buy_turn_filter_rows),
+            "gap_setup_count": len(gap_setup_rows),
+            "pocket_pivot_count": len(pocket_pivot_rows),
+            "five_day_top_count": len(five_day_top_rows),
+            "final_top_count": len(final_top_rows),
+            "csv_path": str(csv_path),
+            "rows_path": str(rows_path),
+            "summary_path": str(summary_path),
+        }
+        if telegram_skipped_reason:
+            meta_payload["telegram_skipped_reason"] = telegram_skipped_reason
         write_json(
-            {
-                "run_at_kst": run_at_kst.isoformat(),
-                "mode": "scan",
-                "scan_mode": scan_mode,
-                "universe_profile": universe_profile,
-                "full_universe_count": len(full_tickers),
-                "shard_ticker_count": len(tickers),
-                "shard_count": shard_count,
-                "shard_index": shard_index,
-                "universe": universe_payload,
-                "etf_errors": list(universe_payload.get("etf_errors") or []),
-                "performance": scan_result.perf,
-                "skip_reasons": scan_result.skips,
-                "result_count": len(scan_result.rows),
-                "detected_turn_count": len(detected_turn_rows),
-                "trend_turn_count": len(turn_rows),
-                "pullback_reentry_count": len(pullback_rows),
-                "hull_bear_count": len(hull_bear_rows),
-                "new_52w_high_count": len(high_52w_rows),
-                "pullback_filter_count": len(pullback_filter_rows),
-                "chase_filter_count": len(chase_filter_rows),
-                "buy_turn_filter_count": len(buy_turn_filter_rows),
-                "gap_setup_count": len(gap_setup_rows),
-                "pocket_pivot_count": len(pocket_pivot_rows),
-                "five_day_top_count": len(five_day_top_rows),
-                "final_top_count": len(final_top_rows),
-                "csv_path": str(csv_path),
-                "rows_path": str(rows_path),
-                "summary_path": str(summary_path),
-            },
+            meta_payload,
             out_dir=out_dir,
             filename=f"run_meta_{run_label}.json",
         )
@@ -2934,7 +2977,10 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
         print(f"[SCAN] CSV saved: {csv_path}")
         print(f"[SCAN] Summary saved: {summary_path}")
 
-    _send_telegram_if_enabled(args, summary_text=summary_text, csv_path=csv_path, scan_label=scan_label, run_at_kst=run_at_kst)
+    if telegram_skipped_reason:
+        print(f"[SCAN] Telegram send skipped: {telegram_skipped_reason}")
+    else:
+        _send_telegram_if_enabled(args, summary_text=summary_text, csv_path=csv_path, scan_label=scan_label, run_at_kst=run_at_kst)
     return 0
 
 
