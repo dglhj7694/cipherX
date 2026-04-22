@@ -11,9 +11,11 @@ from unittest.mock import patch
 import pandas as pd
 
 from scripts.daily_scan_and_notify import (
+    POST_CLOSE_FINAL_ENTRY_FIELD_SPECS,
     POST_CLOSE_LATEST_SESSION_FIELD_SPECS,
     RUSSELL2000_UNIVERSE_ITEMS,
     _compute_post_close_row_metrics,
+    _with_post_close_final_top20_scores,
     _with_post_close_cross_section_metrics,
     _with_post_close_setup_scores,
     _last_us_market_session_date,
@@ -25,6 +27,7 @@ from scripts.daily_scan_and_notify import (
     merge_shard_scan_rows,
     select_post_close_buy_turn_rows_for_telegram,
     select_post_close_chase_rows_for_telegram,
+    select_post_close_final_top_rows_for_telegram,
     select_post_close_gap_setup_rows_for_telegram,
     select_post_close_pocket_pivot_rows_for_telegram,
     select_post_close_pullback_rows_for_telegram,
@@ -171,6 +174,44 @@ class DailyScanNotifyTests(unittest.TestCase):
         self.assertFalse(any(str(name).endswith("(latest_session_hull_buy_turn)") for name in base_header))
         self.assertFalse(any(str(name).endswith("(chg_5d)") for name in base_header))
         self.assertFalse(any(str(name).endswith("(gap_risk_2pct)") for name in base_header))
+
+    def test_write_scan_csv_post_close_final_entry_columns(self):
+        row = {
+            "ticker": "MSFT",
+            "a_score": 4,
+            "b_score": 3,
+            "c_score": 2,
+            "final_entry_score": 98.12,
+            "final_entry_rank": 1,
+            "final_entry_selected": True,
+            "final_entry_reason": "A4/B3/C2 | PASS",
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            out_dir = Path(temp_dir)
+            csv_path = write_scan_csv(
+                [row],
+                out_dir=out_dir,
+                run_label="post_close_final_entry",
+                extra_field_specs=[*POST_CLOSE_LATEST_SESSION_FIELD_SPECS, *POST_CLOSE_FINAL_ENTRY_FIELD_SPECS],
+            )
+            csv_rows = list(csv.reader(io.StringIO(csv_path.read_text(encoding="utf-8-sig"))))
+
+        header = csv_rows[0]
+        data = csv_rows[1]
+        a_idx = next(i for i, name in enumerate(header) if str(name).endswith("(a_score)"))
+        b_idx = next(i for i, name in enumerate(header) if str(name).endswith("(b_score)"))
+        c_idx = next(i for i, name in enumerate(header) if str(name).endswith("(c_score)"))
+        score_idx = next(i for i, name in enumerate(header) if str(name).endswith("(final_entry_score)"))
+        rank_idx = next(i for i, name in enumerate(header) if str(name).endswith("(final_entry_rank)"))
+        selected_idx = next(i for i, name in enumerate(header) if str(name).endswith("(final_entry_selected)"))
+        reason_idx = next(i for i, name in enumerate(header) if str(name).endswith("(final_entry_reason)"))
+        self.assertEqual(data[a_idx], "4")
+        self.assertEqual(data[b_idx], "3")
+        self.assertEqual(data[c_idx], "2")
+        self.assertEqual(data[score_idx], "98.12")
+        self.assertEqual(data[rank_idx], "1")
+        self.assertIn(data[selected_idx], {"Y", "True"})
+        self.assertEqual(data[reason_idx], "A4/B3/C2 | PASS")
 
     def test_filter_turn_rows_for_telegram_uses_volume_ratio_gt_one(self):
         rows = [
@@ -587,6 +628,82 @@ class DailyScanNotifyTests(unittest.TestCase):
         self.assertNotIn("NEG", [row["ticker"] for row in selected])
         self.assertEqual(selected[0]["five_day_top_tag"], "5일 +35.00%")
 
+    def test_with_post_close_final_top20_scores_applies_abc_gates_and_top20(self):
+        run_at_kst = datetime(2026, 4, 22, 6, 15, 0)
+
+        def _base_row(ticker: str, *, scan_score: float, es: float) -> dict[str, object]:
+            return {
+                "ticker": ticker,
+                "scan_score": scan_score,
+                "es": es,
+                "jg_key": "BUY",
+                "chg_value": 1.0,
+                "chg": 1.0,
+                "volume_ratio_20": 1.2,
+                "thin_trade_risk": False,
+                "weekly_trend_context": "STRONG_UPTREND",
+                "ichimoku_above_cloud": True,
+                "drawdown_from_52w_high_pct": -10.0,
+                "adx": 25.0,
+                "hma60_slope_pct": 0.2,
+                "pullback_reentry": True,
+                "pocket_pivot_candidate": False,
+                "gap_setup_candidate": True,
+                "pullback_atr_multiple": 1.0,
+                "detected_signal_latest_date": "2026-04-21",
+                "latest_session_utbot_buy_turn": True,
+                "latest_session_hull_buy_turn": False,
+                "cmf": 0.10,
+                "obv_slope": 0.20,
+                "volume_bullish": True,
+                "volume_abnormal": False,
+            }
+
+        rows: list[dict[str, object]] = []
+        for idx in range(25):
+            rows.append(_base_row(f"P{idx:03d}", scan_score=180.0 - idx, es=70.0 - float(idx % 5)))
+
+        rows[5]["pullback_reentry"] = False
+        rows[5]["pocket_pivot_candidate"] = True  # B dimension OR gate
+
+        rows.append(_base_row("BOUND_PASS", scan_score=400.0, es=80.0) | {"detected_signal_latest_date": "2026-04-19"})
+        rows.append(_base_row("BOUND_FAIL", scan_score=399.0, es=80.0) | {"detected_signal_latest_date": "2026-04-18"})
+        rows.append(
+            _base_row("FAIL_A", scan_score=398.0, es=80.0)
+            | {"ichimoku_above_cloud": False, "drawdown_from_52w_high_pct": -25.0, "adx": 10.0, "hma60_slope_pct": -0.1}
+        )
+        rows.append(
+            _base_row("FAIL_C", scan_score=397.0, es=80.0)
+            | {"cmf": 0.01, "obv_slope": 0.05, "volume_bullish": False, "volume_abnormal": True}
+        )
+        rows.append(_base_row("HARD_FAIL", scan_score=396.0, es=80.0) | {"thin_trade_risk": True})
+
+        scored = _with_post_close_final_top20_scores(rows, run_at_kst=run_at_kst, scan_mode="post_close", top_n=20)
+        selected = select_post_close_final_top_rows_for_telegram(scored, top_n=20)
+        by_ticker = {str(row.get("ticker")): row for row in scored}
+
+        self.assertEqual(len(selected), 20)
+        self.assertEqual([int(row["final_entry_rank"]) for row in selected], list(range(1, 21)))
+        self.assertTrue(bool(by_ticker["P005"]["final_entry_selected"]))
+        self.assertGreaterEqual(int(by_ticker["BOUND_PASS"]["b_score"]), 3)
+        self.assertFalse(bool(by_ticker["BOUND_FAIL"]["final_entry_selected"]))
+        self.assertFalse(bool(by_ticker["FAIL_A"]["final_entry_selected"]))
+        self.assertFalse(bool(by_ticker["FAIL_C"]["final_entry_selected"]))
+        self.assertFalse(bool(by_ticker["HARD_FAIL"]["final_entry_selected"]))
+        self.assertIn("HARD_FAIL:thin_trade_risk", str(by_ticker["HARD_FAIL"]["final_entry_reason"]))
+        self.assertRegex(str(by_ticker["P000"]["final_entry_reason"]), r"A\d+/B\d+/C\d+")
+
+    def test_select_post_close_final_top_rows_for_telegram_uses_tie_breaker_order(self):
+        rows = [
+            {"ticker": "AAA", "final_entry_selected": True, "final_entry_score": 90.0, "b_score": 4, "c_score": 2, "scan_score": 120.0, "es": 50.0},
+            {"ticker": "BBB", "final_entry_selected": True, "final_entry_score": 90.0, "b_score": 5, "c_score": 1, "scan_score": 90.0, "es": 50.0},
+            {"ticker": "CCC", "final_entry_selected": True, "final_entry_score": 90.0, "b_score": 4, "c_score": 3, "scan_score": 80.0, "es": 50.0},
+            {"ticker": "DDD", "final_entry_selected": True, "final_entry_score": 90.0, "b_score": 4, "c_score": 2, "scan_score": 130.0, "es": 40.0},
+            {"ticker": "EEE", "final_entry_selected": True, "final_entry_score": 90.0, "b_score": 4, "c_score": 2, "scan_score": 130.0, "es": 60.0},
+        ]
+        selected = select_post_close_final_top_rows_for_telegram(rows, top_n=20)
+        self.assertEqual([row["ticker"] for row in selected], ["BBB", "CCC", "EEE", "DDD", "AAA"])
+
     def test_select_us_session_hull_bear_rows(self):
         rows = [
             {"ticker": "AAA", "scan_score": 6.0, "hull_turn_bear_last_date": "2026-04-16"},
@@ -825,6 +942,44 @@ class DailyScanNotifyTests(unittest.TestCase):
         p9 = summary.index("=== [9/10] 기관 매집 포착 ===")
         p10 = summary.index("=== [10/10] 5일 변동률 상위종목 ===")
         self.assertTrue(p1 < p2 < p3 < p4 < p5 < p6 < p7 < p8 < p9 < p10)
+
+    def test_build_post_close_transition_summary_includes_final_top20_section_when_provided(self):
+        base_row = {
+            "ticker": "AAA",
+            "chg_value": 1.0,
+            "chg": 1.0,
+            "volume_ratio_20": 1.2,
+            "jg_key": "BUY",
+        }
+        final_row = dict(base_row)
+        final_row["final_entry_reason"] = "A4/B3/C2 | PASS"
+        final_row["final_entry_score"] = 97.5
+
+        summary = build_post_close_transition_summary(
+            [dict(base_row)],
+            run_at_kst=datetime(2026, 4, 17, 6, 15, 0),
+            universe_count=1200,
+            result_count=980,
+            skip_count=220,
+            detected_turn_count=1,
+            summary_limit=10,
+            pullback_rows=[],
+            hull_bear_rows=[],
+            high_52w_rows=[],
+            pullback_filter_rows=[],
+            chase_filter_rows=[],
+            buy_turn_filter_rows=[],
+            gap_setup_rows=[],
+            pocket_pivot_rows=[],
+            five_day_top_rows=[],
+            final_top_rows=[final_row],
+        )
+
+        self.assertIn("요약 인덱스:", summary)
+        self.assertIn("오늘 진입 후보 Top20 1", summary)
+        self.assertIn("=== [11/11] 오늘 진입 후보 Top20 (A/B/C 통과만) ===", summary)
+        self.assertIn("A4/B3/C2 | PASS", summary)
+        self.assertIn("점수 97.50", summary)
 
     def test_split_telegram_message_text_preserves_section_boundaries_for_ten_sections(self):
         base_row = {
