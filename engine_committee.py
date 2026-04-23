@@ -1069,7 +1069,7 @@ def compute_committee_ensemble(df, vol_ratio, hma_r_v, bias_mode=DEFAULT_BIAS_MO
     es=_finite_array(es)
     ec=np.clip(ec,0,100)
     ec=_finite_array(ec)
-    # ?쒕꼫吏
+    # 시너지
     syn=np.zeros(n);ts_=es[:,0];ms_=es[:,1];mns_=es[:,2];ss_=es[:,3];ls_=es[:,4]
     bc=(ms_>20)&(ls_>10)&(ts_<10);bstr=np.clip((ms_+ls_)*0.15+np.abs(np.minimum(ts_,0))*0.1,0,25)
     syn+=np.where(bc,bstr,0)+np.where(bc&(mns_>5),8,0)+np.where(bc&(ss_>10),5,0)
@@ -1077,7 +1077,7 @@ def compute_committee_ensemble(df, vol_ratio, hma_r_v, bias_mode=DEFAULT_BIAS_MO
     syn-=np.where(brc,brstr,0)+np.where(brc&(mns_<-5),8,0)+np.where(brc&(ss_<-10),5,0)
     syn=_finite_array(syn)
     df['Reversal_Synergy']=syn
-    # ?덉륫
+    # 예측
     cav=N('Composite_Accel');ab=np.clip(cav.values*JT.ACCEL_PREDICTION_SCALE,-12,12);mh=N('MACD_Hist');mu=_vs(mh>mh.shift(1));md=_vs(mh<mh.shift(1))
     mb=np.where(mu.values>=3,8,np.where(md.values>=3,-8,0));stk=N('StochK');sb=np.where((stk.values<20)&(stk.values>N('StochD').values),5,np.where((stk.values>80)&(stk.values<N('StochD').values),-5,0))
     pred=_finite_array(ab+mb+sb);df['Prediction_Boost']=pred
@@ -1140,7 +1140,7 @@ def compute_committee_ensemble(df, vol_ratio, hma_r_v, bias_mode=DEFAULT_BIAS_MO
         s=es[:,ci];c=ec[:,ci];v=np.full(n,0,dtype=int);v=np.where((s>15)&(c>=25),1,v);v=np.where((s<-15)&(c>=25),-1,v);v=np.where(c<15,-99,v)
         df[f'CM_{cm}_Vote']=v;df[f'CM_{cm}_EffScore']=es[:,ci];df[f'CM_{cm}_EffConv']=ec[:,ci]
     df['Ensemble_Score']=ens
-    # ?먮떒
+    # 판단
     bag=np.zeros(n,dtype=int);sag=np.zeros(n,dtype=int)
     for ci in range(NUM_COMMITTEES):bag+=((es[:,ci]>15)&(ec[:,ci]>=25)).astype(int);sag+=((es[:,ci]<-15)&(ec[:,ci]>=25)).astype(int)
     bag+=((ba_layers>=6)&(buy_total_arr>=20)).astype(int)

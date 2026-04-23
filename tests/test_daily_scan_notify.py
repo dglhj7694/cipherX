@@ -99,9 +99,9 @@ class DailyScanNotifyTests(unittest.TestCase):
 
     def test_select_us_session_turn_rows_filters_previous_us_session(self):
         rows = [
-            {"ticker": "AAA", "scan_score": 3.2, "utbot_buy_last_date": "2026-04-15", "hull_turn_bull_last_date": "?놁쓬"},
-            {"ticker": "BBB", "scan_score": 9.0, "utbot_buy_last_date": "2026-04-14", "hull_turn_bull_last_date": "?놁쓬"},
-            {"ticker": "CCC", "scan_score": 7.1, "utbot_buy_last_date": "?놁쓬", "hull_turn_bull_last_date": "2026-04-15"},
+            {"ticker": "AAA", "scan_score": 3.2, "utbot_buy_last_date": "2026-04-15", "hull_turn_bull_last_date": "없음"},
+            {"ticker": "BBB", "scan_score": 9.0, "utbot_buy_last_date": "2026-04-14", "hull_turn_bull_last_date": "없음"},
+            {"ticker": "CCC", "scan_score": 7.1, "utbot_buy_last_date": "없음", "hull_turn_bull_last_date": "2026-04-15"},
         ]
         selected = select_us_session_turn_rows(rows, run_at_kst=datetime(2026, 4, 16, 6, 15, 0))
         self.assertEqual([row["ticker"] for row in selected], ["CCC", "AAA"])
@@ -912,7 +912,7 @@ class DailyScanNotifyTests(unittest.TestCase):
                     "chg": 2.40,
                     "volume_ratio_20": 1.80,
                     "jg_key": "BUY",
-                    "transition_signals": ["HULL 留ㅼ닔"],
+                    "transition_signals": ["HULL 매수"],
                 }
             ],
             run_at_kst=datetime(2026, 4, 17, 6, 15, 0),
@@ -985,7 +985,7 @@ class DailyScanNotifyTests(unittest.TestCase):
                     "chg": 1.0,
                     "volume_ratio_20": 1.2,
                     "jg_key": "BUY",
-                    "transition_signals": ["UTBot 留ㅼ닔"],
+                    "transition_signals": ["UTBot 매수"],
                 }
             ],
             run_at_kst=datetime(2026, 4, 17, 6, 15, 0),
@@ -1017,7 +1017,7 @@ class DailyScanNotifyTests(unittest.TestCase):
                 "chg": 1.0,
                 "volume_ratio_20": 1.5,
                 "jg_key": "BUY",
-                "transition_signals": ["HULL 留ㅼ닔"],
+                "transition_signals": ["HULL 매수"],
             }
             for i in range(45)
         ]
@@ -1192,7 +1192,7 @@ class DailyScanNotifyTests(unittest.TestCase):
             "chg": 1.0,
             "volume_ratio_20": 1.5,
             "jg_key": "BUY",
-            "transition_signals": ["HULL 留ㅼ닔"],
+            "transition_signals": ["HULL 매수"],
         }
         rows = []
         for i in range(40):
@@ -1255,11 +1255,11 @@ class DailyScanNotifyTests(unittest.TestCase):
             "hull_turn_bull_recent": False,
         }
         gap_row = dict(base_row)
-        gap_row["gap_setup_tag"] = "GAP 8/11 | G4/5 | 嫄곕옒?됯굔議? ?곷?媛뺣룄, 諛대뱶?뺤텞"
+        gap_row["gap_setup_tag"] = "GAP 8/11 | G4/5 | 거래량건조, 상대강도, 밴드압축"
         pocket_row = dict(base_row)
         pocket_row["pocket_pivot_tag"] = "PP 9/12 | G4/5 | TEST"
         five_day_row = dict(base_row)
-        five_day_row["five_day_top_tag"] = "5??+12.34%"
+        five_day_row["five_day_top_tag"] = "5일 +12.34%"
         five_day_row["chg_5d"] = 12.34
         buy_turn_filter_row = dict(base_row)
         buy_turn_filter_row["transition_signals"] = []
@@ -1359,12 +1359,12 @@ class DailyScanNotifyTests(unittest.TestCase):
             gap_row["gap_setup_tag"] = f"GAP 8/11 | G4/5 | TEST{i}"
             gap_rows.append(gap_row)
             pocket_row = dict(row)
-            pocket_row["pocket_pivot_tag"] = f"PP 9/12 | G4/5 | 湲곌?留ㅼ쭛{i}"
+            pocket_row["pocket_pivot_tag"] = f"PP 9/12 | G4/5 | 기관매집{i}"
             pocket_rows.append(pocket_row)
         five_day_rows = []
         for i, row in enumerate(rows):
             five_day_row = dict(row)
-            five_day_row["five_day_top_tag"] = f"5??+{20.0 - (i / 10.0):.2f}%"
+            five_day_row["five_day_top_tag"] = f"5일 +{20.0 - (i / 10.0):.2f}%"
             five_day_row["chg_5d"] = 20.0 - (i / 10.0)
             five_day_rows.append(five_day_row)
 
@@ -1638,9 +1638,9 @@ class DailyScanNotifyTests(unittest.TestCase):
             "pocket_pivot_candidate": False,
             "gap_setup_candidate": True,
             "utbot_buy_last_date": "2026-04-21",
-            "hull_turn_bull_last_date": "?놁쓬",
-            "utbot_sell_last_date": "?놁쓬",
-            "hull_turn_bear_last_date": "?놁쓬",
+            "hull_turn_bull_last_date": "없음",
+            "utbot_sell_last_date": "없음",
+            "hull_turn_bear_last_date": "없음",
             "utbot_buy_recent": True,
             "hull_turn_bull_recent": False,
             "bull_turn_recent": True,
@@ -1916,26 +1916,26 @@ from zoneinfo import ZoneInfo
 
 
 class ScanModeExpansionTests(unittest.TestCase):
-    """21??23???ㅼ틪 紐⑤뱶 ?뺤옣 ?뚯뒪??"""
+    """21시/23시 스캔 모드 확장 테스트."""
 
     # --- _current_us_session_date ---
 
     def test_current_us_session_date_weekday(self):
-        """?됱씪 KST 23??= ET 10?????ㅻ뒛(ET) 諛섑솚."""
-        # 2026-04-17 湲덉슂??KST 23????ET 2026-04-17 10??
+        """평일 KST 23시는 ET 10시이므로 당일(ET) 세션을 반환한다."""
+        # 2026-04-17 금요일 KST 23시 = ET 2026-04-17 10시
         kst_time = datetime(2026, 4, 17, 23, 0, 0, tzinfo=KST)
         result = _current_us_session_date(kst_time)
         self.assertEqual(result, date(2026, 4, 17))
 
     def test_current_us_session_date_saturday_returns_friday(self):
-        """?좎슂????吏곸쟾 湲덉슂??諛섑솚."""
-        kst_time = datetime(2026, 4, 18, 21, 0, 0, tzinfo=KST)  # KST ?좎슂??21??
+        """토요일은 직전 금요일 세션을 반환한다."""
+        kst_time = datetime(2026, 4, 18, 21, 0, 0, tzinfo=KST)  # KST 토요일 21시
         result = _current_us_session_date(kst_time)
         self.assertEqual(result.weekday(), 4)  # Friday
 
     def test_current_us_session_date_sunday_returns_friday(self):
-        """?쇱슂????吏곸쟾 湲덉슂??諛섑솚."""
-        kst_time = datetime(2026, 4, 19, 21, 0, 0, tzinfo=KST)  # KST ?쇱슂??21??
+        """일요일은 직전 금요일 세션을 반환한다."""
+        kst_time = datetime(2026, 4, 19, 21, 0, 0, tzinfo=KST)  # KST 일요일 21시
         result = _current_us_session_date(kst_time)
         self.assertEqual(result.weekday(), 4)  # Friday
 
@@ -1964,26 +1964,26 @@ class ScanModeExpansionTests(unittest.TestCase):
     # --- _time_adjusted_volume_threshold ---
 
     def test_volume_threshold_before_market_open(self):
-        """??媛쒖떆 ????0.05 (?ъ떎??鍮꾪솢?깊솕)."""
+        """장개시 이전에는 최소 0.05를 반환한다(과도한 비활성화 방지)."""
         kst_time = datetime(2026, 4, 17, 21, 0, 0, tzinfo=KST)  # ET ~08:00
         result = _time_adjusted_volume_threshold(kst_time)
         self.assertAlmostEqual(result, 0.05, places=2)
 
     def test_volume_threshold_30min_after_open(self):
-        """??媛쒖떆 30遺?????~0.25."""
+        """장개시 30분 이후에는 대략 0.25 수준이어야 한다."""
         kst_time = datetime(2026, 4, 17, 23, 0, 0, tzinfo=KST)  # ET ~10:00
         result = _time_adjusted_volume_threshold(kst_time)
         self.assertGreater(result, 0.10)
         self.assertLess(result, 0.60)
 
     def test_volume_threshold_after_close(self):
-        """??留덇컧 ????1.0 (湲곗〈怨??숈씪)."""
+        """장마감 이후는 1.0을 반환한다(기존과 동일)."""
         kst_time = datetime(2026, 4, 18, 6, 0, 0, tzinfo=KST)  # ET ~17:00
         result = _time_adjusted_volume_threshold(kst_time)
         self.assertEqual(result, 1.0)
 
     def test_volume_threshold_returns_positive(self):
-        """?대뼡 ?쒓컙?대뱺 ?묒닔 諛섑솚."""
+        """어떤 시간이든 양수 값을 반환한다."""
         for hour in range(0, 24):
             kst_time = datetime(2026, 4, 17, hour, 0, 0, tzinfo=KST)
             result = _time_adjusted_volume_threshold(kst_time)
@@ -2034,7 +2034,7 @@ class ScanModeExpansionTests(unittest.TestCase):
         aapl = enriched[0]
         self.assertEqual(aapl["premarket_price"], 155.0)
         self.assertEqual(aapl["gap_pct"], 3.33)
-        # MSFT has no gap data ??defaults
+        # MSFT has no gap data -> defaults
         msft = enriched[1]
         self.assertEqual(msft["gap_pct"], 0.0)
 
@@ -2050,7 +2050,7 @@ class ScanModeExpansionTests(unittest.TestCase):
         kst_time = datetime(2026, 4, 17, 5, 0, 0, tzinfo=KST)
         summary = build_transition_summary(
             [], run_at_kst=kst_time, universe_count=100, result_count=50,
-            skip_count=5, scan_label="?먮룞 ?ㅼ틪", scan_mode="post_close",
+            skip_count=5, scan_label="자동 스캔", scan_mode="post_close",
         )
         self.assertIn("KST", summary)
         self.assertIn("100", summary)
@@ -2060,7 +2060,7 @@ class ScanModeExpansionTests(unittest.TestCase):
         kst_time = datetime(2026, 4, 17, 21, 0, 0, tzinfo=KST)
         summary = build_transition_summary(
             [], run_at_kst=kst_time, universe_count=100, result_count=50,
-            skip_count=5, scan_label="?꾨━留덉폆 ?ㅼ틪", scan_mode="pre_market",
+            skip_count=5, scan_label="프리마켓 스캔", scan_mode="pre_market",
         )
         self.assertIn("KST", summary)
         self.assertIn("100", summary)
@@ -2070,14 +2070,14 @@ class ScanModeExpansionTests(unittest.TestCase):
         kst_time = datetime(2026, 4, 17, 23, 0, 0, tzinfo=KST)
         summary = build_transition_summary(
             [], run_at_kst=kst_time, universe_count=100, result_count=50,
-            skip_count=5, scan_label="?쇰━?몄뀡 ?ㅼ틪", scan_mode="early_session",
+            skip_count=5, scan_label="얼리세션 스캔", scan_mode="early_session",
             volume_threshold=0.25,
         )
         self.assertIn("KST", summary)
         self.assertIn("0.250x", summary)
 
     def test_summary_early_session_volume_criteria(self):
-        """?쇰━?몄뀡 ?붿빟???쒓컙鍮꾨? 嫄곕옒??湲곗????ы븿?섎뒗吏 ?뺤씤."""
+        """얼리세션 요약에 시간비례 거래량 기준이 포함되는지 확인."""
         kst_time = datetime(2026, 4, 17, 23, 0, 0, tzinfo=KST)
         summary = build_transition_summary(
             [], run_at_kst=kst_time, universe_count=100, result_count=50,

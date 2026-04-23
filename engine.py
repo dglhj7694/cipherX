@@ -47,7 +47,7 @@ def det_bb(c,o,h,l,bbu,bbl,bbw,kcu,kcl):
     wd=bbw.rolling(126,min_periods=60).rank(pct=True)>=.9;tight=bbw<=bbw.rolling(126,min_periods=60).min()*1.05
     return {'BB_Squeeze':tight,'BB_Squeeze_Started':ss_bb&~ss_bb.shift(1).fillna(False),'BB_Squeeze_End_Bull':seb,'BB_Squeeze_End_Bear':ses,'BB_Upper_Touch':ut&~ub,'BB_Lower_Touch':lt&~lb_,'BB_Upper_Break':ub,'BB_Lower_Break':lb_,'BB_Lower_Bounce':lbo,'BB_Upper_Walk':uw,'BB_Lower_Walk':lw,'BB_Wide_Bands':wd}
 
-# ?곣봺??detect_all_signals ?곣봺??
+# 핵심 detect_all_signals 루틴
 def detect_all_signals(df, bias_mode=DEFAULT_BIAS_MODE):
     _ensure_runtime_combo_registry()
     H,L,C,O,V=df['High'],df['Low'],df['Close'],df['Open'],df['Volume']
@@ -93,7 +93,7 @@ def detect_all_signals(df, bias_mode=DEFAULT_BIAS_MODE):
     df['Channel_Breakdown_Bear']=df.get('Channel_Breakdown_Bear',pd.Series(False,index=idx)).fillna(False)&(vol_ratio>=1.0)
     df['Triangle_Breakout_Bull']=df.get('Triangle_Breakout_Bull',pd.Series(False,index=idx)).fillna(False)&(vol_ratio>=1.0)
     df['Triangle_Breakdown_Bear']=df.get('Triangle_Breakdown_Bear',pd.Series(False,index=idx)).fillna(False)&(vol_ratio>=1.0)
-    # BB+罹붾뱾
+    # BB+캔들
     for k,v_ in det_bb(C,O,H,L,df['BB_Up'],df['BB_Low'],df['BB_Width'],df['KC_Upper'],df['KC_Lower']).items():df[k]=v_
     for k,v_ in det_candles(C,O,H,L,wt1,atr,V).items():df[k]=v_
     df['Bullish_Engulfing'],df['Bearish_Engulfing']=det_engulf(C,O,wt1,m50,V)
@@ -108,14 +108,14 @@ def detect_all_signals(df, bias_mode=DEFAULT_BIAS_MODE):
     df['ADX_New_Uptrend']=(adx>25)&(adx.shift(1)<=25)&(pdi>mdi)&vok;df['ADX_New_Downtrend']=(adx>25)&(adx.shift(1)<=25)&(mdi>pdi)&vok
     df['ADX_Momentum_Buy']=(adx>20)&(adx.shift(1)<=20)&(pdi>mdi)&vok;df['ADX_Momentum_Sell']=(adx>20)&(adx.shift(1)<=20)&(mdi>pdi)&vok
     rsi=df['RSI'];df['RSI_Cross_30_Up']=(rsi>30)&(rsi.shift(1)<=30);df['RSI_Cross_50_Up']=(rsi>50)&(rsi.shift(1)<=50);df['RSI_Cross_70_Down']=(rsi<70)&(rsi.shift(1)>=70);df['RSI_Cross_50_Down']=(rsi<50)&(rsi.shift(1)>=50)
-    # 媛?踰붿쐞/52二??곗냽
+    # 갭/변동폭/52주 연속
     t=atr*.5;gu=(O>H.shift(1))&((O-H.shift(1))>t);gd=(O<L.shift(1))&((L.shift(1)-O)>t);df['Gap_Up']=gu;df['Gap_Down']=gd;df['Gap_Up_Closed']=gu.shift(1).fillna(False)&(L<=H.shift(2));df['Gap_Down_Closed']=gd.shift(1).fillna(False)&(H>=L.shift(2))
     dr=H-L;nr7m=dr.rolling(7).min();nr7=dr<=nr7m;df['NR7']=nr7;df['NR7_2']=nr7&nr7.shift(1).fillna(False);df['Narrow_Range_Bar']=dr<atr*.5;df['Wide_Range_Bar']=dr>atr*2
     df['Calm_After_Storm']=(dr>atr*2).rolling(5,min_periods=1).max().shift(1).fillna(False).astype(bool)&(dr<atr*.5)
     h252=H.rolling(252,min_periods=200).max().shift(1);l252=L.rolling(252,min_periods=200).min().shift(1);df['New_52W_High']=H>h252;df['New_52W_Low']=L<l252
     c252h=C.rolling(252,min_periods=200).max().shift(1);c252l=C.rolling(252,min_periods=200).min().shift(1);df['New_52W_Closing_High']=C>c252h;df['New_52W_Closing_Low']=C<c252l
     up_=C>C.shift(1);dn_=C<C.shift(1);us__=_vs(up_);ds__=_vs(dn_);df['Up_3_Days']=us__>=3;df['Up_4_Days']=us__>=4;df['Up_5_Days']=us__>=5;df['Down_3_Days']=ds__>=3;df['Down_4_Days']=ds__>=4;df['Down_5_Days']=ds__>=5
-    # 湲고?
+    # 기타
     n10=(C/10).round()*10;dist=(C-n10).abs();nrd=dist<atr*.5;df['Multiple_Ten_Bull']=nrd&(C.shift(1)<n10)&(C>n10)&(C>O);df['Multiple_Ten_Bear']=nrd&(C.shift(1)>n10)&(C<n10)&(C<O)
     dv_=V.where(C<C.shift(1),0);df['Pocket_Pivot']=(C>O)&(V>dv_.rolling(10).max())&(C>m50)&(C>C.shift(1));df['Parabolic_Rise']=(C-C.shift(10))/(C.shift(10)+1e-10)>.3
     df['Three_Weeks_Tight']=((C.rolling(15).max()-C.rolling(15).min())/(C.rolling(15).min()+1e-10))<.015
@@ -149,13 +149,13 @@ def detect_all_signals(df, bias_mode=DEFAULT_BIAS_MODE):
     df['Volume_Dry_Up']=_vs(vol_ratio<.6)>=5
     cs__=df.get('WT_Conv_Speed',pd.Series(0,index=idx));ga__=df.get('WT_Gap_Abs',pd.Series(0,index=idx))
     df['WT_Convergence_Bull']=(cs__>3)&(ga__>2)&(ga__<15)&(wt1<wt2)&(wt1<20);df['WT_Convergence_Bear']=(cs__>3)&(ga__>2)&(ga__<15)&(wt1>wt2)&(wt1>-20)
-    # ???좉퇋 6醫?
+    # 신규 패턴 6종
     vds=_vs(vol_ratio<0.6);vd5=vds>=5;df['Volume_Dry_Breakout_Buy']=vd5.shift(1).fillna(False)&(C>O)&(vol_ratio>=2)&(C>H.shift(1));df['Volume_Dry_Breakout_Sell']=vd5.shift(1).fillna(False)&(C<O)&(vol_ratio>=2)&(C<L.shift(1))
     br_=(C-O).abs();rr_=H-L+1e-10;idj=br_<rr_*0.1;djs=_vs(idj);df['Doji_Breakout_Buy']=(djs.shift(1)>=2)&(C>O)&(br_>atr*0.5)&(C>H.shift(1));df['Doji_Breakout_Sell']=(djs.shift(1)>=2)&(C<O)&(br_>atr*0.5)&(C<L.shift(1))
     tdn=(C.shift(1)<C.shift(2))&(C.shift(2)<C.shift(3));df['Three_Bar_Reversal_Buy']=tdn&(C>O)&(br_>atr*0.8)&(vol_ratio>=1.5)&(wt1<-20)
     tup=(C.shift(1)>C.shift(2))&(C.shift(2)>C.shift(3));df['Three_Bar_Reversal_Sell']=tup&(C<O)&(br_>atr*0.8)&(vol_ratio>=1.5)&(wt1>20)
 
-    # ?먥븧??荑⑤떎???먥븧??
+    # 쌍방향 쿨다운 충돌 방지
     PAIRED={('MACD_Cross_Buy','MACD_Cross_Sell'):12,('Bullish_Engulfing','Bearish_Engulfing'):5,('Hammer','Shooting_Star'):5,('Morning_Star','Evening_Star'):7,('DMI_Cross_Bull','DMI_Cross_Bear'):10,('Pullback_123_Bull','Pullback_123_Bear'):7,('Expansion_BO','Expansion_BD'):10,('Gilligans_Buy','Gilligans_Sell'):10,('Slingshot_Bull','Slingshot_Bear'):7,('MF_Cross_Bull','MF_Cross_Bear'):10,('Kumo_Breakout_Bull','Kumo_Breakout_Bear'):10,('StochRSI_Cross_Buy','StochRSI_Cross_Sell'):7,('ADX_Momentum_Buy','ADX_Momentum_Sell'):10,('EMA_Pullback_Buy','EMA_Pullback_Sell'):7,('SuperTrend_Buy','SuperTrend_Sell'):10,('Boomer_Buy','Boomer_Sell'):10,('Setup_180_Bull','Setup_180_Bear'):7,('VWAP_Bounce_Buy','VWAP_Reject_Sell'):7,('Momentum_Ignition_Buy','Momentum_Ignition_Sell'):10,('Volume_Dry_Breakout_Buy','Volume_Dry_Breakout_Sell'):7,('Doji_Breakout_Buy','Doji_Breakout_Sell'):5,('Three_Bar_Reversal_Buy','Three_Bar_Reversal_Sell'):5,('Box_Support_Hold','Box_Resistance_Reject'):5,('Box_Breakout_Bull','Box_Breakdown_Bear'):7,('Channel_Support_Hold','Channel_Resistance_Reject'):5,('Channel_Breakout_Bull','Channel_Breakdown_Bear'):7,('Triangle_Breakout_Bull','Triangle_Breakdown_Bear'):7}
     PAIRED.update({
         ('Fib_382_Support','Fib_382_Resistance'):5,
@@ -167,7 +167,7 @@ def detect_all_signals(df, bias_mode=DEFAULT_BIAS_MODE):
     for (bs,ss),cd in PAIRED.items():_cd_dir(df,bs,ss,cd);ph__.add(bs);ph__.add(ss)
     for s,cd in COOLDOWN_MAP.items():
         if s in df.columns and s not in ph__:df[s]=_cooldown(df[s],cd)
-    # 蹂댁“吏??
+    # 보조지표
     df['UTBot_Buy']=df.get('UTBot_Buy_Raw',pd.Series(False,index=idx)).fillna(False)&vok;df['UTBot_Sell']=df.get('UTBot_Sell_Raw',pd.Series(False,index=idx)).fillna(False)&vok
     hma_r=df.get('HMA_Rising',pd.Series(False,index=idx)).fillna(False);hma_r_v=hma_r.values
     df['Hull_Turn_Bull']=df.get('Hull_Turn_Bull_Raw',pd.Series(False,index=idx)).fillna(False)&(wt1>wt1.shift(1))&vok;df['Hull_Turn_Bear']=df.get('Hull_Turn_Bear_Raw',pd.Series(False,index=idx)).fillna(False)&(wt1<wt1.shift(1))&vok
