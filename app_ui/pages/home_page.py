@@ -4,7 +4,7 @@ import base64
 import json
 import os
 from pathlib import Path
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, Mapping, Optional, Union
 
 import requests
 import streamlit as st
@@ -19,7 +19,7 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def _cache_path(cache_path: str | Path | None = None) -> Path:
+def _cache_path(cache_path: Optional[Union[str, Path]] = None) -> Path:
     if cache_path is not None:
         return Path(cache_path)
     return _repo_root() / "artifacts" / "app_cache" / "telegram_digest_latest.json"
@@ -94,14 +94,14 @@ def _fetch_digest_cached(repo: str, branch: str, path: str, token: str) -> dict[
     return fetch_digest_from_github(repo=repo, branch=branch, path=path, token=token)
 
 
-def write_digest_cache(payload: dict[str, Any], *, cache_path: str | Path | None = None) -> Path:
+def write_digest_cache(payload: dict[str, Any], *, cache_path: Optional[Union[str, Path]] = None) -> Path:
     target = _cache_path(cache_path)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     return target
 
 
-def read_digest_cache(*, cache_path: str | Path | None = None) -> dict[str, Any] | None:
+def read_digest_cache(*, cache_path: Optional[Union[str, Path]] = None) -> Optional[dict[str, Any]]:
     target = _cache_path(cache_path)
     if not target.exists():
         return None
@@ -111,7 +111,7 @@ def read_digest_cache(*, cache_path: str | Path | None = None) -> dict[str, Any]
         return None
 
 
-def load_latest_telegram_digest(*, cache_path: str | Path | None = None) -> dict[str, Any]:
+def load_latest_telegram_digest(*, cache_path: Optional[Union[str, Path]] = None) -> dict[str, Any]:
     config = resolve_github_digest_config()
     repo = str(config.get("repo") or "").strip()
     if not repo:
@@ -142,7 +142,7 @@ def load_latest_telegram_digest(*, cache_path: str | Path | None = None) -> dict
         }
 
 
-def extract_section_candidates(payload: Mapping[str, Any] | None, section_key: str, *, limit: int | None = None) -> list[dict[str, Any]]:
+def extract_section_candidates(payload: Optional[Mapping[str, Any]], section_key: str, *, limit: Optional[int] = None) -> list[dict[str, Any]]:
     sections = list(dict(payload or {}).get("sections") or [])
     for section in sections:
         if str(dict(section or {}).get("key") or "") != str(section_key):
