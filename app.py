@@ -10,7 +10,12 @@ import textwrap
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import yfinance as yf
-from app_ui.pages import render_analysis_message, render_market_daily_dashboard
+from app_ui.pages import (
+    render_analysis_message,
+    render_briefing_page,
+    render_home_page,
+    render_market_daily_dashboard,
+)
 from sectors import SECTOR_GROUPS
 from bootstrap import build_default_session_state, ensure_session_defaults as _ensure_session_defaults, reset_session_state as _reset_session_state
 from chart import load_chart_figure, serialize_chart_figure
@@ -93,10 +98,12 @@ _ETF_UNIVERSE_PRESETS = [
     {"key": "WCBR", "label": "WCBR", "symbol": "WCBR"},
 ]
 _ETF_UNIVERSE_PRESET_MAP = {item["key"]: item for item in _ETF_UNIVERSE_PRESETS}
-MODE_MARKET_DAILY = "오늘 미국장"
+MODE_HOME = "홈"
+MODE_BRIEFING = "브리핑"
+MODE_MARKET_DAILY = MODE_BRIEFING
 MODE_ANALYSIS = "분석"
 MODE_SCANNER = "스캐너"
-_APP_MODE_OPTIONS = [MODE_MARKET_DAILY, MODE_ANALYSIS, MODE_SCANNER]
+_APP_MODE_OPTIONS = [MODE_HOME, MODE_BRIEFING, MODE_ANALYSIS, MODE_SCANNER]
 _QUICK_ANALYSIS_TICKERS = ["NVDA", "TSLA", "AAPL", "GOOGL", "AMZN", "META", "MSFT", "PLTR", "HIMS", "SNDK", "LITE", "COHR", "IREN", "ORCL", "RKLB", "ASTS"]
 CHAT_INPUT_PLACEHOLDER = "티커 입력: AAPL / 005930"
 SCAN_FILTER_PRESETS = list(SCAN_FILTER_PRESET_ORDER)
@@ -259,7 +266,7 @@ def _initial_messages():
 
 
 def _session_defaults():
-    return build_default_session_state(_initial_messages(), MODE_MARKET_DAILY)
+    return build_default_session_state(_initial_messages(), MODE_HOME)
 
 
 # ━━━ Session + Main ━━━
@@ -1886,6 +1893,18 @@ def _analysis_messages(limit=None):
             break
     return collected
 
+
+def _recent_analysis_tickers(limit=10):
+    ordered = []
+    for msg in _analysis_messages():
+        ticker = str(msg.get("ticker") or "").strip().upper()
+        if not ticker or ticker in ordered:
+            continue
+        ordered.append(ticker)
+        if len(ordered) >= int(limit):
+            break
+    return ordered
+
 def _format_board_time(value, fallback="--:--"):
     text = str(value).strip() if value is not None else ""
     if not text:
@@ -2237,8 +2256,10 @@ def _resolve_board_tone(mode_label, judgment, es_value):
 def _build_brand_payload(current_mode, chart_period):
     if current_mode == MODE_SCANNER:
         mode_label = 'SCANNER'
-    elif current_mode == MODE_MARKET_DAILY:
-        mode_label = '오늘 미국장'
+    elif current_mode == MODE_HOME:
+        mode_label = 'HOME'
+    elif current_mode == MODE_BRIEFING:
+        mode_label = 'BRIEFING'
     else:
         mode_label = 'ANALYSIS'
     period_label = _short_period_label(chart_period)
@@ -2315,17 +2336,28 @@ def _build_brand_payload(current_mode, chart_period):
             'status_tone': _resolve_board_tone(mode_label, judgment, es_value),
         }
 
-    if current_mode == MODE_MARKET_DAILY:
-        focus = _format_board_code(st.session_state.get('last_ticker'), fallback='US CLOSE')
-        judgment = 'BRIEFING'
-        context = 'US CLOSE'
+    if current_mode in {MODE_HOME, MODE_BRIEFING}:
+        if current_mode == MODE_HOME:
+            focus = _format_board_code(st.session_state.get('last_ticker'), fallback='WATCHLIST')
+            judgment = 'HOME'
+            context = 'DIGEST'
+            feed_status = 'DIGEST_SYNC'
+            recent_label = 'TODAY BOARD'
+            recent_tone = 'accent'
+            summary = "Telegram digest candidates stay one click away from the analysis workspace."
+            marquee_prefix = 'HOME'
+        else:
+            focus = _format_board_code(st.session_state.get('last_ticker'), fallback='US CLOSE')
+            judgment = 'BRIEFING'
+            context = 'US CLOSE'
+            feed_status = 'MARKET_SYNC'
+            recent_label = 'DAILY RECAP'
+            recent_tone = 'accent'
+            summary = "Macro, breadth, and leadership shifts are staged before the next analysis entry."
+            marquee_prefix = 'BRIEFING'
         system_status = 'ACTIVE'
-        feed_status = 'MARKET_SYNC'
-        recent_label = 'DAILY RECAP'
-        recent_tone = 'accent'
-        summary = "Macro, breadth, and leadership shifts are staged before the next analysis entry."
         marquee_items = _build_board_marquee([
-            f"[ {BRAND_NAME} ] BRIEFING",
+            f"[ {BRAND_NAME} ] {marquee_prefix}",
             f"STATUS {system_status}",
             f"FOCUS {focus}",
             f"SIGNAL {judgment}",
@@ -2501,7 +2533,7 @@ with st.sidebar:
         _APP_MODE_OPTIONS,
         "_mode",
         columns=1,
-        default_value=MODE_MARKET_DAILY,
+        default_value=MODE_HOME,
     )
     chart_period = _render_sidebar_choice_buttons(
         "기간",
@@ -2516,16 +2548,31 @@ with st.sidebar:
         reset_session()
         st.rerun()
 
-    if st.session_state.get('_mode', MODE_MARKET_DAILY) == MODE_ANALYSIS:
+    if st.session_state.get('_mode', MODE_HOME) == MODE_ANALYSIS:
         _render_analysis_sidebar_nav()
 
-current_mode = st.session_state.get('_mode', MODE_MARKET_DAILY)
+current_mode = st.session_state.get('_mode', MODE_HOME)
 main_board_payload = _build_brand_payload(current_mode, chart_period)
+
+# ══════════════════════════════════════════════════════════════
+#  홈 모드
+# ══════════════════════════════════════════════════════════════
+if current_mode == MODE_HOME:
+    render_home_page(
+        render_brand_board=_render_brand_board,
+        main_board_payload=main_board_payload,
+        render_section_heading=_render_section_heading,
+        render_empty_state=_render_empty_state,
+        on_select_ticker=_queue_analysis_target,
+        recent_tickers=_recent_analysis_tickers(limit=10),
+        chat_input_placeholder=CHAT_INPUT_PLACEHOLDER,
+        parse_ticker_input=_parse_analysis_ticker_input,
+    )
 
 # ══════════════════════════════════════════════════════════════
 #  스캐너 모드
 # ══════════════════════════════════════════════════════════════
-if current_mode == MODE_SCANNER:
+elif current_mode == MODE_SCANNER:
     _render_brand_board(main_board_payload)
     all_universe = sorted({str(t).strip().upper() for ts in SECTOR_GROUPS.values() for t in ts if str(t).strip()})
     sector_names = list(SECTOR_GROUPS.keys())
@@ -2885,28 +2932,18 @@ if current_mode == MODE_SCANNER:
 # ══════════════════════════════════════════════════════════════
 #  오늘 미국장 모드
 # ══════════════════════════════════════════════════════════════
-elif current_mode == MODE_MARKET_DAILY:
-    _render_brand_board(main_board_payload)
+elif current_mode == MODE_BRIEFING:
     market_daily_payload = render_market_daily_dashboard()
-    _render_section_heading(
-        "오늘 먼저 볼 강한 종목",
-        "버튼 클릭 즉시 상세 분석으로 전환됩니다.",
-        badges=[
-            ("오늘 미국장", "accent"),
-            ("즉시 분석 전환", "warning"),
-        ],
-        eyebrow="Daily To Analysis",
-        tight=True,
+    render_briefing_page(
+        render_brand_board=_render_brand_board,
+        main_board_payload=main_board_payload,
+        render_section_heading=_render_section_heading,
+        market_daily_payload=market_daily_payload,
+        render_market_daily_action_grid=_render_market_daily_action_grid,
+        on_select_ticker=_queue_analysis_target,
+        chat_input_placeholder=CHAT_INPUT_PLACEHOLDER,
+        parse_ticker_input=_parse_analysis_ticker_input,
     )
-    _render_market_daily_action_grid(market_daily_payload, key_prefix="briefing_dynamic")
-    if ti := st.chat_input(CHAT_INPUT_PLACEHOLDER):
-        parsed = _parse_analysis_ticker_input(ti)
-        if not parsed:
-            st.toast("분석할 티커를 입력해 주세요. 예: AAPL / 005930", icon="⌨️")
-        else:
-            if len(parsed) > 1:
-                st.toast(f"{parsed[0]} 기준으로 먼저 분석합니다.", icon="📌")
-            _queue_analysis_target(parsed[0])
 
 # ══════════════════════════════════════════════════════════════
 #  분석 모드

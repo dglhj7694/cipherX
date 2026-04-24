@@ -162,6 +162,7 @@ class ScannerCsvExportTests(unittest.TestCase):
             "detected_signal_latest_date": "2026-04-17",
             "gap_risk_2pct": True,
             "gap_risk_atr": False,
+            "bearish_gap_failure": True,
             "first_higher_high_pivot2": False,
             "system_turn_bull_last_date": "2026-04-15",
         }
@@ -177,6 +178,7 @@ class ScannerCsvExportTests(unittest.TestCase):
         self.assertIn("UTBot매수전환(utbot_buy_recent)", header)
         self.assertIn("우상향지속(uptrend_persistent)", header)
         self.assertIn("강한추세지속(strong_trend_persistent)", header)
+        self.assertIn("약세갭실패(bearish_gap_failure)", header)
 
         data = parsed[1]
         h_index = {name: idx for idx, name in enumerate(header)}
@@ -184,6 +186,7 @@ class ScannerCsvExportTests(unittest.TestCase):
         self.assertEqual(data[h_index["유동성주의(thin_trade_risk)"]], "N")
         self.assertEqual(data[h_index["강한추세지속(strong_trend_persistent)"]], "Y")
         self.assertEqual(data[h_index["눌림목재진입(pullback_reentry)"]], "N")
+        self.assertEqual(data[h_index["약세갭실패(bearish_gap_failure)"]], "Y")
 
     def test_bool_and_date_normalization_for_extra_fields(self):
         row = {

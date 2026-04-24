@@ -6,6 +6,9 @@ on:
     - cron: "5 20,21 * * 1-5"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 concurrency:
   group: daily-scan-notify
   cancel-in-progress: false
@@ -134,6 +137,10 @@ jobs:
     env:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      DIGEST_PUBLISH_TOKEN: ${{ secrets.DIGEST_PUBLISH_TOKEN || github.token }}
+      DIGEST_PUBLISH_REPO: ${{ github.repository }}
+      DIGEST_PUBLISH_BRANCH: telegram-digest
+      DIGEST_PUBLISH_PATH: post_close
       PYTHONPATH: ${{ github.workspace }}
       RUN_STAMP: ${{ github.run_id }}-${{ github.run_attempt }}
     steps:

@@ -48,6 +48,13 @@ from scanner_filters import (
 from sectors import SECTOR_GROUPS
 from strategy import build_strategy_payload
 from etf_sources import resolve_etf_universe
+from telegram_pipeline import (
+    build_post_close_digest,
+    build_post_close_message_texts,
+    publish_digest_if_configured,
+    send_telegram_messages as send_digest_telegram_messages,
+    write_local_digest_artifacts,
+)
 
 KST = ZoneInfo("Asia/Seoul")
 US_EASTERN = ZoneInfo("America/New_York")
@@ -121,6 +128,7 @@ POST_CLOSE_LATEST_SESSION_FIELD_SPECS: tuple[dict[str, str], ...] = (
     {"group": "distance", "key": "dist_bb_upper_pct", "label": "DistBBUpper(%)", "type": "number", "description": "Distance from Bollinger upper", "rule": "(close-BB_Up)/BB_Up*100", "example": "-0.85"},
     {"group": "risk", "key": "gap_risk_2pct", "label": "GapRisk2Pct", "type": "bool", "description": "Absolute gap >= 2%", "rule": "abs((open-prev_close)/prev_close)*100 >= 2", "example": "Y"},
     {"group": "risk", "key": "gap_risk_atr", "label": "GapRiskATR", "type": "bool", "description": "Absolute gap >= ATR", "rule": "abs(open-prev_close) >= ATR", "example": "N"},
+    {"group": "risk", "key": "bearish_gap_failure", "label": "BearishGapFailure", "type": "bool", "description": "Bearish gap failure risk flag", "rule": "Bearish_Gap_Failure", "example": "N"},
     {"group": "momentum", "key": "breakout_dist_20d_high_pct", "label": "BreakoutDist20DHigh(%)", "type": "number", "description": "Distance from 20-day high", "rule": "(close-20d_high)/20d_high*100", "example": "0.42"},
     {"group": "momentum", "key": "breakout_dist_channel_up_pct", "label": "BreakoutDistChannelUp(%)", "type": "number", "description": "Distance from channel upper", "rule": "(close-Price_Channel_Up)/Price_Channel_Up*100", "example": "-0.36"},
     {"group": "momentum", "key": "ret20_pct", "label": "Return20(%)", "type": "number", "description": "20-bar return", "rule": "(close-close_20)/close_20*100", "example": "8.4"},
@@ -1301,6 +1309,7 @@ def _build_scanner_row(ticker: str, *, bias_mode: str, recent_window: int = 5, h
             "volume_abnormal": volume_abnormal,
             "volume_bullish": volume_bullish,
             "thin_trade_risk": thin_trade_risk,
+            "bearish_gap_failure": bearish_gap_failure,
             "bull_turn_recent": bull_turn_recent,
             "uptrend_or_pullback": uptrend_or_pullback,
             "pullback_ready": pullback_ready,
@@ -3111,6 +3120,7 @@ def _send_telegram_if_enabled(
     csv_path: Path,
     scan_label: str,
     run_at_kst: datetime,
+    message_texts: Iterable[str] | None = None,
 ) -> None:
     """Telegram 전송 공통 로직."""
     if args.dry_run or args.skip_telegram:
@@ -3122,8 +3132,13 @@ def _send_telegram_if_enabled(
     if not token or not chat_id:
         raise RuntimeError("TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID must be set")
 
-    print("[SCAN] Sending Telegram summary...")
-    send_telegram_message(token, chat_id, summary_text)
+    text_messages = [str(text or "") for text in (message_texts or []) if str(text or "").strip()]
+    if text_messages:
+        print(f"[SCAN] Sending Telegram digest messages: {len(text_messages)}")
+        send_digest_telegram_messages(token, chat_id, text_messages)
+    else:
+        print("[SCAN] Sending Telegram summary...")
+        send_telegram_message(token, chat_id, summary_text)
     print("[SCAN] Sending Telegram CSV...")
     send_telegram_document(
         token,
@@ -3139,6 +3154,52 @@ def _resolve_cli_run_stamp(args: argparse.Namespace, *, run_at_kst: datetime) ->
     if explicit_run_stamp:
         return explicit_run_stamp
     return run_at_kst.strftime("%Y%m%d_%H%M%S")
+
+
+def _build_post_close_digest_bundle(
+    *,
+    rows: Iterable[Mapping[str, Any]],
+    out_dir: Path,
+    run_stamp: str,
+    run_label: str,
+    run_at_kst: datetime,
+    market_date: date,
+    scan_label: str,
+    universe_count: int,
+    result_count: int,
+    skip_count: int,
+    publish_enabled: bool,
+) -> dict[str, Any]:
+    digest = build_post_close_digest(
+        rows,
+        run_stamp=run_stamp,
+        generated_at=run_at_kst,
+        market_date=market_date,
+        scan_label=scan_label,
+        universe_count=universe_count,
+        result_count=result_count,
+        skip_count=skip_count,
+    )
+    message_texts = build_post_close_message_texts(digest)
+    summary_text = "\n\n".join(message_texts)
+    summary_path = out_dir / f"trend_turn_summary_{run_label}.txt"
+    summary_path.write_text(summary_text, encoding="utf-8")
+    local_paths = write_local_digest_artifacts(digest, out_dir=out_dir, relative_path="post_close")
+
+    publish_status: dict[str, Any]
+    try:
+        publish_status = publish_digest_if_configured(digest, enabled=publish_enabled)
+    except Exception as exc:
+        publish_status = {"ok": False, "skipped": False, "reason": "publish_error", "detail": str(exc)}
+
+    return {
+        "digest": digest,
+        "message_texts": message_texts,
+        "summary_text": summary_text,
+        "summary_path": summary_path,
+        "local_paths": local_paths,
+        "publish_status": publish_status,
+    }
 
 
 def _build_early_session_sections(
@@ -3208,6 +3269,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
     scan_mode = "post_close"
     latest_session_date = _last_us_market_session_date(run_at_kst)
     telegram_skipped_reason = ""
+    message_texts: list[str] | None = None
 
     if merge_dir:
         explicit_run_stamp = str(getattr(args, "run_stamp", "") or "").strip()
@@ -3255,31 +3317,25 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
         pocket_pivot_rows = select_post_close_pocket_pivot_rows_for_telegram(csv_rows)
         five_day_top_rows = select_post_close_top_5d_rows_for_telegram(csv_rows)
         final_top_rows = select_post_close_final_top_rows_for_telegram(csv_rows, top_n=POST_CLOSE_FINAL_TOP_N)
-        summary_text = build_post_close_transition_summary(
-            turn_rows,
-            run_at_kst=run_at_kst,
-            universe_count=int(_safe_float(merged_payload.get("universe_count", 0))),
-            result_count=len(merged_rows),
-            skip_count=int(_safe_float(merged_payload.get("skip_count_sum", 0))),
-            scan_label=scan_label,
-            detected_turn_count=len(detected_turn_rows),
-            summary_limit=int(args.summary_limit),
-            pullback_rows=pullback_rows,
-            hull_bear_rows=hull_bear_rows,
-            high_52w_rows=high_52w_rows,
-            pullback_filter_rows=pullback_filter_rows,
-            chase_filter_rows=chase_filter_rows,
-            buy_turn_filter_rows=buy_turn_filter_rows,
-            gap_setup_rows=gap_setup_rows,
-            pocket_pivot_rows=pocket_pivot_rows,
-            five_day_top_rows=five_day_top_rows,
-            final_top_rows=final_top_rows,
-        )
-        summary_path = out_dir / f"trend_turn_summary_{run_label}.txt"
-        summary_path.write_text(summary_text, encoding="utf-8")
         merge_ready = bool(merged_payload.get("merge_ready", False))
         merge_block_reason = str(merged_payload.get("merge_block_reason") or "").strip()
         missing_shard_indices = [int(_safe_float(v)) for v in (merged_payload.get("missing_shard_indices") or [])]
+        digest_bundle = _build_post_close_digest_bundle(
+            rows=csv_rows,
+            out_dir=out_dir,
+            run_stamp=run_stamp,
+            run_label=run_label,
+            run_at_kst=run_at_kst,
+            market_date=latest_session_date,
+            scan_label=scan_label,
+            universe_count=int(_safe_float(merged_payload.get("universe_count", 0))),
+            result_count=len(merged_rows),
+            skip_count=int(_safe_float(merged_payload.get("skip_count_sum", 0))),
+            publish_enabled=bool(merge_ready and universe_profile == "default" and not args.dry_run),
+        )
+        summary_text = str(digest_bundle["summary_text"])
+        summary_path = Path(digest_bundle["summary_path"])
+        message_texts = list(digest_bundle.get("message_texts") or [])
         meta_payload = {
             "run_at_kst": run_at_kst.isoformat(),
             "run_stamp": run_stamp,
@@ -3308,6 +3364,9 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
             "csv_path": str(csv_path),
             "rows_path": str(rows_path),
             "summary_path": str(summary_path),
+            "telegram_digest_latest_path": str(digest_bundle["local_paths"]["latest_path"]),
+            "telegram_digest_versioned_path": str(digest_bundle["local_paths"]["versioned_path"]),
+            "digest_publish_status": dict(digest_bundle.get("publish_status") or {}),
         }
         if not merge_ready:
             telegram_skipped_reason = merge_block_reason or "incomplete_shards"
@@ -3367,30 +3426,48 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
         pocket_pivot_rows = select_post_close_pocket_pivot_rows_for_telegram(csv_rows)
         five_day_top_rows = select_post_close_top_5d_rows_for_telegram(csv_rows)
         final_top_rows = select_post_close_final_top_rows_for_telegram(csv_rows, top_n=POST_CLOSE_FINAL_TOP_N)
-        summary_text = build_post_close_transition_summary(
-            turn_rows,
-            run_at_kst=run_at_kst,
-            universe_count=len(tickers),
-            result_count=len(scan_result.rows),
-            skip_count=len(scan_result.skips),
-            scan_label=scan_label,
-            detected_turn_count=len(detected_turn_rows),
-            summary_limit=int(args.summary_limit),
-            pullback_rows=pullback_rows,
-            hull_bear_rows=hull_bear_rows,
-            high_52w_rows=high_52w_rows,
-            pullback_filter_rows=pullback_filter_rows,
-            chase_filter_rows=chase_filter_rows,
-            buy_turn_filter_rows=buy_turn_filter_rows,
-            gap_setup_rows=gap_setup_rows,
-            pocket_pivot_rows=pocket_pivot_rows,
-            five_day_top_rows=five_day_top_rows,
-            final_top_rows=final_top_rows,
-        )
-        summary_path = out_dir / f"trend_turn_summary_{run_label}.txt"
-        summary_path.write_text(summary_text, encoding="utf-8")
         if shard_count > 1:
+            summary_text = build_post_close_transition_summary(
+                turn_rows,
+                run_at_kst=run_at_kst,
+                universe_count=len(tickers),
+                result_count=len(scan_result.rows),
+                skip_count=len(scan_result.skips),
+                scan_label=scan_label,
+                detected_turn_count=len(detected_turn_rows),
+                summary_limit=int(args.summary_limit),
+                pullback_rows=pullback_rows,
+                hull_bear_rows=hull_bear_rows,
+                high_52w_rows=high_52w_rows,
+                pullback_filter_rows=pullback_filter_rows,
+                chase_filter_rows=chase_filter_rows,
+                buy_turn_filter_rows=buy_turn_filter_rows,
+                gap_setup_rows=gap_setup_rows,
+                pocket_pivot_rows=pocket_pivot_rows,
+                five_day_top_rows=five_day_top_rows,
+                final_top_rows=final_top_rows,
+            )
+            summary_path = out_dir / f"trend_turn_summary_{run_label}.txt"
+            summary_path.write_text(summary_text, encoding="utf-8")
             telegram_skipped_reason = "requires_merge_for_ranked_post_close_summary"
+            digest_bundle = None
+        else:
+            digest_bundle = _build_post_close_digest_bundle(
+                rows=csv_rows,
+                out_dir=out_dir,
+                run_stamp=run_stamp,
+                run_label=run_label,
+                run_at_kst=run_at_kst,
+                market_date=latest_session_date,
+                scan_label=scan_label,
+                universe_count=len(tickers),
+                result_count=len(scan_result.rows),
+                skip_count=len(scan_result.skips),
+                publish_enabled=bool(universe_profile == "default" and not args.dry_run),
+            )
+            summary_text = str(digest_bundle["summary_text"])
+            summary_path = Path(digest_bundle["summary_path"])
+            message_texts = list(digest_bundle.get("message_texts") or [])
 
         meta_payload = {
             "run_at_kst": run_at_kst.isoformat(),
@@ -3423,6 +3500,10 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
             "rows_path": str(rows_path),
             "summary_path": str(summary_path),
         }
+        if digest_bundle is not None:
+            meta_payload["telegram_digest_latest_path"] = str(digest_bundle["local_paths"]["latest_path"])
+            meta_payload["telegram_digest_versioned_path"] = str(digest_bundle["local_paths"]["versioned_path"])
+            meta_payload["digest_publish_status"] = dict(digest_bundle.get("publish_status") or {})
         if telegram_skipped_reason:
             meta_payload["telegram_skipped_reason"] = telegram_skipped_reason
         write_json(
@@ -3437,7 +3518,14 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
     if telegram_skipped_reason:
         print(f"[SCAN] Telegram send skipped: {telegram_skipped_reason}")
     else:
-        _send_telegram_if_enabled(args, summary_text=summary_text, csv_path=csv_path, scan_label=scan_label, run_at_kst=run_at_kst)
+        _send_telegram_if_enabled(
+            args,
+            summary_text=summary_text,
+            csv_path=csv_path,
+            scan_label=scan_label,
+            run_at_kst=run_at_kst,
+            message_texts=message_texts,
+        )
     return 0
 
 
