@@ -170,6 +170,8 @@ class TelegramPipelineTests(unittest.TestCase):
 
         self.assertEqual([item.ticker for item in section_map["buy_turn"].items], ["BUYDAY"])
         self.assertEqual([item.ticker for item in section_map["sell_turn"].items], ["SELLDAY"])
+        self.assertEqual(section_map["buy_turn"].items[0].source_flags.get("turn_engine"), "UTBot")
+        self.assertEqual(section_map["sell_turn"].items[0].source_flags.get("turn_engine"), "UTBot")
 
     def test_final_top_and_five_day_sections_use_top20_while_other_sections_keep_all(self):
         rows = [self._row(f"T{i:02d}", final_entry_score=500 - i, chg_5d=50 - i, scan_score=300 - i) for i in range(25)]
@@ -213,14 +215,51 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertNotIn("A티어", messages[0])
         self.assertNotIn("B티어", messages[0])
         self.assertNotIn("C티어", messages[0])
+        self.assertNotIn("| 최우선 |", messages[0])
+        self.assertNotIn("| 매수전환 |", messages[0])
+        self.assertNotIn("| 매도전환 |", messages[0])
+
+    def test_message_lines_show_only_core_fields_and_turn_engine_for_turn_sections(self):
+        buy_hull_only = self._row(
+            "BUYHULL",
+            latest_session_utbot_buy_turn=False,
+            latest_session_hull_buy_turn=True,
+            utbot_buy_last_date="?놁쓬",
+            hull_turn_bull_last_date=self.market_date.isoformat(),
+        )
+        sell_both = self._row(
+            "SELLBOTH",
+            final_entry_eligible=False,
+            final_entry_selected=False,
+            latest_session_utbot_buy_turn=False,
+            latest_session_hull_buy_turn=False,
+            utbot_buy_last_date="?놁쓬",
+            hull_turn_bull_last_date="?놁쓬",
+            utbot_sell_last_date=self.market_date.isoformat(),
+            hull_turn_bear_last_date=self.market_date.isoformat(),
+        )
+        digest = build_post_close_digest(
+            [buy_hull_only, sell_both],
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=2,
+            result_count=2,
+            skip_count=0,
+        )
+        message = build_post_close_message_texts(digest)[0]
+
+        self.assertIn("BUYHULL | (+1.75, +2.35%) | x1.45배 | HULL", message)
+        self.assertIn("SELLBOTH | (+1.75, +2.35%) | x1.45배 | UTBot+HULL", message)
 
     def test_split_telegram_message_text_prefers_section_boundaries(self):
         text = "\n\n".join(
             [
                 "[오늘 종목판]\n- 시장일: 2026-04-23 (US)",
-                "## 1. 오늘 최우선 후보 (Top 2)\n1. AAA | (+1.00, +2.00%) | x1.20배 | 최우선 | A/B/C 통과",
-                "## 2. 오늘 매수전환 (1개)\n1. BBB | (+0.50, +1.00%) | x1.10배 | 매수전환 | 당일 전환",
-                "## 3. 눌림목 재진입 (1개)\n1. CCC | (+0.30, +0.80%) | x0.95배 | 눌림목 | 재진입 신호",
+                "## 1. 오늘 최우선 후보 (Top 2)\n1. AAA | (+1.00, +2.00%) | x1.20배",
+                "## 2. 오늘 매수전환 (1개)\n1. BBB | (+0.50, +1.00%) | x1.10배 | UTBot",
+                "## 3. 눌림목 재진입 (1개)\n1. CCC | (+0.30, +0.80%) | x0.95배",
             ]
         )
 
@@ -228,7 +267,7 @@ class TelegramPipelineTests(unittest.TestCase):
 
         self.assertGreater(len(chunks), 1)
         self.assertTrue(any(chunk.startswith("## 2. 오늘 매수전환") for chunk in chunks))
-        self.assertTrue(any(chunk.startswith("## 3. 눌림목 재진입") for chunk in chunks))
+        self.assertTrue(any("## 3. 눌림목 재진입" in chunk for chunk in chunks))
 
     def test_write_local_digest_artifacts_writes_latest_and_versioned_json(self):
         digest = build_post_close_digest(

@@ -22,6 +22,11 @@ from .rankers import (
 
 FINAL_TOP_LIMIT = 20
 FIVE_DAY_TOP_LIMIT = 20
+GAP_SETUP_MIN_SCORE = 8.0
+GAP_SETUP_MIN_GATE_COUNT = 4.0
+GAP_SETUP_MIN_SCAN_SCORE = 110.0
+GAP_SETUP_MIN_DRY_UP_SCORE = 8.0
+GAP_SETUP_MAX_VOLUME_RATIO_20 = 1.10
 
 MANDATORY_SECTION_KEYS: tuple[str, ...] = (
     "final_top",
@@ -57,11 +62,11 @@ CORE_SECTION_TITLES: dict[str, str] = {
 
 CORE_QUALITY_FLOORS: dict[str, str] = {
     "final_top": "final_entry eligible + same-session sell 없음 + multi_sell<2 + thin_trade_risk=N + conflict!=HIGH",
-    "buy_turn": "당일 매수전환 + CMF/OBV 양호 + 거래량 기준 통과 + 동일 세션 매도전환 없음",
+    "buy_turn": "당일 UTBot/HULL 매수전환",
     "pullback_reentry": "상승 구조 유지 + 적정 눌림 + 거래량 건조 + 최근 매도전환 없음",
     "trend_continuation": "상대강도/ADX/기울기 양호 + 거래량 동반 + 과열 제한 + 최근 매도전환 없음",
-    "sell_turn": "당일 매도전환",
-    "gap_setup": "gap_setup_candidate=True",
+    "sell_turn": "당일 UTBot/HULL 매도전환",
+    "gap_setup": "gap_setup_candidate=True + score/gate 강화 + 상승구조 + 건조거래량 + 하락전환없음",
     "pocket_pivot": "pocket_pivot_candidate=True",
     "five_day_top": "chg_5d > 0, Top 20",
     "new_52w_high": "new_52w_high=True + latest_bar_date == target session",
@@ -118,16 +123,6 @@ def select_buy_turn_rows(rows: Iterable[Mapping[str, Any]], *, target_date: date
     selected: list[dict[str, Any]] = []
     for row in _base_rows(rows):
         if not same_session_buy_turn(row, target_date):
-            continue
-        if same_session_sell_turn(row, target_date):
-            continue
-        if is_truthy(row.get("thin_trade_risk")):
-            continue
-        if safe_float(row.get("cmf", 0.0)) <= -0.10:
-            continue
-        if safe_float(row.get("obv_slope", 0.0)) <= 0.0:
-            continue
-        if safe_float(row.get("volume_ratio_20", 0.0)) <= 0.90:
             continue
         selected.append(row)
     selected = _dedupe_within_section(selected)
@@ -206,8 +201,30 @@ def select_sell_turn_rows(rows: Iterable[Mapping[str, Any]], *, target_date: dat
     return selected
 
 
-def select_gap_setup_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    selected = [row for row in _base_rows(rows) if is_truthy(row.get("gap_setup_candidate"))]
+def select_gap_setup_rows(rows: Iterable[Mapping[str, Any]], *, target_date: date) -> list[dict[str, Any]]:
+    selected: list[dict[str, Any]] = []
+    for row in _base_rows(rows):
+        if not is_truthy(row.get("gap_setup_candidate")):
+            continue
+        if is_truthy(row.get("thin_trade_risk")):
+            continue
+        if is_truthy(row.get("bearish_gap_failure")):
+            continue
+        if same_session_sell_turn(row, target_date):
+            continue
+        if not is_truthy(row.get("uptrend_persistent")):
+            continue
+        if safe_float(row.get("gap_setup_score", 0.0)) < GAP_SETUP_MIN_SCORE:
+            continue
+        if safe_float(row.get("gap_setup_gate_count", 0.0)) < GAP_SETUP_MIN_GATE_COUNT:
+            continue
+        if safe_float(row.get("scan_score", 0.0)) < GAP_SETUP_MIN_SCAN_SCORE:
+            continue
+        dry_up_ok = safe_float(row.get("volume_dry_up_score", 0.0)) >= GAP_SETUP_MIN_DRY_UP_SCORE
+        low_volume_ok = safe_float(row.get("volume_ratio_20", 0.0)) <= GAP_SETUP_MAX_VOLUME_RATIO_20
+        if not (dry_up_ok or low_volume_ok):
+            continue
+        selected.append(row)
     selected = _dedupe_within_section(selected)
     selected.sort(key=gap_setup_sort_key)
     return selected
@@ -247,7 +264,7 @@ def select_post_close_sections(rows: Iterable[Mapping[str, Any]], *, target_date
         "pullback_reentry": select_pullback_reentry_rows(rows),
         "trend_continuation": select_trend_continuation_rows(rows),
         "sell_turn": select_sell_turn_rows(rows, target_date=target_date),
-        "gap_setup": select_gap_setup_rows(rows),
+        "gap_setup": select_gap_setup_rows(rows, target_date=target_date),
         "pocket_pivot": select_pocket_pivot_rows(rows),
         "five_day_top": select_five_day_top_rows(rows),
         "new_52w_high": select_new_52w_high_rows(rows, target_date=target_date),

@@ -7,8 +7,12 @@ from .contracts import TelegramCandidate, TelegramDigest, TelegramSection
 from .rankers import (
     is_truthy,
     safe_float,
+    same_day_hull_buy_turn,
+    same_day_hull_sell_turn,
     same_day_buy_turn_count,
     same_day_sell_turn_count,
+    same_day_utbot_buy_turn,
+    same_day_utbot_sell_turn,
     same_session_buy_turn,
     same_session_sell_turn,
 )
@@ -35,6 +39,16 @@ def _ratio(value: Any, decimals: int = 2) -> str:
         return f"x{float(value):.{decimals}f}배"
     except (TypeError, ValueError):
         return "x--배"
+
+
+def _turn_engine_text(*, utbot: bool, hull: bool) -> str:
+    if utbot and hull:
+        return "UTBot+HULL"
+    if utbot:
+        return "UTBot"
+    if hull:
+        return "HULL"
+    return "-"
 
 
 def _top_reasons(reasons: list[str], *, fallback: str) -> str:
@@ -205,11 +219,24 @@ def _candidate_reason(section_key: str, row: Mapping[str, Any], target_date: dat
 
 
 def _candidate_source_flags(section_key: str, row: Mapping[str, Any], target_date: date) -> dict[str, Any]:
+    buy_turn_utbot = same_day_utbot_buy_turn(row, target_date)
+    buy_turn_hull = same_day_hull_buy_turn(row, target_date)
+    sell_turn_utbot = same_day_utbot_sell_turn(row, target_date)
+    sell_turn_hull = same_day_hull_sell_turn(row, target_date)
+    turn_engine = ""
+    if section_key == "buy_turn":
+        turn_engine = _turn_engine_text(utbot=buy_turn_utbot, hull=buy_turn_hull)
+    elif section_key == "sell_turn":
+        turn_engine = _turn_engine_text(utbot=sell_turn_utbot, hull=sell_turn_hull)
+
     return {
         "same_session_buy_turn": same_session_buy_turn(row, target_date),
         "same_session_sell_turn": same_session_sell_turn(row, target_date),
-        "latest_session_utbot_buy_turn": is_truthy(row.get("latest_session_utbot_buy_turn")),
-        "latest_session_hull_buy_turn": is_truthy(row.get("latest_session_hull_buy_turn")),
+        "buy_turn_utbot": buy_turn_utbot,
+        "buy_turn_hull": buy_turn_hull,
+        "sell_turn_utbot": sell_turn_utbot,
+        "sell_turn_hull": sell_turn_hull,
+        "turn_engine": turn_engine,
         "thin_trade_risk": is_truthy(row.get("thin_trade_risk")),
         "bearish_gap_failure": is_truthy(row.get("bearish_gap_failure")),
         "multi_buy": int(safe_float(row.get("multi_buy", 0.0))),
@@ -282,13 +309,15 @@ def build_post_close_digest(
 
 
 def _format_candidate_line(candidate: TelegramCandidate) -> str:
-    return (
+    line = (
         f"{candidate.rank}. {candidate.ticker}"
         f" | ({_signed(candidate.chg_value)}, {_signed(candidate.chg_pct)}%)"
         f" | {_ratio(candidate.volume_ratio_20)}"
-        f" | {candidate.label}"
-        f" | {candidate.reason}"
     )
+    turn_engine = str(candidate.source_flags.get("turn_engine") or "").strip()
+    if turn_engine and candidate.section_key in {"buy_turn", "sell_turn"}:
+        line += f" | {turn_engine}"
+    return line
 
 
 def _section_block(index: int, section: TelegramSection) -> str:

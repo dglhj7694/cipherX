@@ -32,31 +32,45 @@ def parse_iso_date(value: Any) -> date | None:
         return None
 
 
+def same_day_utbot_buy_turn(row: Mapping[str, Any], target_date: date) -> bool:
+    return parse_iso_date(row.get("utbot_buy_last_date")) == target_date
+
+
+def same_day_hull_buy_turn(row: Mapping[str, Any], target_date: date) -> bool:
+    return parse_iso_date(row.get("hull_turn_bull_last_date")) == target_date
+
+
+def same_day_utbot_sell_turn(row: Mapping[str, Any], target_date: date) -> bool:
+    return parse_iso_date(row.get("utbot_sell_last_date")) == target_date
+
+
+def same_day_hull_sell_turn(row: Mapping[str, Any], target_date: date) -> bool:
+    return parse_iso_date(row.get("hull_turn_bear_last_date")) == target_date
+
+
 def same_session_buy_turn(row: Mapping[str, Any], target_date: date) -> bool:
     return (
-        parse_iso_date(row.get("utbot_buy_last_date")) == target_date
-        or parse_iso_date(row.get("hull_turn_bull_last_date")) == target_date
-        or is_truthy(row.get("latest_session_utbot_buy_turn"))
-        or is_truthy(row.get("latest_session_hull_buy_turn"))
+        same_day_utbot_buy_turn(row, target_date)
+        or same_day_hull_buy_turn(row, target_date)
     )
 
 
 def same_session_sell_turn(row: Mapping[str, Any], target_date: date) -> bool:
     return (
-        parse_iso_date(row.get("utbot_sell_last_date")) == target_date
-        or parse_iso_date(row.get("hull_turn_bear_last_date")) == target_date
+        same_day_utbot_sell_turn(row, target_date)
+        or same_day_hull_sell_turn(row, target_date)
     )
 
 
 def same_day_buy_turn_count(row: Mapping[str, Any], target_date: date) -> int:
-    utbot = is_truthy(row.get("latest_session_utbot_buy_turn")) or parse_iso_date(row.get("utbot_buy_last_date")) == target_date
-    hull = is_truthy(row.get("latest_session_hull_buy_turn")) or parse_iso_date(row.get("hull_turn_bull_last_date")) == target_date
+    utbot = same_day_utbot_buy_turn(row, target_date)
+    hull = same_day_hull_buy_turn(row, target_date)
     return int(utbot) + int(hull)
 
 
 def same_day_sell_turn_count(row: Mapping[str, Any], target_date: date) -> int:
-    utbot = parse_iso_date(row.get("utbot_sell_last_date")) == target_date
-    hull = parse_iso_date(row.get("hull_turn_bear_last_date")) == target_date
+    utbot = same_day_utbot_sell_turn(row, target_date)
+    hull = same_day_hull_sell_turn(row, target_date)
     return int(utbot) + int(hull)
 
 
