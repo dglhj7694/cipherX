@@ -33,47 +33,31 @@ def parse_iso_date(value: Any) -> date | None:
 
 
 def same_session_buy_turn(row: Mapping[str, Any], target_date: date) -> bool:
-    return parse_iso_date(row.get("utbot_buy_last_date")) == target_date or parse_iso_date(row.get("hull_turn_bull_last_date")) == target_date
+    return (
+        parse_iso_date(row.get("utbot_buy_last_date")) == target_date
+        or parse_iso_date(row.get("hull_turn_bull_last_date")) == target_date
+        or is_truthy(row.get("latest_session_utbot_buy_turn"))
+        or is_truthy(row.get("latest_session_hull_buy_turn"))
+    )
 
 
 def same_session_sell_turn(row: Mapping[str, Any], target_date: date) -> bool:
-    return parse_iso_date(row.get("utbot_sell_last_date")) == target_date or parse_iso_date(row.get("hull_turn_bear_last_date")) == target_date
-
-
-def buy_turn_bucket(row: Mapping[str, Any], target_date: date) -> int:
-    if same_session_buy_turn(row, target_date):
-        return 0
-    if safe_float(row.get("days_since_utbot_buy", 99.0)) <= 2.0 or safe_float(row.get("days_since_hull_turn_bull", 99.0)) <= 2.0:
-        return 1
-    return 2
-
-
-def buy_turn_signal_count(row: Mapping[str, Any]) -> int:
-    return int(
-        sum(
-            [
-                is_truthy(row.get("latest_session_utbot_buy_turn")),
-                is_truthy(row.get("latest_session_hull_buy_turn")),
-                is_truthy(row.get("utbot_buy_recent")),
-                is_truthy(row.get("hull_turn_bull_recent")),
-            ]
-        )
+    return (
+        parse_iso_date(row.get("utbot_sell_last_date")) == target_date
+        or parse_iso_date(row.get("hull_turn_bear_last_date")) == target_date
     )
 
 
-def sell_turn_signal_count(row: Mapping[str, Any], target_date: date) -> int:
-    return int(
-        sum(
-            [
-                same_session_sell_turn(row, target_date),
-                is_truthy(row.get("utbot_sell_recent")),
-                is_truthy(row.get("hull_turn_bear_recent")),
-                safe_float(row.get("multi_sell", 0.0)) >= 2.0,
-                is_truthy(row.get("thin_trade_risk")),
-                is_truthy(row.get("bearish_gap_failure")),
-            ]
-        )
-    )
+def same_day_buy_turn_count(row: Mapping[str, Any], target_date: date) -> int:
+    utbot = is_truthy(row.get("latest_session_utbot_buy_turn")) or parse_iso_date(row.get("utbot_buy_last_date")) == target_date
+    hull = is_truthy(row.get("latest_session_hull_buy_turn")) or parse_iso_date(row.get("hull_turn_bull_last_date")) == target_date
+    return int(utbot) + int(hull)
+
+
+def same_day_sell_turn_count(row: Mapping[str, Any], target_date: date) -> int:
+    utbot = parse_iso_date(row.get("utbot_sell_last_date")) == target_date
+    hull = parse_iso_date(row.get("hull_turn_bear_last_date")) == target_date
+    return int(utbot) + int(hull)
 
 
 def final_top_sort_key(row: Mapping[str, Any]) -> tuple[float, float, float, float, float, float, float, float, str]:
@@ -91,10 +75,9 @@ def final_top_sort_key(row: Mapping[str, Any]) -> tuple[float, float, float, flo
     )
 
 
-def buy_turn_sort_key(row: Mapping[str, Any], target_date: date) -> tuple[float, float, float, float, float, float, float, str]:
+def buy_turn_sort_key(row: Mapping[str, Any], target_date: date) -> tuple[float, float, float, float, float, float, str]:
     return (
-        buy_turn_bucket(row, target_date),
-        -safe_float(buy_turn_signal_count(row)),
+        -safe_float(same_day_buy_turn_count(row, target_date)),
         -safe_float(row.get("volume_ratio_20", 0.0)),
         -safe_float(row.get("cmf", 0.0)),
         -safe_float(row.get("obv_slope", 0.0)),
@@ -132,12 +115,48 @@ def trend_sort_key(row: Mapping[str, Any]) -> tuple[float, float, float, float, 
     )
 
 
-def sell_turn_sort_key(row: Mapping[str, Any], target_date: date) -> tuple[float, float, float, float, float, str]:
+def sell_turn_sort_key(row: Mapping[str, Any], target_date: date) -> tuple[float, float, float, float, str]:
     return (
-        -safe_float(sell_turn_signal_count(row, target_date)),
-        -safe_float(row.get("multi_sell", 0.0)),
-        safe_float(row.get("drawdown_from_20d_high_pct", 0.0)),
+        -safe_float(same_day_sell_turn_count(row, target_date)),
         -safe_float(row.get("volume_ratio_20", 0.0)),
         -safe_float(row.get("scan_score", 0.0)),
+        -safe_float(row.get("es", 0.0)),
+        str(row.get("ticker", "")),
+    )
+
+
+def gap_setup_sort_key(row: Mapping[str, Any]) -> tuple[float, float, float, float, str]:
+    return (
+        -safe_float(row.get("gap_setup_score", 0.0)),
+        -safe_float(row.get("gap_setup_gate_count", 0.0)),
+        -safe_float(row.get("scan_score", 0.0)),
+        -safe_float(row.get("es", 0.0)),
+        str(row.get("ticker", "")),
+    )
+
+
+def pocket_pivot_sort_key(row: Mapping[str, Any]) -> tuple[float, float, float, float, str]:
+    return (
+        -safe_float(row.get("pocket_pivot_score", 0.0)),
+        -safe_float(row.get("pocket_pivot_gate_count", 0.0)),
+        -safe_float(row.get("scan_score", 0.0)),
+        -safe_float(row.get("es", 0.0)),
+        str(row.get("ticker", "")),
+    )
+
+
+def five_day_top_sort_key(row: Mapping[str, Any]) -> tuple[float, float, float, str]:
+    return (
+        -safe_float(row.get("chg_5d", 0.0)),
+        -safe_float(row.get("scan_score", 0.0)),
+        -safe_float(row.get("es", 0.0)),
+        str(row.get("ticker", "")),
+    )
+
+
+def new_52w_high_sort_key(row: Mapping[str, Any]) -> tuple[float, float, str]:
+    return (
+        -safe_float(row.get("scan_score", 0.0)),
+        -safe_float(row.get("es", 0.0)),
         str(row.get("ticker", "")),
     )

@@ -5,15 +5,30 @@ from typing import Any, Iterable, Mapping
 
 from .rankers import (
     buy_turn_sort_key,
-    buy_turn_signal_count,
     final_top_sort_key,
+    five_day_top_sort_key,
+    gap_setup_sort_key,
     is_truthy,
+    new_52w_high_sort_key,
+    parse_iso_date,
+    pocket_pivot_sort_key,
+    pullback_sort_key,
+    safe_float,
     same_session_buy_turn,
     same_session_sell_turn,
     sell_turn_sort_key,
-    safe_float,
     trend_sort_key,
-    pullback_sort_key,
+)
+
+FINAL_TOP_LIMIT = 20
+FIVE_DAY_TOP_LIMIT = 20
+
+MANDATORY_SECTION_KEYS: tuple[str, ...] = (
+    "final_top",
+    "buy_turn",
+    "pullback_reentry",
+    "trend_continuation",
+    "sell_turn",
 )
 
 CORE_SECTION_ORDER: tuple[str, ...] = (
@@ -22,6 +37,10 @@ CORE_SECTION_ORDER: tuple[str, ...] = (
     "pullback_reentry",
     "trend_continuation",
     "sell_turn",
+    "gap_setup",
+    "pocket_pivot",
+    "five_day_top",
+    "new_52w_high",
 )
 
 CORE_SECTION_TITLES: dict[str, str] = {
@@ -29,31 +48,41 @@ CORE_SECTION_TITLES: dict[str, str] = {
     "buy_turn": "오늘 매수전환",
     "pullback_reentry": "눌림목 재진입",
     "trend_continuation": "추세 지속 / 추격 후보",
-    "sell_turn": "오늘 매도전환 / 주의",
+    "sell_turn": "오늘 매도전환",
+    "gap_setup": "에너지 압축 → 돌파 임박",
+    "pocket_pivot": "기관 매집 포착",
+    "five_day_top": "5일 상승률 상위종목",
+    "new_52w_high": "52주 신고가",
 }
 
 CORE_QUALITY_FLOORS: dict[str, str] = {
     "final_top": "final_entry eligible + same-session sell 없음 + multi_sell<2 + thin_trade_risk=N + conflict!=HIGH",
-    "buy_turn": "당일/최근 매수전환 + CMF/OBV 양호 + 거래량 기준 통과 + 당일 매도전환 없음",
+    "buy_turn": "당일 매수전환 + CMF/OBV 양호 + 거래량 기준 통과 + 동일 세션 매도전환 없음",
     "pullback_reentry": "상승 구조 유지 + 적정 눌림 + 거래량 건조 + 최근 매도전환 없음",
     "trend_continuation": "상대강도/ADX/기울기 양호 + 거래량 동반 + 과열 제한 + 최근 매도전환 없음",
-    "sell_turn": "당일/최근 매도전환 or multi_sell>=2 or thin_trade_risk or bearish_gap_failure",
+    "sell_turn": "당일 매도전환",
+    "gap_setup": "gap_setup_candidate=True",
+    "pocket_pivot": "pocket_pivot_candidate=True",
+    "five_day_top": "chg_5d > 0, Top 20",
+    "new_52w_high": "new_52w_high=True + latest_bar_date == target session",
 }
-
-DEDUPE_PRIORITY: tuple[str, ...] = (
-    "sell_turn",
-    "buy_turn",
-    "pullback_reentry",
-    "trend_continuation",
-)
-
-SUMMARY_TOP_N = 5
-DETAIL_TOP_N = 20
-PRE_DEDUPE_LIMIT = 60
 
 
 def _base_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
     return [dict(row or {}) for row in (rows or [])]
+
+
+def _dedupe_within_section(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    seen: set[str] = set()
+    unique_rows: list[dict[str, Any]] = []
+    for raw_row in rows or []:
+        row = dict(raw_row or {})
+        ticker = str(row.get("ticker") or "").strip().upper()
+        if not ticker or ticker in seen:
+            continue
+        seen.add(ticker)
+        unique_rows.append(row)
+    return unique_rows
 
 
 def _is_high_conflict(row: Mapping[str, Any]) -> bool:
@@ -62,14 +91,6 @@ def _is_high_conflict(row: Mapping[str, Any]) -> bool:
 
 def _has_recent_sell_signal(row: Mapping[str, Any]) -> bool:
     return bool(is_truthy(row.get("utbot_sell_recent")) or is_truthy(row.get("hull_turn_bear_recent")))
-
-
-def _has_recent_buy_signal(row: Mapping[str, Any]) -> bool:
-    return bool(
-        is_truthy(row.get("utbot_buy_recent"))
-        or is_truthy(row.get("hull_turn_bull_recent"))
-        or is_truthy(row.get("bull_turn_recent"))
-    )
 
 
 def select_final_top_rows(rows: Iterable[Mapping[str, Any]], *, target_date: date) -> list[dict[str, Any]]:
@@ -88,22 +109,19 @@ def select_final_top_rows(rows: Iterable[Mapping[str, Any]], *, target_date: dat
         if _is_high_conflict(row):
             continue
         selected.append(row)
+    selected = _dedupe_within_section(selected)
     selected.sort(key=final_top_sort_key)
-    return selected[:PRE_DEDUPE_LIMIT]
+    return selected[:FINAL_TOP_LIMIT]
 
 
 def select_buy_turn_rows(rows: Iterable[Mapping[str, Any]], *, target_date: date) -> list[dict[str, Any]]:
     selected: list[dict[str, Any]] = []
     for row in _base_rows(rows):
-        if is_truthy(row.get("thin_trade_risk")):
+        if not same_session_buy_turn(row, target_date):
             continue
         if same_session_sell_turn(row, target_date):
             continue
-        if not (same_session_buy_turn(row, target_date) or safe_float(row.get("days_since_utbot_buy", 99.0)) <= 2.0 or safe_float(row.get("days_since_hull_turn_bull", 99.0)) <= 2.0):
-            continue
-        if not _has_recent_buy_signal(row):
-            continue
-        if buy_turn_signal_count(row) <= 0:
+        if is_truthy(row.get("thin_trade_risk")):
             continue
         if safe_float(row.get("cmf", 0.0)) <= -0.10:
             continue
@@ -112,8 +130,9 @@ def select_buy_turn_rows(rows: Iterable[Mapping[str, Any]], *, target_date: date
         if safe_float(row.get("volume_ratio_20", 0.0)) <= 0.90:
             continue
         selected.append(row)
+    selected = _dedupe_within_section(selected)
     selected.sort(key=lambda row: buy_turn_sort_key(row, target_date))
-    return selected[:PRE_DEDUPE_LIMIT]
+    return selected
 
 
 def select_pullback_reentry_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -138,8 +157,9 @@ def select_pullback_reentry_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict
         if _has_recent_sell_signal(row):
             continue
         selected.append(row)
+    selected = _dedupe_within_section(selected)
     selected.sort(key=pullback_sort_key)
-    return selected[:PRE_DEDUPE_LIMIT]
+    return selected
 
 
 def select_trend_continuation_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -170,30 +190,54 @@ def select_trend_continuation_rows(rows: Iterable[Mapping[str, Any]]) -> list[di
         if _has_recent_sell_signal(row):
             continue
         selected.append(row)
+    selected = _dedupe_within_section(selected)
     selected.sort(key=trend_sort_key)
-    return selected[:PRE_DEDUPE_LIMIT]
+    return selected
 
 
 def select_sell_turn_rows(rows: Iterable[Mapping[str, Any]], *, target_date: date) -> list[dict[str, Any]]:
     selected: list[dict[str, Any]] = []
     for row in _base_rows(rows):
-        severe_drawdown = safe_float(row.get("drawdown_from_20d_high_pct", 0.0)) <= -6.0
-        has_signal = bool(
-            same_session_sell_turn(row, target_date)
-            or is_truthy(row.get("utbot_sell_recent"))
-            or is_truthy(row.get("hull_turn_bear_recent"))
-            or safe_float(row.get("multi_sell", 0.0)) >= 2.0
-            or severe_drawdown
-            or is_truthy(row.get("thin_trade_risk"))
-            or is_truthy(row.get("bearish_gap_failure"))
-        )
-        if not has_signal:
-            continue
-        if safe_float(row.get("volume_ratio_20", 0.0)) <= 0.50 and not is_truthy(row.get("thin_trade_risk")):
+        if not same_session_sell_turn(row, target_date):
             continue
         selected.append(row)
+    selected = _dedupe_within_section(selected)
     selected.sort(key=lambda row: sell_turn_sort_key(row, target_date))
-    return selected[:PRE_DEDUPE_LIMIT]
+    return selected
+
+
+def select_gap_setup_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    selected = [row for row in _base_rows(rows) if is_truthy(row.get("gap_setup_candidate"))]
+    selected = _dedupe_within_section(selected)
+    selected.sort(key=gap_setup_sort_key)
+    return selected
+
+
+def select_pocket_pivot_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    selected = [row for row in _base_rows(rows) if is_truthy(row.get("pocket_pivot_candidate"))]
+    selected = _dedupe_within_section(selected)
+    selected.sort(key=pocket_pivot_sort_key)
+    return selected
+
+
+def select_five_day_top_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    selected = [row for row in _base_rows(rows) if safe_float(row.get("chg_5d", 0.0)) > 0.0]
+    selected = _dedupe_within_section(selected)
+    selected.sort(key=five_day_top_sort_key)
+    return selected[:FIVE_DAY_TOP_LIMIT]
+
+
+def select_new_52w_high_rows(rows: Iterable[Mapping[str, Any]], *, target_date: date) -> list[dict[str, Any]]:
+    selected: list[dict[str, Any]] = []
+    for row in _base_rows(rows):
+        if not is_truthy(row.get("new_52w_high")):
+            continue
+        if parse_iso_date(row.get("latest_bar_date")) != target_date:
+            continue
+        selected.append(row)
+    selected = _dedupe_within_section(selected)
+    selected.sort(key=new_52w_high_sort_key)
+    return selected
 
 
 def select_post_close_sections(rows: Iterable[Mapping[str, Any]], *, target_date: date) -> dict[str, list[dict[str, Any]]]:
@@ -203,4 +247,8 @@ def select_post_close_sections(rows: Iterable[Mapping[str, Any]], *, target_date
         "pullback_reentry": select_pullback_reentry_rows(rows),
         "trend_continuation": select_trend_continuation_rows(rows),
         "sell_turn": select_sell_turn_rows(rows, target_date=target_date),
+        "gap_setup": select_gap_setup_rows(rows),
+        "pocket_pivot": select_pocket_pivot_rows(rows),
+        "five_day_top": select_five_day_top_rows(rows),
+        "new_52w_high": select_new_52w_high_rows(rows, target_date=target_date),
     }

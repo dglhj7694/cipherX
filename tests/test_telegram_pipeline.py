@@ -8,7 +8,14 @@ from unittest.mock import patch
 
 from app_ui.pages.home_page import extract_section_candidates, load_latest_telegram_digest
 from scripts.daily_scan_and_notify import _build_post_close_digest_bundle, _send_telegram_if_enabled
-from telegram_pipeline import build_post_close_digest, build_post_close_message_texts, write_local_digest_artifacts
+from telegram_pipeline import (
+    FINAL_TOP_LIMIT,
+    FIVE_DAY_TOP_LIMIT,
+    build_post_close_digest,
+    build_post_close_message_texts,
+    split_telegram_message_text,
+    write_local_digest_artifacts,
+)
 
 
 class TelegramPipelineTests(unittest.TestCase):
@@ -22,6 +29,7 @@ class TelegramPipelineTests(unittest.TestCase):
             "price": 101.25,
             "chg_value": 1.75,
             "chg": 2.35,
+            "chg_5d": 12.0,
             "volume_ratio_20": 1.45,
             "dollar_volume_20": 125_000_000,
             "final_entry_eligible": True,
@@ -67,88 +75,160 @@ class TelegramPipelineTests(unittest.TestCase):
             "hull_turn_bear_recent": False,
             "utbot_sell_last_date": "없음",
             "hull_turn_bear_last_date": "없음",
+            "gap_setup_candidate": True,
+            "gap_setup_score": 9,
+            "gap_setup_gate_count": 4,
+            "gap_setup_hits": ["밴드압축", "상대강도"],
+            "gap_setup_quality_hits": ["거래량건조"],
+            "pocket_pivot_candidate": True,
+            "pocket_pivot_score": 10,
+            "pocket_pivot_gate_count": 4,
+            "pocket_pivot_hits": ["PocketPivot", "거래량회복"],
+            "pocket_pivot_quality_hits": ["기관매집"],
+            "new_52w_high": True,
+            "new_52w_closing_high": True,
+            "latest_bar_date": self.market_date.isoformat(),
         }
         row.update(overrides)
         return row
 
-    def test_build_post_close_digest_keeps_final_top_duplicate_and_dedupes_core_sections(self):
-        rows = [
-            self._row("ALPHA", final_entry_score=99.0),
-            self._row(
-                "CLASH",
-                final_entry_eligible=False,
-                final_entry_selected=False,
-                utbot_sell_recent=True,
-                utbot_sell_last_date="2026-04-22",
-                multi_sell=1,
-                drawdown_from_20d_high_pct=-8.0,
-            ),
-        ]
-
+    def test_build_post_close_digest_keeps_cross_section_overlap_and_restored_sections(self):
         digest = build_post_close_digest(
-            rows,
+            [self._row("ALPHA")],
             run_stamp="20260424_050000",
             generated_at=self.generated_at,
             market_date=self.market_date,
             scan_label="post-close default",
-            universe_count=2,
-            result_count=2,
+            universe_count=1,
+            result_count=1,
             skip_count=0,
         )
         section_map = digest.section_map()
 
-        self.assertEqual([item.ticker for item in section_map["final_top"].detail_items], ["ALPHA"])
-        self.assertEqual([item.ticker for item in section_map["buy_turn"].detail_items], ["ALPHA"])
-        self.assertEqual([item.ticker for item in section_map["sell_turn"].detail_items], ["CLASH"])
-        self.assertEqual(section_map["buy_turn"].dedupe_applied, True)
+        self.assertEqual(
+            digest.section_order,
+            [
+                "final_top",
+                "buy_turn",
+                "pullback_reentry",
+                "trend_continuation",
+                "sell_turn",
+                "gap_setup",
+                "pocket_pivot",
+                "five_day_top",
+                "new_52w_high",
+            ],
+        )
+        self.assertEqual([item.ticker for item in section_map["final_top"].items], ["ALPHA"])
+        self.assertEqual([item.ticker for item in section_map["buy_turn"].items], ["ALPHA"])
+        self.assertEqual([item.ticker for item in section_map["gap_setup"].items], ["ALPHA"])
+        self.assertEqual([item.ticker for item in section_map["pocket_pivot"].items], ["ALPHA"])
+        self.assertEqual([item.ticker for item in section_map["five_day_top"].items], ["ALPHA"])
+        self.assertEqual([item.ticker for item in section_map["new_52w_high"].items], ["ALPHA"])
 
-    def test_buy_turn_sort_uses_es_after_scan_score_tie(self):
-        rows = [
-            self._row("LOWES", es=5.0),
-            self._row("HIGHES", es=9.0),
-        ]
+    def test_turn_sections_use_same_day_only_and_skip_recent_or_risk_only_rows(self):
+        same_day_buy = self._row("BUYDAY")
+        recent_buy_only = self._row(
+            "BUYRECENT",
+            latest_session_utbot_buy_turn=False,
+            latest_session_hull_buy_turn=False,
+            utbot_buy_last_date="2026-04-22",
+            days_since_utbot_buy=1,
+        )
+        same_day_sell = self._row(
+            "SELLDAY",
+            final_entry_eligible=False,
+            final_entry_selected=False,
+            latest_session_utbot_buy_turn=False,
+            utbot_buy_last_date="없음",
+            utbot_sell_last_date=self.market_date.isoformat(),
+            hull_turn_bear_last_date="없음",
+        )
+        risk_only = self._row(
+            "RISKONLY",
+            final_entry_eligible=False,
+            final_entry_selected=False,
+            latest_session_utbot_buy_turn=False,
+            utbot_buy_last_date="없음",
+            thin_trade_risk=True,
+            bearish_gap_failure=True,
+            utbot_sell_last_date="없음",
+            hull_turn_bear_last_date="없음",
+        )
 
         digest = build_post_close_digest(
+            [same_day_buy, recent_buy_only, same_day_sell, risk_only],
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=4,
+            result_count=4,
+            skip_count=0,
+        )
+        section_map = digest.section_map()
+
+        self.assertEqual([item.ticker for item in section_map["buy_turn"].items], ["BUYDAY"])
+        self.assertEqual([item.ticker for item in section_map["sell_turn"].items], ["SELLDAY"])
+
+    def test_final_top_and_five_day_sections_use_top20_while_other_sections_keep_all(self):
+        rows = [self._row(f"T{i:02d}", final_entry_score=500 - i, chg_5d=50 - i, scan_score=300 - i) for i in range(25)]
+        digest = build_post_close_digest(
             rows,
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=25,
+            result_count=25,
+            skip_count=0,
+        )
+        section_map = digest.section_map()
+
+        self.assertEqual(section_map["final_top"].item_count, FINAL_TOP_LIMIT)
+        self.assertEqual(section_map["five_day_top"].item_count, FIVE_DAY_TOP_LIMIT)
+        self.assertEqual(section_map["buy_turn"].item_count, 25)
+        self.assertEqual(section_map["gap_setup"].item_count, 25)
+        self.assertEqual(section_map["pocket_pivot"].item_count, 25)
+
+    def test_message_contract_is_single_main_message_without_tier_sections(self):
+        digest = build_post_close_digest(
+            [self._row("ALPHA"), self._row("BETA", final_entry_score=80.0, chg_5d=9.5)],
             run_stamp="20260424_050000",
             generated_at=self.generated_at,
             market_date=self.market_date,
             scan_label="post-close default",
             universe_count=2,
             result_count=2,
-            skip_count=0,
-        )
-        buy_tickers = [item.ticker for item in digest.section_map()["buy_turn"].detail_items]
-        self.assertEqual(buy_tickers[:2], ["HIGHES", "LOWES"])
-
-    def test_summary_and_detail_messages_follow_top5_and_tier_structure(self):
-        rows = [self._row(f"T{i:02d}", final_entry_score=200 - i, scan_score=300 - i) for i in range(12)]
-        digest = build_post_close_digest(
-            rows,
-            run_stamp="20260424_050000",
-            generated_at=self.generated_at,
-            market_date=self.market_date,
-            scan_label="post-close default",
-            universe_count=12,
-            result_count=12,
             skip_count=0,
         )
 
         messages = build_post_close_message_texts(digest)
-        section_map = digest.section_map()
-        summary_text = messages[0]
-        final_detail_text = messages[1]
 
-        self.assertEqual(len(messages), 6)
-        self.assertEqual(section_map["final_top"].sent_count, 12)
-        self.assertEqual([item.ticker for item in section_map["final_top"].summary_items], ["T00", "T01", "T02", "T03", "T04"])
-        self.assertEqual(section_map["final_top"].detail_items[0].tier, "A")
-        self.assertEqual(section_map["final_top"].detail_items[5].tier, "B")
-        self.assertEqual(section_map["final_top"].detail_items[10].tier, "C")
-        for ticker in ("T00", "T01", "T02", "T03", "T04"):
-            self.assertIn(ticker, summary_text)
-        for ticker in ("T00", "T05", "T10"):
-            self.assertIn(ticker, final_detail_text)
+        self.assertEqual(len(messages), 1)
+        self.assertIn("[오늘 종목판]", messages[0])
+        self.assertIn("## 1. 오늘 최우선 후보", messages[0])
+        self.assertIn("## 6. 에너지 압축 → 돌파 임박", messages[0])
+        self.assertIn("## 9. 52주 신고가", messages[0])
+        self.assertNotIn("A티어", messages[0])
+        self.assertNotIn("B티어", messages[0])
+        self.assertNotIn("C티어", messages[0])
+
+    def test_split_telegram_message_text_prefers_section_boundaries(self):
+        text = "\n\n".join(
+            [
+                "[오늘 종목판]\n- 시장일: 2026-04-23 (US)",
+                "## 1. 오늘 최우선 후보 (Top 2)\n1. AAA | (+1.00, +2.00%) | x1.20배 | 최우선 | A/B/C 통과",
+                "## 2. 오늘 매수전환 (1개)\n1. BBB | (+0.50, +1.00%) | x1.10배 | 매수전환 | 당일 전환",
+                "## 3. 눌림목 재진입 (1개)\n1. CCC | (+0.30, +0.80%) | x0.95배 | 눌림목 | 재진입 신호",
+            ]
+        )
+
+        chunks = split_telegram_message_text(text, chunk_size=120)
+
+        self.assertGreater(len(chunks), 1)
+        self.assertTrue(any(chunk.startswith("## 2. 오늘 매수전환") for chunk in chunks))
+        self.assertTrue(any(chunk.startswith("## 3. 눌림목 재진입") for chunk in chunks))
 
     def test_write_local_digest_artifacts_writes_latest_and_versioned_json(self):
         digest = build_post_close_digest(
@@ -164,15 +244,12 @@ class TelegramPipelineTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as temp_dir:
             paths = write_local_digest_artifacts(digest, out_dir=Path(temp_dir))
-            latest_path = paths["latest_path"]
-            versioned_path = paths["versioned_path"]
+            latest_payload = json.loads(paths["latest_path"].read_text(encoding="utf-8"))
+            versioned_payload = json.loads(paths["versioned_path"].read_text(encoding="utf-8"))
 
-            self.assertTrue(latest_path.exists())
-            self.assertTrue(versioned_path.exists())
-            latest_payload = json.loads(latest_path.read_text(encoding="utf-8"))
-            versioned_payload = json.loads(versioned_path.read_text(encoding="utf-8"))
-            self.assertEqual(latest_payload["run_stamp"], "20260424_050000")
-            self.assertEqual(versioned_payload["run_stamp"], "20260424_050000")
+        self.assertEqual(latest_payload["version"], "2.0")
+        self.assertEqual(versioned_payload["run_stamp"], "20260424_050000")
+        self.assertIn("items", latest_payload["sections"][0])
 
     def test_build_post_close_digest_bundle_keeps_publish_failure_non_blocking(self):
         with tempfile.TemporaryDirectory() as temp_dir, patch(
@@ -194,7 +271,7 @@ class TelegramPipelineTests(unittest.TestCase):
             )
 
             self.assertTrue(Path(bundle["summary_path"]).exists())
-            self.assertTrue(bundle["local_paths"]["latest_path"].exists())
+            self.assertEqual(len(bundle["message_texts"]), 1)
             self.assertEqual(bundle["publish_status"]["reason"], "publish_error")
             self.assertIn("publish unavailable", bundle["publish_status"]["detail"])
 
@@ -213,20 +290,28 @@ class TelegramPipelineTests(unittest.TestCase):
                 csv_path=Path("C:/tmp/scan.csv"),
                 scan_label="post-close default",
                 run_at_kst=self.generated_at,
-                message_texts=["summary", "detail"],
+                message_texts=["main board"],
             )
 
-        mock_digest_send.assert_called_once_with("token", "chat", ["summary", "detail"])
+        mock_digest_send.assert_called_once_with("token", "chat", ["main board"])
         mock_single_send.assert_not_called()
         mock_document.assert_called_once()
 
 
 class HomeDigestLoaderTests(unittest.TestCase):
+    def test_extract_section_candidates_reads_new_items_contract(self):
+        payload = {
+            "sections": [
+                {"key": "final_top", "items": [{"ticker": "AAPL"}, {"ticker": "MSFT"}]},
+            ]
+        }
+        self.assertEqual([item["ticker"] for item in extract_section_candidates(payload, "final_top", limit=1)], ["AAPL"])
+
     def test_load_latest_telegram_digest_uses_remote_then_cache_fallback(self):
         payload = {
             "market_date": "2026-04-23",
             "sections": [
-                {"key": "final_top", "detail_items": [{"ticker": "AAPL"}, {"ticker": "MSFT"}]},
+                {"key": "final_top", "items": [{"ticker": "AAPL"}, {"ticker": "MSFT"}]},
             ],
         }
         with tempfile.TemporaryDirectory() as temp_dir:

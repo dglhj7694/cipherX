@@ -4,22 +4,21 @@ from datetime import date, datetime
 from typing import Any, Iterable, Mapping
 
 from .contracts import TelegramCandidate, TelegramDigest, TelegramSection
-from .deduper import dedupe_core_sections
 from .rankers import (
-    buy_turn_signal_count,
     is_truthy,
+    safe_float,
+    same_day_buy_turn_count,
+    same_day_sell_turn_count,
     same_session_buy_turn,
     same_session_sell_turn,
-    safe_float,
-    sell_turn_signal_count,
 )
 from .selectors import (
     CORE_QUALITY_FLOORS,
     CORE_SECTION_ORDER,
     CORE_SECTION_TITLES,
-    DEDUPE_PRIORITY,
-    DETAIL_TOP_N,
-    SUMMARY_TOP_N,
+    FINAL_TOP_LIMIT,
+    FIVE_DAY_TOP_LIMIT,
+    MANDATORY_SECTION_KEYS,
     select_post_close_sections,
 )
 
@@ -38,14 +37,6 @@ def _ratio(value: Any, decimals: int = 2) -> str:
         return "x--배"
 
 
-def _tier_for_rank(rank: int) -> str:
-    if rank <= 5:
-        return "A"
-    if rank <= 10:
-        return "B"
-    return "C"
-
-
 def _top_reasons(reasons: list[str], *, fallback: str) -> str:
     unique: list[str] = []
     for reason in reasons:
@@ -58,6 +49,19 @@ def _top_reasons(reasons: list[str], *, fallback: str) -> str:
     if not unique:
         return fallback
     return " + ".join(unique)
+
+
+def _hit_summary(*values: Any) -> str:
+    hits: list[str] = []
+    for raw_value in values:
+        for item in list(raw_value or []):
+            text = str(item or "").strip()
+            if not text or text in hits:
+                continue
+            hits.append(text)
+            if len(hits) >= 2:
+                return " + ".join(hits)
+    return ""
 
 
 def _build_final_top_reason(row: Mapping[str, Any], target_date: date) -> str:
@@ -76,20 +80,16 @@ def _build_final_top_reason(row: Mapping[str, Any], target_date: date) -> str:
 
 
 def _build_buy_turn_reason(row: Mapping[str, Any], target_date: date) -> str:
-    reasons: list[str] = []
-    if same_session_buy_turn(row, target_date):
-        reasons.append("당일 전환")
-    else:
-        reasons.append("최근 2일 전환")
-    if buy_turn_signal_count(row) >= 2:
-        reasons.append("복수 매수전환")
+    reasons = ["당일 전환"]
+    if same_day_buy_turn_count(row, target_date) >= 2:
+        reasons.append("UTBot+HULL 동시")
     if safe_float(row.get("volume_ratio_20", 0.0)) >= 1.2:
         reasons.append("거래량 우위")
     if safe_float(row.get("cmf", 0.0)) > 0.0:
         reasons.append("CMF 양호")
     if safe_float(row.get("obv_slope", 0.0)) > 0.0:
         reasons.append("OBV 상승")
-    return _top_reasons(reasons, fallback="매수전환 확인")
+    return _top_reasons(reasons, fallback="당일 매수전환")
 
 
 def _build_pullback_reason(row: Mapping[str, Any]) -> str:
@@ -118,20 +118,54 @@ def _build_trend_reason(row: Mapping[str, Any]) -> str:
 
 
 def _build_sell_turn_reason(row: Mapping[str, Any], target_date: date) -> str:
-    reasons: list[str] = []
-    if same_session_sell_turn(row, target_date):
-        reasons.append("당일 매도전환")
-    elif is_truthy(row.get("utbot_sell_recent")) or is_truthy(row.get("hull_turn_bear_recent")):
-        reasons.append("최근 매도전환")
-    if sell_turn_signal_count(row, target_date) >= 3:
-        reasons.append("복수 약세 신호")
-    if is_truthy(row.get("bearish_gap_failure")):
-        reasons.append("갭 실패")
-    if is_truthy(row.get("thin_trade_risk")):
-        reasons.append("유동성 주의")
-    if safe_float(row.get("drawdown_from_20d_high_pct", 0.0)) <= -5.0:
-        reasons.append("20일 고점 이탈")
-    return _top_reasons(reasons, fallback="주의 신호")
+    reasons = ["당일 전환"]
+    if same_day_sell_turn_count(row, target_date) >= 2:
+        reasons.append("UTBot+HULL 동시")
+    if safe_float(row.get("volume_ratio_20", 0.0)) >= 1.0:
+        reasons.append("거래량 동반")
+    if safe_float(row.get("scan_score", 0.0)) > 0.0:
+        reasons.append(f"점수 {safe_float(row.get('scan_score', 0.0)):.1f}")
+    return _top_reasons(reasons, fallback="당일 매도전환")
+
+
+def _build_gap_setup_reason(row: Mapping[str, Any]) -> str:
+    reasons = [
+        f"GAP {int(safe_float(row.get('gap_setup_score', 0.0))):d}",
+        f"G{int(safe_float(row.get('gap_setup_gate_count', 0.0))):d}/5",
+    ]
+    hit_text = _hit_summary(row.get("gap_setup_quality_hits"), row.get("gap_setup_hits"))
+    if hit_text:
+        reasons.append(hit_text)
+    return _top_reasons(reasons, fallback="돌파 임박")
+
+
+def _build_pocket_pivot_reason(row: Mapping[str, Any]) -> str:
+    reasons = [
+        f"PP {int(safe_float(row.get('pocket_pivot_score', 0.0))):d}",
+        f"G{int(safe_float(row.get('pocket_pivot_gate_count', 0.0))):d}/5",
+    ]
+    hit_text = _hit_summary(row.get("pocket_pivot_quality_hits"), row.get("pocket_pivot_hits"))
+    if hit_text:
+        reasons.append(hit_text)
+    return _top_reasons(reasons, fallback="기관 매집 포착")
+
+
+def _build_five_day_top_reason(row: Mapping[str, Any]) -> str:
+    reasons = [f"5일 {_signed(row.get('chg_5d'), 2)}%"]
+    if safe_float(row.get("volume_ratio_20", 0.0)) >= 1.2:
+        reasons.append("거래량 우위")
+    if safe_float(row.get("scan_score", 0.0)) > 0.0:
+        reasons.append(f"점수 {safe_float(row.get('scan_score', 0.0)):.1f}")
+    return _top_reasons(reasons, fallback="5일 상승률 상위")
+
+
+def _build_new_52w_high_reason(row: Mapping[str, Any]) -> str:
+    reasons = ["52주 신고가 갱신"]
+    if is_truthy(row.get("new_52w_closing_high")):
+        reasons.append("종가 신고가")
+    if safe_float(row.get("volume_ratio_20", 0.0)) >= 1.2:
+        reasons.append("거래량 우위")
+    return _top_reasons(reasons, fallback="52주 신고가")
 
 
 def _candidate_label(section_key: str) -> str:
@@ -140,7 +174,11 @@ def _candidate_label(section_key: str) -> str:
         "buy_turn": "매수전환",
         "pullback_reentry": "눌림목",
         "trend_continuation": "추세지속",
-        "sell_turn": "주의",
+        "sell_turn": "매도전환",
+        "gap_setup": "돌파임박",
+        "pocket_pivot": "기관매집",
+        "five_day_top": "5일상승",
+        "new_52w_high": "52주신고",
     }.get(section_key, section_key)
 
 
@@ -155,6 +193,14 @@ def _candidate_reason(section_key: str, row: Mapping[str, Any], target_date: dat
         return _build_trend_reason(row)
     if section_key == "sell_turn":
         return _build_sell_turn_reason(row, target_date)
+    if section_key == "gap_setup":
+        return _build_gap_setup_reason(row)
+    if section_key == "pocket_pivot":
+        return _build_pocket_pivot_reason(row)
+    if section_key == "five_day_top":
+        return _build_five_day_top_reason(row)
+    if section_key == "new_52w_high":
+        return _build_new_52w_high_reason(row)
     return "-"
 
 
@@ -162,10 +208,8 @@ def _candidate_source_flags(section_key: str, row: Mapping[str, Any], target_dat
     return {
         "same_session_buy_turn": same_session_buy_turn(row, target_date),
         "same_session_sell_turn": same_session_sell_turn(row, target_date),
-        "utbot_buy_recent": is_truthy(row.get("utbot_buy_recent")),
-        "utbot_sell_recent": is_truthy(row.get("utbot_sell_recent")),
-        "hull_turn_bull_recent": is_truthy(row.get("hull_turn_bull_recent")),
-        "hull_turn_bear_recent": is_truthy(row.get("hull_turn_bear_recent")),
+        "latest_session_utbot_buy_turn": is_truthy(row.get("latest_session_utbot_buy_turn")),
+        "latest_session_hull_buy_turn": is_truthy(row.get("latest_session_hull_buy_turn")),
         "thin_trade_risk": is_truthy(row.get("thin_trade_risk")),
         "bearish_gap_failure": is_truthy(row.get("bearish_gap_failure")),
         "multi_buy": int(safe_float(row.get("multi_buy", 0.0))),
@@ -183,7 +227,6 @@ def _build_candidate(section_key: str, row: Mapping[str, Any], rank: int, target
         volume_ratio_20=safe_float(row.get("volume_ratio_20")) if row.get("volume_ratio_20") is not None else None,
         section_key=section_key,
         rank=rank,
-        tier=_tier_for_rank(rank),
         label=_candidate_label(section_key),
         reason=_candidate_reason(section_key, row, target_date),
         source_flags=_candidate_source_flags(section_key, row, target_date),
@@ -201,30 +244,25 @@ def build_post_close_digest(
     result_count: int,
     skip_count: int,
 ) -> TelegramDigest:
-    raw_sections = select_post_close_sections(rows, target_date=market_date)
-    deduped_sections, dedupe_applied = dedupe_core_sections(raw_sections, dedupe_order=DEDUPE_PRIORITY)
+    section_rows = select_post_close_sections(rows, target_date=market_date)
 
     sections: list[TelegramSection] = []
     for section_key in CORE_SECTION_ORDER:
-        row_list = raw_sections.get(section_key, []) if section_key == "final_top" else deduped_sections.get(section_key, [])
-        detail_rows = list(row_list[:DETAIL_TOP_N])
-        summary_rows = list(detail_rows[:SUMMARY_TOP_N])
-        detail_items = [_build_candidate(section_key, row, idx, market_date) for idx, row in enumerate(detail_rows, start=1)]
-        summary_items = [_build_candidate(section_key, row, idx, market_date) for idx, row in enumerate(summary_rows, start=1)]
+        row_list = list(section_rows.get(section_key) or [])
+        items = [_build_candidate(section_key, row, idx, market_date) for idx, row in enumerate(row_list, start=1)]
         sections.append(
             TelegramSection(
                 key=section_key,
                 title=CORE_SECTION_TITLES[section_key],
-                summary_items=summary_items,
-                detail_items=detail_items,
-                sent_count=len(detail_items),
+                items=items,
+                item_count=len(items),
                 quality_floor=CORE_QUALITY_FLOORS[section_key],
-                dedupe_applied=bool(dedupe_applied.get(section_key, False)),
+                ranked=section_key in {"final_top", "five_day_top"},
             )
         )
 
     return TelegramDigest(
-        version="1.0",
+        version="2.0",
         scan_mode="post_close",
         run_stamp=str(run_stamp or "").strip(),
         market_date=market_date.isoformat(),
@@ -234,7 +272,7 @@ def build_post_close_digest(
         briefing_refs={
             "mode": "separate_message",
             "job": "market_briefing_notify",
-            "expected_order": ["시장 브리핑", "핵심 요약", "섹션별 상세"],
+            "expected_order": ["시장 브리핑", "종목판 메인"],
         },
         scan_label=scan_label,
         universe_count=int(universe_count or 0),
@@ -253,62 +291,38 @@ def _format_candidate_line(candidate: TelegramCandidate) -> str:
     )
 
 
-def build_summary_message(digest: TelegramDigest) -> str:
-    lines = [
-        "[오늘 종목판 핵심 요약]",
-        f"- 시장일: {digest.market_date} (US)",
-        f"- 유니버스: {digest.universe_count} | 결과: {digest.result_count} | 제외: {digest.skip_count}",
-        f"- 생성: {digest.generated_at}",
-        "",
-    ]
-    for index, section in enumerate(digest.sections, start=1):
-        lines.append(f"{index}) {section.title} Top {len(section.summary_items)} / {section.sent_count}")
-        if not section.summary_items:
-            lines.append("- 해당 없음")
-        else:
-            for item in section.summary_items:
-                lines.append(_format_candidate_line(item))
-        lines.append("")
-    if lines and not lines[-1].strip():
-        lines.pop()
-    return "\n".join(lines)
-
-
-def build_detail_message(digest: TelegramDigest, section: TelegramSection, *, index: int, total: int) -> str:
-    lines = [
-        f"[오늘 종목판 상세 {index}/{total}]",
-        f"- 섹션: {section.title}",
-        f"- 시장일: {digest.market_date} (US)",
-        f"- 전송: {section.sent_count}/{DETAIL_TOP_N}",
-        f"- 품질 기준: {section.quality_floor}",
-        f"- 중복 정리: {'Y' if section.dedupe_applied else 'N'}",
-        "",
-    ]
-    if not section.detail_items:
+def _section_block(index: int, section: TelegramSection) -> str:
+    descriptor = f"Top {min(section.item_count, FINAL_TOP_LIMIT if section.key == 'final_top' else FIVE_DAY_TOP_LIMIT)}" if section.ranked else f"{section.item_count}개"
+    lines = [f"## {index}. {section.title} ({descriptor})"]
+    if not section.items:
         lines.append("- 해당 없음")
         return "\n".join(lines)
-
-    tier_rows = {
-        "A": [item for item in section.detail_items if item.tier == "A"],
-        "B": [item for item in section.detail_items if item.tier == "B"],
-        "C": [item for item in section.detail_items if item.tier == "C"],
-    }
-    for tier_key, tier_title in (("A", "A티어 (1~5)"), ("B", "B티어 (6~10)"), ("C", "C티어 (11~20)")):
-        tier_items = tier_rows[tier_key]
-        if not tier_items:
-            continue
-        lines.append(tier_title)
-        for item in tier_items:
-            lines.append(_format_candidate_line(item))
-        lines.append("")
-    if lines and not lines[-1].strip():
-        lines.pop()
+    for item in section.items:
+        lines.append(_format_candidate_line(item))
     return "\n".join(lines)
+
+
+def build_main_message(digest: TelegramDigest) -> str:
+    blocks = [
+        "\n".join(
+            [
+                "[오늘 종목판]",
+                f"- 시장일: {digest.market_date} (US)",
+                f"- 유니버스: {digest.universe_count} | 결과: {digest.result_count} | 제외: {digest.skip_count}",
+                f"- 생성: {digest.generated_at}",
+            ]
+        )
+    ]
+
+    display_index = 1
+    for section in digest.sections:
+        if section.key not in MANDATORY_SECTION_KEYS and section.item_count <= 0:
+            continue
+        blocks.append(_section_block(display_index, section))
+        display_index += 1
+
+    return "\n\n".join(blocks)
 
 
 def build_post_close_message_texts(digest: TelegramDigest) -> list[str]:
-    messages = [build_summary_message(digest)]
-    total = len(digest.sections)
-    for index, section in enumerate(digest.sections, start=1):
-        messages.append(build_detail_message(digest, section, index=index, total=total))
-    return messages
+    return [build_main_message(digest)]

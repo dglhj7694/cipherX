@@ -192,6 +192,7 @@ POST_CLOSE_INDEX_TITLES = {
     "pocket_pivot": "기관 매집 포착",
     "five_day_top": "5일 변동률 상위종목",
 }
+FINAL_TOP_LIMIT = 20
 POST_CLOSE_FINAL_TOP_N = 30
 POST_CLOSE_FINAL_SECTION_NAME = "오늘 진입 후보 Top30 (A/B/C 통과만)"
 POST_CLOSE_FINAL_INDEX_TITLE = "오늘 진입 후보 Top30"
@@ -3295,7 +3296,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
             csv_rows,
             run_at_kst=run_at_kst,
             scan_mode=scan_mode,
-            top_n=POST_CLOSE_FINAL_TOP_N,
+            top_n=FINAL_TOP_LIMIT,
         )
         csv_path = write_scan_csv(
             csv_rows,
@@ -3316,7 +3317,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
         gap_setup_rows = select_post_close_gap_setup_rows_for_telegram(csv_rows)
         pocket_pivot_rows = select_post_close_pocket_pivot_rows_for_telegram(csv_rows)
         five_day_top_rows = select_post_close_top_5d_rows_for_telegram(csv_rows)
-        final_top_rows = select_post_close_final_top_rows_for_telegram(csv_rows, top_n=POST_CLOSE_FINAL_TOP_N)
+        final_top_rows = select_post_close_final_top_rows_for_telegram(csv_rows, top_n=FINAL_TOP_LIMIT)
         merge_ready = bool(merged_payload.get("merge_ready", False))
         merge_block_reason = str(merged_payload.get("merge_block_reason") or "").strip()
         missing_shard_indices = [int(_safe_float(v)) for v in (merged_payload.get("missing_shard_indices") or [])]
@@ -3405,7 +3406,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
             csv_rows,
             run_at_kst=run_at_kst,
             scan_mode=scan_mode,
-            top_n=POST_CLOSE_FINAL_TOP_N,
+            top_n=FINAL_TOP_LIMIT,
         )
         csv_path = write_scan_csv(
             csv_rows,
@@ -3425,7 +3426,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
         gap_setup_rows = select_post_close_gap_setup_rows_for_telegram(csv_rows)
         pocket_pivot_rows = select_post_close_pocket_pivot_rows_for_telegram(csv_rows)
         five_day_top_rows = select_post_close_top_5d_rows_for_telegram(csv_rows)
-        final_top_rows = select_post_close_final_top_rows_for_telegram(csv_rows, top_n=POST_CLOSE_FINAL_TOP_N)
+        final_top_rows = select_post_close_final_top_rows_for_telegram(csv_rows, top_n=FINAL_TOP_LIMIT)
         if shard_count > 1:
             summary_text = build_post_close_transition_summary(
                 turn_rows,

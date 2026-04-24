@@ -13,7 +13,6 @@ class TelegramCandidate:
     volume_ratio_20: float | None
     section_key: str
     rank: int
-    tier: str
     label: str
     reason: str
     source_flags: dict[str, Any] = field(default_factory=dict)
@@ -26,16 +25,14 @@ class TelegramCandidate:
 class TelegramSection:
     key: str
     title: str
-    summary_items: list[TelegramCandidate] = field(default_factory=list)
-    detail_items: list[TelegramCandidate] = field(default_factory=list)
-    sent_count: int = 0
+    items: list[TelegramCandidate] = field(default_factory=list)
+    item_count: int = 0
     quality_floor: str = ""
-    dedupe_applied: bool = False
+    ranked: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
-        payload["summary_items"] = [item.to_dict() for item in self.summary_items]
-        payload["detail_items"] = [item.to_dict() for item in self.detail_items]
+        payload["items"] = [item.to_dict() for item in self.items]
         return payload
 
 

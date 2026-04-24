@@ -26,31 +26,52 @@ def split_telegram_message_text(text: str, *, chunk_size: int = 3500) -> list[st
     if len(raw) <= limit:
         return [raw]
 
-    chunks: list[str] = []
-    current: list[str] = []
-    current_len = 0
-    for line in raw.splitlines():
-        line_len = len(line) + 1
-        if line_len > limit:
-            if current:
+    def _split_long_block(block: str) -> list[str]:
+        chunks: list[str] = []
+        current: list[str] = []
+        current_len = 0
+        for line in block.splitlines():
+            line_len = len(line) + 1
+            if line_len > limit:
+                if current:
+                    chunks.append("\n".join(current))
+                    current = []
+                    current_len = 0
+                start = 0
+                while start < len(line):
+                    end = min(start + limit, len(line))
+                    chunks.append(line[start:end])
+                    start = end
+                continue
+            if current and current_len + line_len > limit:
                 chunks.append("\n".join(current))
-                current = []
-                current_len = 0
-            start = 0
-            while start < len(line):
-                end = min(start + limit, len(line))
-                chunks.append(line[start:end])
-                start = end
-            continue
-        if current and current_len + line_len > limit:
+                current = [line]
+                current_len = line_len
+            else:
+                current.append(line)
+                current_len += line_len
+        if current:
             chunks.append("\n".join(current))
-            current = [line]
-            current_len = line_len
+        return chunks
+
+    blocks = [block for block in raw.split("\n\n") if block.strip()]
+    chunks: list[str] = []
+    current = ""
+    for block in blocks:
+        if len(block) > limit:
+            if current.strip():
+                chunks.append(current)
+                current = ""
+            chunks.extend(_split_long_block(block))
+            continue
+        candidate = f"{current}\n\n{block}".strip() if current.strip() else block
+        if current.strip() and len(candidate) > limit:
+            chunks.append(current)
+            current = block
         else:
-            current.append(line)
-            current_len += line_len
-    if current:
-        chunks.append("\n".join(current))
+            current = candidate
+    if current.strip():
+        chunks.append(current)
     return chunks or [raw]
 
 

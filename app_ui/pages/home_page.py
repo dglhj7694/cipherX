@@ -147,10 +147,10 @@ def extract_section_candidates(payload: Mapping[str, Any] | None, section_key: s
     for section in sections:
         if str(dict(section or {}).get("key") or "") != str(section_key):
             continue
-        detail_items = [dict(item or {}) for item in list(dict(section or {}).get("detail_items") or [])]
+        items = [dict(item or {}) for item in list(dict(section or {}).get("items") or dict(section or {}).get("detail_items") or [])]
         if limit is None:
-            return detail_items
-        return detail_items[: max(0, int(limit or 0))]
+            return items
+        return items[: max(0, int(limit or 0))]
     return []
 
 
@@ -241,7 +241,7 @@ def render_home_page(
         with quick_left:
             render_section_heading(
                 "매수전환 바로가기",
-                "당일 혹은 최근 2일 내 전환 티커를 바로 검증합니다.",
+                "당일 매수전환이 나온 티커를 바로 검증합니다.",
                 badges=[(f"{len(buy_turn)}개", "accent")],
                 eyebrow="Quick Verify",
                 tight=True,
@@ -249,8 +249,8 @@ def render_home_page(
             _render_ticker_button_row([str(item.get("ticker") or "") for item in buy_turn], key_prefix="home_buy", on_select_ticker=on_select_ticker, columns=2)
         with quick_right:
             render_section_heading(
-                "매도전환 / 주의",
-                "리스크 확인이 필요한 종목을 먼저 열어봅니다.",
+                "오늘 매도전환",
+                "당일 매도전환이 나온 티커를 먼저 확인합니다.",
                 badges=[(f"{len(sell_turn)}개", "warning")],
                 eyebrow="Risk First",
                 tight=True,
