@@ -7,9 +7,9 @@ from .contracts import TelegramCandidate, TelegramDigest, TelegramSection
 from .rankers import (
     is_truthy,
     safe_float,
+    same_day_buy_turn_count,
     same_day_hull_buy_turn,
     same_day_hull_sell_turn,
-    same_day_buy_turn_count,
     same_day_sell_turn_count,
     same_day_utbot_buy_turn,
     same_day_utbot_sell_turn,
@@ -36,9 +36,9 @@ def _signed(value: Any, decimals: int = 2) -> str:
 
 def _ratio(value: Any, decimals: int = 2) -> str:
     try:
-        return f"x{float(value):.{decimals}f}배"
+        return f"x{float(value):.{decimals}f}"
     except (TypeError, ValueError):
-        return "x--배"
+        return "x--"
 
 
 def _turn_engine_text(*, utbot: bool, hull: bool) -> str:
@@ -79,67 +79,84 @@ def _hit_summary(*values: Any) -> str:
 
 
 def _build_final_top_reason(row: Mapping[str, Any], target_date: date) -> str:
-    reasons: list[str] = ["A/B/C 통과"]
+    reasons: list[str] = []
     if same_session_buy_turn(row, target_date):
-        reasons.append("당일 매수전환")
+        reasons.append("same-session buy turn")
     if safe_float(row.get("volume_ratio_20", 0.0)) >= 1.2:
-        reasons.append("거래량 우위")
+        reasons.append("volume lead")
     if safe_float(row.get("cmf", 0.0)) > 0.05:
-        reasons.append("CMF 양호")
+        reasons.append("CMF+")
     if safe_float(row.get("obv_slope", 0.0)) > 0.0:
-        reasons.append("OBV 상승")
+        reasons.append("OBV up")
     if is_truthy(row.get("low_conflict_bullish")) or str(row.get("strategy_conflict_level", "")).strip().upper() == "LOW":
-        reasons.append("충돌 낮음")
-    return _top_reasons(reasons, fallback="A/B/C 통과")
+        reasons.append("low conflict")
+    return _top_reasons(reasons, fallback="final entry")
 
 
 def _build_buy_turn_reason(row: Mapping[str, Any], target_date: date) -> str:
-    reasons = ["당일 전환"]
+    reasons = ["same-day turn"]
     if same_day_buy_turn_count(row, target_date) >= 2:
-        reasons.append("UTBot+HULL 동시")
+        reasons.append("UTBot+HULL")
     if safe_float(row.get("volume_ratio_20", 0.0)) >= 1.2:
-        reasons.append("거래량 우위")
+        reasons.append("volume lead")
     if safe_float(row.get("cmf", 0.0)) > 0.0:
-        reasons.append("CMF 양호")
+        reasons.append("CMF+")
     if safe_float(row.get("obv_slope", 0.0)) > 0.0:
-        reasons.append("OBV 상승")
-    return _top_reasons(reasons, fallback="당일 매수전환")
+        reasons.append("OBV up")
+    return _top_reasons(reasons, fallback="buy turn")
 
 
 def _build_pullback_reason(row: Mapping[str, Any]) -> str:
-    reasons: list[str] = ["상승 구조 유지"]
+    reasons: list[str] = ["uptrend persistent"]
     if is_truthy(row.get("pullback_reentry")):
-        reasons.append("재진입 신호")
+        reasons.append("reentry signal")
     else:
-        reasons.append("재진입 준비")
+        reasons.append("reentry ready")
     if safe_float(row.get("volume_dry_up_score", 0.0)) >= 10.0:
-        reasons.append("거래량 건조")
+        reasons.append("volume dry-up")
     if safe_float(row.get("pullback_atr_multiple", 0.0)) <= 2.0:
-        reasons.append("적정 눌림")
-    return _top_reasons(reasons, fallback="눌림목 재진입")
+        reasons.append("shallow pullback")
+    return _top_reasons(reasons, fallback="pullback reentry")
 
 
 def _build_trend_reason(row: Mapping[str, Any]) -> str:
     reasons: list[str] = []
     if safe_float(row.get("rs_rank_vs_index", 0.0)) >= 70.0:
-        reasons.append("상대강도 우위")
-    reasons.append("추세 기울기 유지")
+        reasons.append("high RS")
+    reasons.append("trend slope up")
     if is_truthy(row.get("volume_bullish")):
-        reasons.append("거래량 동반")
+        reasons.append("volume support")
     if safe_float(row.get("zscore20", 0.0)) >= 2.5 or safe_float(row.get("dist_sma20_pct", 0.0)) >= 15.0:
-        reasons.append("과열 경계")
-    return _top_reasons(reasons, fallback="추세 지속 후보")
+        reasons.append("overheat caution")
+    return _top_reasons(reasons, fallback="trend continuation")
+
+
+def _build_hma_ema_reason(row: Mapping[str, Any]) -> str:
+    reasons: list[str] = []
+    if is_truthy(row.get("hma_ema_long_entry")):
+        reasons.append("HMA25/EMA25 long entry")
+    elif is_truthy(row.get("hma_ema_long_aligned")):
+        reasons.append("HMA/EMA aligned")
+    if is_truthy(row.get("hma25_ema25_cross_bull")):
+        reasons.append("bull cross")
+    if safe_float(row.get("volume_ratio_20", 0.0)) >= 1.2:
+        reasons.append("volume lead")
+    if safe_float(row.get("adx", 0.0)) >= 20.0:
+        reasons.append("ADX trend")
+    if safe_float(row.get("hma_ema_risk_to_ema50_pct", 999.0)) <= 5.0:
+        reasons.append("EMA50 near")
+    return _top_reasons(reasons, fallback="HMA/EMA trend")
 
 
 def _build_sell_turn_reason(row: Mapping[str, Any], target_date: date) -> str:
-    reasons = ["당일 전환"]
+    reasons = ["same-day turn"]
     if same_day_sell_turn_count(row, target_date) >= 2:
-        reasons.append("UTBot+HULL 동시")
+        reasons.append("UTBot+HULL")
     if safe_float(row.get("volume_ratio_20", 0.0)) >= 1.0:
-        reasons.append("거래량 동반")
+        reasons.append("volume support")
     if safe_float(row.get("scan_score", 0.0)) > 0.0:
-        reasons.append(f"점수 {safe_float(row.get('scan_score', 0.0)):.1f}")
-    return _top_reasons(reasons, fallback="당일 매도전환")
+        reasons.append(f"score {safe_float(row.get('scan_score', 0.0)):.1f}")
+    return _top_reasons(reasons, fallback="sell turn")
 
 
 def _build_gap_setup_reason(row: Mapping[str, Any]) -> str:
@@ -150,7 +167,7 @@ def _build_gap_setup_reason(row: Mapping[str, Any]) -> str:
     hit_text = _hit_summary(row.get("gap_setup_quality_hits"), row.get("gap_setup_hits"))
     if hit_text:
         reasons.append(hit_text)
-    return _top_reasons(reasons, fallback="돌파 임박")
+    return _top_reasons(reasons, fallback="gap setup")
 
 
 def _build_pocket_pivot_reason(row: Mapping[str, Any]) -> str:
@@ -161,38 +178,39 @@ def _build_pocket_pivot_reason(row: Mapping[str, Any]) -> str:
     hit_text = _hit_summary(row.get("pocket_pivot_quality_hits"), row.get("pocket_pivot_hits"))
     if hit_text:
         reasons.append(hit_text)
-    return _top_reasons(reasons, fallback="기관 매집 포착")
+    return _top_reasons(reasons, fallback="pocket pivot")
 
 
 def _build_five_day_top_reason(row: Mapping[str, Any]) -> str:
-    reasons = [f"5일 {_signed(row.get('chg_5d'), 2)}%"]
+    reasons = [f"5D {_signed(row.get('chg_5d'), 2)}%"]
     if safe_float(row.get("volume_ratio_20", 0.0)) >= 1.2:
-        reasons.append("거래량 우위")
+        reasons.append("volume lead")
     if safe_float(row.get("scan_score", 0.0)) > 0.0:
-        reasons.append(f"점수 {safe_float(row.get('scan_score', 0.0)):.1f}")
-    return _top_reasons(reasons, fallback="5일 상승률 상위")
+        reasons.append(f"score {safe_float(row.get('scan_score', 0.0)):.1f}")
+    return _top_reasons(reasons, fallback="5D top")
 
 
 def _build_new_52w_high_reason(row: Mapping[str, Any]) -> str:
-    reasons = ["52주 신고가 갱신"]
+    reasons = ["new 52W high"]
     if is_truthy(row.get("new_52w_closing_high")):
-        reasons.append("종가 신고가")
+        reasons.append("closing high")
     if safe_float(row.get("volume_ratio_20", 0.0)) >= 1.2:
-        reasons.append("거래량 우위")
-    return _top_reasons(reasons, fallback="52주 신고가")
+        reasons.append("volume lead")
+    return _top_reasons(reasons, fallback="new 52W high")
 
 
 def _candidate_label(section_key: str) -> str:
     return {
-        "final_top": "최우선",
-        "buy_turn": "매수전환",
-        "pullback_reentry": "눌림목",
-        "trend_continuation": "추세지속",
-        "sell_turn": "매도전환",
-        "gap_setup": "돌파임박",
-        "pocket_pivot": "기관매집",
-        "five_day_top": "5일상승",
-        "new_52w_high": "52주신고",
+        "final_top": "final",
+        "buy_turn": "buy turn",
+        "pullback_reentry": "pullback",
+        "trend_continuation": "trend",
+        "hma_ema_trend": "HMA/EMA",
+        "sell_turn": "sell turn",
+        "gap_setup": "gap setup",
+        "pocket_pivot": "pocket pivot",
+        "five_day_top": "5D top",
+        "new_52w_high": "52W high",
     }.get(section_key, section_key)
 
 
@@ -205,6 +223,8 @@ def _candidate_reason(section_key: str, row: Mapping[str, Any], target_date: dat
         return _build_pullback_reason(row)
     if section_key == "trend_continuation":
         return _build_trend_reason(row)
+    if section_key == "hma_ema_trend":
+        return _build_hma_ema_reason(row)
     if section_key == "sell_turn":
         return _build_sell_turn_reason(row, target_date)
     if section_key == "gap_setup":
@@ -239,6 +259,11 @@ def _candidate_source_flags(section_key: str, row: Mapping[str, Any], target_dat
         "turn_engine": turn_engine,
         "thin_trade_risk": is_truthy(row.get("thin_trade_risk")),
         "bearish_gap_failure": is_truthy(row.get("bearish_gap_failure")),
+        "hma_ema_long_aligned": is_truthy(row.get("hma_ema_long_aligned")),
+        "hma_ema_long_entry": is_truthy(row.get("hma_ema_long_entry")),
+        "hma_ema_short_aligned": is_truthy(row.get("hma_ema_short_aligned")),
+        "hma_ema_short_entry": is_truthy(row.get("hma_ema_short_entry")),
+        "hma_ema_signal_state": str(row.get("hma_ema_signal_state") or "NEUTRAL"),
         "multi_buy": int(safe_float(row.get("multi_buy", 0.0))),
         "multi_sell": int(safe_float(row.get("multi_sell", 0.0))),
         "label": _candidate_label(section_key),
@@ -299,7 +324,7 @@ def build_post_close_digest(
         briefing_refs={
             "mode": "separate_message",
             "job": "market_briefing_notify",
-            "expected_order": ["시장 브리핑", "종목판 메인"],
+            "expected_order": ["market_briefing", "main_board"],
         },
         scan_label=scan_label,
         universe_count=int(universe_count or 0),
@@ -321,7 +346,14 @@ def _format_candidate_line(candidate: TelegramCandidate) -> str:
 
 
 def _section_block(index: int, section: TelegramSection) -> str:
-    descriptor = f"Top {min(section.item_count, FINAL_TOP_LIMIT if section.key == 'final_top' else FIVE_DAY_TOP_LIMIT)}" if section.ranked else f"{section.item_count}개"
+    if section.key == "final_top":
+        descriptor = f"Top {min(section.item_count, FINAL_TOP_LIMIT)}"
+    elif section.key == "five_day_top":
+        descriptor = f"Top {min(section.item_count, FIVE_DAY_TOP_LIMIT)}"
+    elif section.key == "hma_ema_trend":
+        descriptor = f"Top {min(section.item_count, 20)}"
+    else:
+        descriptor = f"{section.item_count} items"
     lines = [f"## {index}. {section.title} ({descriptor})"]
     if not section.items:
         lines.append("- 해당 없음")

@@ -7,6 +7,7 @@ from .selectors import (
     CORE_SECTION_TITLES,
     FINAL_TOP_LIMIT,
     FIVE_DAY_TOP_LIMIT,
+    HMA_EMA_TOP_LIMIT,
     MANDATORY_SECTION_KEYS,
     select_post_close_sections,
 )
@@ -27,6 +28,7 @@ __all__ = [
     "MANDATORY_SECTION_KEYS",
     "FINAL_TOP_LIMIT",
     "FIVE_DAY_TOP_LIMIT",
+    "HMA_EMA_TOP_LIMIT",
     "select_post_close_sections",
     "send_telegram_document",
     "send_telegram_message",

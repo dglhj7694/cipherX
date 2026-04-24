@@ -5,7 +5,20 @@ from dataclasses import asdict, dataclass, field
 from .utils import round_or_none
 
 
-VISIBLE_STATUSES = {"ACTIVE", "CONFIRMING", "TRIGGER_WAIT", "READY", "INTEREST"}
+VISIBLE_STATUSES = {
+    "ACTIVE",
+    "CONFIRMING",
+    "TRIGGER_WAIT",
+    "READY",
+    "INTEREST",
+    "LONG_ENTRY",
+    "LONG_ALIGNED",
+    "LONG_WAIT",
+    "SHORT_ENTRY",
+    "SHORT_ALIGNED",
+    "SHORT_WAIT",
+    "EXIT_WARNING",
+}
 
 
 @dataclass(frozen=True)

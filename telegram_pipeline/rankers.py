@@ -129,6 +129,32 @@ def trend_sort_key(row: Mapping[str, Any]) -> tuple[float, float, float, float, 
     )
 
 
+def hma_ema_long_signal_count(row: Mapping[str, Any]) -> int:
+    return int(
+        sum(
+            [
+                is_truthy(row.get("hma_ema_long_entry")),
+                is_truthy(row.get("hma_ema_long_aligned")),
+                is_truthy(row.get("hma25_ema25_cross_bull")),
+                safe_float(row.get("volume_ratio_20", 0.0)) >= 1.0,
+                safe_float(row.get("adx", 0.0)) >= 18.0,
+                safe_float(row.get("hma_ema_risk_to_ema50_pct", 999.0)) <= 8.0,
+            ]
+        )
+    )
+
+
+def hma_ema_long_sort_key(row: Mapping[str, Any]) -> tuple[float, float, float, float, float, str]:
+    return (
+        -safe_float(hma_ema_long_signal_count(row)),
+        -safe_float(row.get("volume_ratio_20", 0.0)),
+        -safe_float(row.get("adx", 0.0)),
+        safe_float(row.get("hma_ema_risk_to_ema50_pct", 999.0)),
+        -safe_float(row.get("scan_score", 0.0)),
+        str(row.get("ticker", "")),
+    )
+
+
 def sell_turn_sort_key(row: Mapping[str, Any], target_date: date) -> tuple[float, float, float, float, str]:
     return (
         -safe_float(same_day_sell_turn_count(row, target_date)),

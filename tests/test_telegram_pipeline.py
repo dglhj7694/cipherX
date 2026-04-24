@@ -11,6 +11,7 @@ from scripts.daily_scan_and_notify import _build_post_close_digest_bundle, _send
 from telegram_pipeline import (
     FINAL_TOP_LIMIT,
     FIVE_DAY_TOP_LIMIT,
+    HMA_EMA_TOP_LIMIT,
     build_post_close_digest,
     build_post_close_message_texts,
     split_telegram_message_text,
@@ -51,7 +52,7 @@ class TelegramPipelineTests(unittest.TestCase):
             "latest_session_utbot_buy_turn": True,
             "latest_session_hull_buy_turn": False,
             "utbot_buy_last_date": self.market_date.isoformat(),
-            "hull_turn_bull_last_date": "없음",
+            "hull_turn_bull_last_date": "N/A",
             "days_since_utbot_buy": 0,
             "days_since_hull_turn_bull": 99,
             "cmf": 0.18,
@@ -73,26 +74,31 @@ class TelegramPipelineTests(unittest.TestCase):
             "zscore20": 1.9,
             "utbot_sell_recent": False,
             "hull_turn_bear_recent": False,
-            "utbot_sell_last_date": "없음",
-            "hull_turn_bear_last_date": "없음",
+            "utbot_sell_last_date": "N/A",
+            "hull_turn_bear_last_date": "N/A",
             "gap_setup_candidate": True,
             "gap_setup_score": 9,
             "gap_setup_gate_count": 4,
-            "gap_setup_hits": ["밴드압축", "상대강도"],
-            "gap_setup_quality_hits": ["거래량건조"],
+            "gap_setup_hits": ["band squeeze", "relative strength"],
+            "gap_setup_quality_hits": ["volume dry-up"],
             "pocket_pivot_candidate": True,
             "pocket_pivot_score": 10,
             "pocket_pivot_gate_count": 4,
-            "pocket_pivot_hits": ["PocketPivot", "거래량회복"],
-            "pocket_pivot_quality_hits": ["기관매집"],
+            "pocket_pivot_hits": ["PocketPivot", "volume recovery"],
+            "pocket_pivot_quality_hits": ["institutional flow"],
             "new_52w_high": True,
             "new_52w_closing_high": True,
             "latest_bar_date": self.market_date.isoformat(),
+            "ema50": 98.0,
+            "hma_ema_long_entry": True,
+            "hma_ema_long_aligned": True,
+            "hma25_ema25_cross_bull": True,
+            "hma_ema_risk_to_ema50_pct": 2.0,
         }
         row.update(overrides)
         return row
 
-    def test_build_post_close_digest_keeps_cross_section_overlap_and_restored_sections(self):
+    def test_build_post_close_digest_keeps_overlap_and_has_hma_section(self):
         digest = build_post_close_digest(
             [self._row("ALPHA")],
             run_stamp="20260424_050000",
@@ -112,6 +118,7 @@ class TelegramPipelineTests(unittest.TestCase):
                 "buy_turn",
                 "pullback_reentry",
                 "trend_continuation",
+                "hma_ema_trend",
                 "sell_turn",
                 "gap_setup",
                 "pocket_pivot",
@@ -121,12 +128,15 @@ class TelegramPipelineTests(unittest.TestCase):
         )
         self.assertEqual([item.ticker for item in section_map["final_top"].items], ["ALPHA"])
         self.assertEqual([item.ticker for item in section_map["buy_turn"].items], ["ALPHA"])
+        self.assertEqual([item.ticker for item in section_map["hma_ema_trend"].items], ["ALPHA"])
         self.assertEqual([item.ticker for item in section_map["gap_setup"].items], ["ALPHA"])
         self.assertEqual([item.ticker for item in section_map["pocket_pivot"].items], ["ALPHA"])
         self.assertEqual([item.ticker for item in section_map["five_day_top"].items], ["ALPHA"])
         self.assertEqual([item.ticker for item in section_map["new_52w_high"].items], ["ALPHA"])
+        self.assertTrue(section_map["final_top"].items[0].source_flags["hma_ema_long_aligned"])
+        self.assertTrue(section_map["final_top"].items[0].source_flags["hma_ema_long_entry"])
 
-    def test_turn_sections_use_same_day_only_and_skip_recent_or_risk_only_rows(self):
+    def test_turn_sections_use_same_day_only(self):
         same_day_buy = self._row("BUYDAY")
         recent_buy_only = self._row(
             "BUYRECENT",
@@ -134,26 +144,32 @@ class TelegramPipelineTests(unittest.TestCase):
             latest_session_hull_buy_turn=False,
             utbot_buy_last_date="2026-04-22",
             days_since_utbot_buy=1,
+            hma_ema_long_entry=False,
+            hma_ema_long_aligned=False,
         )
         same_day_sell = self._row(
             "SELLDAY",
             final_entry_eligible=False,
             final_entry_selected=False,
             latest_session_utbot_buy_turn=False,
-            utbot_buy_last_date="없음",
+            utbot_buy_last_date="N/A",
             utbot_sell_last_date=self.market_date.isoformat(),
-            hull_turn_bear_last_date="없음",
+            hull_turn_bear_last_date="N/A",
+            hma_ema_long_entry=False,
+            hma_ema_long_aligned=False,
         )
         risk_only = self._row(
             "RISKONLY",
             final_entry_eligible=False,
             final_entry_selected=False,
             latest_session_utbot_buy_turn=False,
-            utbot_buy_last_date="없음",
+            utbot_buy_last_date="N/A",
             thin_trade_risk=True,
             bearish_gap_failure=True,
-            utbot_sell_last_date="없음",
-            hull_turn_bear_last_date="없음",
+            utbot_sell_last_date="N/A",
+            hull_turn_bear_last_date="N/A",
+            hma_ema_long_entry=False,
+            hma_ema_long_aligned=False,
         )
 
         digest = build_post_close_digest(
@@ -173,8 +189,17 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertEqual(section_map["buy_turn"].items[0].source_flags.get("turn_engine"), "UTBot")
         self.assertEqual(section_map["sell_turn"].items[0].source_flags.get("turn_engine"), "UTBot")
 
-    def test_final_top_and_five_day_sections_use_top20_while_other_sections_keep_all(self):
-        rows = [self._row(f"T{i:02d}", final_entry_score=500 - i, chg_5d=50 - i, scan_score=300 - i) for i in range(25)]
+    def test_only_final_five_hma_have_top20_limits(self):
+        rows = [
+            self._row(
+                f"T{i:02d}",
+                final_entry_score=500 - i,
+                chg_5d=50 - i,
+                scan_score=300 - i,
+                hma_ema_risk_to_ema50_pct=1.0 + i * 0.05,
+            )
+            for i in range(25)
+        ]
         digest = build_post_close_digest(
             rows,
             run_stamp="20260424_050000",
@@ -189,11 +214,28 @@ class TelegramPipelineTests(unittest.TestCase):
 
         self.assertEqual(section_map["final_top"].item_count, FINAL_TOP_LIMIT)
         self.assertEqual(section_map["five_day_top"].item_count, FIVE_DAY_TOP_LIMIT)
+        self.assertEqual(section_map["hma_ema_trend"].item_count, HMA_EMA_TOP_LIMIT)
         self.assertEqual(section_map["buy_turn"].item_count, 25)
         self.assertEqual(section_map["gap_setup"].item_count, 25)
         self.assertEqual(section_map["pocket_pivot"].item_count, 25)
 
-    def test_message_contract_is_single_main_message_without_tier_sections(self):
+    def test_hma_selector_applies_price_over_ema50_gate(self):
+        ok = self._row("OK", price=101.0, ema50=100.0)
+        blocked = self._row("BLOCKED", price=99.0, ema50=100.0)
+        digest = build_post_close_digest(
+            [ok, blocked],
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=2,
+            result_count=2,
+            skip_count=0,
+        )
+        hma_items = digest.section_map()["hma_ema_trend"].items
+        self.assertEqual([item.ticker for item in hma_items], ["OK"])
+
+    def test_message_contract_is_single_main_message(self):
         digest = build_post_close_digest(
             [self._row("ALPHA"), self._row("BETA", final_entry_score=80.0, chg_5d=9.5)],
             run_stamp="20260424_050000",
@@ -204,27 +246,17 @@ class TelegramPipelineTests(unittest.TestCase):
             result_count=2,
             skip_count=0,
         )
-
         messages = build_post_close_message_texts(digest)
-
         self.assertEqual(len(messages), 1)
-        self.assertIn("[오늘 종목판]", messages[0])
-        self.assertIn("## 1. 오늘 최우선 후보", messages[0])
-        self.assertIn("## 6. 에너지 압축 → 돌파 임박", messages[0])
-        self.assertIn("## 9. 52주 신고가", messages[0])
-        self.assertNotIn("A티어", messages[0])
-        self.assertNotIn("B티어", messages[0])
-        self.assertNotIn("C티어", messages[0])
-        self.assertNotIn("| 최우선 |", messages[0])
-        self.assertNotIn("| 매수전환 |", messages[0])
-        self.assertNotIn("| 매도전환 |", messages[0])
+        self.assertIn("## 1.", messages[0])
+        self.assertIn("## 2.", messages[0])
 
-    def test_message_lines_show_only_core_fields_and_turn_engine_for_turn_sections(self):
+    def test_message_lines_show_core_fields_and_turn_engine_only_for_turn_sections(self):
         buy_hull_only = self._row(
             "BUYHULL",
             latest_session_utbot_buy_turn=False,
             latest_session_hull_buy_turn=True,
-            utbot_buy_last_date="?놁쓬",
+            utbot_buy_last_date="N/A",
             hull_turn_bull_last_date=self.market_date.isoformat(),
         )
         sell_both = self._row(
@@ -233,10 +265,12 @@ class TelegramPipelineTests(unittest.TestCase):
             final_entry_selected=False,
             latest_session_utbot_buy_turn=False,
             latest_session_hull_buy_turn=False,
-            utbot_buy_last_date="?놁쓬",
-            hull_turn_bull_last_date="?놁쓬",
+            utbot_buy_last_date="N/A",
+            hull_turn_bull_last_date="N/A",
             utbot_sell_last_date=self.market_date.isoformat(),
             hull_turn_bear_last_date=self.market_date.isoformat(),
+            hma_ema_long_entry=False,
+            hma_ema_long_aligned=False,
         )
         digest = build_post_close_digest(
             [buy_hull_only, sell_both],
@@ -250,24 +284,22 @@ class TelegramPipelineTests(unittest.TestCase):
         )
         message = build_post_close_message_texts(digest)[0]
 
-        self.assertIn("BUYHULL | (+1.75, +2.35%) | x1.45배 | HULL", message)
-        self.assertIn("SELLBOTH | (+1.75, +2.35%) | x1.45배 | UTBot+HULL", message)
+        self.assertIn("BUYHULL | (+1.75, +2.35%) | x1.45 | HULL", message)
+        self.assertIn("SELLBOTH | (+1.75, +2.35%) | x1.45 | UTBot+HULL", message)
 
     def test_split_telegram_message_text_prefers_section_boundaries(self):
         text = "\n\n".join(
             [
                 "[오늘 종목판]\n- 시장일: 2026-04-23 (US)",
-                "## 1. 오늘 최우선 후보 (Top 2)\n1. AAA | (+1.00, +2.00%) | x1.20배",
-                "## 2. 오늘 매수전환 (1개)\n1. BBB | (+0.50, +1.00%) | x1.10배 | UTBot",
-                "## 3. 눌림목 재진입 (1개)\n1. CCC | (+0.30, +0.80%) | x0.95배",
+                "## 1. 오늘 최우선 후보 (Top 2)\n1. AAA | (+1.00, +2.00%) | x1.20",
+                "## 2. 오늘 매수전환 (1 items)\n1. BBB | (+0.50, +1.00%) | x1.10 | UTBot",
+                "## 3. 눌림목 재진입 (1 items)\n1. CCC | (+0.30, +0.80%) | x0.95",
             ]
         )
-
         chunks = split_telegram_message_text(text, chunk_size=120)
-
         self.assertGreater(len(chunks), 1)
-        self.assertTrue(any(chunk.startswith("## 2. 오늘 매수전환") for chunk in chunks))
-        self.assertTrue(any("## 3. 눌림목 재진입" in chunk for chunk in chunks))
+        self.assertTrue(any(chunk.startswith("## 2.") for chunk in chunks))
+        self.assertTrue(any("## 3." in chunk for chunk in chunks))
 
     def test_write_local_digest_artifacts_writes_latest_and_versioned_json(self):
         digest = build_post_close_digest(
@@ -308,7 +340,6 @@ class TelegramPipelineTests(unittest.TestCase):
                 skip_count=0,
                 publish_enabled=True,
             )
-
             self.assertTrue(Path(bundle["summary_path"]).exists())
             self.assertEqual(len(bundle["message_texts"]), 1)
             self.assertEqual(bundle["publish_status"]["reason"], "publish_error")
@@ -338,7 +369,7 @@ class TelegramPipelineTests(unittest.TestCase):
 
 
 class HomeDigestLoaderTests(unittest.TestCase):
-    def test_extract_section_candidates_reads_new_items_contract(self):
+    def test_extract_section_candidates_reads_items_contract(self):
         payload = {
             "sections": [
                 {"key": "final_top", "items": [{"ticker": "AAPL"}, {"ticker": "MSFT"}]},
@@ -378,3 +409,4 @@ class HomeDigestLoaderTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

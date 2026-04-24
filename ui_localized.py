@@ -280,9 +280,9 @@ def _strategy_status_badge(value):
     text = _table_cell_text(value)
     if text == "-":
         return "-"
-    if any(token in text for token in ("활성", "성립", "확인 중")):
+    if any(token in text for token in ("활성", "성립", "확인 중", "진입", "정렬")):
         tone = "positive"
-    elif any(token in text for token in ("관심", "대기", "준비")):
+    elif any(token in text for token in ("관심", "대기", "준비", "경고")):
         tone = "warning"
     elif any(token in text for token in ("해제", "실패", "무효")):
         tone = "negative"
@@ -3909,6 +3909,13 @@ STRATEGY_STATUS_MAP = {
     "TRIGGER_WAIT": "트리거 대기",
     "READY": "준비",
     "INTEREST": "관심",
+    "LONG_ENTRY": "롱 진입",
+    "LONG_ALIGNED": "롱 정렬",
+    "LONG_WAIT": "롱 대기",
+    "SHORT_ENTRY": "숏 진입",
+    "SHORT_ALIGNED": "숏 정렬",
+    "SHORT_WAIT": "숏 대기",
+    "EXIT_WARNING": "청산 경고",
     "WATCH": "준비",
     "WEAK_WATCH": "관심",
     "INVALID": "무효",
@@ -3922,6 +3929,13 @@ STRATEGY_PHASE_MAP = {
     "REVERSAL_READY": "반전 확인 대기",
     "DOUBLE_CONFIRMED": "이중 확인 완료",
     "TREND_ALIGNED": "추세 정렬",
+    "LONG_ENTRY": "롱 진입",
+    "LONG_ALIGNED": "롱 정렬",
+    "LONG_WAIT": "롱 대기",
+    "SHORT_ENTRY": "숏 진입",
+    "SHORT_ALIGNED": "숏 정렬",
+    "SHORT_WAIT": "숏 대기",
+    "EXIT_WARNING": "청산 경고",
     "DIVERGENCE_READY": "다이버전스 대기",
     "DIVERGENCE_CONFIRMED": "다이버전스 확인",
     "SETUP_INVALID": "환경 부족",
@@ -4017,7 +4031,22 @@ def build_strategy_tab_view_model(meta):
         strategies = [
             dict(item)
             for item in (meta.get("strategy_results") or [])
-            if str(item.get("status", "")).upper() in {"ACTIVE", "CONFIRMING", "TRIGGER_WAIT", "READY", "INTEREST", "WATCH", "WEAK_WATCH"}
+            if str(item.get("status", "")).upper() in {
+                "ACTIVE",
+                "CONFIRMING",
+                "TRIGGER_WAIT",
+                "READY",
+                "INTEREST",
+                "LONG_ENTRY",
+                "LONG_ALIGNED",
+                "LONG_WAIT",
+                "SHORT_ENTRY",
+                "SHORT_ALIGNED",
+                "SHORT_WAIT",
+                "EXIT_WARNING",
+                "WATCH",
+                "WEAK_WATCH",
+            }
         ]
 
     top_strategy = summary.get("top_strategy") if isinstance(summary.get("top_strategy"), dict) else (meta.get("top_strategy") or {})

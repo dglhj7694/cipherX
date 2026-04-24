@@ -8,6 +8,7 @@ from .rankers import (
     final_top_sort_key,
     five_day_top_sort_key,
     gap_setup_sort_key,
+    hma_ema_long_sort_key,
     is_truthy,
     new_52w_high_sort_key,
     parse_iso_date,
@@ -22,6 +23,7 @@ from .rankers import (
 
 FINAL_TOP_LIMIT = 20
 FIVE_DAY_TOP_LIMIT = 20
+HMA_EMA_TOP_LIMIT = 20
 GAP_SETUP_MIN_SCORE = 8.0
 GAP_SETUP_MIN_GATE_COUNT = 4.0
 GAP_SETUP_MIN_SCAN_SCORE = 110.0
@@ -41,6 +43,7 @@ CORE_SECTION_ORDER: tuple[str, ...] = (
     "buy_turn",
     "pullback_reentry",
     "trend_continuation",
+    "hma_ema_trend",
     "sell_turn",
     "gap_setup",
     "pocket_pivot",
@@ -71,6 +74,12 @@ CORE_QUALITY_FLOORS: dict[str, str] = {
     "five_day_top": "chg_5d > 0, Top 20",
     "new_52w_high": "new_52w_high=True + latest_bar_date == target session",
 }
+
+CORE_SECTION_TITLES["hma_ema_trend"] = "HMA/EMA 추세정렬 후보"
+CORE_QUALITY_FLOORS["hma_ema_trend"] = (
+    "long_entry/aligned + thin_trade_risk=N + bearish_gap_failure=N + "
+    "vol>=0.9 + adx>=16 + risk_to_ema50<=10 + close>ema50"
+)
 
 
 def _base_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -190,6 +199,37 @@ def select_trend_continuation_rows(rows: Iterable[Mapping[str, Any]]) -> list[di
     return selected
 
 
+def select_hma_ema_trend_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    selected: list[dict[str, Any]] = []
+    for row in _base_rows(rows):
+        if is_truthy(row.get("thin_trade_risk")):
+            continue
+        if is_truthy(row.get("bearish_gap_failure")):
+            continue
+        if not (
+            is_truthy(row.get("hma_ema_long_entry"))
+            or is_truthy(row.get("hma_ema_long_aligned"))
+        ):
+            continue
+        if safe_float(row.get("volume_ratio_20", 0.0)) < 0.9:
+            continue
+        if safe_float(row.get("adx", 0.0)) < 16.0:
+            continue
+        if safe_float(row.get("hma_ema_risk_to_ema50_pct", 999.0)) > 10.0:
+            continue
+
+        price_value = safe_float(row.get("price", row.get("close", 0.0)), 0.0)
+        ema50_value = safe_float(row.get("ema50", row.get("EMA50", 0.0)), 0.0)
+        if price_value <= ema50_value:
+            continue
+
+        selected.append(row)
+
+    selected = _dedupe_within_section(selected)
+    selected.sort(key=hma_ema_long_sort_key)
+    return selected[:HMA_EMA_TOP_LIMIT]
+
+
 def select_sell_turn_rows(rows: Iterable[Mapping[str, Any]], *, target_date: date) -> list[dict[str, Any]]:
     selected: list[dict[str, Any]] = []
     for row in _base_rows(rows):
@@ -263,6 +303,7 @@ def select_post_close_sections(rows: Iterable[Mapping[str, Any]], *, target_date
         "buy_turn": select_buy_turn_rows(rows, target_date=target_date),
         "pullback_reentry": select_pullback_reentry_rows(rows),
         "trend_continuation": select_trend_continuation_rows(rows),
+        "hma_ema_trend": select_hma_ema_trend_rows(rows),
         "sell_turn": select_sell_turn_rows(rows, target_date=target_date),
         "gap_setup": select_gap_setup_rows(rows, target_date=target_date),
         "pocket_pivot": select_pocket_pivot_rows(rows),

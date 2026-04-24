@@ -26,6 +26,7 @@ from .trend import (
     evaluate_accumulation_pattern,
     evaluate_anchored_vwap,
     evaluate_fractal_alligator,
+    evaluate_hma_ema_trend,
     evaluate_keltner_pullback,
     evaluate_supertrend_psar,
     evaluate_trend_pullback,
@@ -33,6 +34,7 @@ from .trend import (
 
 STRATEGY_EVALUATORS = {
     "trend_pullback": evaluate_trend_pullback,
+    "hma_ema_trend": evaluate_hma_ema_trend,
     "breakout_confirmation": evaluate_breakout_confirmation,
     "squeeze_expansion": evaluate_squeeze_expansion,
     "reversal_cluster": evaluate_reversal_cluster,

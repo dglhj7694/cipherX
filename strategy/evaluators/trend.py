@@ -241,3 +241,189 @@ def evaluate_fractal_alligator(definition: StrategyDefinition, state: dict) -> S
         risk_template=risk_template_trend,
         invalidation_builder=trend_invalidation_text,
     )
+
+
+def evaluate_hma_ema_trend(definition: StrategyDefinition, state: dict) -> StrategyResult:
+    long_side = definition.direction == "LONG"
+    hma_ema = dict(state.get("hma_ema") or {})
+    price = dict(state.get("price") or {})
+
+    close = float(price.get("close") or 0.0)
+    ema15 = float(hma_ema.get("ema15") or close)
+    ema25 = float(hma_ema.get("ema25") or close)
+    ema50 = float(hma_ema.get("ema50") or close)
+    ema200 = float(hma_ema.get("ema200") or close)
+    hma25 = float(hma_ema.get("hma25") or close)
+
+    long_entry = bool(hma_ema.get("long_entry"))
+    long_aligned = bool(hma_ema.get("long_aligned"))
+    short_entry = bool(hma_ema.get("short_entry"))
+    short_aligned = bool(hma_ema.get("short_aligned"))
+    long_exit_warning = bool(hma_ema.get("hma25_ema15_cross_bear"))
+    short_exit_warning = bool(hma_ema.get("hma25_ema15_cross_bull"))
+
+    if long_side:
+        if (long_entry or long_aligned) and long_exit_warning:
+            status = "EXIT_WARNING"
+        elif long_entry:
+            status = "LONG_ENTRY"
+        elif long_aligned:
+            status = "LONG_ALIGNED"
+        elif close > ema200:
+            status = "LONG_WAIT"
+        else:
+            status = "NEUTRAL"
+    else:
+        if (short_entry or short_aligned) and short_exit_warning:
+            status = "EXIT_WARNING"
+        elif short_entry:
+            status = "SHORT_ENTRY"
+        elif short_aligned:
+            status = "SHORT_ALIGNED"
+        elif close < ema200:
+            status = "SHORT_WAIT"
+        else:
+            status = "NEUTRAL"
+
+    phase = status
+    score_table = {
+        "LONG_ENTRY": 90.0,
+        "LONG_ALIGNED": 78.0,
+        "LONG_WAIT": 62.0,
+        "SHORT_ENTRY": 90.0,
+        "SHORT_ALIGNED": 78.0,
+        "SHORT_WAIT": 62.0,
+        "EXIT_WARNING": 70.0,
+        "NEUTRAL": 35.0,
+    }
+    score = score_table.get(status, 35.0)
+    score += min(float(hma_ema.get("risk_to_ema50_pct") or 0.0), 10.0) * -0.25
+    score += min(float(state.get("volume_flow", {}).get("volume_ratio", 1.0)), 2.0) * 2.0
+    score = max(0.0, min(100.0, score))
+
+    if long_side:
+        setup_checks = [
+            (close > ema200, "EMA200 above"),
+            (hma25 > ema25, "HMA25 > EMA25"),
+            (hma25 > ema15, "HMA25 > EMA15"),
+            (bool(hma_ema.get("ema15_slope_up")), "EMA15 slope up"),
+            (bool(hma_ema.get("ema25_slope_up")), "EMA25 slope up"),
+            (bool(hma_ema.get("ema50_slope_up")), "EMA50 slope up"),
+            (bool(hma_ema.get("hma25_slope_up")), "HMA25 slope up"),
+        ]
+        trigger_checks = [
+            (bool(hma_ema.get("hma25_ema25_cross_bull")), "HMA25/EMA25 bull cross"),
+            (long_entry, "Long entry"),
+        ]
+        rr_valid = bool(hma_ema.get("long_rr_valid"))
+        stop_loss = hma_ema.get("long_virtual_stop")
+        target_1 = hma_ema.get("long_target_2r")
+        target_2 = hma_ema.get("long_target_3r")
+        exit_warning = long_exit_warning
+    else:
+        setup_checks = [
+            (close < ema200, "EMA200 below"),
+            (hma25 < ema25, "HMA25 < EMA25"),
+            (hma25 < ema15, "HMA25 < EMA15"),
+            (bool(hma_ema.get("ema15_slope_down")), "EMA15 slope down"),
+            (bool(hma_ema.get("ema25_slope_down")), "EMA25 slope down"),
+            (bool(hma_ema.get("ema50_slope_down")), "EMA50 slope down"),
+            (bool(hma_ema.get("hma25_slope_down")), "HMA25 slope down"),
+        ]
+        trigger_checks = [
+            (bool(hma_ema.get("hma25_ema25_cross_bear")), "HMA25/EMA25 bear cross"),
+            (short_entry, "Short entry"),
+        ]
+        rr_valid = bool(hma_ema.get("short_rr_valid"))
+        stop_loss = hma_ema.get("short_virtual_stop")
+        target_1 = hma_ema.get("short_target_2r")
+        target_2 = hma_ema.get("short_target_3r")
+        exit_warning = short_exit_warning
+
+    matched = [label for ok, label in [*setup_checks, *trigger_checks] if ok]
+    missing = [label for ok, label in [*setup_checks, *trigger_checks] if not ok]
+    conflicts = list(default_conflicts(state, long_side))
+    if not rr_valid:
+        conflicts.append("EMA50 virtual stop is invalid at current price location.")
+    if long_side and (short_entry or short_aligned):
+        conflicts.append("Opposite short alignment is present.")
+    if (not long_side) and (long_entry or long_aligned):
+        conflicts.append("Opposite long alignment is present.")
+    if exit_warning:
+        conflicts.append("HMA25 crossed EMA15 against position direction.")
+
+    stop_loss_value = float(stop_loss) if isinstance(stop_loss, (int, float)) else None
+    target_1_value = float(target_1) if isinstance(target_1, (int, float)) else None
+    target_2_value = float(target_2) if isinstance(target_2, (int, float)) else None
+    rr = 2.0 if rr_valid else None
+
+    if status in {"LONG_ENTRY", "SHORT_ENTRY"}:
+        entry_hint = "Current entry allowed"
+        entry_reference_type = "ENTRY_PRICE"
+        entry_reference_text = f"진입가 {close:.2f}"
+    elif status in {"LONG_ALIGNED", "SHORT_ALIGNED"}:
+        entry_hint = "Aligned and monitoring trigger"
+        entry_reference_type = "CONFIRMATION"
+        entry_reference_text = f"확인 진행 {close:.2f}"
+    elif status in {"LONG_WAIT", "SHORT_WAIT"}:
+        entry_hint = "Wait for HMA25/EMA25 trigger"
+        entry_reference_type = "CONFIRMATION"
+        entry_reference_text = f"확인선 {ema25:.2f}"
+    elif status == "EXIT_WARNING":
+        entry_hint = "Exit warning"
+        entry_reference_type = "CONFIRMATION"
+        entry_reference_text = f"경고선 EMA15 {ema15:.2f}"
+    else:
+        entry_hint = "Neutral"
+        entry_reference_type = "ZONE"
+        entry_reference_text = "-"
+
+    invalidation_text = (
+        f"EMA50 below break invalidates long setup ({ema50:.2f} below)."
+        if long_side
+        else f"EMA50 above reclaim invalidates short setup ({ema50:.2f} above)."
+    )
+    if exit_warning:
+        invalidation_text += " HMA25/EMA15 cross indicates weakening."
+
+    explanation = (
+        f"{definition.ui_label or definition.label} status is {status}. "
+        f"EMA200 baseline and HMA/EMA alignment are tracked with EMA50 virtual stop."
+    )
+
+    return StrategyResult(
+        id=definition.id,
+        label=str(definition.ui_label or definition.label),
+        canonical_label=definition.label,
+        direction=definition.direction,
+        category=definition.category,
+        score=score,
+        status=status,
+        phase=phase,
+        entry_hint=entry_hint,
+        setup_score=max(0.0, min(40.0, float(sum(1 for ok, _ in setup_checks if ok) * 5))),
+        trigger_score=max(0.0, min(40.0, float(sum(1 for ok, _ in trigger_checks if ok) * 10))),
+        risk_score=20.0 if rr_valid else 8.0,
+        presentation_type=definition.presentation_type,
+        implementation_level=definition.implementation_level,
+        deterministic=definition.deterministic,
+        entry_reference_type=entry_reference_type,
+        entry_reference_text=entry_reference_text,
+        entry_price=close,
+        interest_low=min(close, ema25),
+        interest_high=max(close, ema25),
+        confirmation_level=ema25,
+        invalidation_level=stop_loss_value,
+        matched_conditions=matched,
+        missing_conditions=missing,
+        failed_conditions=conflicts[:3],
+        stop_loss=stop_loss_value,
+        target_1=target_1_value,
+        target_2=target_2_value,
+        rr=rr,
+        conflict_reasons=conflicts,
+        explanation=explanation,
+        last5_change=[],
+        invalidation_text=invalidation_text,
+        note=f"{phase} | EMA200 baseline | EMA50 virtual stop",
+    )

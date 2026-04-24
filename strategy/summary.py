@@ -6,7 +6,8 @@ from .models import StrategyResult, StrategySummary
 def build_summary(visible: list[StrategyResult], results: list[StrategyResult]) -> StrategySummary:
     bullish = [item for item in visible if item.direction == "LONG"]
     bearish = [item for item in visible if item.direction == "SHORT"]
-    active_count = sum(1 for item in visible if item.status == "ACTIVE")
+    active_statuses = {"ACTIVE", "LONG_ENTRY", "SHORT_ENTRY"}
+    active_count = sum(1 for item in visible if item.status in active_statuses)
     top_strategy = visible[0].to_dict() if visible else None
     secondary = [item.to_dict() for item in visible[1:3]]
     long_short_bias = "BALANCED"

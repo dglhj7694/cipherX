@@ -22,7 +22,12 @@ def build_market_state(dc: pd.DataFrame) -> dict:
     swing_high_20 = series_max(recent20, "High", default=close)
     swing_low_20 = series_min(recent20, "Low", default=close)
     ema8 = scalar(latest.get("EMA8"), close)
+    ema15 = scalar(latest.get("EMA15"), close)
     ema21 = scalar(latest.get("EMA21"), close)
+    ema25 = scalar(latest.get("EMA25"), close)
+    ema50 = scalar(latest.get("EMA50"), scalar(latest.get("MA50"), close))
+    ema200 = scalar(latest.get("EMA200"), scalar(latest.get("MA200"), close))
+    hma25 = scalar(latest.get("HMA25"), scalar(latest.get("HMA"), close))
     ma20 = scalar(latest.get("MA20"), close)
     ma50 = scalar(latest.get("MA50"), close)
     ma200 = scalar(latest.get("MA200"), close)
@@ -65,7 +70,12 @@ def build_market_state(dc: pd.DataFrame) -> dict:
     stochk = scalar(latest.get("StochK"), 50.0)
     mfi = scalar(latest.get("MFI"), 50.0)
     price_change_5 = pct_change(close, scalar(recent5.iloc[0].get("Close"), close))
+    ema15_prev = scalar(previous.get("EMA15"), ema15)
     ema21_prev = scalar(previous.get("EMA21"), ema21)
+    ema25_prev = scalar(previous.get("EMA25"), ema25)
+    ema50_prev = scalar(previous.get("EMA50"), ema50)
+    ema200_prev = scalar(previous.get("EMA200"), ema200)
+    hma25_prev = scalar(previous.get("HMA25"), scalar(previous.get("HMA"), hma25))
     ma50_prev = scalar(previous.get("MA50"), ma50)
     vwap_prev = scalar(previous.get("VWAP"), vwap)
     fixed_vwap_prev = scalar(previous.get("Fixed_VWAP"), fixed_vwap)
@@ -74,6 +84,73 @@ def build_market_state(dc: pd.DataFrame) -> dict:
     bb_width_prev = scalar(previous.get("BB_Width"), bb_width)
     recent_fractal_high = recent_flagged_level(frame, "Fractal_High", "High", default=swing_high_20)
     recent_fractal_low = recent_flagged_level(frame, "Fractal_Low", "Low", default=swing_low_20)
+
+    ema15_slope_up = bool(latest.get("EMA15_Slope_Up")) if "EMA15_Slope_Up" in frame.columns else ema15 >= ema15_prev
+    ema25_slope_up = bool(latest.get("EMA25_Slope_Up")) if "EMA25_Slope_Up" in frame.columns else ema25 >= ema25_prev
+    ema50_slope_up = bool(latest.get("EMA50_Slope_Up")) if "EMA50_Slope_Up" in frame.columns else ema50 >= ema50_prev
+    hma25_slope_up = bool(latest.get("HMA25_Slope_Up")) if "HMA25_Slope_Up" in frame.columns else hma25 >= hma25_prev
+    ema15_slope_down = bool(latest.get("EMA15_Slope_Down")) if "EMA15_Slope_Down" in frame.columns else ema15 <= ema15_prev
+    ema25_slope_down = bool(latest.get("EMA25_Slope_Down")) if "EMA25_Slope_Down" in frame.columns else ema25 <= ema25_prev
+    ema50_slope_down = bool(latest.get("EMA50_Slope_Down")) if "EMA50_Slope_Down" in frame.columns else ema50 <= ema50_prev
+    hma25_slope_down = bool(latest.get("HMA25_Slope_Down")) if "HMA25_Slope_Down" in frame.columns else hma25 <= hma25_prev
+
+    hma25_ema25_cross_bull = bool(latest.get("HMA25_EMA25_Cross_Bull")) if "HMA25_EMA25_Cross_Bull" in frame.columns else (hma25 >= ema25 and hma25_prev <= ema25_prev)
+    hma25_ema25_cross_bear = bool(latest.get("HMA25_EMA25_Cross_Bear")) if "HMA25_EMA25_Cross_Bear" in frame.columns else (hma25 <= ema25 and hma25_prev >= ema25_prev)
+    hma25_ema15_cross_bear = bool(latest.get("HMA25_EMA15_Cross_Bear")) if "HMA25_EMA15_Cross_Bear" in frame.columns else (hma25 <= ema15 and hma25_prev >= ema15_prev)
+    hma25_ema15_cross_bull = bool(latest.get("HMA25_EMA15_Cross_Bull")) if "HMA25_EMA15_Cross_Bull" in frame.columns else (hma25 >= ema15 and hma25_prev <= ema15_prev)
+
+    hma_ema_long_aligned = bool(latest.get("HMA_EMA_Long_Aligned")) if "HMA_EMA_Long_Aligned" in frame.columns else (
+        close > ema200
+        and hma25 > ema25
+        and hma25 > ema15
+        and ema15_slope_up
+        and ema25_slope_up
+        and ema50_slope_up
+        and hma25_slope_up
+    )
+    hma_ema_short_aligned = bool(latest.get("HMA_EMA_Short_Aligned")) if "HMA_EMA_Short_Aligned" in frame.columns else (
+        close < ema200
+        and hma25 < ema25
+        and hma25 < ema15
+        and ema15_slope_down
+        and ema25_slope_down
+        and ema50_slope_down
+        and hma25_slope_down
+    )
+    hma_ema_long_entry = bool(latest.get("HMA_EMA_Long_Entry")) if "HMA_EMA_Long_Entry" in frame.columns else (hma25_ema25_cross_bull and hma_ema_long_aligned)
+    hma_ema_short_entry = bool(latest.get("HMA_EMA_Short_Entry")) if "HMA_EMA_Short_Entry" in frame.columns else (hma25_ema25_cross_bear and hma_ema_short_aligned)
+
+    hma_ema_risk_to_ema50_pct = scalar(
+        latest.get("HMA_EMA_Risk_To_EMA50_Pct"),
+        (abs(close - ema50) / max(abs(close), 1e-9)) * 100.0,
+    )
+    hma_ema_ema50_ema200_gap_pct = scalar(
+        latest.get("HMA_EMA_EMA50_EMA200_Gap_Pct"),
+        (abs(ema50 - ema200) / max(abs(close), 1e-9)) * 100.0,
+    )
+
+    long_risk = close - ema50
+    short_risk = ema50 - close
+    hma_ema_long_rr_valid = close > ema50 and long_risk > 0.0
+    hma_ema_short_rr_valid = close < ema50 and short_risk > 0.0
+
+    hma_ema_long_virtual_stop = ema50 if hma_ema_long_rr_valid else None
+    hma_ema_short_virtual_stop = ema50 if hma_ema_short_rr_valid else None
+    hma_ema_long_target_2r = (close + (2.0 * long_risk)) if hma_ema_long_rr_valid else None
+    hma_ema_short_target_2r = (close - (2.0 * short_risk)) if hma_ema_short_rr_valid else None
+    hma_ema_long_target_3r = (close + (3.0 * long_risk)) if hma_ema_long_rr_valid else None
+    hma_ema_short_target_3r = (close - (3.0 * short_risk)) if hma_ema_short_rr_valid else None
+
+    if hma_ema_long_entry:
+        hma_ema_signal_state = "LONG_ENTRY"
+    elif hma_ema_long_aligned:
+        hma_ema_signal_state = "LONG_ALIGNED"
+    elif hma_ema_short_entry:
+        hma_ema_signal_state = "SHORT_ENTRY"
+    elif hma_ema_short_aligned:
+        hma_ema_signal_state = "SHORT_ALIGNED"
+    else:
+        hma_ema_signal_state = "NEUTRAL"
 
     bullish_reversal_candle = any(
         bool_latest(frame, column)
@@ -95,7 +172,12 @@ def build_market_state(dc: pd.DataFrame) -> dict:
             "atr": atr,
             "entry": close,
             "ema8": ema8,
+            "ema15": ema15,
             "ema21": ema21,
+            "ema25": ema25,
+            "ema50": ema50,
+            "ema200": ema200,
+            "hma25": hma25,
             "ma20": ma20,
             "ma50": ma50,
             "ma200": ma200,
@@ -294,6 +376,40 @@ def build_market_state(dc: pd.DataFrame) -> dict:
                 "CS_Divergence_Confluence_Buy", "CS_Divergence_Confluence_Sell", "CS_Triple_Confirm_Buy", "CS_Triple_Confirm_Sell",
                 "CS_Institutional_Accumulation", "CS_Ichimoku_Breakout_Buy", "CS_Ichimoku_Breakout_Sell", "CS_Conflict_Warning",
             )
+        },
+        "hma_ema": {
+            "ema15": ema15,
+            "ema25": ema25,
+            "ema50": ema50,
+            "ema200": ema200,
+            "hma25": hma25,
+            "ema15_slope_up": ema15_slope_up,
+            "ema25_slope_up": ema25_slope_up,
+            "ema50_slope_up": ema50_slope_up,
+            "hma25_slope_up": hma25_slope_up,
+            "ema15_slope_down": ema15_slope_down,
+            "ema25_slope_down": ema25_slope_down,
+            "ema50_slope_down": ema50_slope_down,
+            "hma25_slope_down": hma25_slope_down,
+            "hma25_ema25_cross_bull": hma25_ema25_cross_bull,
+            "hma25_ema25_cross_bear": hma25_ema25_cross_bear,
+            "hma25_ema15_cross_bear": hma25_ema15_cross_bear,
+            "hma25_ema15_cross_bull": hma25_ema15_cross_bull,
+            "long_aligned": hma_ema_long_aligned,
+            "short_aligned": hma_ema_short_aligned,
+            "long_entry": hma_ema_long_entry,
+            "short_entry": hma_ema_short_entry,
+            "signal_state": hma_ema_signal_state,
+            "risk_to_ema50_pct": hma_ema_risk_to_ema50_pct,
+            "ema50_ema200_gap_pct": hma_ema_ema50_ema200_gap_pct,
+            "long_rr_valid": hma_ema_long_rr_valid,
+            "short_rr_valid": hma_ema_short_rr_valid,
+            "long_virtual_stop": hma_ema_long_virtual_stop,
+            "short_virtual_stop": hma_ema_short_virtual_stop,
+            "long_target_2r": hma_ema_long_target_2r,
+            "short_target_2r": hma_ema_short_target_2r,
+            "long_target_3r": hma_ema_long_target_3r,
+            "short_target_3r": hma_ema_short_target_3r,
         },
     }
 

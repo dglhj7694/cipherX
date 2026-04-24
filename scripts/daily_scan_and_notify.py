@@ -101,9 +101,31 @@ POST_CLOSE_LATEST_SESSION_FIELD_SPECS: tuple[dict[str, str], ...] = (
     {"group": "trend", "key": "dist_ema8_pct", "label": "DistEMA8(%)", "type": "number", "description": "Distance from EMA8", "rule": "(close-EMA8)/EMA8*100", "example": "0.92"},
     {"group": "trend", "key": "dist_ema21_pct", "label": "DistEMA21(%)", "type": "number", "description": "Distance from EMA21", "rule": "(close-EMA21)/EMA21*100", "example": "2.31"},
     {"group": "trend", "key": "dist_ema50_pct", "label": "DistEMA50(%)", "type": "number", "description": "Distance from EMA50", "rule": "(close-EMA50)/EMA50*100", "example": "4.65"},
+    {"group": "trend", "key": "ema15", "label": "EMA15", "type": "number", "description": "EMA 15 value", "rule": "EMA15", "example": "101.25"},
+    {"group": "trend", "key": "ema25", "label": "EMA25", "type": "number", "description": "EMA 25 value", "rule": "EMA25", "example": "99.84"},
+    {"group": "trend", "key": "ema50", "label": "EMA50", "type": "number", "description": "EMA 50 value", "rule": "EMA50", "example": "97.60"},
+    {"group": "trend", "key": "ema200", "label": "EMA200", "type": "number", "description": "EMA 200 value", "rule": "EMA200", "example": "90.40"},
+    {"group": "trend", "key": "hma25", "label": "HMA25", "type": "number", "description": "HMA 25 value", "rule": "HMA25", "example": "102.15"},
     {"group": "trend", "key": "hma20_slope_pct", "label": "HMA20Slope(%)", "type": "number", "description": "HMA20 one-bar slope", "rule": "(HMA-HMA[-1])/abs(HMA[-1])*100", "example": "0.44"},
     {"group": "trend", "key": "hma60_slope_pct", "label": "HMA60Slope(%)", "type": "number", "description": "HMA60 one-bar slope", "rule": "(HMA60-HMA60[-1])/abs(HMA60[-1])*100", "example": "0.18"},
     {"group": "trend", "key": "hma200_slope_pct", "label": "HMA200Slope(%)", "type": "number", "description": "HMA200 one-bar slope", "rule": "(HMA200-HMA200[-1])/abs(HMA200[-1])*100", "example": "0.07"},
+    {"group": "hma_ema", "key": "hma_ema_long_aligned", "label": "HMAEMALongAligned", "type": "bool", "description": "HMA/EMA long trend aligned", "rule": "close > EMA200 and HMA/EMA slopes aligned", "example": "Y"},
+    {"group": "hma_ema", "key": "hma_ema_short_aligned", "label": "HMAEMAShortAligned", "type": "bool", "description": "HMA/EMA short trend aligned", "rule": "close < EMA200 and HMA/EMA slopes aligned", "example": "N"},
+    {"group": "hma_ema", "key": "hma_ema_long_entry", "label": "HMAEMALongEntry", "type": "bool", "description": "HMA25 crosses EMA25 bullish with long alignment", "rule": "HMA25_EMA25_Cross_Bull and HMA_EMA_Long_Aligned", "example": "Y"},
+    {"group": "hma_ema", "key": "hma_ema_short_entry", "label": "HMAEMAShortEntry", "type": "bool", "description": "HMA25 crosses EMA25 bearish with short alignment", "rule": "HMA25_EMA25_Cross_Bear and HMA_EMA_Short_Aligned", "example": "N"},
+    {"group": "hma_ema", "key": "hma25_ema25_cross_bull", "label": "HMA25EMA25CrossBull", "type": "bool", "description": "HMA25 bullish cross over EMA25", "rule": "HMA25 > EMA25 and prev <= prev EMA25", "example": "Y"},
+    {"group": "hma_ema", "key": "hma25_ema25_cross_bear", "label": "HMA25EMA25CrossBear", "type": "bool", "description": "HMA25 bearish cross under EMA25", "rule": "HMA25 < EMA25 and prev >= prev EMA25", "example": "N"},
+    {"group": "hma_ema", "key": "hma25_ema15_exit_long", "label": "HMA25EMA15ExitLong", "type": "bool", "description": "Long weakening exit warning", "rule": "HMA25_EMA15_Cross_Bear", "example": "N"},
+    {"group": "hma_ema", "key": "hma25_ema15_exit_short", "label": "HMA25EMA15ExitShort", "type": "bool", "description": "Short weakening exit warning", "rule": "HMA25_EMA15_Cross_Bull", "example": "N"},
+    {"group": "hma_ema", "key": "hma_ema_risk_to_ema50_pct", "label": "HMAEMARiskToEMA50Pct", "type": "number", "description": "Absolute distance to EMA50", "rule": "abs(close-EMA50)/close*100", "example": "3.25"},
+    {"group": "hma_ema", "key": "hma_ema_ema50_ema200_gap_pct", "label": "HMAEMAEMA50EMA200GapPct", "type": "number", "description": "EMA50 and EMA200 spread by close", "rule": "abs(EMA50-EMA200)/close*100", "example": "7.42"},
+    {"group": "hma_ema", "key": "hma_ema_signal_state", "label": "HMAEMASignalState", "type": "text", "description": "HMA/EMA signal state", "rule": "LONG_ENTRY/LONG_ALIGNED/SHORT_ENTRY/SHORT_ALIGNED/NEUTRAL", "example": "LONG_ENTRY"},
+    {"group": "hma_ema", "key": "hma_ema_long_rr_valid", "label": "HMAEMALongRRValid", "type": "bool", "description": "Long R/R validity using EMA50 virtual stop", "rule": "close > EMA50 and close-EMA50 > 0", "example": "Y"},
+    {"group": "hma_ema", "key": "hma_ema_short_rr_valid", "label": "HMAEMAShortRRValid", "type": "bool", "description": "Short R/R validity using EMA50 virtual stop", "rule": "close < EMA50 and EMA50-close > 0", "example": "N"},
+    {"group": "hma_ema", "key": "hma_ema_long_virtual_stop", "label": "HMAEMALongVirtualStop", "type": "number", "description": "Long virtual stop (EMA50)", "rule": "EMA50 when long RR valid", "example": "97.60"},
+    {"group": "hma_ema", "key": "hma_ema_short_virtual_stop", "label": "HMAEMAShortVirtualStop", "type": "number", "description": "Short virtual stop (EMA50)", "rule": "EMA50 when short RR valid", "example": "97.60"},
+    {"group": "hma_ema", "key": "hma_ema_long_target_2r", "label": "HMAEMALongTarget2R", "type": "number", "description": "Long 2R target from virtual risk", "rule": "close + 2*(close-EMA50)", "example": "108.55"},
+    {"group": "hma_ema", "key": "hma_ema_short_target_2r", "label": "HMAEMAShortTarget2R", "type": "number", "description": "Short 2R target from virtual risk", "rule": "close - 2*(EMA50-close)", "example": "92.45"},
     {"group": "trend", "key": "adx", "label": "ADX", "type": "number", "description": "Average directional index", "rule": "ADX", "example": "23.5"},
     {"group": "trend", "key": "ichimoku_above_cloud", "label": "AboveIchimokuCloud", "type": "bool", "description": "Close above cloud", "rule": "close > max(SenkouA,SenkouB)", "example": "Y"},
     {"group": "trend", "key": "ichimoku_below_cloud", "label": "BelowIchimokuCloud", "type": "bool", "description": "Close below cloud", "rule": "close < min(SenkouA,SenkouB)", "example": "N"},
@@ -624,9 +646,31 @@ def _compute_post_close_row_metrics(frame: Any) -> dict[str, Any]:
         "dist_ema8_pct": 0.0,
         "dist_ema21_pct": 0.0,
         "dist_ema50_pct": 0.0,
+        "ema15": 0.0,
+        "ema25": 0.0,
+        "ema50": 0.0,
+        "ema200": 0.0,
+        "hma25": 0.0,
         "hma20_slope_pct": 0.0,
         "hma60_slope_pct": 0.0,
         "hma200_slope_pct": 0.0,
+        "hma_ema_long_aligned": False,
+        "hma_ema_short_aligned": False,
+        "hma_ema_long_entry": False,
+        "hma_ema_short_entry": False,
+        "hma25_ema25_cross_bull": False,
+        "hma25_ema25_cross_bear": False,
+        "hma25_ema15_exit_long": False,
+        "hma25_ema15_exit_short": False,
+        "hma_ema_risk_to_ema50_pct": 0.0,
+        "hma_ema_ema50_ema200_gap_pct": 0.0,
+        "hma_ema_signal_state": "NEUTRAL",
+        "hma_ema_long_rr_valid": False,
+        "hma_ema_short_rr_valid": False,
+        "hma_ema_long_virtual_stop": None,
+        "hma_ema_short_virtual_stop": None,
+        "hma_ema_long_target_2r": None,
+        "hma_ema_short_target_2r": None,
         "adx": 0.0,
         "ichimoku_above_cloud": False,
         "ichimoku_below_cloud": False,
@@ -715,9 +759,45 @@ def _compute_post_close_row_metrics(frame: Any) -> dict[str, Any]:
     metrics["dist_ema8_pct"] = _safe_ratio_pct(current_close, latest.get("EMA8"))
     metrics["dist_ema21_pct"] = _safe_ratio_pct(current_close, latest.get("EMA21"))
     metrics["dist_ema50_pct"] = _safe_ratio_pct(current_close, latest.get("EMA50"))
+    metrics["ema15"] = _safe_float(latest.get("EMA15", 0))
+    metrics["ema25"] = _safe_float(latest.get("EMA25", 0))
+    metrics["ema50"] = _safe_float(latest.get("EMA50", 0))
+    metrics["ema200"] = _safe_float(latest.get("EMA200", 0))
+    metrics["hma25"] = _safe_float(latest.get("HMA25", 0))
     metrics["hma20_slope_pct"] = _safe_slope_pct(latest.get("HMA"), previous.get("HMA"))
     metrics["hma60_slope_pct"] = _safe_slope_pct(latest.get("HMA60"), previous.get("HMA60"))
     metrics["hma200_slope_pct"] = _safe_slope_pct(latest.get("HMA200"), previous.get("HMA200"))
+    metrics["hma_ema_long_aligned"] = bool(latest.get("HMA_EMA_Long_Aligned", False))
+    metrics["hma_ema_short_aligned"] = bool(latest.get("HMA_EMA_Short_Aligned", False))
+    metrics["hma_ema_long_entry"] = bool(latest.get("HMA_EMA_Long_Entry", False))
+    metrics["hma_ema_short_entry"] = bool(latest.get("HMA_EMA_Short_Entry", False))
+    metrics["hma25_ema25_cross_bull"] = bool(latest.get("HMA25_EMA25_Cross_Bull", False))
+    metrics["hma25_ema25_cross_bear"] = bool(latest.get("HMA25_EMA25_Cross_Bear", False))
+    metrics["hma25_ema15_exit_long"] = bool(latest.get("HMA25_EMA15_Cross_Bear", False))
+    metrics["hma25_ema15_exit_short"] = bool(latest.get("HMA25_EMA15_Cross_Bull", False))
+    metrics["hma_ema_risk_to_ema50_pct"] = _safe_float(latest.get("HMA_EMA_Risk_To_EMA50_Pct", 0.0))
+    metrics["hma_ema_ema50_ema200_gap_pct"] = _safe_float(latest.get("HMA_EMA_EMA50_EMA200_Gap_Pct", 0.0))
+    if metrics["hma_ema_long_entry"]:
+        metrics["hma_ema_signal_state"] = "LONG_ENTRY"
+    elif metrics["hma_ema_long_aligned"]:
+        metrics["hma_ema_signal_state"] = "LONG_ALIGNED"
+    elif metrics["hma_ema_short_entry"]:
+        metrics["hma_ema_signal_state"] = "SHORT_ENTRY"
+    elif metrics["hma_ema_short_aligned"]:
+        metrics["hma_ema_signal_state"] = "SHORT_ALIGNED"
+    else:
+        metrics["hma_ema_signal_state"] = "NEUTRAL"
+    ema50_value = metrics["ema50"]
+    long_risk = current_close - ema50_value
+    short_risk = ema50_value - current_close
+    if current_close > ema50_value and long_risk > 0:
+        metrics["hma_ema_long_rr_valid"] = True
+        metrics["hma_ema_long_virtual_stop"] = _safe_float(ema50_value)
+        metrics["hma_ema_long_target_2r"] = _safe_float(current_close + (2.0 * long_risk))
+    if current_close < ema50_value and short_risk > 0:
+        metrics["hma_ema_short_rr_valid"] = True
+        metrics["hma_ema_short_virtual_stop"] = _safe_float(ema50_value)
+        metrics["hma_ema_short_target_2r"] = _safe_float(current_close - (2.0 * short_risk))
     metrics["adx"] = _safe_float(latest.get("ADX", 0))
 
     senkou_a = _coerce_float(latest.get("Ichimoku_SenkouA"))
