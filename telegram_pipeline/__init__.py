@@ -1,4 +1,5 @@
 from .contracts import TelegramCandidate, TelegramDigest, TelegramSection
+from .final_buy_ranker import annotate_rows_with_qbs, build_final_buy_sections
 from .formatters import build_post_close_digest, build_post_close_message_texts
 from .publisher import publish_digest_if_configured, publish_digest_to_github, write_local_digest_artifacts
 from .selectors import (
@@ -17,6 +18,8 @@ __all__ = [
     "TelegramCandidate",
     "TelegramDigest",
     "TelegramSection",
+    "annotate_rows_with_qbs",
+    "build_final_buy_sections",
     "build_post_close_digest",
     "build_post_close_message_texts",
     "write_local_digest_artifacts",

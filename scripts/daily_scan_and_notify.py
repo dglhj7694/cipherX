@@ -49,6 +49,7 @@ from sectors import SECTOR_GROUPS
 from strategy import build_strategy_payload
 from etf_sources import resolve_etf_universe
 from telegram_pipeline import (
+    annotate_rows_with_qbs,
     build_post_close_digest,
     build_post_close_message_texts,
     publish_digest_if_configured,
@@ -226,6 +227,14 @@ POST_CLOSE_FINAL_ENTRY_FIELD_SPECS: tuple[dict[str, str], ...] = (
     {"group": "final", "key": "final_entry_rank", "label": "FinalEntryRank", "type": "number", "description": "Top-N rank among eligible rows", "rule": "1..N when selected", "example": "1"},
     {"group": "final", "key": "final_entry_selected", "label": "FinalEntrySelected", "type": "bool", "description": "Selected for final Top-N", "rule": "within final rank top N", "example": "Y"},
     {"group": "final", "key": "final_entry_reason", "label": "FinalEntryReason", "type": "text", "description": "A/B/C score summary and gate result", "rule": "A#/B#/C# + PASS/FAIL reason", "example": "A4/B3/C2 | PASS"},
+)
+POST_CLOSE_QBS_FIELD_SPECS: tuple[dict[str, str], ...] = (
+    {"group": "qbs", "key": "qbs_score", "label": "QBSScore", "type": "number", "description": "Quant Buy Score for post-close board candidates", "rule": "section confluence + quality/trend/trigger/flow - risk", "example": "87.0"},
+    {"group": "qbs", "key": "qbs_bucket", "label": "QBSBucket", "type": "text", "description": "QBS candidate bucket", "rule": "BUY_NOW / CHASE_WATCH / PULLBACK_WAIT / EXCLUDE", "example": "BUY_NOW"},
+    {"group": "qbs", "key": "qbs_rank", "label": "QBSRank", "type": "number", "description": "Rank inside QBS bucket", "rule": "1..N after sorting by QBS", "example": "1"},
+    {"group": "qbs", "key": "qbs_tags", "label": "QBSTags", "type": "text", "description": "Compact section and trigger tags used by QBS", "rule": "tags joined with +", "example": "final+buy+HMA+pocket"},
+    {"group": "qbs", "key": "qbs_risk_flags", "label": "QBSRiskFlags", "type": "text", "description": "Risk flags applied by QBS", "rule": "flags joined with +", "example": "chase_risk+low_volume"},
+    {"group": "qbs", "key": "qbs_membership_count", "label": "QBSMembershipCount", "type": "number", "description": "Number of post-close sections containing this ticker", "rule": "count of selected section memberships", "example": "4"},
 )
 EARLY_SESSION_CORE_TOP_N = 20
 EARLY_SESSION_EXTENDED_SECTION_TOTAL = 10
@@ -3378,11 +3387,12 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
             scan_mode=scan_mode,
             top_n=FINAL_TOP_LIMIT,
         )
+        csv_rows = annotate_rows_with_qbs(csv_rows, target_date=latest_session_date)
         csv_path = write_scan_csv(
             csv_rows,
             out_dir=out_dir,
             run_label=run_label,
-            extra_field_specs=[*POST_CLOSE_LATEST_SESSION_FIELD_SPECS, *POST_CLOSE_FINAL_ENTRY_FIELD_SPECS],
+            extra_field_specs=[*POST_CLOSE_LATEST_SESSION_FIELD_SPECS, *POST_CLOSE_FINAL_ENTRY_FIELD_SPECS, *POST_CLOSE_QBS_FIELD_SPECS],
         )
         rows_path = write_scan_rows_json(merged_rows, out_dir=out_dir, run_label=run_label)
 
@@ -3488,11 +3498,12 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
             scan_mode=scan_mode,
             top_n=FINAL_TOP_LIMIT,
         )
+        csv_rows = annotate_rows_with_qbs(csv_rows, target_date=latest_session_date)
         csv_path = write_scan_csv(
             csv_rows,
             out_dir=out_dir,
             run_label=run_label,
-            extra_field_specs=[*POST_CLOSE_LATEST_SESSION_FIELD_SPECS, *POST_CLOSE_FINAL_ENTRY_FIELD_SPECS],
+            extra_field_specs=[*POST_CLOSE_LATEST_SESSION_FIELD_SPECS, *POST_CLOSE_FINAL_ENTRY_FIELD_SPECS, *POST_CLOSE_QBS_FIELD_SPECS],
         )
         rows_path = write_scan_rows_json(scan_result.rows, out_dir=out_dir, run_label=run_label)
         detected_turn_rows = select_us_session_turn_rows(csv_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)

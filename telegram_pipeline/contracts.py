@@ -16,6 +16,10 @@ class TelegramCandidate:
     label: str
     reason: str
     source_flags: dict[str, Any] = field(default_factory=dict)
+    qbs_score: float | None = None
+    bucket: str = ""
+    tags: list[str] = field(default_factory=list)
+    risk_flags: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

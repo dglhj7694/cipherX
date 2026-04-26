@@ -4,6 +4,14 @@ from datetime import date, datetime
 from typing import Any, Iterable, Mapping
 
 from .contracts import TelegramCandidate, TelegramDigest, TelegramSection
+from .final_buy_ranker import (
+    QBS_BUY_NOW_KEY,
+    QBS_CHASE_WATCH_KEY,
+    QBS_OUTPUT_KEYS,
+    QBS_OUTPUT_LIMIT,
+    QBS_PULLBACK_WAIT_KEY,
+    build_final_buy_sections,
+)
 from .rankers import (
     is_truthy,
     safe_float,
@@ -25,6 +33,24 @@ from .selectors import (
     MANDATORY_SECTION_KEYS,
     select_post_close_sections,
 )
+
+QBS_SECTION_TITLES: dict[str, str] = {
+    QBS_BUY_NOW_KEY: f"오늘 매수 최종 후보 Top {QBS_OUTPUT_LIMIT}",
+    QBS_CHASE_WATCH_KEY: "강하지만 추격주의",
+    QBS_PULLBACK_WAIT_KEY: "눌림 대기 후보",
+}
+
+QBS_QUALITY_FLOORS: dict[str, str] = {
+    QBS_BUY_NOW_KEY: "QBS>=50 + final/buy confluence + no hard risk + not chase extended",
+    QBS_CHASE_WATCH_KEY: "QBS>=40 + extended move / 52W / 5D chase risk",
+    QBS_PULLBACK_WAIT_KEY: "QBS>=25 + pullback reentry + no hard risk",
+}
+
+QBS_DISPLAY_NUMBERS: dict[str, str] = {
+    QBS_BUY_NOW_KEY: "0",
+    QBS_CHASE_WATCH_KEY: "0-1",
+    QBS_PULLBACK_WAIT_KEY: "0-2",
+}
 
 
 def _signed(value: Any, decimals: int = 2) -> str:
@@ -285,6 +311,44 @@ def _build_candidate(section_key: str, row: Mapping[str, Any], rank: int, target
     )
 
 
+def _build_qbs_candidate(section_key: str, candidate: Any) -> TelegramCandidate:
+    return TelegramCandidate(
+        ticker=str(candidate.ticker or "").strip().upper(),
+        price=candidate.price,
+        chg_value=candidate.chg_value,
+        chg_pct=candidate.chg_pct,
+        volume_ratio_20=candidate.volume_ratio_20,
+        section_key=section_key,
+        rank=int(candidate.rank or 0),
+        label=str(candidate.bucket or ""),
+        reason="+".join(candidate.tags) or "-",
+        source_flags=dict(candidate.source_flags or {}),
+        qbs_score=candidate.qbs_score,
+        bucket=str(candidate.bucket or ""),
+        tags=list(candidate.tags or []),
+        risk_flags=list(candidate.risk_flags or []),
+    )
+
+
+def _build_qbs_sections(section_rows: Mapping[str, Iterable[Mapping[str, Any]]], target_date: date) -> list[TelegramSection]:
+    qbs_sections = build_final_buy_sections(section_rows, target_date=target_date)
+    sections: list[TelegramSection] = []
+    for section_key in QBS_OUTPUT_KEYS:
+        candidates = list(qbs_sections.get(section_key) or [])
+        items = [_build_qbs_candidate(section_key, candidate) for candidate in candidates]
+        sections.append(
+            TelegramSection(
+                key=section_key,
+                title=QBS_SECTION_TITLES[section_key],
+                items=items,
+                item_count=len(items),
+                quality_floor=QBS_QUALITY_FLOORS[section_key],
+                ranked=True,
+            )
+        )
+    return sections
+
+
 def build_post_close_digest(
     rows: Iterable[Mapping[str, Any]],
     *,
@@ -298,7 +362,7 @@ def build_post_close_digest(
 ) -> TelegramDigest:
     section_rows = select_post_close_sections(rows, target_date=market_date)
 
-    sections: list[TelegramSection] = []
+    sections: list[TelegramSection] = _build_qbs_sections(section_rows, market_date)
     for section_key in CORE_SECTION_ORDER:
         row_list = list(section_rows.get(section_key) or [])
         items = [_build_candidate(section_key, row, idx, market_date) for idx, row in enumerate(row_list, start=1)]
@@ -319,7 +383,7 @@ def build_post_close_digest(
         run_stamp=str(run_stamp or "").strip(),
         market_date=market_date.isoformat(),
         generated_at=generated_at.isoformat(),
-        section_order=list(CORE_SECTION_ORDER),
+        section_order=[*QBS_OUTPUT_KEYS, *CORE_SECTION_ORDER],
         sections=sections,
         briefing_refs={
             "mode": "separate_message",
@@ -343,6 +407,32 @@ def _format_candidate_line(candidate: TelegramCandidate) -> str:
     if turn_engine and candidate.section_key in {"buy_turn", "sell_turn"}:
         line += f" | {turn_engine}"
     return line
+
+
+def _format_qbs_candidate_line(candidate: TelegramCandidate) -> str:
+    tags = "+".join(list(candidate.tags or [])) or "-"
+    line = (
+        f"{candidate.rank}. {candidate.ticker}"
+        f" | QBS {safe_float(candidate.qbs_score):.1f}"
+        f" | ({_signed(candidate.chg_value)}, {_signed(candidate.chg_pct)}%)"
+        f" | {_ratio(candidate.volume_ratio_20)}"
+        f" | {str(candidate.bucket or '-')}"
+        f" | {tags}"
+    )
+    risk_flags = "+".join(list(candidate.risk_flags or []))
+    if risk_flags:
+        line += f" | 주의:{risk_flags}"
+    return line
+
+
+def _qbs_section_block(display_number: str, section: TelegramSection) -> str:
+    lines = [f"## {display_number}. {section.title}"]
+    if not section.items:
+        lines.append("- 해당 없음")
+        return "\n".join(lines)
+    for item in section.items:
+        lines.append(_format_qbs_candidate_line(item))
+    return "\n".join(lines)
 
 
 def _section_block(index: int, section: TelegramSection) -> str:
@@ -377,6 +467,9 @@ def build_main_message(digest: TelegramDigest) -> str:
 
     display_index = 1
     for section in digest.sections:
+        if section.key in QBS_DISPLAY_NUMBERS:
+            blocks.append(_qbs_section_block(QBS_DISPLAY_NUMBERS[section.key], section))
+            continue
         if section.key not in MANDATORY_SECTION_KEYS and section.item_count <= 0:
             continue
         blocks.append(_section_block(display_index, section))

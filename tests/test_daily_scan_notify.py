@@ -16,6 +16,7 @@ from scripts.daily_scan_and_notify import (
     EARLY_SESSION_INDEX_TITLES,
     POST_CLOSE_FINAL_ENTRY_FIELD_SPECS,
     POST_CLOSE_LATEST_SESSION_FIELD_SPECS,
+    POST_CLOSE_QBS_FIELD_SPECS,
     RUSSELL2000_UNIVERSE_ITEMS,
     ScanRunResult,
     _compute_post_close_row_metrics,
@@ -49,6 +50,7 @@ from scripts.daily_scan_and_notify import (
     split_tickers_for_shard,
     write_scan_csv,
 )
+from telegram_pipeline import annotate_rows_with_qbs
 
 
 class DailyScanNotifyTests(unittest.TestCase):
@@ -221,6 +223,96 @@ class DailyScanNotifyTests(unittest.TestCase):
         self.assertEqual(data[rank_idx], "1")
         self.assertIn(data[selected_idx], {"Y", "True"})
         self.assertEqual(data[reason_idx], "A4/B3/C2 | PASS")
+
+    def test_write_scan_csv_post_close_qbs_columns(self):
+        target_date = datetime(2026, 4, 23).date()
+        base_row = {
+            "ticker": "ALPHA",
+            "price": 101.25,
+            "chg_value": 1.75,
+            "chg": 2.35,
+            "chg_5d": 8.0,
+            "volume_ratio_20": 1.45,
+            "dollar_volume_20": 125_000_000,
+            "final_entry_eligible": True,
+            "final_entry_selected": True,
+            "final_entry_score": 90.0,
+            "b_score": 3,
+            "c_score": 2,
+            "scan_score": 140.0,
+            "es": 7.0,
+            "low_conflict_bullish": True,
+            "strategy_conflict_level": "LOW",
+            "multi_buy": 2,
+            "multi_sell": 0,
+            "thin_trade_risk": False,
+            "bearish_gap_failure": False,
+            "utbot_buy_last_date": target_date.isoformat(),
+            "hull_turn_bull_last_date": "N/A",
+            "utbot_sell_last_date": "N/A",
+            "hull_turn_bear_last_date": "N/A",
+            "uptrend_persistent": True,
+            "bull_strength_recent": True,
+            "volume_bullish": True,
+            "adx": 24.0,
+            "rs_rank_vs_index": 83.0,
+            "hma20_slope_pct": 1.8,
+            "hma60_slope_pct": 2.2,
+            "dist_sma20_pct": 9.0,
+            "zscore20": 1.9,
+            "pullback_ready": False,
+            "pullback_reentry": False,
+            "gap_setup_candidate": False,
+            "pocket_pivot_candidate": False,
+            "new_52w_high": False,
+            "latest_bar_date": target_date.isoformat(),
+            "ema50": 98.0,
+            "hma_ema_long_entry": False,
+            "hma_ema_long_aligned": False,
+        }
+        chase_row = dict(base_row, ticker="CHASE", chg=13.0)
+        excluded_row = dict(base_row, ticker="SELLX", utbot_sell_last_date=target_date.isoformat())
+        blank_row = {
+            "ticker": "BLANK",
+            "chg": 0.0,
+            "chg_5d": 0.0,
+            "volume_ratio_20": 0.5,
+            "utbot_buy_last_date": "N/A",
+            "hull_turn_bull_last_date": "N/A",
+            "utbot_sell_last_date": "N/A",
+            "hull_turn_bear_last_date": "N/A",
+            "final_entry_eligible": False,
+            "final_entry_selected": False,
+        }
+        rows = annotate_rows_with_qbs([base_row, chase_row, excluded_row, blank_row], target_date=target_date)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            csv_path = write_scan_csv(
+                rows,
+                out_dir=Path(temp_dir),
+                run_label="post_close_qbs",
+                extra_field_specs=[*POST_CLOSE_LATEST_SESSION_FIELD_SPECS, *POST_CLOSE_FINAL_ENTRY_FIELD_SPECS, *POST_CLOSE_QBS_FIELD_SPECS],
+            )
+            csv_rows = list(csv.DictReader(io.StringIO(csv_path.read_text(encoding="utf-8-sig"))))
+
+        first_row = csv_rows[0]
+        self.assertIn("QBSScore(qbs_score)", first_row)
+        self.assertIn("QBSBucket(qbs_bucket)", first_row)
+        self.assertIn("QBSRank(qbs_rank)", first_row)
+        self.assertIn("QBSTags(qbs_tags)", first_row)
+        self.assertIn("QBSRiskFlags(qbs_risk_flags)", first_row)
+        self.assertIn("QBSMembershipCount(qbs_membership_count)", first_row)
+
+        by_ticker = {row["티커(ticker)"]: row for row in csv_rows}
+        self.assertEqual(by_ticker["ALPHA"]["QBSBucket(qbs_bucket)"], "BUY_NOW")
+        self.assertNotEqual(by_ticker["ALPHA"]["QBSScore(qbs_score)"], "")
+        self.assertIn("final+buy", by_ticker["ALPHA"]["QBSTags(qbs_tags)"])
+        self.assertEqual(by_ticker["CHASE"]["QBSBucket(qbs_bucket)"], "CHASE_WATCH")
+        self.assertIn("chase_risk", by_ticker["CHASE"]["QBSRiskFlags(qbs_risk_flags)"])
+        self.assertEqual(by_ticker["SELLX"]["QBSBucket(qbs_bucket)"], "EXCLUDE")
+        self.assertIn("sell_turn", by_ticker["SELLX"]["QBSRiskFlags(qbs_risk_flags)"])
+        self.assertEqual(by_ticker["BLANK"]["QBSBucket(qbs_bucket)"], "")
+        self.assertEqual(by_ticker["BLANK"]["QBSScore(qbs_score)"], "")
 
     def test_filter_turn_rows_for_telegram_uses_volume_ratio_gt_one(self):
         rows = [

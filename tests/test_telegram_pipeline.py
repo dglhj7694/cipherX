@@ -12,6 +12,8 @@ from telegram_pipeline import (
     FINAL_TOP_LIMIT,
     FIVE_DAY_TOP_LIMIT,
     HMA_EMA_TOP_LIMIT,
+    TelegramCandidate,
+    annotate_rows_with_qbs,
     build_post_close_digest,
     build_post_close_message_texts,
     split_telegram_message_text,
@@ -114,6 +116,9 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertEqual(
             digest.section_order,
             [
+                "qbs_buy_now",
+                "qbs_chase_watch",
+                "qbs_pullback_wait",
                 "final_top",
                 "buy_turn",
                 "pullback_reentry",
@@ -135,6 +140,106 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertEqual([item.ticker for item in section_map["new_52w_high"].items], ["ALPHA"])
         self.assertTrue(section_map["final_top"].items[0].source_flags["hma_ema_long_aligned"])
         self.assertTrue(section_map["final_top"].items[0].source_flags["hma_ema_long_entry"])
+
+    def test_qbs_scores_confluence_above_single_buy_turn(self):
+        confluence = self._row("ALPHA")
+        single_buy = self._row(
+            "BETA",
+            final_entry_eligible=False,
+            final_entry_selected=False,
+            chg_5d=0.0,
+            uptrend_persistent=False,
+            pullback_ready=False,
+            pullback_reentry=False,
+            bull_strength_recent=False,
+            gap_setup_candidate=False,
+            pocket_pivot_candidate=False,
+            new_52w_high=False,
+            latest_bar_date=self.market_date.isoformat(),
+            hma_ema_long_entry=False,
+            hma_ema_long_aligned=False,
+            hma25_ema25_cross_bull=False,
+        )
+
+        annotated = annotate_rows_with_qbs([confluence, single_buy], target_date=self.market_date)
+        by_ticker = {row["ticker"]: row for row in annotated}
+
+        self.assertGreater(float(by_ticker["ALPHA"]["qbs_score"]), float(by_ticker["BETA"]["qbs_score"]))
+        self.assertEqual(by_ticker["ALPHA"]["qbs_bucket"], "BUY_NOW")
+
+    def test_qbs_hard_risk_and_chase_buckets(self):
+        sell_conflict = self._row(
+            "SELLX",
+            utbot_sell_last_date=self.market_date.isoformat(),
+        )
+        chase = self._row("CHASE", chg=13.0)
+        extreme = self._row("EXTREME", chg=21.0)
+
+        annotated = annotate_rows_with_qbs([sell_conflict, chase, extreme], target_date=self.market_date)
+        by_ticker = {row["ticker"]: row for row in annotated}
+
+        self.assertEqual(by_ticker["SELLX"]["qbs_bucket"], "EXCLUDE")
+        self.assertIn("sell_turn", by_ticker["SELLX"]["qbs_risk_flags"])
+        self.assertEqual(by_ticker["CHASE"]["qbs_bucket"], "CHASE_WATCH")
+        self.assertIn("chase_risk", by_ticker["CHASE"]["qbs_risk_flags"])
+        self.assertEqual(by_ticker["EXTREME"]["qbs_bucket"], "CHASE_WATCH")
+        self.assertIn("extreme_chase", by_ticker["EXTREME"]["qbs_risk_flags"])
+
+    def test_qbs_hma_negative_not_buy_now_and_pullback_wait(self):
+        hma_negative = self._row(
+            "HMANEG",
+            final_entry_eligible=False,
+            final_entry_selected=False,
+            latest_session_utbot_buy_turn=False,
+            latest_session_hull_buy_turn=False,
+            utbot_buy_last_date="N/A",
+            hull_turn_bull_last_date="N/A",
+            chg=-0.5,
+            chg_5d=0.0,
+            uptrend_persistent=False,
+            pullback_ready=False,
+            pullback_reentry=False,
+            bull_strength_recent=False,
+            gap_setup_candidate=False,
+            pocket_pivot_candidate=False,
+            new_52w_high=False,
+            hma_ema_long_entry=True,
+            hma_ema_long_aligned=True,
+            hma25_ema25_cross_bull=True,
+        )
+        pullback = self._row(
+            "PULL",
+            final_entry_eligible=False,
+            final_entry_selected=False,
+            latest_session_utbot_buy_turn=False,
+            latest_session_hull_buy_turn=False,
+            utbot_buy_last_date="N/A",
+            hull_turn_bull_last_date="N/A",
+            chg=0.4,
+            chg_5d=0.0,
+            gap_setup_candidate=False,
+            pocket_pivot_candidate=False,
+            new_52w_high=False,
+            hma_ema_long_entry=False,
+            hma_ema_long_aligned=False,
+            hma25_ema25_cross_bull=False,
+        )
+
+        annotated = annotate_rows_with_qbs([hma_negative, pullback], target_date=self.market_date)
+        by_ticker = {row["ticker"]: row for row in annotated}
+
+        self.assertNotEqual(by_ticker["HMANEG"]["qbs_bucket"], "BUY_NOW")
+        self.assertEqual(by_ticker["PULL"]["qbs_bucket"], "PULLBACK_WAIT")
+
+    def test_qbs_candidate_mutable_fields_are_isolated(self):
+        first = TelegramCandidate("AAA", None, None, None, None, "qbs_buy_now", 1, "", "")
+        second = TelegramCandidate("BBB", None, None, None, None, "qbs_buy_now", 2, "", "")
+
+        first.tags.append("final")
+        first.risk_flags.append("chase_risk")
+
+        self.assertEqual(second.tags, [])
+        self.assertEqual(second.risk_flags, [])
 
     def test_turn_sections_use_same_day_only(self):
         same_day_buy = self._row("BUYDAY")
@@ -250,6 +355,62 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertEqual(len(messages), 1)
         self.assertIn("## 1.", messages[0])
         self.assertIn("## 2.", messages[0])
+
+    def test_qbs_blocks_render_above_existing_sections_with_special_numbering(self):
+        digest = build_post_close_digest(
+            [self._row("ALPHA")],
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=1,
+            result_count=1,
+            skip_count=0,
+        )
+        message = build_post_close_message_texts(digest)[0]
+
+        qbs_0 = message.index("## 0. ")
+        qbs_01 = message.index("## 0-1. ")
+        qbs_02 = message.index("## 0-2. ")
+        normal_1 = message.index("## 1. ")
+        self.assertTrue(qbs_0 < qbs_01 < qbs_02 < normal_1)
+        self.assertIn("QBS", message)
+
+    def test_empty_qbs_blocks_are_always_rendered(self):
+        digest = build_post_close_digest(
+            [],
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=0,
+            result_count=0,
+            skip_count=0,
+        )
+        message = build_post_close_message_texts(digest)[0]
+
+        self.assertIn("## 0. ", message)
+        self.assertIn("## 0-1. ", message)
+        self.assertIn("## 0-2. ", message)
+        self.assertGreaterEqual(message.count("- 해당 없음"), 3)
+
+    def test_chunk_split_keeps_qbs_before_existing_sections(self):
+        rows = [self._row(f"T{i:02d}", final_entry_score=100.0 - i, chg_5d=15.0 - (i / 10.0)) for i in range(12)]
+        digest = build_post_close_digest(
+            rows,
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=12,
+            result_count=12,
+            skip_count=0,
+        )
+        chunks = split_telegram_message_text(build_post_close_message_texts(digest)[0], chunk_size=350)
+        joined = "\n".join(chunks)
+
+        self.assertGreater(len(chunks), 1)
+        self.assertTrue(joined.index("## 0. ") < joined.index("## 0-1. ") < joined.index("## 0-2. ") < joined.index("## 1. "))
 
     def test_message_lines_show_core_fields_and_turn_engine_only_for_turn_sections(self):
         buy_hull_only = self._row(
@@ -409,4 +570,3 @@ class HomeDigestLoaderTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
