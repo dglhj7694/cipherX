@@ -9,13 +9,12 @@ from unittest.mock import patch
 from app_ui.pages.home_page import extract_section_candidates, load_latest_telegram_digest
 from scripts.daily_scan_and_notify import _build_post_close_digest_bundle, _send_telegram_if_enabled
 from telegram_pipeline import (
-    FINAL_TOP_LIMIT,
-    FIVE_DAY_TOP_LIMIT,
-    HMA_EMA_TOP_LIMIT,
+    BOARD_SECTION_LIMIT,
     TelegramCandidate,
     annotate_rows_with_qbs,
     build_post_close_digest,
     build_post_close_message_texts,
+    select_post_close_sections,
     split_telegram_message_text,
     write_local_digest_artifacts,
 )
@@ -100,7 +99,7 @@ class TelegramPipelineTests(unittest.TestCase):
         row.update(overrides)
         return row
 
-    def test_build_post_close_digest_keeps_overlap_and_has_hma_section(self):
+    def test_build_post_close_digest_uses_trader_board_sections_and_tags_overlap(self):
         digest = build_post_close_digest(
             [self._row("ALPHA")],
             run_stamp="20260424_050000",
@@ -119,27 +118,30 @@ class TelegramPipelineTests(unittest.TestCase):
                 "qbs_buy_now",
                 "qbs_chase_watch",
                 "qbs_pullback_wait",
-                "final_top",
-                "buy_turn",
+                "confluence",
+                "entry_now",
                 "pullback_reentry",
-                "trend_continuation",
-                "hma_ema_trend",
-                "sell_turn",
-                "gap_setup",
-                "pocket_pivot",
-                "five_day_top",
-                "new_52w_high",
+                "steady_uptrend",
+                "breakout_wait",
+                "accumulation",
+                "rs_leader",
+                "chase_risk",
+                "sell_risk",
             ],
         )
-        self.assertEqual([item.ticker for item in section_map["final_top"].items], ["ALPHA"])
-        self.assertEqual([item.ticker for item in section_map["buy_turn"].items], ["ALPHA"])
-        self.assertEqual([item.ticker for item in section_map["hma_ema_trend"].items], ["ALPHA"])
-        self.assertEqual([item.ticker for item in section_map["gap_setup"].items], ["ALPHA"])
-        self.assertEqual([item.ticker for item in section_map["pocket_pivot"].items], ["ALPHA"])
-        self.assertEqual([item.ticker for item in section_map["five_day_top"].items], ["ALPHA"])
-        self.assertEqual([item.ticker for item in section_map["new_52w_high"].items], ["ALPHA"])
-        self.assertTrue(section_map["final_top"].items[0].source_flags["hma_ema_long_aligned"])
-        self.assertTrue(section_map["final_top"].items[0].source_flags["hma_ema_long_entry"])
+        self.assertEqual([item.ticker for item in section_map["qbs_buy_now"].items], ["ALPHA"])
+        self.assertEqual([item.ticker for item in section_map["confluence"].items], ["ALPHA"])
+        confluence = section_map["confluence"].items[0]
+        self.assertGreaterEqual(confluence.source_flags["membership_count"], 3)
+        self.assertIn("HMA", confluence.tags)
+        self.assertIn("pocket", confluence.tags)
+        general_tickers = [
+            item.ticker
+            for key in digest.section_order
+            if not key.startswith("qbs_")
+            for item in section_map[key].items
+        ]
+        self.assertEqual(len(general_tickers), len(set(general_tickers)))
 
     def test_qbs_scores_confluence_above_single_buy_turn(self):
         confluence = self._row("ALPHA")
@@ -310,17 +312,21 @@ class TelegramPipelineTests(unittest.TestCase):
         )
         section_map = digest.section_map()
 
-        self.assertEqual([item.ticker for item in section_map["buy_turn"].items], ["BUYDAY"])
-        self.assertEqual([item.ticker for item in section_map["sell_turn"].items], ["SELLDAY"])
-        self.assertEqual(section_map["buy_turn"].items[0].source_flags.get("turn_engine"), "UTBot")
-        self.assertEqual(section_map["sell_turn"].items[0].source_flags.get("turn_engine"), "UTBot")
+        board_tickers = {
+            item.ticker
+            for key in ["confluence", "entry_now", "pullback_reentry", "steady_uptrend", "breakout_wait", "accumulation", "rs_leader", "chase_risk"]
+            for item in section_map[key].items
+        }
+        self.assertIn("BUYDAY", board_tickers)
+        self.assertEqual(section_map["sell_risk"].items[0].ticker, "SELLDAY")
+        self.assertIn("sell_turn", section_map["sell_risk"].items[0].risk_flags)
 
-    def test_only_final_hma_have_top20_and_five_day_has_top30_limit(self):
+    def test_board_sections_and_qbs_buckets_apply_new_limits(self):
         rows = [
             self._row(
                 f"T{i:02d}",
                 final_entry_score=500 - i,
-                chg_5d=50 - i,
+                chg_5d=5.0 - (i * 0.01),
                 scan_score=300 - i,
                 hma_ema_risk_to_ema50_pct=1.0 + i * 0.05,
             )
@@ -338,28 +344,66 @@ class TelegramPipelineTests(unittest.TestCase):
         )
         section_map = digest.section_map()
 
-        self.assertEqual(section_map["final_top"].item_count, FINAL_TOP_LIMIT)
-        self.assertEqual(section_map["five_day_top"].item_count, FIVE_DAY_TOP_LIMIT)
-        self.assertEqual(section_map["hma_ema_trend"].item_count, HMA_EMA_TOP_LIMIT)
-        self.assertEqual(section_map["buy_turn"].item_count, 35)
-        self.assertEqual(section_map["gap_setup"].item_count, 35)
-        self.assertEqual(section_map["pocket_pivot"].item_count, 35)
+        self.assertEqual(section_map["qbs_buy_now"].item_count, 20)
+        self.assertEqual(section_map["confluence"].item_count, BOARD_SECTION_LIMIT)
+        self.assertTrue(all(section.item_count <= BOARD_SECTION_LIMIT for key, section in section_map.items() if not key.startswith("qbs_")))
 
-    def test_hma_selector_applies_price_over_ema50_gate(self):
-        ok = self._row("OK", price=101.0, ema50=100.0)
-        blocked = self._row("BLOCKED", price=99.0, ema50=100.0)
+    def test_five_day_only_candidates_land_in_chase_risk_top10(self):
+        rows = [
+            self._row(
+                f"C{i:02d}",
+                final_entry_eligible=False,
+                final_entry_selected=False,
+                latest_session_utbot_buy_turn=False,
+                latest_session_hull_buy_turn=False,
+                utbot_buy_last_date="N/A",
+                hull_turn_bull_last_date="N/A",
+                chg=1.0,
+                chg_5d=30.0 - i,
+                uptrend_persistent=False,
+                pullback_ready=False,
+                pullback_reentry=False,
+                bull_strength_recent=False,
+                gap_setup_candidate=False,
+                pocket_pivot_candidate=False,
+                new_52w_high=False,
+                hma_ema_long_entry=False,
+                hma_ema_long_aligned=False,
+                hma25_ema25_cross_bull=False,
+                rs_rank_vs_index=20.0,
+                ret20_percentile=20.0,
+                ret60_percentile=20.0,
+                near_52w_high_2pct=False,
+                breakout_dist_20d_high_pct=-20.0,
+                drawdown_from_52w_high_pct=-20.0,
+                nr7_flag=False,
+                inside_day_flag=False,
+                three_weeks_tight=False,
+                atr_contracting=False,
+            )
+            for i in range(15)
+        ]
         digest = build_post_close_digest(
-            [ok, blocked],
+            rows,
             run_stamp="20260424_050000",
             generated_at=self.generated_at,
             market_date=self.market_date,
             scan_label="post-close default",
-            universe_count=2,
-            result_count=2,
+            universe_count=15,
+            result_count=15,
             skip_count=0,
         )
-        hma_items = digest.section_map()["hma_ema_trend"].items
-        self.assertEqual([item.ticker for item in hma_items], ["OK"])
+        chase_items = digest.section_map()["chase_risk"].items
+
+        self.assertEqual(len(chase_items), BOARD_SECTION_LIMIT)
+        self.assertEqual([item.ticker for item in chase_items], [f"C{i:02d}" for i in range(10)])
+
+    def test_hma_selector_applies_price_over_ema50_gate(self):
+        ok = self._row("OK", price=101.0, ema50=100.0)
+        blocked = self._row("BLOCKED", price=99.0, ema50=100.0)
+        source_sections = select_post_close_sections([ok, blocked], target_date=self.market_date)
+
+        self.assertEqual([item["ticker"] for item in source_sections["hma_ema_trend"]], ["OK"])
 
     def test_message_contract_is_single_main_message(self):
         digest = build_post_close_digest(
@@ -433,7 +477,7 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertGreater(len(chunks), 1)
         self.assertTrue(joined.index("## 0. ") < joined.index("## 0-1. ") < joined.index("## 0-2. ") < joined.index("## 1. "))
 
-    def test_message_lines_show_core_fields_and_turn_engine_only_for_turn_sections(self):
+    def test_message_lines_show_board_label_change_volume_reason_and_risk(self):
         buy_hull_only = self._row(
             "BUYHULL",
             latest_session_utbot_buy_turn=False,
@@ -466,12 +510,44 @@ class TelegramPipelineTests(unittest.TestCase):
         )
         message = build_post_close_message_texts(digest)[0]
 
-        self.assertIn("BUYHULL | (+1.75, +2.35%) | x1.45 | HULL", message)
-        self.assertIn("SELLBOTH | (+1.75, +2.35%) | x1.45 | UTBot+HULL", message)
+        self.assertIn("BUYHULL | CONFLUENCE | +2.35% | x1.45", message)
+        self.assertIn("SELLBOTH | SELL_RISK | +2.35% | x1.45", message)
+        self.assertIn("| sell_turn", message)
 
-    def test_five_day_top_message_lines_show_five_day_return(self):
+    def test_five_day_only_message_line_uses_chase_risk_section(self):
+        row = self._row(
+            "FIVE",
+            final_entry_eligible=False,
+            final_entry_selected=False,
+            latest_session_utbot_buy_turn=False,
+            latest_session_hull_buy_turn=False,
+            utbot_buy_last_date="N/A",
+            hull_turn_bull_last_date="N/A",
+            chg=1.0,
+            chg_5d=17.42,
+            uptrend_persistent=False,
+            pullback_ready=False,
+            pullback_reentry=False,
+            bull_strength_recent=False,
+            gap_setup_candidate=False,
+            pocket_pivot_candidate=False,
+            new_52w_high=False,
+            hma_ema_long_entry=False,
+            hma_ema_long_aligned=False,
+            hma25_ema25_cross_bull=False,
+            rs_rank_vs_index=20.0,
+            ret20_percentile=20.0,
+            ret60_percentile=20.0,
+            near_52w_high_2pct=False,
+            breakout_dist_20d_high_pct=-20.0,
+            drawdown_from_52w_high_pct=-20.0,
+            nr7_flag=False,
+            inside_day_flag=False,
+            three_weeks_tight=False,
+            atr_contracting=False,
+        )
         digest = build_post_close_digest(
-            [self._row("ALPHA", chg_5d=17.42)],
+            [row],
             run_stamp="20260424_050000",
             generated_at=self.generated_at,
             market_date=self.market_date,
@@ -482,7 +558,8 @@ class TelegramPipelineTests(unittest.TestCase):
         )
         message = build_post_close_message_texts(digest)[0]
 
-        self.assertIn("ALPHA | (+1.75, +2.35%) | x1.45 | 5D +17.42%", message)
+        self.assertIn("## 8. 단기 급등 / 추격주의 후보", message)
+        self.assertIn("FIVE | CHASE_RISK | +1.00% | x1.45 | 5D", message)
 
     def test_split_telegram_message_text_prefers_section_boundaries(self):
         text = "\n\n".join(

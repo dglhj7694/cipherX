@@ -219,9 +219,9 @@ def render_home_page(
             ],
         )
     else:
-        final_top = extract_section_candidates(payload, "final_top", limit=5)
-        buy_turn = extract_section_candidates(payload, "buy_turn", limit=5)
-        sell_turn = extract_section_candidates(payload, "sell_turn", limit=5)
+        final_top = extract_section_candidates(payload, "qbs_buy_now", limit=5)
+        entry_now = extract_section_candidates(payload, "entry_now", limit=5)
+        sell_risk = extract_section_candidates(payload, "sell_risk", limit=5)
 
         render_section_heading(
             "오늘 최우선 후보 Top 5",
@@ -240,22 +240,22 @@ def render_home_page(
         quick_left, quick_right = st.columns(2)
         with quick_left:
             render_section_heading(
-                "매수전환 바로가기",
-                "당일 매수전환이 나온 티커를 바로 검증합니다.",
-                badges=[(f"{len(buy_turn)}개", "accent")],
+                "지금 진입형 바로가기",
+                "매수전환, MA20 재탈환, HMA/EMA 진입형 티커를 바로 검증합니다.",
+                badges=[(f"{len(entry_now)}개", "accent")],
                 eyebrow="Quick Verify",
                 tight=True,
             )
-            _render_ticker_button_row([str(item.get("ticker") or "") for item in buy_turn], key_prefix="home_buy", on_select_ticker=on_select_ticker, columns=2)
+            _render_ticker_button_row([str(item.get("ticker") or "") for item in entry_now], key_prefix="home_buy", on_select_ticker=on_select_ticker, columns=2)
         with quick_right:
             render_section_heading(
-                "오늘 매도전환",
-                "당일 매도전환이 나온 티커를 먼저 확인합니다.",
-                badges=[(f"{len(sell_turn)}개", "warning")],
+                "매도전환 / 위험",
+                "매도전환이나 강한 위험 신호가 나온 티커를 먼저 확인합니다.",
+                badges=[(f"{len(sell_risk)}개", "warning")],
                 eyebrow="Risk First",
                 tight=True,
             )
-            _render_ticker_button_row([str(item.get("ticker") or "") for item in sell_turn], key_prefix="home_sell", on_select_ticker=on_select_ticker, columns=2)
+            _render_ticker_button_row([str(item.get("ticker") or "") for item in sell_risk], key_prefix="home_sell", on_select_ticker=on_select_ticker, columns=2)
 
     recent = _collect_recent_tickers(recent_tickers)
     render_section_heading(

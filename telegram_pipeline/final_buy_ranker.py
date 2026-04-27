@@ -27,7 +27,15 @@ BUCKET_CHASE_WATCH = "CHASE_WATCH"
 BUCKET_PULLBACK_WAIT = "PULLBACK_WAIT"
 BUCKET_EXCLUDE = "EXCLUDE"
 
-QBS_OUTPUT_LIMIT = 20
+QBS_BUY_NOW_LIMIT = 20
+QBS_CHASE_WATCH_LIMIT = 10
+QBS_PULLBACK_WAIT_LIMIT = 10
+QBS_OUTPUT_LIMIT = QBS_BUY_NOW_LIMIT
+QBS_OUTPUT_LIMITS: dict[str, int] = {
+    QBS_BUY_NOW_KEY: QBS_BUY_NOW_LIMIT,
+    QBS_CHASE_WATCH_KEY: QBS_CHASE_WATCH_LIMIT,
+    QBS_PULLBACK_WAIT_KEY: QBS_PULLBACK_WAIT_LIMIT,
+}
 QBS_BUY_NOW_MIN = 50.0
 QBS_CHASE_MIN = 40.0
 QBS_PULLBACK_MIN = 25.0
@@ -456,7 +464,7 @@ def build_final_buy_sections(
         output_key = bucket_to_key.get(candidate.bucket)
         if not output_key:
             continue
-        if len(sections[output_key]) >= QBS_OUTPUT_LIMIT:
+        if len(sections[output_key]) >= QBS_OUTPUT_LIMITS.get(output_key, QBS_OUTPUT_LIMIT):
             continue
         sections[output_key].append(candidate)
     return sections

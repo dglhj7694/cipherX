@@ -9,6 +9,7 @@ from .final_buy_ranker import (
     QBS_CHASE_WATCH_KEY,
     QBS_OUTPUT_KEYS,
     QBS_OUTPUT_LIMIT,
+    QBS_OUTPUT_LIMITS,
     QBS_PULLBACK_WAIT_KEY,
     build_final_buy_sections,
 )
@@ -25,19 +26,19 @@ from .rankers import (
     same_session_sell_turn,
 )
 from .selectors import (
-    CORE_QUALITY_FLOORS,
-    CORE_SECTION_ORDER,
-    CORE_SECTION_TITLES,
-    FINAL_TOP_LIMIT,
-    FIVE_DAY_TOP_LIMIT,
-    MANDATORY_SECTION_KEYS,
+    BOARD_MANDATORY_SECTION_KEYS,
+    BOARD_QUALITY_FLOORS,
+    BOARD_SECTION_LIMIT,
+    BOARD_SECTION_ORDER,
+    BOARD_SECTION_TITLES,
     select_post_close_sections,
+    select_post_close_board_sections,
 )
 
 QBS_SECTION_TITLES: dict[str, str] = {
     QBS_BUY_NOW_KEY: f"오늘 매수 최종 후보 Top {QBS_OUTPUT_LIMIT}",
-    QBS_CHASE_WATCH_KEY: "강하지만 추격주의",
-    QBS_PULLBACK_WAIT_KEY: "눌림 대기 후보",
+    QBS_CHASE_WATCH_KEY: f"강하지만 추격주의 Top {QBS_OUTPUT_LIMITS[QBS_CHASE_WATCH_KEY]}",
+    QBS_PULLBACK_WAIT_KEY: f"눌림 대기 후보 Top {QBS_OUTPUT_LIMITS[QBS_PULLBACK_WAIT_KEY]}",
 }
 
 QBS_QUALITY_FLOORS: dict[str, str] = {
@@ -51,6 +52,8 @@ QBS_DISPLAY_NUMBERS: dict[str, str] = {
     QBS_CHASE_WATCH_KEY: "0-1",
     QBS_PULLBACK_WAIT_KEY: "0-2",
 }
+
+BOARD_SECTION_KEYS = set(BOARD_SECTION_ORDER)
 
 
 def _signed(value: Any, decimals: int = 2) -> str:
@@ -227,6 +230,14 @@ def _build_new_52w_high_reason(row: Mapping[str, Any]) -> str:
 
 def _candidate_label(section_key: str) -> str:
     return {
+        "confluence": "CONFLUENCE",
+        "entry_now": "ENTRY",
+        "steady_uptrend": "STEADY",
+        "breakout_wait": "BREAKOUT_WAIT",
+        "accumulation": "ACCUMULATION",
+        "rs_leader": "RS_LEADER",
+        "chase_risk": "CHASE_RISK",
+        "sell_risk": "SELL_RISK",
         "final_top": "final",
         "buy_turn": "buy turn",
         "pullback_reentry": "pullback",
@@ -241,6 +252,9 @@ def _candidate_label(section_key: str) -> str:
 
 
 def _candidate_reason(section_key: str, row: Mapping[str, Any], target_date: date) -> str:
+    board_reason = str(row.get("board_reason") or "").strip()
+    if section_key in BOARD_SECTION_KEYS and board_reason:
+        return board_reason
     if section_key == "final_top":
         return _build_final_top_reason(row, target_date)
     if section_key == "buy_turn":
@@ -294,6 +308,9 @@ def _candidate_source_flags(section_key: str, row: Mapping[str, Any], target_dat
         "multi_sell": int(safe_float(row.get("multi_sell", 0.0))),
         "chg_5d": safe_float(row.get("chg_5d", 0.0)),
         "label": _candidate_label(section_key),
+        "membership": list(row.get("source_membership") or []),
+        "membership_count": int(safe_float(row.get("membership_count", 0.0))),
+        "board_risk": str(row.get("board_risk") or "-"),
     }
 
 
@@ -306,9 +323,11 @@ def _build_candidate(section_key: str, row: Mapping[str, Any], rank: int, target
         volume_ratio_20=safe_float(row.get("volume_ratio_20")) if row.get("volume_ratio_20") is not None else None,
         section_key=section_key,
         rank=rank,
-        label=_candidate_label(section_key),
+        label=str(row.get("board_label") or _candidate_label(section_key)),
         reason=_candidate_reason(section_key, row, target_date),
         source_flags=_candidate_source_flags(section_key, row, target_date),
+        tags=list(row.get("board_tags") or []),
+        risk_flags=list(row.get("board_risk_flags") or []),
     )
 
 
@@ -361,20 +380,33 @@ def build_post_close_digest(
     result_count: int,
     skip_count: int,
 ) -> TelegramDigest:
-    section_rows = select_post_close_sections(rows, target_date=market_date)
+    row_list = [dict(row or {}) for row in (rows or [])]
+    section_rows = select_post_close_sections(row_list, target_date=market_date)
 
     sections: list[TelegramSection] = _build_qbs_sections(section_rows, market_date)
-    for section_key in CORE_SECTION_ORDER:
-        row_list = list(section_rows.get(section_key) or [])
+    qbs_top_tickers = {
+        item.ticker
+        for section in sections
+        if section.key == QBS_BUY_NOW_KEY
+        for item in section.items
+    }
+    board_rows = select_post_close_board_sections(
+        section_rows,
+        target_date=market_date,
+        all_rows=row_list,
+        qbs_top_tickers=qbs_top_tickers,
+    )
+    for section_key in BOARD_SECTION_ORDER:
+        row_list = list(board_rows.get(section_key) or [])
         items = [_build_candidate(section_key, row, idx, market_date) for idx, row in enumerate(row_list, start=1)]
         sections.append(
             TelegramSection(
                 key=section_key,
-                title=CORE_SECTION_TITLES[section_key],
+                title=BOARD_SECTION_TITLES[section_key],
                 items=items,
                 item_count=len(items),
-                quality_floor=CORE_QUALITY_FLOORS[section_key],
-                ranked=section_key in {"final_top", "five_day_top"},
+                quality_floor=BOARD_QUALITY_FLOORS[section_key],
+                ranked=True,
             )
         )
 
@@ -384,7 +416,7 @@ def build_post_close_digest(
         run_stamp=str(run_stamp or "").strip(),
         market_date=market_date.isoformat(),
         generated_at=generated_at.isoformat(),
-        section_order=[*QBS_OUTPUT_KEYS, *CORE_SECTION_ORDER],
+        section_order=[*QBS_OUTPUT_KEYS, *BOARD_SECTION_ORDER],
         sections=sections,
         briefing_refs={
             "mode": "separate_message",
@@ -399,17 +431,15 @@ def build_post_close_digest(
 
 
 def _format_candidate_line(candidate: TelegramCandidate) -> str:
-    line = (
+    risk = "+".join(list(candidate.risk_flags or [])) or str(candidate.source_flags.get("board_risk") or "-")
+    return (
         f"{candidate.rank}. {candidate.ticker}"
-        f" | ({_signed(candidate.chg_value)}, {_signed(candidate.chg_pct)}%)"
+        f" | {str(candidate.label or '-')}"
+        f" | {_signed(candidate.chg_pct)}%"
         f" | {_ratio(candidate.volume_ratio_20)}"
+        f" | {str(candidate.reason or '-')}"
+        f" | {risk or '-'}"
     )
-    turn_engine = str(candidate.source_flags.get("turn_engine") or "").strip()
-    if turn_engine and candidate.section_key in {"buy_turn", "sell_turn"}:
-        line += f" | {turn_engine}"
-    if candidate.section_key == "five_day_top":
-        line += f" | 5D {_signed(candidate.source_flags.get('chg_5d'), 2)}%"
-    return line
 
 
 def _format_qbs_candidate_line(candidate: TelegramCandidate) -> str:
@@ -439,14 +469,7 @@ def _qbs_section_block(display_number: str, section: TelegramSection) -> str:
 
 
 def _section_block(index: int, section: TelegramSection) -> str:
-    if section.key == "final_top":
-        descriptor = f"Top {min(section.item_count, FINAL_TOP_LIMIT)}"
-    elif section.key == "five_day_top":
-        descriptor = f"Top {min(section.item_count, FIVE_DAY_TOP_LIMIT)}"
-    elif section.key == "hma_ema_trend":
-        descriptor = f"Top {min(section.item_count, 20)}"
-    else:
-        descriptor = f"{section.item_count} items"
+    descriptor = f"Top {min(section.item_count, BOARD_SECTION_LIMIT)}"
     lines = [f"## {index}. {section.title} ({descriptor})"]
     if not section.items:
         lines.append("- 해당 없음")
@@ -473,7 +496,7 @@ def build_main_message(digest: TelegramDigest) -> str:
         if section.key in QBS_DISPLAY_NUMBERS:
             blocks.append(_qbs_section_block(QBS_DISPLAY_NUMBERS[section.key], section))
             continue
-        if section.key not in MANDATORY_SECTION_KEYS and section.item_count <= 0:
+        if section.key not in BOARD_MANDATORY_SECTION_KEYS and section.item_count <= 0:
             continue
         blocks.append(_section_block(display_index, section))
         display_index += 1
