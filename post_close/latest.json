@@ -1,10 +1,13 @@
 {
   "version": "2.0",
   "scan_mode": "post_close",
-  "run_stamp": "24968909788-1",
+  "run_stamp": "24970333207-1",
   "market_date": "2026-04-24",
-  "generated_at": "2026-04-27T07:53:43.412801+09:00",
+  "generated_at": "2026-04-27T09:10:39.009061+09:00",
   "section_order": [
+    "qbs_buy_now",
+    "qbs_chase_watch",
+    "qbs_pullback_wait",
     "final_top",
     "buy_turn",
     "pullback_reentry",
@@ -17,6 +20,830 @@
     "new_52w_high"
   ],
   "sections": [
+    {
+      "key": "qbs_buy_now",
+      "title": "오늘 매수 최종 후보 Top 20",
+      "items": [
+        {
+          "ticker": "GLW",
+          "price": 175.88999938964844,
+          "chg_value": 6.3899993896484375,
+          "chg_pct": 3.769911144335361,
+          "volume_ratio_20": 1.0123679342495686,
+          "section_key": "qbs_buy_now",
+          "rank": 1,
+          "label": "BUY_NOW",
+          "reason": "final+buy+pocket+52W+UTBot",
+          "source_flags": {
+            "membership": [
+              "buy_turn",
+              "final_top",
+              "new_52w_high",
+              "pocket_pivot"
+            ],
+            "membership_count": 4,
+            "hard_exclude": false
+          },
+          "qbs_score": 125.0,
+          "bucket": "BUY_NOW",
+          "tags": [
+            "final",
+            "buy",
+            "pocket",
+            "52W",
+            "UTBot"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "FTI",
+          "price": 74.76000213623047,
+          "chg_value": 2.3199996948242188,
+          "chg_pct": 3.2026499401360065,
+          "volume_ratio_20": 1.052069241060075,
+          "section_key": "qbs_buy_now",
+          "rank": 2,
+          "label": "BUY_NOW",
+          "reason": "final+buy+UTBot+HULL",
+          "source_flags": {
+            "membership": [
+              "buy_turn",
+              "final_top"
+            ],
+            "membership_count": 2,
+            "hard_exclude": false
+          },
+          "qbs_score": 92.0,
+          "bucket": "BUY_NOW",
+          "tags": [
+            "final",
+            "buy",
+            "UTBot+HULL"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "ENTG",
+          "price": 155.97999572753906,
+          "chg_value": 6.649993896484375,
+          "chg_pct": 4.453220260459035,
+          "volume_ratio_20": 1.7704143171145357,
+          "section_key": "qbs_buy_now",
+          "rank": 3,
+          "label": "BUY_NOW",
+          "reason": "final+trend",
+          "source_flags": {
+            "membership": [
+              "final_top",
+              "trend_continuation"
+            ],
+            "membership_count": 2,
+            "hard_exclude": false
+          },
+          "qbs_score": 88.0,
+          "bucket": "BUY_NOW",
+          "tags": [
+            "final",
+            "trend"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "ASX",
+          "price": 32.0,
+          "chg_value": 2.190000534057617,
+          "chg_pct": 7.34652993388903,
+          "volume_ratio_20": 1.5215571191772943,
+          "section_key": "qbs_buy_now",
+          "rank": 4,
+          "label": "BUY_NOW",
+          "reason": "final+trend",
+          "source_flags": {
+            "membership": [
+              "final_top",
+              "trend_continuation"
+            ],
+            "membership_count": 2,
+            "hard_exclude": false
+          },
+          "qbs_score": 88.0,
+          "bucket": "BUY_NOW",
+          "tags": [
+            "final",
+            "trend"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "BKR",
+          "price": 68.94000244140625,
+          "chg_value": 4.450004577636719,
+          "chg_pct": 6.900301946104934,
+          "volume_ratio_20": 1.8383715366366902,
+          "section_key": "qbs_buy_now",
+          "rank": 5,
+          "label": "BUY_NOW",
+          "reason": "final+pocket+52W",
+          "source_flags": {
+            "membership": [
+              "final_top",
+              "new_52w_high",
+              "pocket_pivot"
+            ],
+            "membership_count": 3,
+            "hard_exclude": false
+          },
+          "qbs_score": 83.0,
+          "bucket": "BUY_NOW",
+          "tags": [
+            "final",
+            "pocket",
+            "52W"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "VOYA",
+          "price": 80.3499984741211,
+          "chg_value": 1.4799957275390625,
+          "chg_pct": 1.8765001597558593,
+          "volume_ratio_20": 1.385498115542555,
+          "section_key": "qbs_buy_now",
+          "rank": 6,
+          "label": "BUY_NOW",
+          "reason": "final+trend",
+          "source_flags": {
+            "membership": [
+              "final_top",
+              "trend_continuation"
+            ],
+            "membership_count": 2,
+            "hard_exclude": false
+          },
+          "qbs_score": 78.0,
+          "bucket": "BUY_NOW",
+          "tags": [
+            "final",
+            "trend"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "SNPS",
+          "price": 500.82000732421875,
+          "chg_value": 43.970001220703125,
+          "chg_pct": 9.624603400079666,
+          "volume_ratio_20": 1.678936195545798,
+          "section_key": "qbs_buy_now",
+          "rank": 7,
+          "label": "BUY_NOW",
+          "reason": "buy+pocket+UTBot",
+          "source_flags": {
+            "membership": [
+              "buy_turn",
+              "pocket_pivot"
+            ],
+            "membership_count": 2,
+            "hard_exclude": false
+          },
+          "qbs_score": 77.0,
+          "bucket": "BUY_NOW",
+          "tags": [
+            "buy",
+            "pocket",
+            "UTBot"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "FORM",
+          "price": 155.0800018310547,
+          "chg_value": 6.7100067138671875,
+          "chg_pct": 4.522482263726843,
+          "volume_ratio_20": 1.0778462034295682,
+          "section_key": "qbs_buy_now",
+          "rank": 8,
+          "label": "BUY_NOW",
+          "reason": "final+52W",
+          "source_flags": {
+            "membership": [
+              "final_top",
+              "new_52w_high"
+            ],
+            "membership_count": 2,
+            "hard_exclude": false
+          },
+          "qbs_score": 74.0,
+          "bucket": "BUY_NOW",
+          "tags": [
+            "final",
+            "52W"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "AMAT",
+          "price": 417.0400085449219,
+          "chg_value": 13.1300048828125,
+          "chg_pct": 3.250725350639346,
+          "volume_ratio_20": 1.1224419121774822,
+          "section_key": "qbs_buy_now",
+          "rank": 9,
+          "label": "BUY_NOW",
+          "reason": "buy+52W+HULL",
+          "source_flags": {
+            "membership": [
+              "buy_turn",
+              "new_52w_high"
+            ],
+            "membership_count": 2,
+            "hard_exclude": false
+          },
+          "qbs_score": 73.0,
+          "bucket": "BUY_NOW",
+          "tags": [
+            "buy",
+            "52W",
+            "HULL"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "AMKR",
+          "price": 78.0999984741211,
+          "chg_value": 5.189994812011719,
+          "chg_pct": 7.11835763452157,
+          "volume_ratio_20": 1.4934320875178029,
+          "section_key": "qbs_buy_now",
+          "rank": 10,
+          "label": "BUY_NOW",
+          "reason": "final",
+          "source_flags": {
+            "membership": [
+              "final_top"
+            ],
+            "membership_count": 1,
+            "hard_exclude": false
+          },
+          "qbs_score": 62.0,
+          "bucket": "BUY_NOW",
+          "tags": [
+            "final"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "MPWR",
+          "price": 1632.06005859375,
+          "chg_value": 39.8900146484375,
+          "chg_pct": 2.5053865823019867,
+          "volume_ratio_20": 1.2242155241775048,
+          "section_key": "qbs_buy_now",
+          "rank": 11,
+          "label": "BUY_NOW",
+          "reason": "final",
+          "source_flags": {
+            "membership": [
+              "final_top"
+            ],
+            "membership_count": 1,
+            "hard_exclude": false
+          },
+          "qbs_score": 62.0,
+          "bucket": "BUY_NOW",
+          "tags": [
+            "final"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "R",
+          "price": 253.33999633789062,
+          "chg_value": 10.75,
+          "chg_pct": 4.431345134704936,
+          "volume_ratio_20": 1.3385511740141527,
+          "section_key": "qbs_buy_now",
+          "rank": 12,
+          "label": "BUY_NOW",
+          "reason": "final",
+          "source_flags": {
+            "membership": [
+              "final_top"
+            ],
+            "membership_count": 1,
+            "hard_exclude": false
+          },
+          "qbs_score": 60.0,
+          "bucket": "BUY_NOW",
+          "tags": [
+            "final"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "UCTT",
+          "price": 83.01000213623047,
+          "chg_value": 4.7700042724609375,
+          "chg_pct": 6.096631394042733,
+          "volume_ratio_20": 1.4731696974093147,
+          "section_key": "qbs_buy_now",
+          "rank": 13,
+          "label": "BUY_NOW",
+          "reason": "buy+HULL",
+          "source_flags": {
+            "membership": [
+              "buy_turn"
+            ],
+            "membership_count": 1,
+            "hard_exclude": false
+          },
+          "qbs_score": 58.0,
+          "bucket": "BUY_NOW",
+          "tags": [
+            "buy",
+            "HULL"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "FLEX",
+          "price": 91.41000366210938,
+          "chg_value": 4.510002136230469,
+          "chg_pct": 5.189875784855292,
+          "volume_ratio_20": 1.0724947230506305,
+          "section_key": "qbs_buy_now",
+          "rank": 14,
+          "label": "BUY_NOW",
+          "reason": "final",
+          "source_flags": {
+            "membership": [
+              "final_top"
+            ],
+            "membership_count": 1,
+            "hard_exclude": false
+          },
+          "qbs_score": 56.0,
+          "bucket": "BUY_NOW",
+          "tags": [
+            "final"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "PLPC",
+          "price": 351.1700134277344,
+          "chg_value": 22.370025634765625,
+          "chg_pct": 6.803536029584974,
+          "volume_ratio_20": 1.1144150660344498,
+          "section_key": "qbs_buy_now",
+          "rank": 15,
+          "label": "BUY_NOW",
+          "reason": "final",
+          "source_flags": {
+            "membership": [
+              "final_top"
+            ],
+            "membership_count": 1,
+            "hard_exclude": false
+          },
+          "qbs_score": 54.0,
+          "bucket": "BUY_NOW",
+          "tags": [
+            "final"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "GOOG",
+          "price": 342.32000732421875,
+          "chg_value": 4.57000732421875,
+          "chg_pct": 1.353073967200222,
+          "volume_ratio_20": 1.0590692609027812,
+          "section_key": "qbs_buy_now",
+          "rank": 16,
+          "label": "BUY_NOW",
+          "reason": "buy+UTBot",
+          "source_flags": {
+            "membership": [
+              "buy_turn"
+            ],
+            "membership_count": 1,
+            "hard_exclude": false
+          },
+          "qbs_score": 54.0,
+          "bucket": "BUY_NOW",
+          "tags": [
+            "buy",
+            "UTBot"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "TER",
+          "price": 418.0799865722656,
+          "chg_value": 17.089996337890625,
+          "chg_pct": 4.2619508601453315,
+          "volume_ratio_20": 1.1824030921294408,
+          "section_key": "qbs_buy_now",
+          "rank": 17,
+          "label": "BUY_NOW",
+          "reason": "final",
+          "source_flags": {
+            "membership": [
+              "final_top"
+            ],
+            "membership_count": 1,
+            "hard_exclude": false
+          },
+          "qbs_score": 52.0,
+          "bucket": "BUY_NOW",
+          "tags": [
+            "final"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "CDNS",
+          "price": 332.8900146484375,
+          "chg_value": 18.560028076171875,
+          "chg_pct": 5.904631714767962,
+          "volume_ratio_20": 1.4770178747386116,
+          "section_key": "qbs_buy_now",
+          "rank": 18,
+          "label": "BUY_NOW",
+          "reason": "buy+UTBot",
+          "source_flags": {
+            "membership": [
+              "buy_turn"
+            ],
+            "membership_count": 1,
+            "hard_exclude": false
+          },
+          "qbs_score": 51.0,
+          "bucket": "BUY_NOW",
+          "tags": [
+            "buy",
+            "UTBot"
+          ],
+          "risk_flags": []
+        }
+      ],
+      "item_count": 18,
+      "quality_floor": "QBS>=50 + final/buy confluence + no hard risk + not chase extended",
+      "ranked": true
+    },
+    {
+      "key": "qbs_chase_watch",
+      "title": "강하지만 추격주의",
+      "items": [
+        {
+          "ticker": "INTC",
+          "price": 82.54000091552734,
+          "chg_value": 15.760002136230469,
+          "chg_pct": 23.59988383395476,
+          "volume_ratio_20": 2.334398574877082,
+          "section_key": "qbs_chase_watch",
+          "rank": 1,
+          "label": "CHASE_WATCH",
+          "reason": "final+buy+52W+5D+HULL",
+          "source_flags": {
+            "membership": [
+              "buy_turn",
+              "final_top",
+              "five_day_top",
+              "new_52w_high"
+            ],
+            "membership_count": 4,
+            "hard_exclude": false
+          },
+          "qbs_score": 126.0,
+          "bucket": "CHASE_WATCH",
+          "tags": [
+            "final",
+            "buy",
+            "52W",
+            "5D",
+            "HULL"
+          ],
+          "risk_flags": [
+            "extreme_chase"
+          ]
+        },
+        {
+          "ticker": "OGN",
+          "price": 11.260000228881836,
+          "chg_value": 2.6599998474121094,
+          "chg_pct": 30.930229411891254,
+          "volume_ratio_20": 3.5185528838931455,
+          "section_key": "qbs_chase_watch",
+          "rank": 2,
+          "label": "CHASE_WATCH",
+          "reason": "final+buy+pocket+UTBot+HULL",
+          "source_flags": {
+            "membership": [
+              "buy_turn",
+              "final_top",
+              "pocket_pivot"
+            ],
+            "membership_count": 3,
+            "hard_exclude": false
+          },
+          "qbs_score": 119.0,
+          "bucket": "CHASE_WATCH",
+          "tags": [
+            "final",
+            "buy",
+            "pocket",
+            "UTBot+HULL"
+          ],
+          "risk_flags": [
+            "extreme_chase"
+          ]
+        },
+        {
+          "ticker": "ATOM",
+          "price": 8.600000381469727,
+          "chg_value": 2.4100003242492676,
+          "chg_pct": 38.933769014074095,
+          "volume_ratio_20": 12.540783315360585,
+          "section_key": "qbs_chase_watch",
+          "rank": 3,
+          "label": "CHASE_WATCH",
+          "reason": "final+52W+5D",
+          "source_flags": {
+            "membership": [
+              "final_top",
+              "five_day_top",
+              "new_52w_high"
+            ],
+            "membership_count": 3,
+            "hard_exclude": false
+          },
+          "qbs_score": 87.0,
+          "bucket": "CHASE_WATCH",
+          "tags": [
+            "final",
+            "52W",
+            "5D"
+          ],
+          "risk_flags": [
+            "extreme_chase"
+          ]
+        },
+        {
+          "ticker": "PENG",
+          "price": 30.690000534057617,
+          "chg_value": 3.0799999237060547,
+          "chg_pct": 11.155377963125792,
+          "volume_ratio_20": 1.476930881121191,
+          "section_key": "qbs_chase_watch",
+          "rank": 4,
+          "label": "CHASE_WATCH",
+          "reason": "final+52W",
+          "source_flags": {
+            "membership": [
+              "final_top",
+              "new_52w_high"
+            ],
+            "membership_count": 2,
+            "hard_exclude": false
+          },
+          "qbs_score": 80.0,
+          "bucket": "CHASE_WATCH",
+          "tags": [
+            "final",
+            "52W"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "ARM",
+          "price": 234.80999755859375,
+          "chg_value": 30.199996948242188,
+          "chg_pct": 14.759785376157375,
+          "volume_ratio_20": 2.44320316639398,
+          "section_key": "qbs_chase_watch",
+          "rank": 5,
+          "label": "CHASE_WATCH",
+          "reason": "final+5D",
+          "source_flags": {
+            "membership": [
+              "final_top",
+              "five_day_top"
+            ],
+            "membership_count": 2,
+            "hard_exclude": false
+          },
+          "qbs_score": 69.0,
+          "bucket": "CHASE_WATCH",
+          "tags": [
+            "final",
+            "5D"
+          ],
+          "risk_flags": [
+            "chase_risk"
+          ]
+        },
+        {
+          "ticker": "AMSC",
+          "price": 49.47999954223633,
+          "chg_value": 3.329998016357422,
+          "chg_pct": 7.215596763285272,
+          "volume_ratio_20": 1.873407672335927,
+          "section_key": "qbs_chase_watch",
+          "rank": 6,
+          "label": "CHASE_WATCH",
+          "reason": "5D",
+          "source_flags": {
+            "membership": [
+              "five_day_top"
+            ],
+            "membership_count": 1,
+            "hard_exclude": false
+          },
+          "qbs_score": 51.0,
+          "bucket": "CHASE_WATCH",
+          "tags": [
+            "5D"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "AMD",
+          "price": 347.80999755859375,
+          "chg_value": 42.480010986328125,
+          "chg_pct": 13.912819852128719,
+          "volume_ratio_20": 2.1103437015689708,
+          "section_key": "qbs_chase_watch",
+          "rank": 7,
+          "label": "CHASE_WATCH",
+          "reason": "5D",
+          "source_flags": {
+            "membership": [
+              "five_day_top"
+            ],
+            "membership_count": 1,
+            "hard_exclude": false
+          },
+          "qbs_score": 49.0,
+          "bucket": "CHASE_WATCH",
+          "tags": [
+            "5D"
+          ],
+          "risk_flags": [
+            "chase_risk"
+          ]
+        },
+        {
+          "ticker": "ALAB",
+          "price": 212.83999633789062,
+          "chg_value": 15.300003051757812,
+          "chg_pct": 7.745268589533694,
+          "volume_ratio_20": 1.1665470302561798,
+          "section_key": "qbs_chase_watch",
+          "rank": 8,
+          "label": "CHASE_WATCH",
+          "reason": "5D",
+          "source_flags": {
+            "membership": [
+              "five_day_top"
+            ],
+            "membership_count": 1,
+            "hard_exclude": false
+          },
+          "qbs_score": 42.0,
+          "bucket": "CHASE_WATCH",
+          "tags": [
+            "5D"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "AAOI",
+          "price": 162.1699981689453,
+          "chg_value": 24.44000244140625,
+          "chg_pct": 17.74486546108233,
+          "volume_ratio_20": 1.1114689316842294,
+          "section_key": "qbs_chase_watch",
+          "rank": 9,
+          "label": "CHASE_WATCH",
+          "reason": "buy+UTBot",
+          "source_flags": {
+            "membership": [
+              "buy_turn"
+            ],
+            "membership_count": 1,
+            "hard_exclude": false
+          },
+          "qbs_score": 42.0,
+          "bucket": "CHASE_WATCH",
+          "tags": [
+            "buy",
+            "UTBot"
+          ],
+          "risk_flags": [
+            "chase_risk"
+          ]
+        }
+      ],
+      "item_count": 9,
+      "quality_floor": "QBS>=40 + extended move / 52W / 5D chase risk",
+      "ranked": true
+    },
+    {
+      "key": "qbs_pullback_wait",
+      "title": "눌림 대기 후보",
+      "items": [
+        {
+          "ticker": "MU",
+          "price": 496.7200012207031,
+          "chg_value": 15.0,
+          "chg_pct": 3.113842058039781,
+          "volume_ratio_20": 0.7797415856326779,
+          "section_key": "qbs_pullback_wait",
+          "rank": 1,
+          "label": "PULLBACK_WAIT",
+          "reason": "final+pullback",
+          "source_flags": {
+            "membership": [
+              "final_top",
+              "pullback_reentry"
+            ],
+            "membership_count": 2,
+            "hard_exclude": false
+          },
+          "qbs_score": 45.0,
+          "bucket": "PULLBACK_WAIT",
+          "tags": [
+            "final",
+            "pullback"
+          ],
+          "risk_flags": [
+            "low_volume"
+          ]
+        },
+        {
+          "ticker": "CLH",
+          "price": 308.989990234375,
+          "chg_value": -1.33001708984375,
+          "chg_pct": -0.42859533979520814,
+          "volume_ratio_20": 0.6697952218430032,
+          "section_key": "qbs_pullback_wait",
+          "rank": 2,
+          "label": "PULLBACK_WAIT",
+          "reason": "final+pullback",
+          "source_flags": {
+            "membership": [
+              "final_top",
+              "pullback_reentry"
+            ],
+            "membership_count": 2,
+            "hard_exclude": false
+          },
+          "qbs_score": 36.0,
+          "bucket": "PULLBACK_WAIT",
+          "tags": [
+            "final",
+            "pullback"
+          ],
+          "risk_flags": [
+            "negative_day",
+            "low_volume"
+          ]
+        },
+        {
+          "ticker": "SEB",
+          "price": 5833.06005859375,
+          "chg_value": 8.7001953125,
+          "chg_pct": 0.14937599181240496,
+          "volume_ratio_20": 0.7369323050556921,
+          "section_key": "qbs_pullback_wait",
+          "rank": 3,
+          "label": "PULLBACK_WAIT",
+          "reason": "pocket+pullback",
+          "source_flags": {
+            "membership": [
+              "pocket_pivot",
+              "pullback_reentry"
+            ],
+            "membership_count": 2,
+            "hard_exclude": false
+          },
+          "qbs_score": 29.0,
+          "bucket": "PULLBACK_WAIT",
+          "tags": [
+            "pocket",
+            "pullback"
+          ],
+          "risk_flags": [
+            "low_volume"
+          ]
+        }
+      ],
+      "item_count": 3,
+      "quality_floor": "QBS>=25 + pullback reentry + no hard risk",
+      "ranked": true
+    },
     {
       "key": "final_top",
       "title": "오늘 최우선 후보",
@@ -49,7 +876,11 @@
             "multi_buy": 3,
             "multi_sell": 1,
             "label": "final"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "ASX",
@@ -79,7 +910,11 @@
             "multi_buy": 3,
             "multi_sell": 1,
             "label": "final"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "OGN",
@@ -109,7 +944,11 @@
             "multi_buy": 5,
             "multi_sell": 1,
             "label": "final"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "PENG",
@@ -139,7 +978,11 @@
             "multi_buy": 4,
             "multi_sell": 0,
             "label": "final"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "MPWR",
@@ -169,7 +1012,11 @@
             "multi_buy": 1,
             "multi_sell": 1,
             "label": "final"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "FTI",
@@ -199,7 +1046,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "final"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "AMKR",
@@ -229,7 +1080,11 @@
             "multi_buy": 1,
             "multi_sell": 1,
             "label": "final"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "R",
@@ -259,7 +1114,11 @@
             "multi_buy": 2,
             "multi_sell": 1,
             "label": "final"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "FLEX",
@@ -289,7 +1148,11 @@
             "multi_buy": 4,
             "multi_sell": 1,
             "label": "final"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "FORM",
@@ -319,7 +1182,11 @@
             "multi_buy": 2,
             "multi_sell": 1,
             "label": "final"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "GLW",
@@ -349,7 +1216,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "final"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "MU",
@@ -379,7 +1250,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "final"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "INTC",
@@ -409,7 +1284,11 @@
             "multi_buy": 4,
             "multi_sell": 0,
             "label": "final"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CLH",
@@ -439,7 +1318,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "final"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "PLPC",
@@ -469,7 +1352,11 @@
             "multi_buy": 4,
             "multi_sell": 0,
             "label": "final"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "BKR",
@@ -499,7 +1386,11 @@
             "multi_buy": 3,
             "multi_sell": 0,
             "label": "final"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "ARM",
@@ -529,7 +1420,11 @@
             "multi_buy": 5,
             "multi_sell": 1,
             "label": "final"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "ATOM",
@@ -559,7 +1454,11 @@
             "multi_buy": 6,
             "multi_sell": 1,
             "label": "final"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "VOYA",
@@ -589,7 +1488,11 @@
             "multi_buy": 3,
             "multi_sell": 1,
             "label": "final"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "TER",
@@ -619,7 +1522,11 @@
             "multi_buy": 4,
             "multi_sell": 0,
             "label": "final"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         }
       ],
       "item_count": 20,
@@ -658,7 +1565,11 @@
             "multi_buy": 5,
             "multi_sell": 1,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "NDAQ",
@@ -688,7 +1599,11 @@
             "multi_buy": 1,
             "multi_sell": 1,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "FLUT",
@@ -718,7 +1633,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "FTI",
@@ -748,7 +1667,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "AROC",
@@ -778,7 +1701,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "DTM",
@@ -808,7 +1735,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "TLN",
@@ -838,7 +1769,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "VLO",
@@ -868,7 +1803,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "LIDR",
@@ -898,7 +1837,11 @@
             "multi_buy": 3,
             "multi_sell": 1,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "POET",
@@ -928,7 +1871,11 @@
             "multi_buy": 5,
             "multi_sell": 1,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "QCOM",
@@ -958,7 +1905,11 @@
             "multi_buy": 4,
             "multi_sell": 5,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CHE",
@@ -988,7 +1939,11 @@
             "multi_buy": 2,
             "multi_sell": 4,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "INTC",
@@ -1018,7 +1973,11 @@
             "multi_buy": 4,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "MOG-A",
@@ -1048,7 +2007,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "ESI",
@@ -1078,7 +2041,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "DCI",
@@ -1108,7 +2075,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "PNR",
@@ -1138,7 +2109,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "INVZ",
@@ -1168,7 +2143,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "SNPS",
@@ -1198,7 +2177,11 @@
             "multi_buy": 2,
             "multi_sell": 1,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "PG",
@@ -1228,7 +2211,11 @@
             "multi_buy": 0,
             "multi_sell": 2,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CDNS",
@@ -1258,7 +2245,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "UCTT",
@@ -1288,7 +2279,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "NEM",
@@ -1318,7 +2313,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "JEF",
@@ -1348,7 +2347,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "DKNG",
@@ -1378,7 +2381,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "HIMS",
@@ -1408,7 +2415,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CEG",
@@ -1438,7 +2449,11 @@
             "multi_buy": 1,
             "multi_sell": 2,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CLF",
@@ -1468,7 +2483,11 @@
             "multi_buy": 0,
             "multi_sell": 2,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "SMCI",
@@ -1498,7 +2517,11 @@
             "multi_buy": 1,
             "multi_sell": 2,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "LINE",
@@ -1528,7 +2551,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "TTD",
@@ -1558,7 +2585,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "GLPI",
@@ -1588,7 +2619,11 @@
             "multi_buy": 1,
             "multi_sell": 2,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CHD",
@@ -1618,7 +2653,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "WFRD",
@@ -1648,7 +2687,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "AMAT",
@@ -1678,7 +2721,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "AAOI",
@@ -1708,7 +2755,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "FIVN",
@@ -1738,7 +2789,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "GOOG",
@@ -1768,7 +2823,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "GOOGL",
@@ -1798,7 +2857,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "MET",
@@ -1828,7 +2891,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "GLW",
@@ -1858,7 +2925,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CCEP",
@@ -1888,7 +2959,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CL",
@@ -1918,7 +2993,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CVS",
@@ -1948,7 +3027,11 @@
             "multi_buy": 3,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "VST",
@@ -1978,7 +3061,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "COLD",
@@ -2008,7 +3095,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "EXC",
@@ -2038,7 +3129,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "AWK",
@@ -2068,7 +3163,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "HSAI",
@@ -2098,7 +3197,11 @@
             "multi_buy": 0,
             "multi_sell": 2,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "KO",
@@ -2128,7 +3231,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "PEG",
@@ -2158,7 +3265,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "HAS",
@@ -2188,7 +3299,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CELH",
@@ -2218,7 +3333,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "AM",
@@ -2248,7 +3367,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "PSX",
@@ -2278,7 +3401,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CERT",
@@ -2308,7 +3435,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "PUBM",
@@ -2338,7 +3469,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "LIN",
@@ -2368,7 +3503,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "NRG",
@@ -2398,7 +3537,11 @@
             "multi_buy": 0,
             "multi_sell": 2,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "WMB",
@@ -2428,7 +3571,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "MPC",
@@ -2458,7 +3605,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "SFD",
@@ -2488,7 +3639,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "RSG",
@@ -2518,7 +3673,11 @@
             "multi_buy": 1,
             "multi_sell": 1,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "DINO",
@@ -2548,7 +3707,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "U",
@@ -2578,7 +3741,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "ALNT",
@@ -2608,7 +3775,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "buy turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         }
       ],
       "item_count": 66,
@@ -2647,7 +3818,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "pullback"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "MLI",
@@ -2677,7 +3852,11 @@
             "multi_buy": 6,
             "multi_sell": 0,
             "label": "pullback"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "MU",
@@ -2707,7 +3886,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "pullback"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "STRL",
@@ -2737,7 +3920,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "pullback"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "MOD",
@@ -2767,7 +3954,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "pullback"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "DOCN",
@@ -2797,7 +3988,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "pullback"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "HUBB",
@@ -2827,7 +4022,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "pullback"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "BROS",
@@ -2857,7 +4056,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "pullback"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "WAB",
@@ -2887,7 +4090,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "pullback"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "SEB",
@@ -2917,7 +4124,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "pullback"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CLH",
@@ -2947,7 +4158,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "pullback"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "L",
@@ -2977,7 +4192,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "pullback"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CE",
@@ -3007,7 +4226,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "pullback"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "COST",
@@ -3037,7 +4260,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "pullback"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "AEP",
@@ -3067,7 +4294,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "pullback"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         }
       ],
       "item_count": 15,
@@ -3106,7 +4337,11 @@
             "multi_buy": 3,
             "multi_sell": 1,
             "label": "trend"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "ENTG",
@@ -3136,7 +4371,11 @@
             "multi_buy": 3,
             "multi_sell": 1,
             "label": "trend"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "VOYA",
@@ -3166,7 +4405,11 @@
             "multi_buy": 3,
             "multi_sell": 1,
             "label": "trend"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "MOH",
@@ -3196,7 +4439,11 @@
             "multi_buy": 4,
             "multi_sell": 0,
             "label": "trend"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         }
       ],
       "item_count": 4,
@@ -3235,7 +4482,11 @@
             "multi_buy": 4,
             "multi_sell": 0,
             "label": "HMA/EMA"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CSL",
@@ -3265,7 +4516,11 @@
             "multi_buy": 2,
             "multi_sell": 1,
             "label": "HMA/EMA"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "GNTX",
@@ -3295,7 +4550,11 @@
             "multi_buy": 2,
             "multi_sell": 1,
             "label": "HMA/EMA"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "EGP",
@@ -3325,7 +4584,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "HMA/EMA"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "WMS",
@@ -3355,7 +4618,11 @@
             "multi_buy": 1,
             "multi_sell": 1,
             "label": "HMA/EMA"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "PFG",
@@ -3385,7 +4652,11 @@
             "multi_buy": 4,
             "multi_sell": 2,
             "label": "HMA/EMA"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "VTRS",
@@ -3415,7 +4686,11 @@
             "multi_buy": 3,
             "multi_sell": 1,
             "label": "HMA/EMA"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "AIZ",
@@ -3445,7 +4720,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "HMA/EMA"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "QRVO",
@@ -3475,7 +4754,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "HMA/EMA"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "BEN",
@@ -3505,7 +4788,11 @@
             "multi_buy": 1,
             "multi_sell": 1,
             "label": "HMA/EMA"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "GL",
@@ -3535,7 +4822,11 @@
             "multi_buy": 5,
             "multi_sell": 1,
             "label": "HMA/EMA"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "RBA",
@@ -3565,7 +4856,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "HMA/EMA"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "HXL",
@@ -3595,7 +4890,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "HMA/EMA"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "SSD",
@@ -3625,7 +4924,11 @@
             "multi_buy": 4,
             "multi_sell": 1,
             "label": "HMA/EMA"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "HR",
@@ -3655,7 +4958,11 @@
             "multi_buy": 4,
             "multi_sell": 1,
             "label": "HMA/EMA"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "HAYW",
@@ -3685,7 +4992,11 @@
             "multi_buy": 1,
             "multi_sell": 1,
             "label": "HMA/EMA"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "TDY",
@@ -3715,7 +5026,11 @@
             "multi_buy": 3,
             "multi_sell": 2,
             "label": "HMA/EMA"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "FNF",
@@ -3745,7 +5060,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "HMA/EMA"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "NOVT",
@@ -3775,7 +5094,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "HMA/EMA"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "SYM",
@@ -3805,7 +5128,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "HMA/EMA"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         }
       ],
       "item_count": 20,
@@ -3844,7 +5171,11 @@
             "multi_buy": 0,
             "multi_sell": 8,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "WU",
@@ -3874,7 +5205,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CHTR",
@@ -3904,7 +5239,11 @@
             "multi_buy": 0,
             "multi_sell": 8,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "LBRDA",
@@ -3934,7 +5273,11 @@
             "multi_buy": 0,
             "multi_sell": 7,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "BYD",
@@ -3964,7 +5307,11 @@
             "multi_buy": 2,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "HLNE",
@@ -3994,7 +5341,11 @@
             "multi_buy": 0,
             "multi_sell": 3,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "BEAM",
@@ -4024,7 +5375,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "FHB",
@@ -4054,7 +5409,11 @@
             "multi_buy": 3,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "SYF",
@@ -4084,7 +5443,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "PTGX",
@@ -4114,7 +5477,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "UAMY",
@@ -4144,7 +5511,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "NBIX",
@@ -4174,7 +5545,11 @@
             "multi_buy": 0,
             "multi_sell": 3,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "UEC",
@@ -4204,7 +5579,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "BLSH",
@@ -4234,7 +5613,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "RCAT",
@@ -4264,7 +5647,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CRWV",
@@ -4294,7 +5681,11 @@
             "multi_buy": 1,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "THG",
@@ -4324,7 +5715,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "FOXA",
@@ -4354,7 +5749,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "KEY",
@@ -4384,7 +5783,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CBRE",
@@ -4414,7 +5817,11 @@
             "multi_buy": 2,
             "multi_sell": 3,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "OMC",
@@ -4444,7 +5851,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "BRO",
@@ -4474,7 +5885,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "MSI",
@@ -4504,7 +5919,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "JAZZ",
@@ -4534,7 +5953,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "BKSY",
@@ -4564,7 +5987,11 @@
             "multi_buy": 1,
             "multi_sell": 2,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "PNC",
@@ -4594,7 +6021,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "PB",
@@ -4624,7 +6055,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "HBAN",
@@ -4654,7 +6089,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "EPR",
@@ -4684,7 +6123,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "DDS",
@@ -4714,7 +6157,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "FITB",
@@ -4744,7 +6191,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "FOX",
@@ -4774,7 +6225,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "NTLA",
@@ -4804,7 +6259,11 @@
             "multi_buy": 3,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CMCSA",
@@ -4834,7 +6293,11 @@
             "multi_buy": 4,
             "multi_sell": 3,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "REXR",
@@ -4864,7 +6327,11 @@
             "multi_buy": 2,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "SIRI",
@@ -4894,7 +6361,11 @@
             "multi_buy": 3,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "EGP",
@@ -4924,7 +6395,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "HIG",
@@ -4954,7 +6429,11 @@
             "multi_buy": 1,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "WMS",
@@ -4984,7 +6463,11 @@
             "multi_buy": 1,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "ERIE",
@@ -5014,7 +6497,11 @@
             "multi_buy": 0,
             "multi_sell": 2,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "EBAY",
@@ -5044,7 +6531,11 @@
             "multi_buy": 2,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "PACB",
@@ -5074,7 +6565,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "SNA",
@@ -5104,7 +6599,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "SSNC",
@@ -5134,7 +6633,11 @@
             "multi_buy": 0,
             "multi_sell": 4,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "NOW",
@@ -5164,7 +6667,11 @@
             "multi_buy": 1,
             "multi_sell": 3,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "FR",
@@ -5194,7 +6701,11 @@
             "multi_buy": 1,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "NVST",
@@ -5224,7 +6735,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "SMMT",
@@ -5254,7 +6769,11 @@
             "multi_buy": 0,
             "multi_sell": 2,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "MAN",
@@ -5284,7 +6803,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "HRB",
@@ -5314,7 +6837,11 @@
             "multi_buy": 0,
             "multi_sell": 2,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "FFIV",
@@ -5344,7 +6871,11 @@
             "multi_buy": 3,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "KMPR",
@@ -5374,7 +6905,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "LWLG",
@@ -5404,7 +6939,11 @@
             "multi_buy": 6,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "MDB",
@@ -5434,7 +6973,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "ROK",
@@ -5464,7 +7007,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "TMUS",
@@ -5494,7 +7041,11 @@
             "multi_buy": 0,
             "multi_sell": 2,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CB",
@@ -5524,7 +7075,11 @@
             "multi_buy": 1,
             "multi_sell": 2,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "IRDM",
@@ -5554,7 +7109,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "HOG",
@@ -5584,7 +7143,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "MIDD",
@@ -5614,7 +7177,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "IRM",
@@ -5644,7 +7211,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "SYM",
@@ -5674,7 +7245,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "TSAT",
@@ -5704,7 +7279,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CPB",
@@ -5734,7 +7313,11 @@
             "multi_buy": 0,
             "multi_sell": 3,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "ADP",
@@ -5764,7 +7347,11 @@
             "multi_buy": 0,
             "multi_sell": 3,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "AMTM",
@@ -5794,7 +7381,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "BRX",
@@ -5824,7 +7415,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "ROP",
@@ -5854,7 +7449,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "NBIS",
@@ -5884,7 +7483,11 @@
             "multi_buy": 1,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "WDAY",
@@ -5914,7 +7517,11 @@
             "multi_buy": 0,
             "multi_sell": 2,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "RDW",
@@ -5944,7 +7551,11 @@
             "multi_buy": 3,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "UUUU",
@@ -5974,7 +7585,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "AGCO",
@@ -6004,7 +7619,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "SPOT",
@@ -6034,7 +7653,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "KD",
@@ -6064,7 +7687,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "TFSL",
@@ -6094,7 +7721,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "GM",
@@ -6124,7 +7755,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "SPGI",
@@ -6154,7 +7789,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "PM",
@@ -6184,7 +7823,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "HLT",
@@ -6214,7 +7857,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "STAG",
@@ -6244,7 +7891,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "WRB",
@@ -6274,7 +7925,11 @@
             "multi_buy": 1,
             "multi_sell": 2,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "KIM",
@@ -6304,7 +7959,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "PNFP",
@@ -6334,7 +7993,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "RNR",
@@ -6364,7 +8027,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "UAA",
@@ -6394,7 +8061,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "EXEL",
@@ -6424,7 +8095,11 @@
             "multi_buy": 3,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CPRT",
@@ -6454,7 +8129,11 @@
             "multi_buy": 2,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "LTBR",
@@ -6484,7 +8163,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "BPOP",
@@ -6514,7 +8197,11 @@
             "multi_buy": 2,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "FOUR",
@@ -6544,7 +8231,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "WTW",
@@ -6574,7 +8265,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "AXS",
@@ -6604,7 +8299,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "NWL",
@@ -6634,7 +8333,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "SMR",
@@ -6664,7 +8367,11 @@
             "multi_buy": 2,
             "multi_sell": 2,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "TTEK",
@@ -6694,7 +8401,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "UBER",
@@ -6724,7 +8435,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "DE",
@@ -6754,7 +8469,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "EXLS",
@@ -6784,7 +8503,11 @@
             "multi_buy": 0,
             "multi_sell": 3,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CFR",
@@ -6814,7 +8537,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "AUR",
@@ -6844,7 +8571,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "ZION",
@@ -6874,7 +8605,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "WTM",
@@ -6904,7 +8639,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "BSX",
@@ -6934,7 +8673,11 @@
             "multi_buy": 1,
             "multi_sell": 3,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "ALB",
@@ -6964,7 +8707,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "MAT",
@@ -6994,7 +8741,11 @@
             "multi_buy": 0,
             "multi_sell": 2,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "DXCM",
@@ -7024,7 +8775,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "RKLB",
@@ -7054,7 +8809,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CINF",
@@ -7084,7 +8843,11 @@
             "multi_buy": 1,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "AMH",
@@ -7114,7 +8877,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "PLD",
@@ -7144,7 +8911,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "H",
@@ -7174,7 +8945,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "RVMD",
@@ -7204,7 +8979,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "PFGC",
@@ -7234,7 +9013,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "ALL",
@@ -7264,7 +9047,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "INCY",
@@ -7294,7 +9081,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "EU",
@@ -7324,7 +9115,11 @@
             "multi_buy": 0,
             "multi_sell": 2,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CHH",
@@ -7354,7 +9149,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "AIT",
@@ -7384,7 +9183,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "LOW",
@@ -7414,7 +9217,11 @@
             "multi_buy": 3,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "NNE",
@@ -7444,7 +9251,11 @@
             "multi_buy": 1,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "LH",
@@ -7474,7 +9285,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "SDGR",
@@ -7504,7 +9319,11 @@
             "multi_buy": 0,
             "multi_sell": 2,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "PKE",
@@ -7534,7 +9353,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "RDDT",
@@ -7564,7 +9387,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "ARQQ",
@@ -7594,7 +9421,11 @@
             "multi_buy": 1,
             "multi_sell": 5,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "MORN",
@@ -7624,7 +9455,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "ACHR",
@@ -7654,7 +9489,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "BC",
@@ -7684,7 +9523,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "MSA",
@@ -7714,7 +9557,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "TRMB",
@@ -7744,7 +9591,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "BIO",
@@ -7774,7 +9625,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CAG",
@@ -7804,7 +9659,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "URG",
@@ -7834,7 +9693,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "EXPD",
@@ -7864,7 +9727,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "COLM",
@@ -7894,7 +9761,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "NXE",
@@ -7924,7 +9795,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "ALLY",
@@ -7954,7 +9829,11 @@
             "multi_buy": 1,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "FERG",
@@ -7984,7 +9863,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "MRNA",
@@ -8014,7 +9897,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "PRME",
@@ -8044,7 +9931,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "LYFT",
@@ -8074,7 +9965,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "MAR",
@@ -8104,7 +9999,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CHWY",
@@ -8134,7 +10033,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "WRBY",
@@ -8164,7 +10067,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "BSY",
@@ -8194,7 +10101,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CFG",
@@ -8224,7 +10135,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "BAX",
@@ -8254,7 +10169,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "AVAV",
@@ -8284,7 +10203,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "REG",
@@ -8314,7 +10237,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "PGY",
@@ -8344,7 +10271,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "IT",
@@ -8374,7 +10305,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "VEEV",
@@ -8404,7 +10339,11 @@
             "multi_buy": 0,
             "multi_sell": 2,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "APO",
@@ -8434,7 +10373,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "SOFI",
@@ -8464,7 +10407,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "PL",
@@ -8494,7 +10441,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CSGP",
@@ -8524,7 +10475,11 @@
             "multi_buy": 0,
             "multi_sell": 3,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "GEN",
@@ -8554,7 +10509,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "IEX",
@@ -8584,7 +10543,11 @@
             "multi_buy": 1,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "WSM",
@@ -8614,7 +10577,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "BIRK",
@@ -8644,7 +10611,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "LUNR",
@@ -8674,7 +10645,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "MS",
@@ -8704,7 +10679,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "DIS",
@@ -8734,7 +10713,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "DNN",
@@ -8764,7 +10747,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "TKR",
@@ -8794,7 +10781,11 @@
             "multi_buy": 1,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "BMY",
@@ -8824,7 +10815,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "EG",
@@ -8854,7 +10849,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "BX",
@@ -8884,7 +10883,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "FDS",
@@ -8914,7 +10917,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "FHN",
@@ -8944,7 +10951,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "BK",
@@ -8974,7 +10985,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "BR",
@@ -9004,7 +11019,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "AVB",
@@ -9034,7 +11053,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "MSCI",
@@ -9064,7 +11087,11 @@
             "multi_buy": 0,
             "multi_sell": 2,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "TRU",
@@ -9094,7 +11121,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "LPLA",
@@ -9124,7 +11155,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "RF",
@@ -9154,7 +11189,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "AJG",
@@ -9184,7 +11223,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "APH",
@@ -9214,7 +11257,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "USB",
@@ -9244,7 +11291,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "RSG",
@@ -9274,7 +11325,11 @@
             "multi_buy": 1,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "GMED",
@@ -9304,7 +11359,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "PVH",
@@ -9334,7 +11393,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "AN",
@@ -9364,7 +11427,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "DG",
@@ -9394,7 +11461,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "BAM",
@@ -9424,7 +11495,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "BILL",
@@ -9454,7 +11529,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CART",
@@ -9484,7 +11563,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "UA",
@@ -9514,7 +11597,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "TMQ",
@@ -9544,7 +11631,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "RGTI",
@@ -9574,7 +11665,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "BJ",
@@ -9604,7 +11699,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "JPM",
@@ -9634,7 +11733,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "MAA",
@@ -9664,7 +11767,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CHKP",
@@ -9694,7 +11801,11 @@
             "multi_buy": 0,
             "multi_sell": 2,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "PEN",
@@ -9724,7 +11835,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "GPN",
@@ -9754,7 +11869,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CRCL",
@@ -9784,7 +11903,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "MRSH",
@@ -9814,7 +11937,11 @@
             "multi_buy": 0,
             "multi_sell": 2,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "EXPE",
@@ -9844,7 +11971,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "BIIB",
@@ -9874,7 +12005,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "GPC",
@@ -9904,7 +12039,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "FRT",
@@ -9934,7 +12073,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "SGML",
@@ -9964,7 +12107,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "HLI",
@@ -9994,7 +12141,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "sell turn"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         }
       ],
       "item_count": 206,
@@ -10033,7 +12184,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "gap setup"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         }
       ],
       "item_count": 1,
@@ -10072,7 +12227,11 @@
             "multi_buy": 5,
             "multi_sell": 3,
             "label": "pocket pivot"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "OGN",
@@ -10102,7 +12261,11 @@
             "multi_buy": 5,
             "multi_sell": 1,
             "label": "pocket pivot"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "POET",
@@ -10132,7 +12295,11 @@
             "multi_buy": 5,
             "multi_sell": 1,
             "label": "pocket pivot"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "QCOM",
@@ -10162,7 +12329,11 @@
             "multi_buy": 4,
             "multi_sell": 5,
             "label": "pocket pivot"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "TSM",
@@ -10192,7 +12363,11 @@
             "multi_buy": 4,
             "multi_sell": 0,
             "label": "pocket pivot"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "BKR",
@@ -10222,7 +12397,11 @@
             "multi_buy": 3,
             "multi_sell": 0,
             "label": "pocket pivot"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "SNPS",
@@ -10252,7 +12431,11 @@
             "multi_buy": 2,
             "multi_sell": 1,
             "label": "pocket pivot"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "SCI",
@@ -10282,7 +12465,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "pocket pivot"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "AEIS",
@@ -10312,7 +12499,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "pocket pivot"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "GLW",
@@ -10342,7 +12533,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "pocket pivot"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "SEB",
@@ -10372,7 +12567,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "pocket pivot"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "HAL",
@@ -10402,7 +12601,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "pocket pivot"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "NEU",
@@ -10432,7 +12635,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "pocket pivot"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "DINO",
@@ -10462,7 +12669,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "pocket pivot"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "JCI",
@@ -10492,7 +12703,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "pocket pivot"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "VNOM",
@@ -10522,7 +12737,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "pocket pivot"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         }
       ],
       "item_count": 16,
@@ -10561,7 +12780,11 @@
             "multi_buy": 5,
             "multi_sell": 1,
             "label": "5D top"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "ATOM",
@@ -10591,7 +12814,11 @@
             "multi_buy": 6,
             "multi_sell": 1,
             "label": "5D top"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "ARM",
@@ -10621,7 +12848,11 @@
             "multi_buy": 5,
             "multi_sell": 1,
             "label": "5D top"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "VICR",
@@ -10651,7 +12882,11 @@
             "multi_buy": 4,
             "multi_sell": 1,
             "label": "5D top"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "AMD",
@@ -10681,7 +12916,11 @@
             "multi_buy": 2,
             "multi_sell": 1,
             "label": "5D top"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "AMSC",
@@ -10711,7 +12950,11 @@
             "multi_buy": 4,
             "multi_sell": 1,
             "label": "5D top"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "NRGV",
@@ -10741,7 +12984,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "5D top"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "URI",
@@ -10771,7 +13018,11 @@
             "multi_buy": 4,
             "multi_sell": 0,
             "label": "5D top"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "ALAB",
@@ -10801,7 +13052,11 @@
             "multi_buy": 1,
             "multi_sell": 1,
             "label": "5D top"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "WOLF",
@@ -10831,7 +13086,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "5D top"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "PUMP",
@@ -10861,7 +13120,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "5D top"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "LIDR",
@@ -10891,7 +13154,11 @@
             "multi_buy": 3,
             "multi_sell": 1,
             "label": "5D top"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "CRDO",
@@ -10921,7 +13188,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "5D top"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "VMI",
@@ -10951,7 +13222,11 @@
             "multi_buy": 6,
             "multi_sell": 0,
             "label": "5D top"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "TXN",
@@ -10981,7 +13256,11 @@
             "multi_buy": 4,
             "multi_sell": 1,
             "label": "5D top"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "ACLS",
@@ -11011,7 +13290,11 @@
             "multi_buy": 2,
             "multi_sell": 1,
             "label": "5D top"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "INTC",
@@ -11041,7 +13324,11 @@
             "multi_buy": 4,
             "multi_sell": 0,
             "label": "5D top"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "VECO",
@@ -11071,7 +13358,11 @@
             "multi_buy": 4,
             "multi_sell": 2,
             "label": "5D top"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "SEDG",
@@ -11101,7 +13392,11 @@
             "multi_buy": 3,
             "multi_sell": 0,
             "label": "5D top"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "ON",
@@ -11131,7 +13426,11 @@
             "multi_buy": 1,
             "multi_sell": 1,
             "label": "5D top"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         }
       ],
       "item_count": 20,
@@ -11170,7 +13469,11 @@
             "multi_buy": 4,
             "multi_sell": 0,
             "label": "52W high"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "ATOM",
@@ -11200,7 +13503,11 @@
             "multi_buy": 6,
             "multi_sell": 1,
             "label": "52W high"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "PENG",
@@ -11230,7 +13537,11 @@
             "multi_buy": 4,
             "multi_sell": 0,
             "label": "52W high"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "TSM",
@@ -11260,7 +13571,11 @@
             "multi_buy": 4,
             "multi_sell": 0,
             "label": "52W high"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "BKR",
@@ -11290,7 +13605,11 @@
             "multi_buy": 3,
             "multi_sell": 0,
             "label": "52W high"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "HR",
@@ -11320,7 +13639,11 @@
             "multi_buy": 4,
             "multi_sell": 1,
             "label": "52W high"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "KLAC",
@@ -11350,7 +13673,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "52W high"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "AMAT",
@@ -11380,7 +13707,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "52W high"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "ESI",
@@ -11410,7 +13741,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "52W high"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "FORM",
@@ -11440,7 +13775,11 @@
             "multi_buy": 2,
             "multi_sell": 1,
             "label": "52W high"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "IESC",
@@ -11470,7 +13809,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "52W high"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "GLW",
@@ -11500,7 +13843,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "52W high"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "VIAV",
@@ -11530,7 +13877,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "52W high"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "FAF",
@@ -11560,7 +13911,11 @@
             "multi_buy": 2,
             "multi_sell": 0,
             "label": "52W high"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "SNDK",
@@ -11590,7 +13945,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "52W high"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "FN",
@@ -11620,7 +13979,11 @@
             "multi_buy": 3,
             "multi_sell": 0,
             "label": "52W high"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "NVT",
@@ -11650,7 +14013,11 @@
             "multi_buy": 3,
             "multi_sell": 0,
             "label": "52W high"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "ONTO",
@@ -11680,7 +14047,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "52W high"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "KLIC",
@@ -11710,7 +14081,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "52W high"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "PWR",
@@ -11740,7 +14115,11 @@
             "multi_buy": 1,
             "multi_sell": 0,
             "label": "52W high"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "NEE",
@@ -11770,7 +14149,11 @@
             "multi_buy": 4,
             "multi_sell": 1,
             "label": "52W high"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "ACLS",
@@ -11800,7 +14183,11 @@
             "multi_buy": 2,
             "multi_sell": 1,
             "label": "52W high"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "LRCX",
@@ -11830,7 +14217,11 @@
             "multi_buy": 0,
             "multi_sell": 0,
             "label": "52W high"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         },
         {
           "ticker": "DLR",
@@ -11860,7 +14251,11 @@
             "multi_buy": 0,
             "multi_sell": 1,
             "label": "52W high"
-          }
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
         }
       ],
       "item_count": 24,
