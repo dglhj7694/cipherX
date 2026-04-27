@@ -22,7 +22,7 @@ from .rankers import (
 )
 
 FINAL_TOP_LIMIT = 20
-FIVE_DAY_TOP_LIMIT = 20
+FIVE_DAY_TOP_LIMIT = 30
 HMA_EMA_TOP_LIMIT = 20
 GAP_SETUP_MIN_SCORE = 8.0
 GAP_SETUP_MIN_GATE_COUNT = 4.0
@@ -71,7 +71,7 @@ CORE_QUALITY_FLOORS: dict[str, str] = {
     "sell_turn": "당일 UTBot/HULL 매도전환",
     "gap_setup": "gap_setup_candidate=True + score/gate 강화 + 상승구조 + 건조거래량 + 하락전환없음",
     "pocket_pivot": "pocket_pivot_candidate=True",
-    "five_day_top": "chg_5d > 0, Top 20",
+    "five_day_top": "chg_5d > 0, Top 30",
     "new_52w_high": "new_52w_high=True + latest_bar_date == target session",
 }
 

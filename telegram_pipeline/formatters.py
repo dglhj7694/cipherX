@@ -292,6 +292,7 @@ def _candidate_source_flags(section_key: str, row: Mapping[str, Any], target_dat
         "hma_ema_signal_state": str(row.get("hma_ema_signal_state") or "NEUTRAL"),
         "multi_buy": int(safe_float(row.get("multi_buy", 0.0))),
         "multi_sell": int(safe_float(row.get("multi_sell", 0.0))),
+        "chg_5d": safe_float(row.get("chg_5d", 0.0)),
         "label": _candidate_label(section_key),
     }
 
@@ -406,6 +407,8 @@ def _format_candidate_line(candidate: TelegramCandidate) -> str:
     turn_engine = str(candidate.source_flags.get("turn_engine") or "").strip()
     if turn_engine and candidate.section_key in {"buy_turn", "sell_turn"}:
         line += f" | {turn_engine}"
+    if candidate.section_key == "five_day_top":
+        line += f" | 5D {_signed(candidate.source_flags.get('chg_5d'), 2)}%"
     return line
 
 

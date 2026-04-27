@@ -315,7 +315,7 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertEqual(section_map["buy_turn"].items[0].source_flags.get("turn_engine"), "UTBot")
         self.assertEqual(section_map["sell_turn"].items[0].source_flags.get("turn_engine"), "UTBot")
 
-    def test_only_final_five_hma_have_top20_limits(self):
+    def test_only_final_hma_have_top20_and_five_day_has_top30_limit(self):
         rows = [
             self._row(
                 f"T{i:02d}",
@@ -324,7 +324,7 @@ class TelegramPipelineTests(unittest.TestCase):
                 scan_score=300 - i,
                 hma_ema_risk_to_ema50_pct=1.0 + i * 0.05,
             )
-            for i in range(25)
+            for i in range(35)
         ]
         digest = build_post_close_digest(
             rows,
@@ -332,8 +332,8 @@ class TelegramPipelineTests(unittest.TestCase):
             generated_at=self.generated_at,
             market_date=self.market_date,
             scan_label="post-close default",
-            universe_count=25,
-            result_count=25,
+            universe_count=35,
+            result_count=35,
             skip_count=0,
         )
         section_map = digest.section_map()
@@ -341,9 +341,9 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertEqual(section_map["final_top"].item_count, FINAL_TOP_LIMIT)
         self.assertEqual(section_map["five_day_top"].item_count, FIVE_DAY_TOP_LIMIT)
         self.assertEqual(section_map["hma_ema_trend"].item_count, HMA_EMA_TOP_LIMIT)
-        self.assertEqual(section_map["buy_turn"].item_count, 25)
-        self.assertEqual(section_map["gap_setup"].item_count, 25)
-        self.assertEqual(section_map["pocket_pivot"].item_count, 25)
+        self.assertEqual(section_map["buy_turn"].item_count, 35)
+        self.assertEqual(section_map["gap_setup"].item_count, 35)
+        self.assertEqual(section_map["pocket_pivot"].item_count, 35)
 
     def test_hma_selector_applies_price_over_ema50_gate(self):
         ok = self._row("OK", price=101.0, ema50=100.0)
@@ -468,6 +468,21 @@ class TelegramPipelineTests(unittest.TestCase):
 
         self.assertIn("BUYHULL | (+1.75, +2.35%) | x1.45 | HULL", message)
         self.assertIn("SELLBOTH | (+1.75, +2.35%) | x1.45 | UTBot+HULL", message)
+
+    def test_five_day_top_message_lines_show_five_day_return(self):
+        digest = build_post_close_digest(
+            [self._row("ALPHA", chg_5d=17.42)],
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=1,
+            result_count=1,
+            skip_count=0,
+        )
+        message = build_post_close_message_texts(digest)[0]
+
+        self.assertIn("ALPHA | (+1.75, +2.35%) | x1.45 | 5D +17.42%", message)
 
     def test_split_telegram_message_text_prefers_section_boundaries(self):
         text = "\n\n".join(
