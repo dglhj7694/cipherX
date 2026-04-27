@@ -185,6 +185,27 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertEqual(by_ticker["EXTREME"]["qbs_bucket"], "CHASE_WATCH")
         self.assertIn("extreme_chase", by_ticker["EXTREME"]["qbs_risk_flags"])
 
+    def test_qbs_high_conflict_extreme_strength_stays_chase_watch(self):
+        row = self._row(
+            "POET",
+            chg=28.84,
+            chg_5d=107.99,
+            strategy_conflict_level="HIGH",
+            low_conflict_bullish=False,
+            final_entry_eligible=False,
+            final_entry_selected=False,
+            gap_setup_candidate=False,
+            new_52w_high=False,
+            hma_ema_long_entry=False,
+            hma_ema_long_aligned=False,
+        )
+
+        annotated = annotate_rows_with_qbs([row], target_date=self.market_date)
+
+        self.assertEqual(annotated[0]["qbs_bucket"], "CHASE_WATCH")
+        self.assertIn("high_conflict", annotated[0]["qbs_risk_flags"])
+        self.assertIn("extreme_chase", annotated[0]["qbs_risk_flags"])
+
     def test_qbs_hma_negative_not_buy_now_and_pullback_wait(self):
         hma_negative = self._row(
             "HMANEG",

@@ -275,8 +275,9 @@ def _risk_flags(row: Mapping[str, Any], membership: set[str], target_date: date)
         _unique_append(flags, "gap_failure")
     if str(row.get("strategy_conflict_level") or "").strip().upper() == "HIGH":
         _unique_append(flags, "high_conflict")
+        penalty -= 10.0
 
-    hard_exclude = any(flag in flags for flag in {"sell_turn", "thin_trade", "gap_failure", "high_conflict"})
+    hard_exclude = any(flag in flags for flag in {"sell_turn", "thin_trade", "gap_failure"})
 
     chg_pct = _row_number(row, "chg")
     if chg_pct >= 20.0:
@@ -349,6 +350,7 @@ def _classify_bucket(
         and chg_pct >= 0.0
         and volume_ratio >= 1.0
         and "multi_sell" not in risk_flags
+        and "high_conflict" not in risk_flags
         and not (has_hma_only and chg_pct < 0.0)
     ):
         return BUCKET_BUY_NOW
