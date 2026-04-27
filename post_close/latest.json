@@ -1,9 +1,9 @@
 {
   "version": "2.0",
   "scan_mode": "post_close",
-  "run_stamp": "24970333207-1",
+  "run_stamp": "24972043022-1",
   "market_date": "2026-04-24",
-  "generated_at": "2026-04-27T09:10:39.009061+09:00",
+  "generated_at": "2026-04-27T10:29:36.620029+09:00",
   "section_order": [
     "qbs_buy_now",
     "qbs_chase_watch",
@@ -83,13 +83,43 @@
           "risk_flags": []
         },
         {
+          "ticker": "BKR",
+          "price": 68.94000244140625,
+          "chg_value": 4.450004577636719,
+          "chg_pct": 6.900301946104934,
+          "volume_ratio_20": 1.8383715366366902,
+          "section_key": "qbs_buy_now",
+          "rank": 3,
+          "label": "BUY_NOW",
+          "reason": "final+pocket+52W+5D",
+          "source_flags": {
+            "membership": [
+              "final_top",
+              "five_day_top",
+              "new_52w_high",
+              "pocket_pivot"
+            ],
+            "membership_count": 4,
+            "hard_exclude": false
+          },
+          "qbs_score": 91.0,
+          "bucket": "BUY_NOW",
+          "tags": [
+            "final",
+            "pocket",
+            "52W",
+            "5D"
+          ],
+          "risk_flags": []
+        },
+        {
           "ticker": "ENTG",
           "price": 155.97999572753906,
           "chg_value": 6.649993896484375,
           "chg_pct": 4.453220260459035,
           "volume_ratio_20": 1.7704143171145357,
           "section_key": "qbs_buy_now",
-          "rank": 3,
+          "rank": 4,
           "label": "BUY_NOW",
           "reason": "final+trend",
           "source_flags": {
@@ -115,7 +145,7 @@
           "chg_pct": 7.34652993388903,
           "volume_ratio_20": 1.5215571191772943,
           "section_key": "qbs_buy_now",
-          "rank": 4,
+          "rank": 5,
           "label": "BUY_NOW",
           "reason": "final+trend",
           "source_flags": {
@@ -131,34 +161,6 @@
           "tags": [
             "final",
             "trend"
-          ],
-          "risk_flags": []
-        },
-        {
-          "ticker": "BKR",
-          "price": 68.94000244140625,
-          "chg_value": 4.450004577636719,
-          "chg_pct": 6.900301946104934,
-          "volume_ratio_20": 1.8383715366366902,
-          "section_key": "qbs_buy_now",
-          "rank": 5,
-          "label": "BUY_NOW",
-          "reason": "final+pocket+52W",
-          "source_flags": {
-            "membership": [
-              "final_top",
-              "new_52w_high",
-              "pocket_pivot"
-            ],
-            "membership_count": 3,
-            "hard_exclude": false
-          },
-          "qbs_score": 83.0,
-          "bucket": "BUY_NOW",
-          "tags": [
-            "final",
-            "pocket",
-            "52W"
           ],
           "risk_flags": []
         },
@@ -277,18 +279,20 @@
           "section_key": "qbs_buy_now",
           "rank": 10,
           "label": "BUY_NOW",
-          "reason": "final",
+          "reason": "final+5D",
           "source_flags": {
             "membership": [
-              "final_top"
+              "final_top",
+              "five_day_top"
             ],
-            "membership_count": 1,
+            "membership_count": 2,
             "hard_exclude": false
           },
-          "qbs_score": 62.0,
+          "qbs_score": 70.0,
           "bucket": "BUY_NOW",
           "tags": [
-            "final"
+            "final",
+            "5D"
           ],
           "risk_flags": []
         },
@@ -497,13 +501,46 @@
       "title": "강하지만 추격주의",
       "items": [
         {
+          "ticker": "OGN",
+          "price": 11.260000228881836,
+          "chg_value": 2.6599998474121094,
+          "chg_pct": 30.930229411891254,
+          "volume_ratio_20": 3.5185528838931455,
+          "section_key": "qbs_chase_watch",
+          "rank": 1,
+          "label": "CHASE_WATCH",
+          "reason": "final+buy+pocket+5D+UTBot+HULL",
+          "source_flags": {
+            "membership": [
+              "buy_turn",
+              "final_top",
+              "five_day_top",
+              "pocket_pivot"
+            ],
+            "membership_count": 4,
+            "hard_exclude": false
+          },
+          "qbs_score": 127.0,
+          "bucket": "CHASE_WATCH",
+          "tags": [
+            "final",
+            "buy",
+            "pocket",
+            "5D",
+            "UTBot+HULL"
+          ],
+          "risk_flags": [
+            "extreme_chase"
+          ]
+        },
+        {
           "ticker": "INTC",
           "price": 82.54000091552734,
           "chg_value": 15.760002136230469,
           "chg_pct": 23.59988383395476,
           "volume_ratio_20": 2.334398574877082,
           "section_key": "qbs_chase_watch",
-          "rank": 1,
+          "rank": 2,
           "label": "CHASE_WATCH",
           "reason": "final+buy+52W+5D+HULL",
           "source_flags": {
@@ -524,37 +561,6 @@
             "52W",
             "5D",
             "HULL"
-          ],
-          "risk_flags": [
-            "extreme_chase"
-          ]
-        },
-        {
-          "ticker": "OGN",
-          "price": 11.260000228881836,
-          "chg_value": 2.6599998474121094,
-          "chg_pct": 30.930229411891254,
-          "volume_ratio_20": 3.5185528838931455,
-          "section_key": "qbs_chase_watch",
-          "rank": 2,
-          "label": "CHASE_WATCH",
-          "reason": "final+buy+pocket+UTBot+HULL",
-          "source_flags": {
-            "membership": [
-              "buy_turn",
-              "final_top",
-              "pocket_pivot"
-            ],
-            "membership_count": 3,
-            "hard_exclude": false
-          },
-          "qbs_score": 119.0,
-          "bucket": "CHASE_WATCH",
-          "tags": [
-            "final",
-            "buy",
-            "pocket",
-            "UTBot+HULL"
           ],
           "risk_flags": [
             "extreme_chase"
@@ -617,13 +623,45 @@
           "risk_flags": []
         },
         {
+          "ticker": "POET",
+          "price": 15.100000381469727,
+          "chg_value": 3.380000114440918,
+          "chg_pct": 28.839590763062304,
+          "volume_ratio_20": 3.205177625755657,
+          "section_key": "qbs_chase_watch",
+          "rank": 5,
+          "label": "CHASE_WATCH",
+          "reason": "buy+pocket+5D+UTBot",
+          "source_flags": {
+            "membership": [
+              "buy_turn",
+              "five_day_top",
+              "pocket_pivot"
+            ],
+            "membership_count": 3,
+            "hard_exclude": false
+          },
+          "qbs_score": 78.0,
+          "bucket": "CHASE_WATCH",
+          "tags": [
+            "buy",
+            "pocket",
+            "5D",
+            "UTBot"
+          ],
+          "risk_flags": [
+            "high_conflict",
+            "extreme_chase"
+          ]
+        },
+        {
           "ticker": "ARM",
           "price": 234.80999755859375,
           "chg_value": 30.199996948242188,
           "chg_pct": 14.759785376157375,
           "volume_ratio_20": 2.44320316639398,
           "section_key": "qbs_chase_watch",
-          "rank": 5,
+          "rank": 6,
           "label": "CHASE_WATCH",
           "reason": "final+5D",
           "source_flags": {
@@ -651,7 +689,7 @@
           "chg_pct": 7.215596763285272,
           "volume_ratio_20": 1.873407672335927,
           "section_key": "qbs_chase_watch",
-          "rank": 6,
+          "rank": 7,
           "label": "CHASE_WATCH",
           "reason": "5D",
           "source_flags": {
@@ -675,7 +713,7 @@
           "chg_pct": 13.912819852128719,
           "volume_ratio_20": 2.1103437015689708,
           "section_key": "qbs_chase_watch",
-          "rank": 7,
+          "rank": 8,
           "label": "CHASE_WATCH",
           "reason": "5D",
           "source_flags": {
@@ -695,13 +733,41 @@
           ]
         },
         {
+          "ticker": "ACLS",
+          "price": 143.1300048828125,
+          "chg_value": 3.2700042724609375,
+          "chg_pct": 2.338055382661647,
+          "volume_ratio_20": 1.222148750826553,
+          "section_key": "qbs_chase_watch",
+          "rank": 9,
+          "label": "CHASE_WATCH",
+          "reason": "52W+5D",
+          "source_flags": {
+            "membership": [
+              "five_day_top",
+              "new_52w_high"
+            ],
+            "membership_count": 2,
+            "hard_exclude": false
+          },
+          "qbs_score": 44.0,
+          "bucket": "CHASE_WATCH",
+          "tags": [
+            "52W",
+            "5D"
+          ],
+          "risk_flags": [
+            "high_conflict"
+          ]
+        },
+        {
           "ticker": "ALAB",
           "price": 212.83999633789062,
           "chg_value": 15.300003051757812,
           "chg_pct": 7.745268589533694,
           "volume_ratio_20": 1.1665470302561798,
           "section_key": "qbs_chase_watch",
-          "rank": 8,
+          "rank": 10,
           "label": "CHASE_WATCH",
           "reason": "5D",
           "source_flags": {
@@ -725,7 +791,7 @@
           "chg_pct": 17.74486546108233,
           "volume_ratio_20": 1.1114689316842294,
           "section_key": "qbs_chase_watch",
-          "rank": 9,
+          "rank": 11,
           "label": "CHASE_WATCH",
           "reason": "buy+UTBot",
           "source_flags": {
@@ -744,9 +810,35 @@
           "risk_flags": [
             "chase_risk"
           ]
+        },
+        {
+          "ticker": "TTMI",
+          "price": 149.00999450683594,
+          "chg_value": 16.029998779296875,
+          "chg_pct": 12.054443746667374,
+          "volume_ratio_20": 1.572737564565202,
+          "section_key": "qbs_chase_watch",
+          "rank": 12,
+          "label": "CHASE_WATCH",
+          "reason": "5D",
+          "source_flags": {
+            "membership": [
+              "five_day_top"
+            ],
+            "membership_count": 1,
+            "hard_exclude": false
+          },
+          "qbs_score": 41.0,
+          "bucket": "CHASE_WATCH",
+          "tags": [
+            "5D"
+          ],
+          "risk_flags": [
+            "chase_risk"
+          ]
         }
       ],
-      "item_count": 9,
+      "item_count": 12,
       "quality_floor": "QBS>=40 + extended move / 52W / 5D chase risk",
       "ranked": true
     },
@@ -875,6 +967,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 3,
             "multi_sell": 1,
+            "chg_5d": 6.791728286155683,
             "label": "final"
           },
           "qbs_score": null,
@@ -909,6 +1002,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 3,
             "multi_sell": 1,
+            "chg_5d": 11.927246691894283,
             "label": "final"
           },
           "qbs_score": null,
@@ -943,6 +1037,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 5,
             "multi_sell": 1,
+            "chg_5d": 15.368852098601323,
             "label": "final"
           },
           "qbs_score": null,
@@ -977,6 +1072,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 4,
             "multi_sell": 0,
+            "chg_5d": 14.77188031693943,
             "label": "final"
           },
           "qbs_score": null,
@@ -1011,6 +1107,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 1,
+            "chg_5d": 11.149254995729803,
             "label": "final"
           },
           "qbs_score": null,
@@ -1045,6 +1142,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": 6.132878400192706,
             "label": "final"
           },
           "qbs_score": null,
@@ -1079,6 +1177,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 1,
+            "chg_5d": 15.92696347052389,
             "label": "final"
           },
           "qbs_score": null,
@@ -1113,6 +1212,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 1,
+            "chg_5d": 11.539642888046053,
             "label": "final"
           },
           "qbs_score": null,
@@ -1147,6 +1247,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 4,
             "multi_sell": 1,
+            "chg_5d": 11.707199824867965,
             "label": "final"
           },
           "qbs_score": null,
@@ -1181,6 +1282,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 1,
+            "chg_5d": 13.023827886294725,
             "label": "final"
           },
           "qbs_score": null,
@@ -1215,6 +1317,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 7.002064828408712,
             "label": "final"
           },
           "qbs_score": null,
@@ -1249,6 +1352,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": 9.15243659791678,
             "label": "final"
           },
           "qbs_score": null,
@@ -1283,6 +1387,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 4,
             "multi_sell": 0,
+            "chg_5d": 20.49635170149977,
             "label": "final"
           },
           "qbs_score": null,
@@ -1317,6 +1422,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 2.7568931462617035,
             "label": "final"
           },
           "qbs_score": null,
@@ -1351,6 +1457,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 4,
             "multi_sell": 0,
+            "chg_5d": 10.222852071646384,
             "label": "final"
           },
           "qbs_score": null,
@@ -1385,6 +1492,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 3,
             "multi_sell": 0,
+            "chg_5d": 15.322856890525205,
             "label": "final"
           },
           "qbs_score": null,
@@ -1419,6 +1527,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 5,
             "multi_sell": 1,
+            "chg_5d": 40.83248580075973,
             "label": "final"
           },
           "qbs_score": null,
@@ -1453,6 +1562,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 6,
             "multi_sell": 1,
+            "chg_5d": 60.747673547115035,
             "label": "final"
           },
           "qbs_score": null,
@@ -1487,6 +1597,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 3,
             "multi_sell": 1,
+            "chg_5d": 7.9247841070841165,
             "label": "final"
           },
           "qbs_score": null,
@@ -1521,6 +1632,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 4,
             "multi_sell": 0,
+            "chg_5d": 9.911136549111655,
             "label": "final"
           },
           "qbs_score": null,
@@ -1564,6 +1676,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 5,
             "multi_sell": 1,
+            "chg_5d": 15.368852098601323,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -1598,6 +1711,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 1,
+            "chg_5d": 1.4558186509894278,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -1632,6 +1746,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 1.3535590833803819,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -1666,6 +1781,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": 6.132878400192706,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -1700,6 +1816,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 2.8374727703645726,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -1734,6 +1851,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 0.30541447150133677,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -1768,6 +1886,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -0.28192110636096246,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -1802,6 +1921,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 5.4549575407893744,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -1836,6 +1956,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 3,
             "multi_sell": 1,
+            "chg_5d": 21.666673068647203,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -1870,6 +1991,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 5,
             "multi_sell": 1,
+            "chg_5d": 107.98897941350872,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -1904,6 +2026,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 4,
             "multi_sell": 5,
+            "chg_5d": 9.287818971156518,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -1938,6 +2061,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 2,
             "multi_sell": 4,
+            "chg_5d": 9.490133223305747,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -1972,6 +2096,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 4,
             "multi_sell": 0,
+            "chg_5d": 20.49635170149977,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2006,6 +2131,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -3.0487982456671183,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2040,6 +2166,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": 3.3828797522773555,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2074,6 +2201,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -0.26905591029200226,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2108,6 +2236,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 0.7356150147955636,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2142,6 +2271,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": 2.8358198996773787,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2176,6 +2306,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 1,
+            "chg_5d": 11.397309106800463,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2210,6 +2341,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 2,
+            "chg_5d": 1.6101513847410727,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2244,6 +2376,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 7.0282660691685335,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2278,6 +2411,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 4.401961899086842,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2312,6 +2446,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 3.6051475950576712,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2346,6 +2481,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -1.3100458850410959,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2380,6 +2516,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": 1.5775662364851557,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2414,6 +2551,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 6.037473246159161,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2448,6 +2586,7 @@
             "hma_ema_signal_state": "LONG_ENTRY",
             "multi_buy": 1,
             "multi_sell": 2,
+            "chg_5d": 5.847205639194458,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2482,6 +2621,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 2,
+            "chg_5d": -1.810858743462078,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2516,6 +2656,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 2,
+            "chg_5d": 1.8207299281772364,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2550,6 +2691,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -1.4592710456369993,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2584,6 +2726,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 6.675567627225123,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2618,6 +2761,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 2,
+            "chg_5d": -0.8799458893219885,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2652,6 +2796,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -1.9199015927779055,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2686,6 +2831,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 6.037514916301011,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2720,6 +2866,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 5.0637390990802595,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2754,6 +2901,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": 1.7250031561822552,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2788,6 +2936,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 4.879591363239989,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2822,6 +2971,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 0.8603457513982653,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2856,6 +3006,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 0.7960668692954822,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2890,6 +3041,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": -0.48668657005763677,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2924,6 +3076,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 7.002064828408712,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2958,6 +3111,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -0.7489933909985811,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -2992,6 +3146,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -0.7387397542633537,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -3026,6 +3181,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 3,
             "multi_sell": 0,
+            "chg_5d": 1.712922643831548,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -3060,6 +3216,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": 0.5444753169540486,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -3094,6 +3251,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 0.23437291034500435,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -3128,6 +3286,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -0.2126803229365932,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -3162,6 +3321,7 @@
             "hma_ema_signal_state": "SHORT_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 0.6154528947931948,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -3196,6 +3356,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 2,
+            "chg_5d": -3.913977838331653,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -3230,6 +3391,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 1.1750718441387382,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -3264,6 +3426,7 @@
             "hma_ema_signal_state": "SHORT_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -1.0296689733161979,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -3298,6 +3461,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -2.1307253343406387,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -3332,6 +3496,7 @@
             "hma_ema_signal_state": "SHORT_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -1.8723399926584665,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -3366,6 +3531,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 0.3757628946258461,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -3400,6 +3566,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 4.1440245498964465,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -3434,6 +3601,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 1.6077232289849541,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -3468,6 +3636,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": -1.9368045456723944,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -3502,6 +3671,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 3.6710432934456985,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -3536,6 +3706,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 2,
+            "chg_5d": -4.721873469674782,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -3570,6 +3741,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 1.4476440719712993,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -3604,6 +3776,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 4.890260109902696,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -3638,6 +3811,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 1.206897867136988,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -3672,6 +3846,7 @@
             "hma_ema_signal_state": "SHORT_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 1,
+            "chg_5d": 1.025710096533185,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -3706,6 +3881,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": 5.441814020330367,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -3740,6 +3916,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 0.3472228098880426,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -3774,6 +3951,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 0.3628987063561982,
             "label": "buy turn"
           },
           "qbs_score": null,
@@ -3817,6 +3995,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 23.888893230461893,
             "label": "pullback"
           },
           "qbs_score": null,
@@ -3851,6 +4030,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 6,
             "multi_sell": 0,
+            "chg_5d": 11.373132998784406,
             "label": "pullback"
           },
           "qbs_score": null,
@@ -3885,6 +4065,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": 9.15243659791678,
             "label": "pullback"
           },
           "qbs_score": null,
@@ -3919,6 +4100,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 7.2317479177585975,
             "label": "pullback"
           },
           "qbs_score": null,
@@ -3953,6 +4135,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 3.2784826286414304,
             "label": "pullback"
           },
           "qbs_score": null,
@@ -3987,6 +4170,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 11.187670370586513,
             "label": "pullback"
           },
           "qbs_score": null,
@@ -4021,6 +4205,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 3.2675466812326555,
             "label": "pullback"
           },
           "qbs_score": null,
@@ -4055,6 +4240,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 7.4850301324686495,
             "label": "pullback"
           },
           "qbs_score": null,
@@ -4089,6 +4275,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 1.4010716899487237,
             "label": "pullback"
           },
           "qbs_score": null,
@@ -4123,6 +4310,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": 5.3033875724075505,
             "label": "pullback"
           },
           "qbs_score": null,
@@ -4157,6 +4345,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 2.7568931462617035,
             "label": "pullback"
           },
           "qbs_score": null,
@@ -4191,6 +4380,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": -0.6915102412375529,
             "label": "pullback"
           },
           "qbs_score": null,
@@ -4225,6 +4415,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": 4.788007865791531,
             "label": "pullback"
           },
           "qbs_score": null,
@@ -4259,6 +4450,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 1.1261248337982486,
             "label": "pullback"
           },
           "qbs_score": null,
@@ -4293,6 +4485,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 0.8005327219162828,
             "label": "pullback"
           },
           "qbs_score": null,
@@ -4336,6 +4529,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 3,
             "multi_sell": 1,
+            "chg_5d": 11.927246691894283,
             "label": "trend"
           },
           "qbs_score": null,
@@ -4370,6 +4564,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 3,
             "multi_sell": 1,
+            "chg_5d": 6.791728286155683,
             "label": "trend"
           },
           "qbs_score": null,
@@ -4404,6 +4599,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 3,
             "multi_sell": 1,
+            "chg_5d": 7.9247841070841165,
             "label": "trend"
           },
           "qbs_score": null,
@@ -4438,6 +4634,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 4,
             "multi_sell": 0,
+            "chg_5d": 18.1043169763732,
             "label": "trend"
           },
           "qbs_score": null,
@@ -4481,6 +4678,7 @@
             "hma_ema_signal_state": "LONG_ENTRY",
             "multi_buy": 4,
             "multi_sell": 0,
+            "chg_5d": 10.139459318080824,
             "label": "HMA/EMA"
           },
           "qbs_score": null,
@@ -4515,6 +4713,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 1,
+            "chg_5d": -0.45065104445711535,
             "label": "HMA/EMA"
           },
           "qbs_score": null,
@@ -4549,6 +4748,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 1,
+            "chg_5d": 5.523641389112874,
             "label": "HMA/EMA"
           },
           "qbs_score": null,
@@ -4583,6 +4783,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -1.493577611711603,
             "label": "HMA/EMA"
           },
           "qbs_score": null,
@@ -4617,6 +4818,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 1,
+            "chg_5d": -0.9128212434346514,
             "label": "HMA/EMA"
           },
           "qbs_score": null,
@@ -4651,6 +4853,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 4,
             "multi_sell": 2,
+            "chg_5d": 3.2962443894159823,
             "label": "HMA/EMA"
           },
           "qbs_score": null,
@@ -4685,6 +4888,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 3,
             "multi_sell": 1,
+            "chg_5d": -0.6130800457555776,
             "label": "HMA/EMA"
           },
           "qbs_score": null,
@@ -4719,6 +4923,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": 0.895683436127167,
             "label": "HMA/EMA"
           },
           "qbs_score": null,
@@ -4753,6 +4958,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 7.203908932791184,
             "label": "HMA/EMA"
           },
           "qbs_score": null,
@@ -4787,6 +4993,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 1,
+            "chg_5d": -0.5500535974049428,
             "label": "HMA/EMA"
           },
           "qbs_score": null,
@@ -4821,6 +5028,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 5,
             "multi_sell": 1,
+            "chg_5d": 0.4609488643676932,
             "label": "HMA/EMA"
           },
           "qbs_score": null,
@@ -4855,6 +5063,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 2.476722546227159,
             "label": "HMA/EMA"
           },
           "qbs_score": null,
@@ -4889,6 +5098,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 0.7097760683365436,
             "label": "HMA/EMA"
           },
           "qbs_score": null,
@@ -4923,6 +5133,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 4,
             "multi_sell": 1,
+            "chg_5d": 3.0067526653971064,
             "label": "HMA/EMA"
           },
           "qbs_score": null,
@@ -4957,6 +5168,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 4,
             "multi_sell": 1,
+            "chg_5d": 0.8625329056210955,
             "label": "HMA/EMA"
           },
           "qbs_score": null,
@@ -4991,6 +5203,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 1,
+            "chg_5d": 0.5893856988577643,
             "label": "HMA/EMA"
           },
           "qbs_score": null,
@@ -5025,6 +5238,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 3,
             "multi_sell": 2,
+            "chg_5d": 2.020976556714179,
             "label": "HMA/EMA"
           },
           "qbs_score": null,
@@ -5059,6 +5273,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": 5.291752570910194,
             "label": "HMA/EMA"
           },
           "qbs_score": null,
@@ -5093,6 +5308,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 4.074505045643732,
             "label": "HMA/EMA"
           },
           "qbs_score": null,
@@ -5127,6 +5343,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -5.983851335862696,
             "label": "HMA/EMA"
           },
           "qbs_score": null,
@@ -5170,6 +5387,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 8,
+            "chg_5d": -24.06301109121685,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -5204,6 +5422,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -6.118142950555807,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -5238,6 +5457,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 8,
+            "chg_5d": -23.87371794441885,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -5272,6 +5492,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 7,
+            "chg_5d": -24.015964850260506,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -5306,6 +5527,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 2,
             "multi_sell": 1,
+            "chg_5d": -4.159048822286271,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -5340,6 +5562,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 3,
+            "chg_5d": -11.181871678126717,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -5374,6 +5597,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -13.634911954500712,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -5408,6 +5632,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 3,
             "multi_sell": 1,
+            "chg_5d": -1.52870936643311,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -5442,6 +5667,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -2.6040252508234176,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -5476,6 +5702,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -5.642577059365945,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -5510,6 +5737,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -7.852411993090959,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -5544,6 +5772,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 3,
+            "chg_5d": -4.180112341331496,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -5578,6 +5807,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -6.145624982520749,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -5612,6 +5842,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -8.18202182469839,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -5646,6 +5877,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": -7.23270485047594,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -5680,6 +5912,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 1,
+            "chg_5d": -5.742404083949327,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -5714,6 +5947,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -2.3700922038624497,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -5748,6 +5982,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -3.4117123576376898,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -5782,6 +6017,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -0.7798168910251194,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -5816,6 +6052,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 2,
             "multi_sell": 3,
+            "chg_5d": -2.125273142002419,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -5850,6 +6087,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -3.724418931450272,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -5884,6 +6122,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -2.6875364176275514,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -5918,6 +6157,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -0.8371757084326942,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -5952,6 +6192,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": -3.3919938838824293,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -5986,6 +6227,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 2,
+            "chg_5d": -9.95474552608199,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6020,6 +6262,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": -2.201858014322533,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6054,6 +6297,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": -1.9842959730086083,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6088,6 +6332,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": -2.6706276127704287,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6122,6 +6367,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": -1.9936504270132254,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6156,6 +6402,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": -1.7448878259769132,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6190,6 +6437,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -1.3508150637953935,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6224,6 +6472,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": -4.032121407093447,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6258,6 +6507,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 3,
             "multi_sell": 1,
+            "chg_5d": -8.82942950946501,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6292,6 +6542,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 4,
             "multi_sell": 3,
+            "chg_5d": -6.986161840885664,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6326,6 +6577,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 2,
             "multi_sell": 1,
+            "chg_5d": -4.16102991264951,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6360,6 +6612,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 3,
             "multi_sell": 0,
+            "chg_5d": 4.4348551350721745,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6394,6 +6647,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -1.493577611711603,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6428,6 +6682,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 1,
+            "chg_5d": -3.854404698799309,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6462,6 +6717,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 1,
+            "chg_5d": -0.9128212434346514,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6496,6 +6752,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 2,
+            "chg_5d": -4.570892754789556,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6530,6 +6787,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 2,
             "multi_sell": 1,
+            "chg_5d": -6.41184805220795,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6564,6 +6822,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -7.692314203511271,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6598,6 +6857,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -0.48649003060585666,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6632,6 +6892,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 4,
+            "chg_5d": -6.684231942902377,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6666,6 +6927,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 3,
+            "chg_5d": -6.7142615841924895,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6700,6 +6962,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 1,
+            "chg_5d": -3.7333350088082105,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6734,6 +6997,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -3.7356354519655763,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6768,6 +7032,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 2,
+            "chg_5d": -12.206758415066826,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6802,6 +7067,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -5.3324763641632895,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6836,6 +7102,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 2,
+            "chg_5d": -5.907959040874077,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6870,6 +7137,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 3,
             "multi_sell": 0,
+            "chg_5d": -2.4801336816606305,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6904,6 +7172,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -0.9954805908442206,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6938,6 +7207,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 6,
             "multi_sell": 0,
+            "chg_5d": 1.0366835313906009,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -6972,6 +7242,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -3.7170659744189054,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7006,6 +7277,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -3.49987201453815,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7040,6 +7312,7 @@
             "hma_ema_signal_state": "SHORT_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 2,
+            "chg_5d": -3.9813806799659823,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7074,6 +7347,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 2,
+            "chg_5d": -1.4236894012778032,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7108,6 +7382,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": -6.905614086068688,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7142,6 +7417,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": -1.6177061067230183,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7176,6 +7452,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -1.5059079360312622,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7210,6 +7487,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": -1.7277893798595227,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7244,6 +7522,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -5.983851335862696,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7278,6 +7557,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": -7.93436422950957,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7312,6 +7592,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 3,
+            "chg_5d": -1.7627390944228452,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7346,6 +7627,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 3,
+            "chg_5d": -1.9653825596921055,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7380,6 +7662,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -6.272659706388644,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7414,6 +7697,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": -1.8434660201092037,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7448,6 +7732,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -2.4942082783434825,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7482,6 +7767,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 1,
+            "chg_5d": -6.35102186986294,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7516,6 +7802,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 2,
+            "chg_5d": -3.286763817040924,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7550,6 +7837,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 3,
             "multi_sell": 1,
+            "chg_5d": -6.382977153505408,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7584,6 +7872,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -0.8296733928400049,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7618,6 +7907,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -2.082631747454944,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7652,6 +7942,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": -3.4680654217364375,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7686,6 +7977,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -5.763888511760725,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7720,6 +8012,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -2.0680418323932948,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7754,6 +8047,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -4.021146895398393,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7788,6 +8082,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -1.3060077916808657,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7822,6 +8117,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": 4.0623638600995555,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7856,6 +8152,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -1.5834366231162758,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7890,6 +8187,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -2.238992175216195,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7924,6 +8222,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 2,
+            "chg_5d": -0.4489047486729329,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7958,6 +8257,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -2.066969776606823,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -7992,6 +8292,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": -1.2569557504538649,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8026,6 +8327,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -1.8464489526720016,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8060,6 +8362,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": -4.468412512795253,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8094,6 +8397,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 3,
             "multi_sell": 0,
+            "chg_5d": 0.11138168353835314,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8128,6 +8432,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 2,
             "multi_sell": 1,
+            "chg_5d": -1.136027083551676,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8162,6 +8467,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -0.8647846544208989,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8196,6 +8502,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 1,
+            "chg_5d": 0.09530251563324808,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8230,6 +8537,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -8.79983678073349,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8264,6 +8572,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -3.3295266679161886,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8298,6 +8607,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -2.6754246691879158,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8332,6 +8642,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": -2.309466660382254,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8366,6 +8677,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 2,
             "multi_sell": 2,
+            "chg_5d": -5.4545423019029915,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8400,6 +8712,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -1.1705182919617898,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8434,6 +8747,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -3.21577187319733,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8468,6 +8782,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": -4.711581866503923,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8502,6 +8817,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 3,
+            "chg_5d": -4.5825516756171165,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8536,6 +8852,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -1.3465484615323198,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8570,6 +8887,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -6.831122102795777,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8604,6 +8922,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -2.2158447310565434,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8638,6 +8957,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": -2.592896247624944,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8672,6 +8992,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 3,
+            "chg_5d": -3.362920051717861,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8706,6 +9027,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -4.76358946596476,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8740,6 +9062,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 2,
+            "chg_5d": -4.279128614129109,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8774,6 +9097,7 @@
             "hma_ema_signal_state": "SHORT_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -3.7668019141218507,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8808,6 +9132,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": -6.037738870666113,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8842,6 +9167,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 1,
+            "chg_5d": -1.402716397279505,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8876,6 +9202,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -0.45617886790750184,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8910,6 +9237,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -2.0675395408734674,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8944,6 +9272,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -4.765770770129186,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -8978,6 +9307,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": -8.968580631861474,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9012,6 +9342,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -3.443851572944519,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9046,6 +9377,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -1.5173939321466736,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9080,6 +9412,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -3.2406442228940646,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9114,6 +9447,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 2,
+            "chg_5d": -7.619040698961562,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9148,6 +9482,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -0.1006818895242699,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9182,6 +9517,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 0.7971711967666026,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9216,6 +9552,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 3,
             "multi_sell": 0,
+            "chg_5d": -2.421976532583648,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9250,6 +9587,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 1,
+            "chg_5d": -5.241777648899548,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9284,6 +9622,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -2.541748584666664,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9318,6 +9657,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 2,
+            "chg_5d": -4.457051733662416,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9352,6 +9692,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -3.9408776059131236,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9386,6 +9727,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": -5.439562573935958,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9420,6 +9762,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 5,
+            "chg_5d": -9.357460320784377,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9454,6 +9797,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -4.3466434555543465,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9488,6 +9832,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -6.710316125859721,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9522,6 +9867,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -2.2897950676900933,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9556,6 +9902,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -1.9398420877046019,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9590,6 +9937,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -2.7998303013032735,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9624,6 +9972,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -3.7388780304149085,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9658,6 +10007,7 @@
             "hma_ema_signal_state": "SHORT_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -4.643335103128713,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9692,6 +10042,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": 4.294481758089831,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9726,6 +10077,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": 0.1765067898502225,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9760,6 +10112,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -0.871858177351605,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9794,6 +10147,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -2.285263762351266,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9828,6 +10182,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 1,
+            "chg_5d": -2.6014115725265103,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9862,6 +10217,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": 1.1900672654355757,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9896,6 +10252,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -5.565900242970363,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9930,6 +10287,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -2.887136397581572,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9964,6 +10322,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -4.749164195353074,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -9998,6 +10357,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -2.852379802664888,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10032,6 +10392,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -5.450581304684662,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10066,6 +10427,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -8.246183001120166,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10100,6 +10462,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -4.675037396645416,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10134,6 +10497,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -1.024043543779942,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10168,6 +10532,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -2.9396005557102822,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10202,6 +10567,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": 2.538919996259835,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10236,6 +10602,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -0.9143678005425704,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10270,6 +10637,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -9.339557304248324,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10304,6 +10672,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -2.6322546850069513,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10338,6 +10707,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 2,
+            "chg_5d": -4.060727710243086,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10372,6 +10742,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -0.28887867310004234,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10406,6 +10777,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -5.09521232922702,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10440,6 +10812,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -7.900210373419014,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10474,6 +10847,7 @@
             "hma_ema_signal_state": "SHORT_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 3,
+            "chg_5d": -8.257810909342359,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10508,6 +10882,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -5.367792637463946,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10542,6 +10917,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 1,
+            "chg_5d": -0.5730345213062478,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10576,6 +10952,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -4.096833906904262,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10610,6 +10987,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -0.35407027417002357,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10644,6 +11022,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -7.432919661825288,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10678,6 +11057,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -0.39720367064290557,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10712,6 +11092,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -3.471636475324554,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10746,6 +11127,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -2.0618597877583125,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10780,6 +11162,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 1,
+            "chg_5d": -0.4272772600964396,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10814,6 +11197,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -2.4264569202300303,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10848,6 +11232,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": -2.3073161617361357,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10882,6 +11267,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -5.7561203902835985,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10916,6 +11302,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -3.6995663508847545,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10950,6 +11337,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -0.3293611693672126,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -10984,6 +11372,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": -0.7772042963146016,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11018,6 +11407,7 @@
             "hma_ema_signal_state": "SHORT_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -4.818310172448108,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11052,6 +11442,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -0.8683619024302708,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11086,6 +11477,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 2,
+            "chg_5d": 4.24589133176234,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11120,6 +11512,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -7.207666951627396,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11154,6 +11547,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 0.9766567114298189,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11188,6 +11582,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -1.3153179627563216,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11222,6 +11617,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -2.8112430442582,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11256,6 +11652,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": -0.8936785823810984,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11290,6 +11687,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -2.371330523246737,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11324,6 +11722,7 @@
             "hma_ema_signal_state": "SHORT_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 1,
+            "chg_5d": 1.025710096533185,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11358,6 +11757,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -0.39894724768290685,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11392,6 +11792,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": -0.5628106505280299,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11426,6 +11827,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -2.365497398434857,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11460,6 +11862,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -4.7126627773296645,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11494,6 +11897,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -3.548256307437995,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11528,6 +11932,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -4.1741888411704995,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11562,6 +11967,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 1.8845102459507435,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11596,6 +12002,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": -4.920641432243182,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11630,6 +12037,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -8.70535412556208,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11664,6 +12072,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": -16.153452508125007,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11698,6 +12107,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 2.4329291530294794,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11732,6 +12142,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": -0.6477842374141426,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11766,6 +12177,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -1.7820843643809254,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11800,6 +12212,7 @@
             "hma_ema_signal_state": "SHORT_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 2,
+            "chg_5d": -1.2900348906552186,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11834,6 +12247,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -0.6744317590834197,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11868,6 +12282,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -6.370043437050013,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11902,6 +12317,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -5.9012366952037185,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11936,6 +12352,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 2,
+            "chg_5d": -3.2423190269024253,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -11970,6 +12387,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -5.416789834055501,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -12004,6 +12422,7 @@
             "hma_ema_signal_state": "LONG_ENTRY",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": 3.9639123413357016,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -12038,6 +12457,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": -4.438002470451434,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -12072,6 +12492,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -1.3240894694150296,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -12106,6 +12527,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -0.15212363256300754,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -12140,6 +12562,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": -2.769230769230769,
             "label": "sell turn"
           },
           "qbs_score": null,
@@ -12183,6 +12606,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 8.178524377592465,
             "label": "gap setup"
           },
           "qbs_score": null,
@@ -12226,6 +12650,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 5,
             "multi_sell": 3,
+            "chg_5d": 10.129057651035081,
             "label": "pocket pivot"
           },
           "qbs_score": null,
@@ -12260,6 +12685,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 5,
             "multi_sell": 1,
+            "chg_5d": 15.368852098601323,
             "label": "pocket pivot"
           },
           "qbs_score": null,
@@ -12294,6 +12720,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 5,
             "multi_sell": 1,
+            "chg_5d": 107.98897941350872,
             "label": "pocket pivot"
           },
           "qbs_score": null,
@@ -12328,6 +12755,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 4,
             "multi_sell": 5,
+            "chg_5d": 9.287818971156518,
             "label": "pocket pivot"
           },
           "qbs_score": null,
@@ -12362,6 +12790,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 4,
             "multi_sell": 0,
+            "chg_5d": 8.62617853038546,
             "label": "pocket pivot"
           },
           "qbs_score": null,
@@ -12396,6 +12825,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 3,
             "multi_sell": 0,
+            "chg_5d": 15.322856890525205,
             "label": "pocket pivot"
           },
           "qbs_score": null,
@@ -12430,6 +12860,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 1,
+            "chg_5d": 11.397309106800463,
             "label": "pocket pivot"
           },
           "qbs_score": null,
@@ -12464,6 +12895,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 5.724270677078856,
             "label": "pocket pivot"
           },
           "qbs_score": null,
@@ -12498,6 +12930,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": 3.0990372581760255,
             "label": "pocket pivot"
           },
           "qbs_score": null,
@@ -12532,6 +12965,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 7.002064828408712,
             "label": "pocket pivot"
           },
           "qbs_score": null,
@@ -12566,6 +13000,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": 5.3033875724075505,
             "label": "pocket pivot"
           },
           "qbs_score": null,
@@ -12600,6 +13035,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 8.640643210301223,
             "label": "pocket pivot"
           },
           "qbs_score": null,
@@ -12634,6 +13070,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 9.850405711225662,
             "label": "pocket pivot"
           },
           "qbs_score": null,
@@ -12668,6 +13105,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": 5.441814020330367,
             "label": "pocket pivot"
           },
           "qbs_score": null,
@@ -12702,6 +13140,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 0.7453702620521365,
             "label": "pocket pivot"
           },
           "qbs_score": null,
@@ -12736,6 +13175,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 4.779731489014092,
             "label": "pocket pivot"
           },
           "qbs_score": null,
@@ -12779,6 +13219,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 5,
             "multi_sell": 1,
+            "chg_5d": 107.98897941350872,
             "label": "5D top"
           },
           "qbs_score": null,
@@ -12813,6 +13254,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 6,
             "multi_sell": 1,
+            "chg_5d": 60.747673547115035,
             "label": "5D top"
           },
           "qbs_score": null,
@@ -12847,6 +13289,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 5,
             "multi_sell": 1,
+            "chg_5d": 40.83248580075973,
             "label": "5D top"
           },
           "qbs_score": null,
@@ -12881,6 +13324,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 4,
             "multi_sell": 1,
+            "chg_5d": 25.44370325661952,
             "label": "5D top"
           },
           "qbs_score": null,
@@ -12915,6 +13359,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 1,
+            "chg_5d": 24.936233074962367,
             "label": "5D top"
           },
           "qbs_score": null,
@@ -12949,6 +13394,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 4,
             "multi_sell": 1,
+            "chg_5d": 24.571999047286113,
             "label": "5D top"
           },
           "qbs_score": null,
@@ -12983,6 +13429,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 23.888893230461893,
             "label": "5D top"
           },
           "qbs_score": null,
@@ -13017,6 +13464,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 4,
             "multi_sell": 0,
+            "chg_5d": 22.39024596672739,
             "label": "5D top"
           },
           "qbs_score": null,
@@ -13051,6 +13499,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 1,
+            "chg_5d": 22.28669497615447,
             "label": "5D top"
           },
           "qbs_score": null,
@@ -13085,6 +13534,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 22.183099353538644,
             "label": "5D top"
           },
           "qbs_score": null,
@@ -13119,6 +13569,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": 21.776503965228873,
             "label": "5D top"
           },
           "qbs_score": null,
@@ -13153,6 +13604,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 3,
             "multi_sell": 1,
+            "chg_5d": 21.666673068647203,
             "label": "5D top"
           },
           "qbs_score": null,
@@ -13187,6 +13639,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": 21.376557547350767,
             "label": "5D top"
           },
           "qbs_score": null,
@@ -13221,6 +13674,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 6,
             "multi_sell": 0,
+            "chg_5d": 20.91513240555319,
             "label": "5D top"
           },
           "qbs_score": null,
@@ -13255,6 +13709,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 4,
             "multi_sell": 1,
+            "chg_5d": 20.59002950838045,
             "label": "5D top"
           },
           "qbs_score": null,
@@ -13289,6 +13744,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 1,
+            "chg_5d": 20.550830317528156,
             "label": "5D top"
           },
           "qbs_score": null,
@@ -13323,6 +13779,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 4,
             "multi_sell": 0,
+            "chg_5d": 20.49635170149977,
             "label": "5D top"
           },
           "qbs_score": null,
@@ -13357,6 +13814,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 4,
             "multi_sell": 2,
+            "chg_5d": 20.386311549166535,
             "label": "5D top"
           },
           "qbs_score": null,
@@ -13391,6 +13849,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 3,
             "multi_sell": 0,
+            "chg_5d": 19.66058157700385,
             "label": "5D top"
           },
           "qbs_score": null,
@@ -13425,6 +13884,357 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 1,
+            "chg_5d": 18.53993373520386,
+            "label": "5D top"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
+        },
+        {
+          "ticker": "MOH",
+          "price": 175.94000244140625,
+          "chg_value": 1.2400054931640625,
+          "chg_pct": 0.7097913650974104,
+          "volume_ratio_20": 1.3585466354181028,
+          "section_key": "five_day_top",
+          "rank": 21,
+          "label": "5D top",
+          "reason": "5D +18.10% + volume lead + score 122.3",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 4,
+            "multi_sell": 0,
+            "chg_5d": 18.1043169763732,
+            "label": "5D top"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
+        },
+        {
+          "ticker": "TTMI",
+          "price": 149.00999450683594,
+          "chg_value": 16.029998779296875,
+          "chg_pct": 12.054443746667374,
+          "volume_ratio_20": 1.572737564565202,
+          "section_key": "five_day_top",
+          "rank": 22,
+          "label": "5D top",
+          "reason": "5D +18.04% + volume lead + score 140.1",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 4,
+            "multi_sell": 1,
+            "chg_5d": 18.03706988940097,
+            "label": "5D top"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
+        },
+        {
+          "ticker": "MRVL",
+          "price": 164.30999755859375,
+          "chg_value": -1.25,
+          "chg_pct": -0.7550132993675658,
+          "volume_ratio_20": 1.2220370649267127,
+          "section_key": "five_day_top",
+          "rank": 23,
+          "label": "5D top",
+          "reason": "5D +17.62% + volume lead",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 3,
+            "multi_sell": 1,
+            "chg_5d": 17.624736693318116,
+            "label": "5D top"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
+        },
+        {
+          "ticker": "MBLY",
+          "price": 9.229999542236328,
+          "chg_value": 0.5299997329711914,
+          "chg_pct": 6.091951087249034,
+          "volume_ratio_20": 1.9244815505647366,
+          "section_key": "five_day_top",
+          "rank": 24,
+          "label": "5D top",
+          "reason": "5D +17.28% + volume lead + score 27.8",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 2,
+            "multi_sell": 3,
+            "chg_5d": 17.280809103603083,
+            "label": "5D top"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
+        },
+        {
+          "ticker": "MEI",
+          "price": 8.390000343322754,
+          "chg_value": 0.5500001907348633,
+          "chg_pct": 7.015308418754492,
+          "volume_ratio_20": 1.208836043597365,
+          "section_key": "five_day_top",
+          "rank": 25,
+          "label": "5D top",
+          "reason": "5D +16.69% + volume lead + score 119.1",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": true,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 4,
+            "multi_sell": 1,
+            "chg_5d": 16.689850856081858,
+            "label": "5D top"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
+        },
+        {
+          "ticker": "AMKR",
+          "price": 78.0999984741211,
+          "chg_value": 5.189994812011719,
+          "chg_pct": 7.11835763452157,
+          "volume_ratio_20": 1.4934320875178029,
+          "section_key": "five_day_top",
+          "rank": 26,
+          "label": "5D top",
+          "reason": "5D +15.93% + volume lead + score 120.7",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 1,
+            "multi_sell": 1,
+            "chg_5d": 15.92696347052389,
+            "label": "5D top"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
+        },
+        {
+          "ticker": "ASYS",
+          "price": 18.770000457763672,
+          "chg_value": 1.5300006866455078,
+          "chg_pct": 8.874714077483272,
+          "volume_ratio_20": 2.614328221560997,
+          "section_key": "five_day_top",
+          "rank": 27,
+          "label": "5D top",
+          "reason": "5D +15.79% + volume lead + score 137.5",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": true,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 6,
+            "multi_sell": 1,
+            "chg_5d": 15.792729906710527,
+            "label": "5D top"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
+        },
+        {
+          "ticker": "OGN",
+          "price": 11.260000228881836,
+          "chg_value": 2.6599998474121094,
+          "chg_pct": 30.930229411891254,
+          "volume_ratio_20": 3.5185528838931455,
+          "section_key": "five_day_top",
+          "rank": 28,
+          "label": "5D top",
+          "reason": "5D +15.37% + volume lead + score 190.6",
+          "source_flags": {
+            "same_session_buy_turn": true,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": true,
+            "buy_turn_hull": true,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 5,
+            "multi_sell": 1,
+            "chg_5d": 15.368852098601323,
+            "label": "5D top"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
+        },
+        {
+          "ticker": "BKR",
+          "price": 68.94000244140625,
+          "chg_value": 4.450004577636719,
+          "chg_pct": 6.900301946104934,
+          "volume_ratio_20": 1.8383715366366902,
+          "section_key": "five_day_top",
+          "rank": 29,
+          "label": "5D top",
+          "reason": "5D +15.32% + volume lead + score 132.4",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 3,
+            "multi_sell": 0,
+            "chg_5d": 15.322856890525205,
+            "label": "5D top"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [],
+          "risk_flags": []
+        },
+        {
+          "ticker": "AMBA",
+          "price": 66.87000274658203,
+          "chg_value": 5.530002593994141,
+          "chg_pct": 9.015328627710858,
+          "volume_ratio_20": 1.2513747849262844,
+          "section_key": "five_day_top",
+          "rank": 30,
+          "label": "5D top",
+          "reason": "5D +14.84% + volume lead + score 99.8",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 0,
+            "multi_sell": 0,
+            "chg_5d": 14.837718138875813,
             "label": "5D top"
           },
           "qbs_score": null,
@@ -13433,8 +14243,8 @@
           "risk_flags": []
         }
       ],
-      "item_count": 20,
-      "quality_floor": "chg_5d > 0, Top 20",
+      "item_count": 30,
+      "quality_floor": "chg_5d > 0, Top 30",
       "ranked": true
     },
     {
@@ -13468,6 +14278,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 4,
             "multi_sell": 0,
+            "chg_5d": 20.49635170149977,
             "label": "52W high"
           },
           "qbs_score": null,
@@ -13502,6 +14313,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 6,
             "multi_sell": 1,
+            "chg_5d": 60.747673547115035,
             "label": "52W high"
           },
           "qbs_score": null,
@@ -13536,6 +14348,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 4,
             "multi_sell": 0,
+            "chg_5d": 14.77188031693943,
             "label": "52W high"
           },
           "qbs_score": null,
@@ -13570,6 +14383,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 4,
             "multi_sell": 0,
+            "chg_5d": 8.62617853038546,
             "label": "52W high"
           },
           "qbs_score": null,
@@ -13604,6 +14418,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 3,
             "multi_sell": 0,
+            "chg_5d": 15.322856890525205,
             "label": "52W high"
           },
           "qbs_score": null,
@@ -13638,6 +14453,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 4,
             "multi_sell": 1,
+            "chg_5d": 0.8625329056210955,
             "label": "52W high"
           },
           "qbs_score": null,
@@ -13672,6 +14488,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": 8.013668517464101,
             "label": "52W high"
           },
           "qbs_score": null,
@@ -13706,6 +14523,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 5.0637390990802595,
             "label": "52W high"
           },
           "qbs_score": null,
@@ -13740,6 +14558,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": 3.3828797522773555,
             "label": "52W high"
           },
           "qbs_score": null,
@@ -13774,6 +14593,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 1,
+            "chg_5d": 13.023827886294725,
             "label": "52W high"
           },
           "qbs_score": null,
@@ -13808,6 +14628,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 11.574085480325138,
             "label": "52W high"
           },
           "qbs_score": null,
@@ -13842,6 +14663,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 7.002064828408712,
             "label": "52W high"
           },
           "qbs_score": null,
@@ -13876,6 +14698,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 8.178524377592465,
             "label": "52W high"
           },
           "qbs_score": null,
@@ -13910,6 +14733,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 0,
+            "chg_5d": 7.378792040275806,
             "label": "52W high"
           },
           "qbs_score": null,
@@ -13944,6 +14768,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 7.482169720666689,
             "label": "52W high"
           },
           "qbs_score": null,
@@ -13978,6 +14803,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 3,
             "multi_sell": 0,
+            "chg_5d": 4.392002659787645,
             "label": "52W high"
           },
           "qbs_score": null,
@@ -14012,6 +14838,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 3,
             "multi_sell": 0,
+            "chg_5d": 5.7089808782785685,
             "label": "52W high"
           },
           "qbs_score": null,
@@ -14046,6 +14873,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 5.881130489616298,
             "label": "52W high"
           },
           "qbs_score": null,
@@ -14080,6 +14908,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": 7.120178342227927,
             "label": "52W high"
           },
           "qbs_score": null,
@@ -14114,6 +14943,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 1,
             "multi_sell": 0,
+            "chg_5d": 3.8147175161810902,
             "label": "52W high"
           },
           "qbs_score": null,
@@ -14148,6 +14978,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 4,
             "multi_sell": 1,
+            "chg_5d": 3.5877313567357274,
             "label": "52W high"
           },
           "qbs_score": null,
@@ -14182,6 +15013,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 2,
             "multi_sell": 1,
+            "chg_5d": 20.550830317528156,
             "label": "52W high"
           },
           "qbs_score": null,
@@ -14216,6 +15048,7 @@
             "hma_ema_signal_state": "NEUTRAL",
             "multi_buy": 0,
             "multi_sell": 0,
+            "chg_5d": 0.0672618354543772,
             "label": "52W high"
           },
           "qbs_score": null,
@@ -14250,6 +15083,7 @@
             "hma_ema_signal_state": "LONG_ALIGNED",
             "multi_buy": 0,
             "multi_sell": 1,
+            "chg_5d": -1.777819076709101,
             "label": "52W high"
           },
           "qbs_score": null,
