@@ -249,8 +249,13 @@ class DailyScanResilienceTests(unittest.TestCase):
             self.assertTrue(meta["prev_scan_found"])
             self.assertEqual(meta["fallback_reason"], "")
 
-    def test_daily_scan_workflow_uses_eight_shards(self):
+    def test_daily_scan_workflow_schedule_guard_and_shards(self):
         workflow_text = Path(".github/workflows/daily_scan_notify.yml").read_text(encoding="utf-8")
+        self.assertIn('cron: "5 20 * * 1-5"', workflow_text)
+        self.assertNotIn('cron: "5 20,21 * * 1-5"', workflow_text)
+        self.assertIn("is_manual = os.getenv(\"GITHUB_EVENT_NAME\") != \"schedule\"", workflow_text)
+        self.assertIn("now.hour == 16 and now.minute >= 5", workflow_text)
+        self.assertIn("now.hour == 17 and now.minute <= 15", workflow_text)
         self.assertGreaterEqual(workflow_text.count("shard_index: [0, 1, 2, 3, 4, 5, 6, 7]"), 2)
         self.assertGreaterEqual(workflow_text.count("--shard-count 8"), 2)
         self.assertGreaterEqual(workflow_text.count('--run-stamp "$RUN_STAMP"'), 4)

@@ -2,8 +2,8 @@ name: Daily Scan Notify
 
 on:
   schedule:
-    # US/Eastern 16:05 = UTC 20:05(EDT) / 21:05(EST)
-    - cron: "5 20,21 * * 1-5"
+    # US/Eastern 16:05 = UTC 20:05 during EDT
+    - cron: "5 20 * * 1-5"
   workflow_dispatch:
 
 permissions:
@@ -31,7 +31,12 @@ jobs:
           import os
 
           now = datetime.now(ZoneInfo("US/Eastern"))
-          should_run = os.getenv("GITHUB_EVENT_NAME") != "schedule" or now.hour == 16
+          is_manual = os.getenv("GITHUB_EVENT_NAME") != "schedule"
+          is_post_close_window = (
+              (now.hour == 16 and now.minute >= 5)
+              or (now.hour == 17 and now.minute <= 15)
+          )
+          should_run = is_manual or is_post_close_window
 
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
               handle.write(f"should_run={'true' if should_run else 'false'}\n")
