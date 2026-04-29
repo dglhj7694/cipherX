@@ -276,8 +276,3 @@ python tests/manual/test_signal_flip.py
 - Telegram 전송은 현재 scheduled script와 `telegram_pipeline.sender` 중심입니다.
 - Streamlit 앱은 사용자 분석 UI와 digest 확인 UI를 제공하고, scheduled 배치는 GitHub Actions가 담당합니다.
 - `artifacts/` 하위 산출물은 scan/briefing 실행 결과이며, 필요 시 GitHub Actions artifact로 업로드됩니다.
-
-## 참고 문서
-
-- `WORKSPACE_ORGANIZATION.md`: 현재 런타임 파일과 workspace 정리 노트
-- `BRAND_GUIDE.md`: `$SIGN (Signal)` 브랜드/로고 사용 규칙
