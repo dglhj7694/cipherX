@@ -2,8 +2,10 @@ name: Daily Scan Notify
 
 on:
   schedule:
-    # US/Eastern 16:05 = UTC 20:05 during EDT
-    - cron: "5 20 * * 1-5"
+    # US/Eastern 16:05 = UTC 20:05(EDT) / 21:05(EST).
+    # March/November overlap is resolved by schedule-guard during DST transitions.
+    - cron: "5 20 * 3-11 1-5"
+    - cron: "5 21 * 1-3,11-12 1-5"
   workflow_dispatch:
 
 permissions:
@@ -20,29 +22,37 @@ jobs:
     outputs:
       should_run: ${{ steps.guard.outputs.should_run }}
       eastern_now: ${{ steps.guard.outputs.eastern_now }}
+      event_schedule: ${{ steps.guard.outputs.event_schedule }}
     steps:
       - name: Resolve US/Eastern window
         id: guard
         shell: bash
+        env:
+          EVENT_SCHEDULE: ${{ github.event.schedule }}
         run: |
           python - <<'PY'
-          from datetime import datetime
+          from datetime import datetime, timedelta
           from zoneinfo import ZoneInfo
           import os
 
+          event_name = os.getenv("GITHUB_EVENT_NAME")
+          event_schedule = os.getenv("EVENT_SCHEDULE", "")
           now = datetime.now(ZoneInfo("US/Eastern"))
-          is_manual = os.getenv("GITHUB_EVENT_NAME") != "schedule"
-          is_post_close_window = (
-              (now.hour == 16 and now.minute >= 5)
-              or (now.hour == 17 and now.minute <= 15)
-          )
-          should_run = is_manual or is_post_close_window
+          is_dst = now.dst() != timedelta(0)
+          expected_schedule = "5 20 * 3-11 1-5" if is_dst else "5 21 * 1-3,11-12 1-5"
+          should_run = event_name != "schedule" or event_schedule == expected_schedule
 
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
               handle.write(f"should_run={'true' if should_run else 'false'}\n")
               handle.write(f"eastern_now={now.isoformat()}\n")
+              handle.write(f"event_schedule={event_schedule}\n")
 
-          print(f"event={os.getenv('GITHUB_EVENT_NAME')} eastern_now={now.isoformat()} should_run={should_run}")
+          print(
+              "event="
+              f"{event_name} event_schedule={event_schedule!r} "
+              f"expected_schedule={expected_schedule!r} eastern_now={now.isoformat()} "
+              f"should_run={should_run}"
+          )
           PY
 
   market_briefing_notify:

@@ -251,11 +251,7 @@ class DailyScanResilienceTests(unittest.TestCase):
 
     def test_daily_scan_workflow_schedule_guard_and_shards(self):
         workflow_text = Path(".github/workflows/daily_scan_notify.yml").read_text(encoding="utf-8")
-        self.assertIn('cron: "5 20 * * 1-5"', workflow_text)
         self.assertNotIn('cron: "5 20,21 * * 1-5"', workflow_text)
-        self.assertIn("is_manual = os.getenv(\"GITHUB_EVENT_NAME\") != \"schedule\"", workflow_text)
-        self.assertIn("now.hour == 16 and now.minute >= 5", workflow_text)
-        self.assertIn("now.hour == 17 and now.minute <= 15", workflow_text)
         self.assertGreaterEqual(workflow_text.count("shard_index: [0, 1, 2, 3, 4, 5, 6, 7]"), 2)
         self.assertGreaterEqual(workflow_text.count("--shard-count 8"), 2)
         self.assertGreaterEqual(workflow_text.count('--run-stamp "$RUN_STAMP"'), 4)
@@ -270,10 +266,34 @@ class DailyScanResilienceTests(unittest.TestCase):
             r"extended_merge_and_notify:\s+name:\s+extended-merge-and-notify[\s\S]*?needs:\s+[\s\S]*?-\s+extended_scan_shard\s+if:\s+\$\{\{\s*always\(\)\s*&&",
         )
 
+    def test_daily_scan_workflow_uses_schedule_event_for_dst_guard(self):
+        workflow_text = Path(".github/workflows/daily_scan_notify.yml").read_text(encoding="utf-8")
+        self.assertIn('- cron: "5 20 * 3-11 1-5"', workflow_text)
+        self.assertIn('- cron: "5 21 * 1-3,11-12 1-5"', workflow_text)
+        self.assertIn("EVENT_SCHEDULE: ${{ github.event.schedule }}", workflow_text)
+        self.assertIn(
+            'expected_schedule = "5 20 * 3-11 1-5" if is_dst else "5 21 * 1-3,11-12 1-5"',
+            workflow_text,
+        )
+        self.assertNotIn("now.hour == 16", workflow_text)
+
     def test_early_session_workflow_uses_shared_run_stamp(self):
         workflow_text = Path(".github/workflows/early_session_scan.yml").read_text(encoding="utf-8")
         self.assertGreaterEqual(workflow_text.count('--run-stamp "$RUN_STAMP"'), 2)
         self.assertGreaterEqual(workflow_text.count("RUN_STAMP: ${{ github.run_id }}-${{ github.run_attempt }}"), 2)
+
+    def test_kst_scheduled_workflows_use_single_utc_cron_without_guard(self):
+        workflows = {
+            ".github/workflows/pre_market_1800_scan.yml": "0 9 * * 1-5",
+            ".github/workflows/pre_market_scan.yml": "0 12 * * 1-5",
+            ".github/workflows/early_session_scan.yml": "0 14 * * 1-5",
+        }
+        for path, cron in workflows.items():
+            with self.subTest(path=path):
+                workflow_text = Path(path).read_text(encoding="utf-8")
+                self.assertIn(f'- cron: "{cron}"', workflow_text)
+                self.assertNotIn("schedule_guard:", workflow_text)
+                self.assertNotIn("needs.schedule_guard", workflow_text)
 
 
 if __name__ == "__main__":
