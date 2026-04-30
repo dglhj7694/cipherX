@@ -105,6 +105,9 @@ class FinalBuyCandidate:
     price: float | None = None
     source_flags: dict[str, Any] = field(default_factory=dict)
     membership_count: int = 0
+    entry_judgment: str = ""
+    rr: float | None = None
+    risk_judgment: str = ""
 
 
 def _ticker(row: Mapping[str, Any]) -> str:
@@ -411,8 +414,14 @@ def _score_candidate(ticker: str, row: Mapping[str, Any], membership: set[str], 
             "membership": sorted(membership),
             "membership_count": len(membership),
             "hard_exclude": hard_exclude,
+            "entry_judgment": str(row.get("entry_judgment") or "").strip(),
+            "rr": _optional_float(row, "rr"),
+            "risk_judgment": str(row.get("risk_judgment") or "").strip(),
         },
         membership_count=len(membership),
+        entry_judgment=str(row.get("entry_judgment") or "").strip(),
+        rr=_optional_float(row, "rr"),
+        risk_judgment=str(row.get("risk_judgment") or "").strip(),
     )
 
 

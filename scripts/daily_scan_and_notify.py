@@ -25,6 +25,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from config import COMBINED_SCAN_REGISTRY, DEFAULT_BIAS_MODE, JT, resolve_bias_mode
 from engine import detect_all_signals
+from engine_runtime.entry_decision import compute_adjusted_decision_fields, compute_entry_decision_row
 from indicators import compute_indicators
 from localization import (
     localize_action_label,
@@ -1433,6 +1434,21 @@ def _build_scanner_row(ticker: str, *, bias_mode: str, recent_window: int = 5, h
             "buy_combo_present": buy_combo_present,
             **advanced_metrics,
         }
+        row.update(compute_entry_decision_row(row))
+        row.update(
+            compute_adjusted_decision_fields(
+                {
+                    **row,
+                    "Trade_Judgment": raw_jg,
+                    "Judgment_Confidence": cf,
+                    "Final_Decision_Score": _safe_float(latest.get("Final_Decision_Score", es)),
+                    "Contrast_Notes": str(latest.get("Contrast_Notes", "")),
+                    "Downgrade_Count": downgrade_count,
+                    "Macro_Risk_Off_Count": _safe_float(latest.get("Macro_Risk_Off_Count", 0)),
+                    "Leading_Noise_Block": bool(latest.get("Leading_Noise_Block", False)),
+                }
+            )
+        )
         return {"ok": True, "ticker": ticker, "row": row, "skip_reason": "", "detail": ""}
     except Exception as exc:
         return {"ok": False, "ticker": ticker, "skip_reason": "row_build_error", "detail": str(exc)[:220]}
@@ -2033,6 +2049,10 @@ def _with_post_close_final_top20_scores(
     for rank, row_dict in enumerate(selected_rows, start=1):
         row_dict["final_entry_rank"] = rank
         row_dict["final_entry_selected"] = True
+
+    for row_dict in row_list:
+        row_dict.update(compute_entry_decision_row(row_dict))
+        row_dict.update(compute_adjusted_decision_fields(row_dict))
 
     return row_list
 

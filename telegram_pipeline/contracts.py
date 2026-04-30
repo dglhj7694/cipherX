@@ -20,6 +20,9 @@ class TelegramCandidate:
     bucket: str = ""
     tags: list[str] = field(default_factory=list)
     risk_flags: list[str] = field(default_factory=list)
+    entry_judgment: str = ""
+    rr: float | None = None
+    risk_judgment: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

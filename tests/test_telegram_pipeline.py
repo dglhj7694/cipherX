@@ -514,6 +514,72 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertIn("SELLBOTH | SELL_RISK | +2.35% | x1.45", message)
         self.assertIn("| sell_turn", message)
 
+    def test_old_rows_without_entry_v2_fields_still_build_digest_and_message(self):
+        row = self._row("OLDROW")
+        for key in ("entry_judgment", "rr", "risk_judgment", "direction_judgment", "final_entry_score_v2"):
+            row.pop(key, None)
+
+        digest = build_post_close_digest(
+            [row],
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=1,
+            result_count=1,
+            skip_count=0,
+        )
+        messages = build_post_close_message_texts(digest)
+
+        self.assertIsInstance(messages, list)
+        self.assertTrue(all(isinstance(text, str) for text in messages))
+        self.assertIn("qbs_buy_now", digest.section_order)
+        self.assertIn("qbs_chase_watch", digest.section_order)
+        self.assertIn("qbs_pullback_wait", digest.section_order)
+        self.assertIn("OLDROW", messages[0])
+
+    def test_entry_hints_append_to_existing_candidate_line_substrings(self):
+        row = self._row(
+            "HINTS",
+            entry_judgment="WAIT_PULLBACK",
+            rr=1.8,
+            risk_judgment="MEDIUM",
+        )
+
+        digest = build_post_close_digest(
+            [row],
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=1,
+            result_count=1,
+            skip_count=0,
+        )
+        message = build_post_close_message_texts(digest)[0]
+
+        self.assertIn("HINTS | CONFLUENCE | +2.35% | x1.45", message)
+        self.assertIn("| Entry: WAIT_PULLBACK | RR 1.8 | Risk MEDIUM", message)
+
+    def test_qbs_fields_and_buckets_ignore_entry_decision_v2_fields(self):
+        base = self._row("SAME")
+        with_entry_v2 = self._row(
+            "SAME",
+            entry_judgment="NO_TRADE",
+            rr=0.5,
+            risk_judgment="HIGH",
+            final_entry_score_v2=1.0,
+        )
+
+        base_annotated = annotate_rows_with_qbs([base], target_date=self.market_date)[0]
+        v2_annotated = annotate_rows_with_qbs([with_entry_v2], target_date=self.market_date)[0]
+
+        self.assertIn("qbs_score", v2_annotated)
+        self.assertIn("qbs_bucket", v2_annotated)
+        self.assertIn("qbs_rank", v2_annotated)
+        self.assertEqual(v2_annotated["qbs_score"], base_annotated["qbs_score"])
+        self.assertEqual(v2_annotated["qbs_bucket"], base_annotated["qbs_bucket"])
+
     def test_five_day_only_message_line_uses_chase_risk_section(self):
         row = self._row(
             "FIVE",

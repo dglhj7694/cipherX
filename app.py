@@ -21,6 +21,7 @@ from bootstrap import build_default_session_state, ensure_session_defaults as _e
 from chart import load_chart_figure, serialize_chart_figure
 from config import GEMINI_API_KEY, GEMINI_API_KEY_FROM_SECRETS, COMBINED_SCAN_REGISTRY, CTX_KOR, JT
 from domain import AnalysisRequest
+from engine_runtime.entry_decision import compute_adjusted_decision_fields, compute_entry_decision_row
 from infrastructure.etf import FunctionHoldingsProvider, HoldingsProviderRegistry
 from etf_sources import resolve_etf_universe as resolve_shared_etf_universe
 from utils import _valid_fmt, _sf, resolve_analysis_ticker, _compute_cached
@@ -1145,6 +1146,21 @@ def _build_scanner_row_cached(ticker, cache_bucket):
             'watch_buy_plus': watch_buy_plus,
             'buy_combo_present': buy_combo_present,
         }
+        row.update(compute_entry_decision_row(row))
+        row.update(
+            compute_adjusted_decision_fields(
+                {
+                    **row,
+                    "Trade_Judgment": raw_jg,
+                    "Judgment_Confidence": cf,
+                    "Final_Decision_Score": _sf(lt.get("Final_Decision_Score", es)),
+                    "Contrast_Notes": str(lt.get("Contrast_Notes", "")),
+                    "Downgrade_Count": downgrade_count,
+                    "Macro_Risk_Off_Count": _sf(lt.get("Macro_Risk_Off_Count", 0)),
+                    "Leading_Noise_Block": bool(lt.get("Leading_Noise_Block", False)),
+                }
+            )
+        )
         return {"ok": True, "ticker": ticker, "row": row, "skip_reason": "", "detail": ""}
     except Exception as exc:
         return {"ok": False, "ticker": ticker, "skip_reason": "row_build_error", "detail": str(exc)[:220]}

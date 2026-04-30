@@ -179,6 +179,10 @@ class ScannerCsvExportTests(unittest.TestCase):
         self.assertIn("우상향지속(uptrend_persistent)", header)
         self.assertIn("강한추세지속(strong_trend_persistent)", header)
         self.assertIn("약세갭실패(bearish_gap_failure)", header)
+        self.assertIn("EntryJudgment(entry_judgment)", header)
+        self.assertIn("EntryChaseRisk(entry_chase_risk)", header)
+        self.assertIn("InvalidationLevel(invalidation_level)", header)
+        self.assertIn("RR(rr)", header)
 
         data = parsed[1]
         h_index = {name: idx for idx, name in enumerate(header)}
@@ -187,6 +191,32 @@ class ScannerCsvExportTests(unittest.TestCase):
         self.assertEqual(data[h_index["강한추세지속(strong_trend_persistent)"]], "Y")
         self.assertEqual(data[h_index["눌림목재진입(pullback_reentry)"]], "N")
         self.assertEqual(data[h_index["약세갭실패(bearish_gap_failure)"]], "Y")
+
+    def test_entry_v2_missing_trade_plan_prices_export_empty_strings(self):
+        blob = scanner_rows_to_csv_bytes(
+            [
+                {
+                    "ticker": "AAPL",
+                    "entry_judgment": "WAIT_PULLBACK",
+                    "risk_judgment": "MEDIUM",
+                    "position_action": "WATCHLIST",
+                }
+            ]
+        ).decode("utf-8-sig")
+        parsed = list(csv.reader(io.StringIO(blob)))
+        header = parsed[0]
+        data = parsed[1]
+        h_index = {name: idx for idx, name in enumerate(header)}
+
+        for column in (
+            "EntryZoneLow(entry_zone_low)",
+            "EntryZoneHigh(entry_zone_high)",
+            "InvalidationLevel(invalidation_level)",
+            "Target1(target_1)",
+            "Target2(target_2)",
+            "RR(rr)",
+        ):
+            self.assertEqual(data[h_index[column]], "")
 
     def test_bool_and_date_normalization_for_extra_fields(self):
         row = {

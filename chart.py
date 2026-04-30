@@ -852,6 +852,45 @@ def _add_pattern_overlay(fig,dc,pattern,default_visible='legendonly'):
         hoverinfo='skip'
     ),row=1,col=1)
 
+
+def _add_trade_plan_level_overlays(fig,dc):
+    if dc is None or dc.empty:
+        return
+    latest=dc.iloc[-1]
+    levels=[
+        ("entry_zone_low","Entry Low","#38BDF8","dot"),
+        ("entry_zone_high","Entry High","#38BDF8","dot"),
+        ("invalidation_level","Invalidation","#F87171","dash"),
+        ("target_1","Target 1","#22C55E","dash"),
+        ("target_2","Target 2","#16A34A","dash"),
+    ]
+    seen:set[tuple[str,float]]=set()
+    for key,label,color,dash in levels:
+        value=_sf(latest.get(key),float("nan"))
+        if not np.isfinite(value) or value<=0:
+            continue
+        rounded=round(float(value),4)
+        marker=(key,rounded)
+        if marker in seen:
+            continue
+        seen.add(marker)
+        try:
+            fig.add_hline(
+                y=float(value),
+                line_dash=dash,
+                line_color=color,
+                line_width=1,
+                opacity=.72,
+                row=1,
+                col=1,
+                annotation_text=f"{label} {float(value):.2f}",
+                annotation_position="right",
+                annotation_font_size=9,
+                annotation_font_color=color,
+            )
+        except Exception:
+            continue
+
 def _build_chart_legacy(dc,ticker):
     mac={20:'#f1c40f',50:'#e74c3c',200:'#2ecc71'}
     fig=make_subplots(
@@ -920,6 +959,7 @@ def _build_chart_legacy(dc,ticker):
     _add_pattern_overlay(fig,dc,_detect_active_pattern(dc),default_visible='legendonly')
     _add_volume_profile_overlay(fig,dc,default_visible='legendonly')
     _add_fibonacci_overlay(fig,dc,default_visible='legendonly')
+    _add_trade_plan_level_overlays(fig,dc)
     if sb.any():
         sr=dc[sb];yv=sr['Low']-sr['ATR']*2;ht=[]
         for bi in sr.index:
@@ -1284,6 +1324,32 @@ def build_metadata(dc,ticker):
         'bias_mode':str(lat.get('Bias_Mode', DEFAULT_BIAS_MODE)),
         'buy_total':_sf(lat.get('Buy_Total')),'sell_total':_sf(lat.get('Sell_Total')),'buy_active':int(_sf(lat.get('Buy_Active_Layers'))),'sell_active':int(_sf(lat.get('Sell_Active_Layers'))),
         'buy_layers':bl,'sell_layers':sl,'judgment':str(lat.get('Trade_Judgment','NEUTRAL')),'confidence':_sf(lat.get('Judgment_Confidence')),
+        'committee_confidence':_sf(lat.get('Committee_Confidence')),'final_decision_score':_sf(lat.get('Final_Decision_Score')),
+        'direction_judgment':str(lat.get('direction_judgment','')),
+        'entry_judgment':str(lat.get('entry_judgment','')),
+        'risk_judgment':str(lat.get('risk_judgment','')),
+        'position_action':str(lat.get('position_action','')),
+        'final_entry_score_v2':_sf(lat.get('final_entry_score_v2')),
+        'trend_quality_score':_sf(lat.get('trend_quality_score')),
+        'entry_timing_score':_sf(lat.get('entry_timing_score')),
+        'volume_flow_score':_sf(lat.get('volume_flow_score')),
+        'risk_penalty_score':_sf(lat.get('risk_penalty_score')),
+        'rr_score':_sf(lat.get('rr_score')),
+        'entry_chase_risk':bool(lat.get('entry_chase_risk',False)),
+        'nearest_support':_sf(lat.get('nearest_support')),
+        'nearest_resistance':_sf(lat.get('nearest_resistance')),
+        'entry_zone_low':_sf(lat.get('entry_zone_low')),
+        'entry_zone_high':_sf(lat.get('entry_zone_high')),
+        'invalidation_level':_sf(lat.get('invalidation_level')),
+        'invalidation_text':str(lat.get('invalidation_text','')),
+        'target_1':_sf(lat.get('target_1')),
+        'target_2':_sf(lat.get('target_2')),
+        'rr':_sf(lat.get('rr')),
+        'entry_reason':str(lat.get('entry_reason','')),
+        'risk_notes':str(lat.get('risk_notes','')),
+        'final_adjusted_score':_sf(lat.get('final_adjusted_score',lat.get('Final_Decision_Score',lat.get('Ensemble_Score',0)))),
+        'final_adjusted_confidence':_sf(lat.get('final_adjusted_confidence',lat.get('Judgment_Confidence',0))),
+        'final_adjustment_reasons':str(lat.get('final_adjustment_reasons','')),
         'objective_buy_score':_sf(lat.get('Objective_Buy_Score')),'objective_sell_score':_sf(lat.get('Objective_Sell_Score')),'objective_conflict_score':_sf(lat.get('Objective_Conflict_Score')),
         'objective_trend_buy':_sf(lat.get('Objective_Trend_Buy')),'objective_trend_sell':_sf(lat.get('Objective_Trend_Sell')),
         'objective_momentum_buy':_sf(lat.get('Objective_Momentum_Buy')),'objective_momentum_sell':_sf(lat.get('Objective_Momentum_Sell')),
@@ -1572,6 +1638,7 @@ def _build_unified_timeline_chart(dc,ticker):
     _add_pattern_overlay(fig,dc,_detect_active_pattern(dc),default_visible='legendonly')
     _add_volume_profile_overlay(fig,dc,default_visible='legendonly')
     _add_fibonacci_overlay(fig,dc,default_visible='legendonly')
+    _add_trade_plan_level_overlays(fig,dc)
     if sb.any():
         sr=dc[sb]
         yv=sr['Low']-sr['ATR']*2
@@ -2122,6 +2189,10 @@ def build_metadata(dc,ticker):
     meta['judgment_reason']=translate_chart_text(meta.get('judgment_reason'))
     meta['judgment_detail']=translate_chart_text(meta.get('judgment_detail'))
     meta['contrast_notes']=translate_chart_text(meta.get('contrast_notes'))
+    meta['entry_reason']=translate_chart_text(meta.get('entry_reason'))
+    meta['risk_notes']=translate_chart_text(meta.get('risk_notes'))
+    meta['invalidation_text']=translate_chart_text(meta.get('invalidation_text'))
+    meta['final_adjustment_reasons']=translate_chart_text(meta.get('final_adjustment_reasons'))
     meta['objective_reason']=translate_chart_text(meta.get('objective_reason'))
     meta['objective_detail']=translate_chart_text(meta.get('objective_detail'))
     leading_reasons=dict(meta.get('leading_reasons') or {})

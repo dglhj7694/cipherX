@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from datetime import date, datetime
 from typing import Any, Iterable, Mapping
 
@@ -68,6 +69,28 @@ def _ratio(value: Any, decimals: int = 2) -> str:
         return f"x{float(value):.{decimals}f}"
     except (TypeError, ValueError):
         return "x--"
+
+
+def _optional_positive_float(value: Any) -> float | None:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+    return numeric if math.isfinite(numeric) and numeric > 0 else None
+
+
+def _entry_hint_tokens(candidate: TelegramCandidate) -> list[str]:
+    entry = str(candidate.entry_judgment or candidate.source_flags.get("entry_judgment") or "").strip().upper()
+    risk = str(candidate.risk_judgment or candidate.source_flags.get("risk_judgment") or "").strip().upper()
+    rr = _optional_positive_float(candidate.rr if candidate.rr is not None else candidate.source_flags.get("rr"))
+    hints: list[str] = []
+    if entry:
+        hints.append(f"Entry: {entry}")
+    if rr is not None:
+        hints.append(f"RR {rr:.1f}")
+    if risk:
+        hints.append(f"Risk {risk}")
+    return hints
 
 
 def _turn_engine_text(*, utbot: bool, hull: bool) -> str:
@@ -311,6 +334,9 @@ def _candidate_source_flags(section_key: str, row: Mapping[str, Any], target_dat
         "membership": list(row.get("source_membership") or []),
         "membership_count": int(safe_float(row.get("membership_count", 0.0))),
         "board_risk": str(row.get("board_risk") or "-"),
+        "entry_judgment": str(row.get("entry_judgment") or "").strip(),
+        "rr": _optional_positive_float(row.get("rr")),
+        "risk_judgment": str(row.get("risk_judgment") or "").strip(),
     }
 
 
@@ -328,6 +354,9 @@ def _build_candidate(section_key: str, row: Mapping[str, Any], rank: int, target
         source_flags=_candidate_source_flags(section_key, row, target_date),
         tags=list(row.get("board_tags") or []),
         risk_flags=list(row.get("board_risk_flags") or []),
+        entry_judgment=str(row.get("entry_judgment") or "").strip(),
+        rr=_optional_positive_float(row.get("rr")),
+        risk_judgment=str(row.get("risk_judgment") or "").strip(),
     )
 
 
@@ -347,6 +376,9 @@ def _build_qbs_candidate(section_key: str, candidate: Any) -> TelegramCandidate:
         bucket=str(candidate.bucket or ""),
         tags=list(candidate.tags or []),
         risk_flags=list(candidate.risk_flags or []),
+        entry_judgment=str(getattr(candidate, "entry_judgment", "") or ""),
+        rr=_optional_positive_float(getattr(candidate, "rr", None)),
+        risk_judgment=str(getattr(candidate, "risk_judgment", "") or ""),
     )
 
 
@@ -432,7 +464,7 @@ def build_post_close_digest(
 
 def _format_candidate_line(candidate: TelegramCandidate) -> str:
     risk = "+".join(list(candidate.risk_flags or [])) or str(candidate.source_flags.get("board_risk") or "-")
-    return (
+    line = (
         f"{candidate.rank}. {candidate.ticker}"
         f" | {str(candidate.label or '-')}"
         f" | {_signed(candidate.chg_pct)}%"
@@ -440,6 +472,10 @@ def _format_candidate_line(candidate: TelegramCandidate) -> str:
         f" | {str(candidate.reason or '-')}"
         f" | {risk or '-'}"
     )
+    hints = _entry_hint_tokens(candidate)
+    if hints:
+        line += " | " + " | ".join(hints)
+    return line
 
 
 def _format_qbs_candidate_line(candidate: TelegramCandidate) -> str:
@@ -455,6 +491,9 @@ def _format_qbs_candidate_line(candidate: TelegramCandidate) -> str:
     risk_flags = "+".join(list(candidate.risk_flags or []))
     if risk_flags:
         line += f" | 주의:{risk_flags}"
+    hints = _entry_hint_tokens(candidate)
+    if hints:
+        line += " | " + " | ".join(hints)
     return line
 
 

@@ -436,6 +436,125 @@ def render_price_header(meta, key_prefix="analysis"):
     _render_ensemble_gauge(es, chart_key=f"{key_prefix}_ensemble_gauge")
 
 
+def _entry_decision_tone(value):
+    text = str(value or "").upper()
+    if text in {"ENTER_NOW", "BUY_NOW", "BUY", "LOW"}:
+        return "positive"
+    if text in {"EXIT_OR_AVOID", "SELL_OR_EXIT", "AVOID", "SELL", "HIGH"}:
+        return "negative"
+    if text in {"WAIT_PULLBACK", "WAIT_BREAKOUT_CONFIRM", "CHASE_RISK", "WATCHLIST", "WAIT", "MEDIUM"}:
+        return "warning"
+    return "muted"
+
+
+def _entry_plan_price_text(value):
+    numeric = _safe_float(value, float("nan"))
+    if not math.isfinite(numeric) or numeric <= 0:
+        return "-"
+    return f"{numeric:.2f}"
+
+
+def _entry_zone_text(meta):
+    low = _entry_plan_price_text(meta.get("entry_zone_low"))
+    high = _entry_plan_price_text(meta.get("entry_zone_high"))
+    if low == "-" and high == "-":
+        return "-"
+    if low == "-":
+        return high
+    if high == "-":
+        return low
+    return f"{low} ~ {high}"
+
+
+def _entry_rr_text(value):
+    numeric = _safe_float(value, float("nan"))
+    if not math.isfinite(numeric) or numeric <= 0:
+        return "-"
+    return f"{numeric:.2f}R"
+
+
+def render_entry_decision_card(meta):
+    if not meta:
+        return
+
+    entry = str(meta.get("entry_judgment") or "").strip()
+    direction = str(meta.get("direction_judgment") or "").strip()
+    action = str(meta.get("position_action") or "").strip()
+    risk = str(meta.get("risk_judgment") or "").strip()
+    if not any([entry, direction, action, risk]):
+        return
+
+    entry_tone = _entry_decision_tone(entry)
+    current_price = _entry_plan_price_text(meta.get("price"))
+    rr_text = _entry_rr_text(meta.get("rr"))
+    adjusted_score = _safe_float(meta.get("final_adjusted_score", meta.get("final_decision_score", 0)))
+    adjusted_conf = _safe_float(meta.get("final_adjusted_confidence", meta.get("confidence", 0)))
+    final_score = _safe_float(meta.get("final_decision_score", meta.get("ensemble_score", 0)))
+    final_conf = _safe_float(meta.get("confidence", 0))
+    committee_conf = _safe_float(meta.get("committee_confidence", final_conf))
+    reason = _translate_note_text(meta.get("entry_reason", ""))
+    risk_notes = _translate_note_text(meta.get("risk_notes", ""))
+    adjustment_reasons = _translate_note_text(meta.get("final_adjustment_reasons", ""))
+    invalidation_text = _translate_note_text(meta.get("invalidation_text", "")) or _entry_plan_price_text(meta.get("invalidation_level"))
+
+    cards = [
+        _mini_stat_card("방향성", direction or "-", _entry_decision_tone(direction)),
+        _mini_stat_card("진입판단", entry or "-", entry_tone),
+        _mini_stat_card("포지션 액션", action or "-", _entry_decision_tone(action)),
+        _mini_stat_card("리스크", risk or "-", _entry_decision_tone(risk)),
+        _mini_stat_card("현재가", current_price, "accent"),
+        _mini_stat_card("관심 진입구간", _entry_zone_text(meta), "accent"),
+        _mini_stat_card("무효화", invalidation_text or "-", "negative"),
+        _mini_stat_card("1차 목표", _entry_plan_price_text(meta.get("target_1")), "positive"),
+        _mini_stat_card("2차 목표", _entry_plan_price_text(meta.get("target_2")), "positive"),
+        _mini_stat_card("손익비", rr_text, "warning"),
+        _mini_stat_card("최종 점수", f"{adjusted_score:+.1f}", entry_tone),
+        _mini_stat_card("최종 신뢰도", f"{adjusted_conf:.0f}%", entry_tone),
+    ]
+
+    comparison_cards = [
+        _mini_stat_card("Committee Confidence", f"{committee_conf:.0f}%", "muted"),
+        _mini_stat_card("Final Confidence", f"{final_conf:.0f}%", _tone_from_text(meta.get("judgment"))),
+        _mini_stat_card("Ensemble Score", f"{_safe_float(meta.get('ensemble_score', 0)):+.1f}", "accent"),
+        _mini_stat_card("Final Decision Score", f"{final_score:+.1f}", "accent"),
+    ]
+    note_parts = []
+    if reason:
+        note_parts.append(f"<div class='sigl-summary' style='margin-bottom:6px'><strong>판단 근거</strong>: {_esc(reason)}</div>")
+    if risk_notes:
+        note_parts.append(f"<div class='sigl-summary' style='margin-bottom:6px'><strong>주의사항</strong>: {_esc(risk_notes)}</div>")
+    if adjustment_reasons:
+        note_parts.append(f"<div class='sigl-summary'><strong>Adjustment Reasons</strong>: {_esc(adjustment_reasons)}</div>")
+    conclusion = ""
+    if direction == "BUY" and entry in {"WAIT_PULLBACK", "CHASE_RISK"}:
+        conclusion = "방향은 매수 우위지만 즉시 추격보다 대기 쪽이 유리합니다."
+    elif entry == "ENTER_NOW":
+        conclusion = "조건이 맞아 즉시 진입 후보로 볼 수 있습니다."
+    elif entry == "EXIT_OR_AVOID":
+        conclusion = "매도 전환 또는 회피 신호가 우선입니다."
+    elif action in {"WAIT", "AVOID"}:
+        conclusion = "진입 조건이 충분히 맞을 때까지 기다리는 구간입니다."
+    if conclusion:
+        note_parts.append(f"<div class='sigl-summary'><strong>결론</strong>: {_esc(conclusion)}</div>")
+
+    note_html = "".join(note_parts) if note_parts else "<span class='sigl-summary'>추가 메모 없음</span>"
+    panel_html = (
+        f"<div class='sigl-card sigl-card--{'positive' if entry_tone == 'positive' else 'negative' if entry_tone == 'negative' else 'warning'}'>"
+        "<div class='sigl-section-head'>"
+        "<div>"
+        "<p class='sigl-section-title'>최종 매매 판단</p>"
+        f"<p class='sigl-section-copy'>{_esc(direction or '-')} · {_esc(entry or '-')} · {_esc(action or '-')}</p>"
+        "</div>"
+        f"<div class='sigl-inline'>{_badge(entry or '-', entry_tone)}{_badge(risk or '-', _entry_decision_tone(risk))}{_badge(rr_text, 'warning')}</div>"
+        "</div>"
+        f"<div class='sigl-grid sigl-grid--4'>{''.join(cards)}</div>"
+        f"<div class='sigl-note'><strong>점수 / 신뢰도 분리</strong><div class='sigl-grid sigl-grid--4'>{''.join(comparison_cards)}</div></div>"
+        f"<div class='sigl-note'>{note_html}</div>"
+        "</div>"
+    )
+    _render_panel_html(panel_html)
+
+
 def _judgment_panel_height(detail_text="", contrast="", risk_tag_count=0):
     height = 320
     if detail_text:
@@ -4766,6 +4885,9 @@ def render_analysis(msg, key_prefix="analysis"):
     audit = msg.get("audit")
     if meta:
         render_price_header(meta, key_prefix=key_prefix)
+        if any(str(meta.get(key) or "").strip() for key in ("entry_judgment", "direction_judgment", "position_action", "risk_judgment")):
+            st.markdown("<div class='sigl-stack-gap'></div>", unsafe_allow_html=True)
+            render_entry_decision_card(meta)
     if not (meta or fig_json):
         return
 
