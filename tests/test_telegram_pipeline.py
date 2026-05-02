@@ -350,7 +350,7 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertEqual(section_map["confluence"].item_count, BOARD_SECTION_LIMIT)
         self.assertTrue(all(section.item_count <= BOARD_SECTION_LIMIT for key, section in section_map.items() if not key.startswith("qbs_")))
 
-    def test_five_day_only_candidates_land_in_chase_risk_top10(self):
+    def test_five_day_only_candidates_land_in_chase_risk_top20(self):
         rows = [
             self._row(
                 f"C{i:02d}",
@@ -383,7 +383,7 @@ class TelegramPipelineTests(unittest.TestCase):
                 three_weeks_tight=False,
                 atr_contracting=False,
             )
-            for i in range(15)
+            for i in range(25)
         ]
         digest = build_post_close_digest(
             rows,
@@ -391,14 +391,14 @@ class TelegramPipelineTests(unittest.TestCase):
             generated_at=self.generated_at,
             market_date=self.market_date,
             scan_label="post-close default",
-            universe_count=15,
-            result_count=15,
+            universe_count=25,
+            result_count=25,
             skip_count=0,
         )
         chase_items = digest.section_map()["chase_risk"].items
 
         self.assertEqual(len(chase_items), BOARD_SECTION_LIMIT)
-        self.assertEqual([item.ticker for item in chase_items], [f"C{i:02d}" for i in range(10)])
+        self.assertEqual([item.ticker for item in chase_items], [f"C{i:02d}" for i in range(20)])
 
     def test_hma_selector_applies_price_over_ema50_gate(self):
         ok = self._row("OK", price=101.0, ema50=100.0)
