@@ -9,6 +9,10 @@ from typing import Any, Callable, Iterable, Mapping, Optional, Union
 import requests
 import streamlit as st
 
+from telegram_pipeline.contracts import TelegramCandidate, TelegramDigest, TelegramSection
+from telegram_pipeline.formatters import QBS_DISPLAY_NUMBERS, build_main_message
+from telegram_pipeline.selectors import BOARD_MANDATORY_SECTION_KEYS
+
 
 DIGEST_CACHE_TTL_SEC = 900
 DEFAULT_DIGEST_REPO = "dglhj7694/cipherX"
@@ -160,6 +164,105 @@ def extract_section_candidates(payload: Optional[Mapping[str, Any]], section_key
     return []
 
 
+def _optional_float(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number == number else None
+
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _text_list(value: Any) -> list[str]:
+    if not isinstance(value, (list, tuple)):
+        return []
+    return [str(item) for item in value if str(item or "").strip()]
+
+
+def _candidate_from_payload(item: Mapping[str, Any], *, section_key: str, fallback_rank: int) -> TelegramCandidate:
+    payload = dict(item or {})
+    return TelegramCandidate(
+        ticker=str(payload.get("ticker") or "").strip().upper(),
+        price=_optional_float(payload.get("price")),
+        chg_value=_optional_float(payload.get("chg_value")),
+        chg_pct=_optional_float(payload.get("chg_pct")),
+        volume_ratio_20=_optional_float(payload.get("volume_ratio_20")),
+        section_key=str(payload.get("section_key") or section_key),
+        rank=_safe_int(payload.get("rank"), fallback_rank),
+        label=str(payload.get("label") or ""),
+        reason=str(payload.get("reason") or ""),
+        source_flags=dict(payload.get("source_flags") or {}),
+        qbs_score=_optional_float(payload.get("qbs_score")),
+        bucket=str(payload.get("bucket") or ""),
+        tags=_text_list(payload.get("tags")),
+        risk_flags=_text_list(payload.get("risk_flags")),
+    )
+
+
+def telegram_digest_from_payload(payload: Optional[Mapping[str, Any]]) -> TelegramDigest:
+    raw = dict(payload or {})
+    sections: list[TelegramSection] = []
+    for section_payload in list(raw.get("sections") or []):
+        section_dict = dict(section_payload or {})
+        section_key = str(section_dict.get("key") or "")
+        raw_items = list(section_dict.get("items") or section_dict.get("detail_items") or [])
+        items = [
+            _candidate_from_payload(dict(item or {}), section_key=section_key, fallback_rank=idx)
+            for idx, item in enumerate(raw_items, start=1)
+        ]
+        sections.append(
+            TelegramSection(
+                key=section_key,
+                title=str(section_dict.get("title") or section_key),
+                items=items,
+                item_count=_safe_int(section_dict.get("item_count"), len(items)),
+                quality_floor=str(section_dict.get("quality_floor") or ""),
+                ranked=bool(section_dict.get("ranked")),
+            )
+        )
+
+    section_order = [str(item) for item in list(raw.get("section_order") or []) if str(item or "").strip()]
+    if not section_order:
+        section_order = [section.key for section in sections if section.key]
+
+    return TelegramDigest(
+        version=str(raw.get("version") or ""),
+        scan_mode=str(raw.get("scan_mode") or ""),
+        run_stamp=str(raw.get("run_stamp") or ""),
+        market_date=str(raw.get("market_date") or ""),
+        generated_at=str(raw.get("generated_at") or ""),
+        section_order=section_order,
+        sections=sections,
+        briefing_refs=dict(raw.get("briefing_refs") or {}),
+        scan_label=str(raw.get("scan_label") or ""),
+        universe_count=_safe_int(raw.get("universe_count")),
+        result_count=_safe_int(raw.get("result_count")),
+        skip_count=_safe_int(raw.get("skip_count")),
+    )
+
+
+def build_telegram_digest_message(payload: Optional[Mapping[str, Any]]) -> str:
+    return build_main_message(telegram_digest_from_payload(payload))
+
+
+def _visible_telegram_sections(digest: TelegramDigest) -> list[TelegramSection]:
+    mandatory = set(BOARD_MANDATORY_SECTION_KEYS)
+    visible: list[TelegramSection] = []
+    for section in digest.sections:
+        if section.key in QBS_DISPLAY_NUMBERS:
+            visible.append(section)
+            continue
+        if section.key in mandatory or section.item_count > 0:
+            visible.append(section)
+    return visible
+
+
 def _collect_recent_tickers(items: Iterable[str]) -> list[str]:
     ordered: list[str] = []
     for item in items:
@@ -186,6 +289,40 @@ def _render_ticker_button_row(tickers: list[str], *, key_prefix: str, on_select_
                     on_select_ticker(ticker)
 
 
+def _render_telegram_message_board(
+    payload: Mapping[str, Any],
+    *,
+    source: str,
+    digest_result: Mapping[str, Any],
+    on_select_ticker: Callable[[str], None],
+) -> None:
+    digest = telegram_digest_from_payload(payload)
+    message = build_main_message(digest)
+    blocks = [block.strip() for block in message.split("\n\n") if block.strip()]
+    visible_sections = _visible_telegram_sections(digest)
+
+    if blocks:
+        st.code(blocks[0], language="text")
+    if digest_result.get("error") and source == "cache":
+        st.caption(f"원격 갱신 실패로 마지막 성공 캐시를 표시 중입니다: {digest_result['error']}")
+
+    for idx, section in enumerate(visible_sections):
+        block = blocks[idx + 1] if idx + 1 < len(blocks) else f"## {section.title}"
+        ticker_list = [item.ticker for item in section.items if item.ticker]
+        expander_label = section.title or section.key or f"Section {idx + 1}"
+        with st.expander(expander_label, expanded=idx < 3):
+            st.code(block, language="text")
+            if ticker_list:
+                _render_ticker_button_row(
+                    ticker_list,
+                    key_prefix=f"home_telegram_{section.key or idx}",
+                    on_select_ticker=on_select_ticker,
+                    columns=5,
+                )
+            else:
+                st.caption("해당 티커가 없습니다.")
+
+
 def render_home_page(
     *,
     render_brand_board: Callable[..., None],
@@ -205,7 +342,7 @@ def render_home_page(
 
     render_section_heading(
         "텔레그램 종목판",
-        "오늘 최우선 후보와 전환/주의 티커를 바로 열어 개별 분석으로 이어갑니다.",
+        "실제 발송되는 텔레그램 메시지 순서 그대로 후보와 전환/주의 티커를 확인하고 개별 분석으로 이어갑니다.",
         badges=[
             ("홈", "accent"),
             (source_badge, "warning" if source == "cache" else "muted" if source == "missing" else "accent"),
@@ -225,44 +362,12 @@ def render_home_page(
             ],
         )
     else:
-        final_top = extract_section_candidates(payload, "qbs_buy_now", limit=5)
-        entry_now = extract_section_candidates(payload, "entry_now", limit=5)
-        sell_risk = extract_section_candidates(payload, "sell_risk", limit=5)
-
-        render_section_heading(
-            "오늘 최우선 후보 Top 5",
-            "텔레그램 종목판의 메인 랭킹입니다. 버튼을 누르면 바로 분석 모드로 전환됩니다.",
-            badges=[
-                (f"{len(final_top)}개", "accent"),
-                (str(payload.get("market_date") or "US close"), "muted"),
-            ],
-            eyebrow="Primary Board",
-            tight=True,
+        _render_telegram_message_board(
+            payload,
+            source=source,
+            digest_result=digest_result,
+            on_select_ticker=on_select_ticker,
         )
-        _render_ticker_button_row([str(item.get("ticker") or "") for item in final_top], key_prefix="home_final", on_select_ticker=on_select_ticker)
-        if digest_result.get("error") and source == "cache":
-            st.caption(f"원격 갱신 실패로 마지막 성공 캐시를 표시 중입니다: {digest_result['error']}")
-
-        quick_left, quick_right = st.columns(2)
-        with quick_left:
-            render_section_heading(
-                "지금 진입형 바로가기",
-                "매수전환, MA20 재탈환, HMA/EMA 진입형 티커를 바로 검증합니다.",
-                badges=[(f"{len(entry_now)}개", "accent")],
-                eyebrow="Quick Verify",
-                tight=True,
-            )
-            _render_ticker_button_row([str(item.get("ticker") or "") for item in entry_now], key_prefix="home_buy", on_select_ticker=on_select_ticker, columns=2)
-        with quick_right:
-            render_section_heading(
-                "매도전환 / 위험",
-                "매도전환이나 강한 위험 신호가 나온 티커를 먼저 확인합니다.",
-                badges=[(f"{len(sell_risk)}개", "warning")],
-                eyebrow="Risk First",
-                tight=True,
-            )
-            _render_ticker_button_row([str(item.get("ticker") or "") for item in sell_risk], key_prefix="home_sell", on_select_ticker=on_select_ticker, columns=2)
-
     recent = _collect_recent_tickers(recent_tickers)
     render_section_heading(
         "최근 본 종목",

@@ -653,6 +653,70 @@ class HomeDigestLoaderTests(unittest.TestCase):
         }
         self.assertEqual([item["ticker"] for item in extract_section_candidates(payload, "final_top", limit=1)], ["AAPL"])
 
+    def test_build_telegram_digest_message_uses_actual_formatter_structure(self):
+        payload = {
+            "version": "2.0",
+            "scan_mode": "post_close",
+            "run_stamp": "run-1",
+            "market_date": "2026-05-01",
+            "generated_at": "2026-05-02T06:16:51+09:00",
+            "section_order": ["qbs_buy_now", "sell_risk"],
+            "universe_count": 10,
+            "result_count": 2,
+            "skip_count": 1,
+            "sections": [
+                {
+                    "key": "qbs_buy_now",
+                    "title": "오늘 매수 최종 후보 Top 20",
+                    "item_count": 1,
+                    "ranked": True,
+                    "items": [
+                        {
+                            "ticker": "AAPL",
+                            "price": 200.0,
+                            "chg_value": 1.25,
+                            "chg_pct": 0.63,
+                            "volume_ratio_20": 1.5,
+                            "section_key": "qbs_buy_now",
+                            "rank": 1,
+                            "label": "BUY_NOW",
+                            "reason": "final+buy",
+                            "qbs_score": 88.0,
+                            "tags": ["final", "buy"],
+                            "risk_flags": [],
+                        }
+                    ],
+                },
+                {
+                    "key": "sell_risk",
+                    "title": "매도전환 / 위험 후보",
+                    "item_count": 1,
+                    "items": [
+                        {
+                            "ticker": "TSLA",
+                            "price": 180.0,
+                            "chg_value": -2.0,
+                            "chg_pct": -1.1,
+                            "volume_ratio_20": 2.0,
+                            "section_key": "sell_risk",
+                            "rank": 1,
+                            "label": "SELL_RISK",
+                            "reason": "sell_turn",
+                            "risk_flags": ["sell_turn"],
+                        }
+                    ],
+                },
+            ],
+        }
+
+        message = home_page.build_telegram_digest_message(payload)
+
+        self.assertIn("## 0. 오늘 매수 최종 후보 Top 20", message)
+        self.assertIn("## 1. 매도전환 / 위험 후보", message)
+        self.assertIn("AAPL", message)
+        self.assertIn("TSLA", message)
+        self.assertLess(message.index("AAPL"), message.index("TSLA"))
+
     def test_resolve_github_digest_config_uses_default_repo_when_unconfigured(self):
         with patch.dict(os.environ, {}, clear=True), patch("app_ui.pages.home_page._read_secret", return_value=""):
             config = home_page.resolve_github_digest_config()
