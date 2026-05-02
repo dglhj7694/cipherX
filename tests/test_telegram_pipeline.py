@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 import unittest
 from datetime import date, datetime
@@ -6,6 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from app_ui.pages import home_page
 from app_ui.pages.home_page import extract_section_candidates, load_latest_telegram_digest
 from scripts.daily_scan_and_notify import _build_post_close_digest_bundle, _send_telegram_if_enabled
 from telegram_pipeline import (
@@ -650,6 +652,23 @@ class HomeDigestLoaderTests(unittest.TestCase):
             ]
         }
         self.assertEqual([item["ticker"] for item in extract_section_candidates(payload, "final_top", limit=1)], ["AAPL"])
+
+    def test_resolve_github_digest_config_uses_default_repo_when_unconfigured(self):
+        with patch.dict(os.environ, {}, clear=True), patch("app_ui.pages.home_page._read_secret", return_value=""):
+            config = home_page.resolve_github_digest_config()
+
+        self.assertEqual(config["repo"], "dglhj7694/cipherX")
+        self.assertEqual(config["branch"], "telegram-digest")
+        self.assertEqual(config["path"], "post_close/latest.json")
+
+    def test_resolve_github_digest_config_uses_github_repository_env_before_default(self):
+        with patch.dict(os.environ, {"GITHUB_REPOSITORY": "owner/runtime-repo"}, clear=True), patch(
+            "app_ui.pages.home_page._read_secret",
+            return_value="",
+        ):
+            config = home_page.resolve_github_digest_config()
+
+        self.assertEqual(config["repo"], "owner/runtime-repo")
 
     def test_load_latest_telegram_digest_uses_remote_then_cache_fallback(self):
         payload = {

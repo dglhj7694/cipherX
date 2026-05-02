@@ -1,6 +1,61 @@
-FONT_IMPORT_URL = "https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css"
-FONT_STACK = "'NanumSquareRound','Malgun Gothic','Apple SD Gothic Neo',sans-serif"
-PLOTLY_FONT_FAMILY = "NanumSquareRound, Malgun Gothic, Apple SD Gothic Neo, sans-serif"
+FONT_FACE_CSS = """
+@font-face {
+  font-family: 'A2Z';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2601-6@1.0/%EC%97%90%EC%9D%B4%ED%88%AC%EC%A7%80%EC%B2%B4-1Thin.woff2') format('woff2');
+  font-weight: 100;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'A2Z';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2601-6@1.0/%EC%97%90%EC%9D%B4%ED%88%AC%EC%A7%80%EC%B2%B4-2ExtraLight.woff2') format('woff2');
+  font-weight: 200;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'A2Z';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2601-6@1.0/%EC%97%90%EC%9D%B4%ED%88%AC%EC%A7%80%EC%B2%B4-3Light.woff2') format('woff2');
+  font-weight: 300;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'A2Z';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2601-6@1.0/%EC%97%90%EC%9D%B4%ED%88%AC%EC%A7%80%EC%B2%B4-4Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'A2Z';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2601-6@1.0/%EC%97%90%EC%9D%B4%ED%88%AC%EC%A7%80%EC%B2%B4-5Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'A2Z';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2601-6@1.0/%EC%97%90%EC%9D%B4%ED%88%AC%EC%A7%80%EC%B2%B4-6SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'A2Z';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2601-6@1.0/%EC%97%90%EC%9D%B4%ED%88%AC%EC%A7%80%EC%B2%B4-7Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'A2Z';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2601-6@1.0/%EC%97%90%EC%9D%B4%ED%88%AC%EC%A7%80%EC%B2%B4-8ExtraBold.woff2') format('woff2');
+  font-weight: 800;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'A2Z';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2601-6@1.0/%EC%97%90%EC%9D%B4%ED%88%AC%EC%A7%80%EC%B2%B4-9Black.woff2') format('woff2');
+  font-weight: 900;
+  font-display: swap;
+}
+""".strip()
+FONT_STACK = "'A2Z','A2z','Malgun Gothic','Apple SD Gothic Neo',sans-serif"
+PLOTLY_FONT_FAMILY = "A2Z, A2z, Malgun Gothic, Apple SD Gothic Neo, sans-serif"
 
 
 def _css_vars(scope=":root"):
@@ -38,7 +93,7 @@ def _css_vars(scope=":root"):
 
 def build_app_theme_css():
     return f"""<style>
-@import url('{FONT_IMPORT_URL}');
+{FONT_FACE_CSS}
 {_css_vars()}
 html,body,[class*="css"]{{
   font-family:{FONT_STACK}!important;
@@ -2368,7 +2423,7 @@ p[data-testid="stCaption"]{{
 
 def build_brand_theme_css():
     return f"""
-@import url('{FONT_IMPORT_URL}');
+{FONT_FACE_CSS}
 {_css_vars()}
 html,body{{
   margin:0;
@@ -2930,7 +2985,7 @@ html,body{{
 
 
 COMPANY_DETAILS_THEME_OVERRIDES = f"""
-@import url('{FONT_IMPORT_URL}');
+{FONT_FACE_CSS}
 {_css_vars()}
 html, body, [class*="css"] {{
   font-family:{FONT_STACK} !important;

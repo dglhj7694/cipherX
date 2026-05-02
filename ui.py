@@ -33,7 +33,7 @@ from localization import (
 )
 from etf_sources import resolve_etf_universe
 from sectors import SECTOR_GROUPS
-from theme import FONT_IMPORT_URL, FONT_STACK
+from theme import FONT_FACE_CSS, FONT_STACK
 
 SOFT_GREEN = '#63D9A2'
 SOFT_GREEN_TEXT = '#B8F1D5'
@@ -3814,8 +3814,8 @@ def _build_us_market_daily_doc(payload):
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1">
-          <link href="__FONT_IMPORT_URL__" rel="stylesheet">
           <style>
+            __FONT_FACE_CSS__
             :root {
               color-scheme: dark;
               --border: rgba(148,163,184,.16);
@@ -4543,7 +4543,7 @@ def _build_us_market_daily_doc(payload):
         </html>
         """
     ).strip()
-    return template.replace("__FONT_IMPORT_URL__", FONT_IMPORT_URL).replace("__FONT_STACK__", FONT_STACK).replace("__PAYLOAD_B64__", payload_b64)
+    return template.replace("__FONT_FACE_CSS__", FONT_FACE_CSS).replace("__FONT_STACK__", FONT_STACK).replace("__PAYLOAD_B64__", payload_b64)
 
 
 def _render_us_market_daily_deck(payload):
@@ -5056,7 +5056,7 @@ def render_10layer_bars(m, html_key="analysis"):
         "</div>"
     )
     panel_h=max(430,120+len(layer_names)*44)
-    html_doc=f"""<!doctype html><html><head><meta charset='utf-8'><link href='{FONT_IMPORT_URL}' rel='stylesheet'></head><body style='margin:0;background:transparent;color:#E2E8F0;font-family:{FONT_STACK}'><!-- {html_key} -->{panel_html}</body></html>"""
+    html_doc=f"""<!doctype html><html><head><meta charset='utf-8'><style>{FONT_FACE_CSS}</style></head><body style='margin:0;background:transparent;color:#E2E8F0;font-family:{FONT_STACK}'><!-- {html_key} -->{panel_html}</body></html>"""
     components.html(html_doc,height=panel_h,scrolling=False)
 def render_leading_lagging(m):
     lv=m['leading_verdict'];lgv=m['lagging_verdict'];ac=m['composite_accel']
@@ -5499,7 +5499,7 @@ def render_10layer_bars(m, html_key="analysis"):
         "</div>"
     )
     panel_h = max(430, 120 + len(layer_names) * 44)
-    html_doc = f"<!doctype html><html><head><meta charset='utf-8'><link href='{FONT_IMPORT_URL}' rel='stylesheet'></head><body style='margin:0;background:transparent;color:#E2E8F0;font-family:{FONT_STACK}'><!-- {html_key} -->{panel_html}</body></html>"
+    html_doc = f"<!doctype html><html><head><meta charset='utf-8'><style>{FONT_FACE_CSS}</style></head><body style='margin:0;background:transparent;color:#E2E8F0;font-family:{FONT_STACK}'><!-- {html_key} -->{panel_html}</body></html>"
     components.html(html_doc, height=panel_h, scrolling=False)
 
 

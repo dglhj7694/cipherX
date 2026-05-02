@@ -11,6 +11,7 @@ import streamlit as st
 
 
 DIGEST_CACHE_TTL_SEC = 900
+DEFAULT_DIGEST_REPO = "dglhj7694/cipherX"
 DEFAULT_DIGEST_BRANCH = "telegram-digest"
 DEFAULT_DIGEST_PATH = "post_close/latest.json"
 
@@ -33,7 +34,12 @@ def _read_secret(name: str) -> str:
 
 
 def resolve_github_digest_config() -> dict[str, str]:
-    repo = _read_secret("GITHUB_DIGEST_REPO") or str(os.getenv("GITHUB_DIGEST_REPO", "")).strip()
+    repo = (
+        _read_secret("GITHUB_DIGEST_REPO")
+        or str(os.getenv("GITHUB_DIGEST_REPO", "")).strip()
+        or str(os.getenv("GITHUB_REPOSITORY", "")).strip()
+        or DEFAULT_DIGEST_REPO
+    )
     branch = _read_secret("GITHUB_DIGEST_BRANCH") or str(os.getenv("GITHUB_DIGEST_BRANCH", DEFAULT_DIGEST_BRANCH)).strip()
     path = _read_secret("GITHUB_DIGEST_PATH") or str(os.getenv("GITHUB_DIGEST_PATH", DEFAULT_DIGEST_PATH)).strip()
     token = _read_secret("GITHUB_DIGEST_TOKEN") or str(os.getenv("GITHUB_DIGEST_TOKEN", "")).strip()
