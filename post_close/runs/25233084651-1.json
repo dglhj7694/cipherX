@@ -464,7 +464,7 @@
     },
     {
       "key": "qbs_chase_watch",
-      "title": "강하지만 추격주의 Top 10",
+      "title": "강하지만 추격주의 Top 20",
       "items": [
         {
           "ticker": "LWLG",
@@ -767,15 +767,115 @@
             "5D"
           ],
           "risk_flags": []
+        },
+        {
+          "ticker": "TEAM",
+          "price": 88.87999725341797,
+          "chg_value": null,
+          "chg_pct": 29.581574571857356,
+          "volume_ratio_20": 3.0024370526415822,
+          "section_key": "qbs_chase_watch",
+          "rank": 11,
+          "label": "CHASE_WATCH",
+          "reason": "buy+pocket+5D+UTBot+HULL",
+          "source_flags": {
+            "membership_count": 3,
+            "hard_exclude": false
+          },
+          "qbs_score": 62.0,
+          "bucket": "CHASE_WATCH",
+          "tags": [
+            "buy",
+            "pocket",
+            "5D",
+            "UTBot",
+            "HULL"
+          ],
+          "risk_flags": [
+            "high_conflict",
+            "extreme_chase"
+          ]
+        },
+        {
+          "ticker": "INTC",
+          "price": 99.62000274658203,
+          "chg_value": null,
+          "chg_pct": 5.440303987109489,
+          "volume_ratio_20": 1.1258854631258495,
+          "section_key": "qbs_chase_watch",
+          "rank": 12,
+          "label": "CHASE_WATCH",
+          "reason": "final+5D",
+          "source_flags": {
+            "membership_count": 2,
+            "hard_exclude": false
+          },
+          "qbs_score": 62.0,
+          "bucket": "CHASE_WATCH",
+          "tags": [
+            "final",
+            "5D"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "RDDT",
+          "price": 166.47999572753906,
+          "chg_value": null,
+          "chg_pct": 13.074781334384925,
+          "volume_ratio_20": 2.9129398705474943,
+          "section_key": "qbs_chase_watch",
+          "rank": 13,
+          "label": "CHASE_WATCH",
+          "reason": "buy+pocket+UTBot",
+          "source_flags": {
+            "membership_count": 2,
+            "hard_exclude": false
+          },
+          "qbs_score": 56.0,
+          "bucket": "CHASE_WATCH",
+          "tags": [
+            "buy",
+            "pocket",
+            "UTBot"
+          ],
+          "risk_flags": [
+            "high_conflict",
+            "chase_risk"
+          ]
+        },
+        {
+          "ticker": "FIVN",
+          "price": 22.239999771118164,
+          "chg_value": null,
+          "chg_pct": 29.302318515231175,
+          "volume_ratio_20": 5.225501447373476,
+          "section_key": "qbs_chase_watch",
+          "rank": 14,
+          "label": "CHASE_WATCH",
+          "reason": "pocket+5D",
+          "source_flags": {
+            "membership_count": 2,
+            "hard_exclude": false
+          },
+          "qbs_score": 49.0,
+          "bucket": "CHASE_WATCH",
+          "tags": [
+            "pocket",
+            "5D"
+          ],
+          "risk_flags": [
+            "extreme_chase"
+          ]
         }
       ],
-      "item_count": 10,
+      "item_count": 14,
       "quality_floor": "QBS>=40 + extended move / 52W / 5D chase risk",
       "ranked": true
     },
     {
       "key": "qbs_pullback_wait",
-      "title": "눌림 대기 후보 Top 10",
+      "title": "눌림 대기 후보 Top 20",
       "items": [
         {
           "ticker": "LITE",
@@ -1066,9 +1166,34 @@
           "risk_flags": [
             "high_conflict"
           ]
+        },
+        {
+          "ticker": "DAL",
+          "price": 68.9800033569336,
+          "chg_value": null,
+          "chg_pct": 1.4561046098982393,
+          "volume_ratio_20": 0.9099063502242981,
+          "section_key": "qbs_pullback_wait",
+          "rank": 11,
+          "label": "PULLBACK_WAIT",
+          "reason": "buy+pullback+UTBot",
+          "source_flags": {
+            "membership_count": 2,
+            "hard_exclude": false
+          },
+          "qbs_score": 32.0,
+          "bucket": "PULLBACK_WAIT",
+          "tags": [
+            "buy",
+            "pullback",
+            "UTBot"
+          ],
+          "risk_flags": [
+            "high_conflict"
+          ]
         }
       ],
-      "item_count": 10,
+      "item_count": 11,
       "quality_floor": "QBS>=25 + pullback reentry + no hard risk",
       "ranked": true
     },
@@ -1562,9 +1687,508 @@
             "OBV+"
           ],
           "risk_flags": []
+        },
+        {
+          "ticker": "FRT",
+          "price": 115.31999969482422,
+          "chg_value": null,
+          "chg_pct": 3.9855708819930813,
+          "volume_ratio_20": 1.7181321847568298,
+          "section_key": "confluence",
+          "rank": 11,
+          "label": "CONFLUENCE",
+          "reason": "final+buy_turn+HMA+pocket+pre_high+CMF+",
+          "source_flags": {
+            "same_session_buy_turn": true,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": true,
+            "buy_turn_hull": true,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 5,
+            "multi_sell": 1,
+            "chg_5d": 3.8544657276730794,
+            "label": "CONFLUENCE",
+            "membership": [
+              "final_top",
+              "buy_turn",
+              "hma_ema_trend",
+              "pocket_pivot"
+            ],
+            "membership_count": 4,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "final",
+            "buy_turn",
+            "HMA",
+            "pocket",
+            "pre_high",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "GME",
+          "price": 26.530000686645508,
+          "chg_value": null,
+          "chg_pct": 6.332664831229083,
+          "volume_ratio_20": 2.038655904652371,
+          "section_key": "confluence",
+          "rank": 12,
+          "label": "CONFLUENCE",
+          "reason": "buy_turn+HMA+pocket+pre_high+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": true,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": true,
+            "buy_turn_hull": true,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 6,
+            "multi_sell": 1,
+            "chg_5d": 6.332664831229083,
+            "label": "CONFLUENCE",
+            "membership": [
+              "buy_turn",
+              "hma_ema_trend",
+              "pocket_pivot"
+            ],
+            "membership_count": 3,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "buy_turn",
+            "HMA",
+            "pocket",
+            "pre_high",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "MTZ",
+          "price": 417.4100036621094,
+          "chg_value": null,
+          "chg_pct": 5.928185913664797,
+          "volume_ratio_20": 2.1185664609677186,
+          "section_key": "confluence",
+          "rank": 13,
+          "label": "CONFLUENCE",
+          "reason": "final+pocket+pre_high+RS85+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 6,
+            "multi_sell": 1,
+            "chg_5d": 10.977881814567494,
+            "label": "CONFLUENCE",
+            "membership": [
+              "final_top",
+              "pocket_pivot"
+            ],
+            "membership_count": 2,
+            "board_risk": "chase_risk"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "final",
+            "pocket",
+            "pre_high",
+            "RS85",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "chase_risk"
+          ]
+        },
+        {
+          "ticker": "CBOE",
+          "price": 326.9599914550781,
+          "chg_value": null,
+          "chg_pct": 8.953978954677599,
+          "volume_ratio_20": 1.8569399682857053,
+          "section_key": "confluence",
+          "rank": 14,
+          "label": "CONFLUENCE",
+          "reason": "buy_turn+pocket+pre_high+OBV+",
+          "source_flags": {
+            "same_session_buy_turn": true,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": true,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 3,
+            "multi_sell": 0,
+            "chg_5d": 7.619892064947466,
+            "label": "CONFLUENCE",
+            "membership": [
+              "buy_turn",
+              "pocket_pivot"
+            ],
+            "membership_count": 2,
+            "board_risk": "chase_risk"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "buy_turn",
+            "pocket",
+            "pre_high",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "chase_risk"
+          ]
+        },
+        {
+          "ticker": "AFRM",
+          "price": 67.54000091552734,
+          "chg_value": null,
+          "chg_pct": 5.071565336246461,
+          "volume_ratio_20": 1.253260838151014,
+          "section_key": "confluence",
+          "rank": 15,
+          "label": "CONFLUENCE",
+          "reason": "buy_turn+pocket+pre_high+RS97+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": true,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": true,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 1,
+            "multi_sell": 0,
+            "chg_5d": 5.994977435096268,
+            "label": "CONFLUENCE",
+            "membership": [
+              "buy_turn",
+              "pocket_pivot"
+            ],
+            "membership_count": 2,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "buy_turn",
+            "pocket",
+            "pre_high",
+            "RS97",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "EMN",
+          "price": 77.52999877929688,
+          "chg_value": null,
+          "chg_pct": 6.074706066313627,
+          "volume_ratio_20": 1.9785616620748956,
+          "section_key": "confluence",
+          "rank": 16,
+          "label": "CONFLUENCE",
+          "reason": "buy_turn+pocket+pre_high+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": true,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": true,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 3,
+            "multi_sell": 0,
+            "chg_5d": 7.680553860134548,
+            "label": "CONFLUENCE",
+            "membership": [
+              "buy_turn",
+              "pocket_pivot"
+            ],
+            "membership_count": 2,
+            "board_risk": "chase_risk"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "buy_turn",
+            "pocket",
+            "pre_high",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "chase_risk"
+          ]
+        },
+        {
+          "ticker": "HIW",
+          "price": 24.709999084472656,
+          "chg_value": null,
+          "chg_pct": 1.645411877078243,
+          "volume_ratio_20": 1.023930249138382,
+          "section_key": "confluence",
+          "rank": 17,
+          "label": "CONFLUENCE",
+          "reason": "buy_turn+pocket+compression+pre_high+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": true,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": true,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 3,
+            "multi_sell": 0,
+            "chg_5d": 3.432397303365045,
+            "label": "CONFLUENCE",
+            "membership": [
+              "buy_turn",
+              "pocket_pivot"
+            ],
+            "membership_count": 2,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "buy_turn",
+            "pocket",
+            "compression",
+            "pre_high",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "LWLG",
+          "price": 16.270000457763672,
+          "chg_value": null,
+          "chg_pct": 18.586006859364947,
+          "volume_ratio_20": 1.7166997590627342,
+          "section_key": "confluence",
+          "rank": 18,
+          "label": "CONFLUENCE",
+          "reason": "final+buy_turn+pocket+5D+RS99+CMF+",
+          "source_flags": {
+            "same_session_buy_turn": true,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": true,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 4,
+            "multi_sell": 0,
+            "chg_5d": 28.413578214616315,
+            "label": "CONFLUENCE",
+            "membership": [
+              "final_top",
+              "buy_turn",
+              "pocket_pivot",
+              "five_day_top"
+            ],
+            "membership_count": 4,
+            "board_risk": "extended_day"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "final",
+            "buy_turn",
+            "pocket",
+            "5D",
+            "RS99",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "extended_day"
+          ]
+        },
+        {
+          "ticker": "TWLO",
+          "price": 183.33999633789062,
+          "chg_value": null,
+          "chg_pct": 23.82817733421551,
+          "volume_ratio_20": 2.6017477231796207,
+          "section_key": "confluence",
+          "rank": 19,
+          "label": "CONFLUENCE",
+          "reason": "final+buy_turn+pocket+5D+pre_high+RS82",
+          "source_flags": {
+            "same_session_buy_turn": true,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": true,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 4,
+            "multi_sell": 0,
+            "chg_5d": 27.505393211234008,
+            "label": "CONFLUENCE",
+            "membership": [
+              "final_top",
+              "buy_turn",
+              "pocket_pivot",
+              "five_day_top"
+            ],
+            "membership_count": 4,
+            "board_risk": "extended_day"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "final",
+            "buy_turn",
+            "pocket",
+            "5D",
+            "pre_high",
+            "RS82",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "extended_day"
+          ]
+        },
+        {
+          "ticker": "LITE",
+          "price": 949.9299926757812,
+          "chg_value": null,
+          "chg_pct": 5.276396950650284,
+          "volume_ratio_20": 0.8503280409757303,
+          "section_key": "confluence",
+          "rank": 20,
+          "label": "CONFLUENCE",
+          "reason": "final+buy_turn+pullback+RS83+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": true,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": true,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 1,
+            "multi_sell": 0,
+            "chg_5d": 7.745789312271068,
+            "label": "CONFLUENCE",
+            "membership": [
+              "final_top",
+              "buy_turn",
+              "pullback_reentry"
+            ],
+            "membership_count": 3,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "final",
+            "buy_turn",
+            "pullback",
+            "RS83",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": []
         }
       ],
-      "item_count": 10,
+      "item_count": 20,
       "quality_floor": "membership_count>=3 또는 QBS 상위 + source 2개 이상",
       "ranked": true
     },
@@ -2060,9 +2684,500 @@
             "OBV+"
           ],
           "risk_flags": []
+        },
+        {
+          "ticker": "AAOI",
+          "price": 183.50999450683594,
+          "chg_value": null,
+          "chg_pct": 11.651249589541731,
+          "volume_ratio_20": 1.1090818049435627,
+          "section_key": "entry_now",
+          "rank": 11,
+          "label": "ENTRY",
+          "reason": "buy_turn+RS98+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": true,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": true,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 3,
+            "multi_sell": 0,
+            "chg_5d": 13.159028537238473,
+            "label": "ENTRY",
+            "membership": [
+              "buy_turn"
+            ],
+            "membership_count": 1,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "buy_turn",
+            "RS98",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "AAPL",
+          "price": 280.1400146484375,
+          "chg_value": null,
+          "chg_pct": 3.2393618379240534,
+          "volume_ratio_20": 1.6665962145461761,
+          "section_key": "entry_now",
+          "rank": 12,
+          "label": "ENTRY",
+          "reason": "buy_turn+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": true,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": true,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 1,
+            "multi_sell": 0,
+            "chg_5d": 3.3498181847658897,
+            "label": "ENTRY",
+            "membership": [
+              "buy_turn"
+            ],
+            "membership_count": 1,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "buy_turn",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "CUBE",
+          "price": 40.13999938964844,
+          "chg_value": null,
+          "chg_pct": -0.8399213350611298,
+          "volume_ratio_20": 1.3737190684190461,
+          "section_key": "entry_now",
+          "rank": 13,
+          "label": "ENTRY",
+          "reason": "final+HMA+pocket+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 5,
+            "multi_sell": 1,
+            "chg_5d": 1.5174467886404994,
+            "label": "ENTRY",
+            "membership": [
+              "final_top",
+              "hma_ema_trend",
+              "pocket_pivot"
+            ],
+            "membership_count": 3,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "final",
+            "HMA",
+            "pocket",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "SOUN",
+          "price": 9.5600004196167,
+          "chg_value": null,
+          "chg_pct": 20.100507208567734,
+          "volume_ratio_20": 2.3888301092293855,
+          "section_key": "entry_now",
+          "rank": 14,
+          "label": "ENTRY",
+          "reason": "buy_turn+pocket+5D+pre_high+RS90+CMF+",
+          "source_flags": {
+            "same_session_buy_turn": true,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": true,
+            "buy_turn_hull": true,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 6,
+            "multi_sell": 0,
+            "chg_5d": 16.727727831816093,
+            "label": "ENTRY",
+            "membership": [
+              "buy_turn",
+              "pocket_pivot",
+              "five_day_top"
+            ],
+            "membership_count": 3,
+            "board_risk": "extended_day"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "buy_turn",
+            "pocket",
+            "5D",
+            "pre_high",
+            "RS90",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "extended_day"
+          ]
+        },
+        {
+          "ticker": "WOLF",
+          "price": 36.7599983215332,
+          "chg_value": null,
+          "chg_pct": 24.4835674458936,
+          "volume_ratio_20": 1.8888968899420457,
+          "section_key": "entry_now",
+          "rank": 15,
+          "label": "ENTRY",
+          "reason": "buy_turn+pocket+5D+RS99",
+          "source_flags": {
+            "same_session_buy_turn": true,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": true,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 4,
+            "multi_sell": 0,
+            "chg_5d": 17.707329043722687,
+            "label": "ENTRY",
+            "membership": [
+              "buy_turn",
+              "pocket_pivot",
+              "five_day_top"
+            ],
+            "membership_count": 3,
+            "board_risk": "extended_day"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "buy_turn",
+            "pocket",
+            "5D",
+            "RS99"
+          ],
+          "risk_flags": [
+            "extended_day"
+          ]
+        },
+        {
+          "ticker": "DNA",
+          "price": 9.699999809265137,
+          "chg_value": null,
+          "chg_pct": 14.657207630341407,
+          "volume_ratio_20": 1.827103334737846,
+          "section_key": "entry_now",
+          "rank": 16,
+          "label": "ENTRY",
+          "reason": "buy_turn+pocket+5D+pre_high+RS89+CMF+",
+          "source_flags": {
+            "same_session_buy_turn": true,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": true,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 1,
+            "multi_sell": 0,
+            "chg_5d": 23.25285832677051,
+            "label": "ENTRY",
+            "membership": [
+              "buy_turn",
+              "pocket_pivot",
+              "five_day_top"
+            ],
+            "membership_count": 3,
+            "board_risk": "extended_day"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "buy_turn",
+            "pocket",
+            "5D",
+            "pre_high",
+            "RS89",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "extended_day"
+          ]
+        },
+        {
+          "ticker": "TEAM",
+          "price": 88.87999725341797,
+          "chg_value": null,
+          "chg_pct": 29.581574571857356,
+          "volume_ratio_20": 3.0024370526415822,
+          "section_key": "entry_now",
+          "rank": 17,
+          "label": "ENTRY",
+          "reason": "buy_turn+pocket+5D+pre_high+RS41+CMF+",
+          "source_flags": {
+            "same_session_buy_turn": true,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": true,
+            "buy_turn_hull": true,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 3,
+            "multi_sell": 0,
+            "chg_5d": 24.220815461215274,
+            "label": "ENTRY",
+            "membership": [
+              "buy_turn",
+              "pocket_pivot",
+              "five_day_top"
+            ],
+            "membership_count": 3,
+            "board_risk": "extended_day"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "buy_turn",
+            "pocket",
+            "5D",
+            "pre_high",
+            "RS41",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "extended_day"
+          ]
+        },
+        {
+          "ticker": "STX",
+          "price": 726.9299926757812,
+          "chg_value": null,
+          "chg_pct": 7.910750084398561,
+          "volume_ratio_20": 1.6769475877095024,
+          "section_key": "entry_now",
+          "rank": 18,
+          "label": "ENTRY",
+          "reason": "final+5D+pre_high+RS97+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 6,
+            "multi_sell": 1,
+            "chg_5d": 23.996587236807034,
+            "label": "ENTRY",
+            "membership": [
+              "final_top",
+              "five_day_top"
+            ],
+            "membership_count": 2,
+            "board_risk": "chase_risk"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "final",
+            "5D",
+            "pre_high",
+            "RS97",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "chase_risk"
+          ]
+        },
+        {
+          "ticker": "INTC",
+          "price": 99.62000274658203,
+          "chg_value": null,
+          "chg_pct": 5.440303987109489,
+          "volume_ratio_20": 1.1258854631258495,
+          "section_key": "entry_now",
+          "rank": 19,
+          "label": "ENTRY",
+          "reason": "final+5D+pre_high+RS99+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 2,
+            "multi_sell": 0,
+            "chg_5d": 20.69299932348512,
+            "label": "ENTRY",
+            "membership": [
+              "final_top",
+              "five_day_top"
+            ],
+            "membership_count": 2,
+            "board_risk": "chase_risk"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "final",
+            "5D",
+            "pre_high",
+            "RS99",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "chase_risk"
+          ]
+        },
+        {
+          "ticker": "CIEN",
+          "price": 535.2899780273438,
+          "chg_value": null,
+          "chg_pct": 1.4613822904113216,
+          "volume_ratio_20": 0.708789413464398,
+          "section_key": "entry_now",
+          "rank": 20,
+          "label": "ENTRY",
+          "reason": "final+buy_turn+RS89+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": true,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": true,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 2,
+            "multi_sell": 1,
+            "chg_5d": 2.782256254609426,
+            "label": "ENTRY",
+            "membership": [
+              "final_top",
+              "buy_turn"
+            ],
+            "membership_count": 2,
+            "board_risk": "low_volume"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "final",
+            "buy_turn",
+            "RS89",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "low_volume"
+          ]
         }
       ],
-      "item_count": 10,
+      "item_count": 20,
       "quality_floor": "매수전환 / MA20 재탈환 / HMA·EMA long entry / final top",
       "ranked": true
     },
@@ -2545,9 +3660,474 @@
           "risk_flags": [
             "low_volume"
           ]
+        },
+        {
+          "ticker": "NCNO",
+          "price": 18.1299991607666,
+          "chg_value": null,
+          "chg_pct": 3.7185333841668675,
+          "volume_ratio_20": 0.8207823840989509,
+          "section_key": "pullback_reentry",
+          "rank": 11,
+          "label": "PULLBACK",
+          "reason": "buy_turn+pullback+RS81+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": true,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": true,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 1,
+            "multi_sell": 0,
+            "chg_5d": 2.5452423519420653,
+            "label": "pullback",
+            "membership": [
+              "buy_turn",
+              "pullback_reentry"
+            ],
+            "membership_count": 2,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "buy_turn",
+            "pullback",
+            "RS81",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "FIGR",
+          "price": 36.45000076293945,
+          "chg_value": null,
+          "chg_pct": 3.8461605342054463,
+          "volume_ratio_20": 0.876820003995489,
+          "section_key": "pullback_reentry",
+          "rank": 12,
+          "label": "PULLBACK",
+          "reason": "buy_turn+pullback+compression+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": true,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": true,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 1,
+            "multi_sell": 0,
+            "chg_5d": 13.374802590909038,
+            "label": "pullback",
+            "membership": [
+              "buy_turn",
+              "pullback_reentry"
+            ],
+            "membership_count": 2,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "buy_turn",
+            "pullback",
+            "compression",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "DAL",
+          "price": 68.9800033569336,
+          "chg_value": null,
+          "chg_pct": 1.4561046098982393,
+          "volume_ratio_20": 0.9099063502242981,
+          "section_key": "pullback_reentry",
+          "rank": 13,
+          "label": "PULLBACK",
+          "reason": "buy_turn+pullback",
+          "source_flags": {
+            "same_session_buy_turn": true,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": true,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 1,
+            "multi_sell": 0,
+            "chg_5d": 0.774297198423786,
+            "label": "pullback",
+            "membership": [
+              "buy_turn",
+              "pullback_reentry"
+            ],
+            "membership_count": 2,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "buy_turn",
+            "pullback"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "WULF",
+          "price": 21.309999465942383,
+          "chg_value": null,
+          "chg_pct": -1.9328121727641847,
+          "volume_ratio_20": 0.7956155574987002,
+          "section_key": "pullback_reentry",
+          "rank": 14,
+          "label": "PULLBACK",
+          "reason": "pullback+compression+RS95+CMF+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 3,
+            "multi_sell": 0,
+            "chg_5d": 6.496747737084814,
+            "label": "pullback",
+            "membership": [
+              "pullback_reentry"
+            ],
+            "membership_count": 1,
+            "board_risk": "low_volume"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "pullback",
+            "compression",
+            "RS95",
+            "CMF+"
+          ],
+          "risk_flags": [
+            "low_volume"
+          ]
+        },
+        {
+          "ticker": "AIT",
+          "price": 302.989990234375,
+          "chg_value": null,
+          "chg_pct": -0.902701476901063,
+          "volume_ratio_20": 0.5820896687715631,
+          "section_key": "pullback_reentry",
+          "rank": 15,
+          "label": "PULLBACK",
+          "reason": "pullback+compression+OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 4,
+            "multi_sell": 0,
+            "chg_5d": 3.286171443765941,
+            "label": "pullback",
+            "membership": [
+              "pullback_reentry"
+            ],
+            "membership_count": 1,
+            "board_risk": "low_volume"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "pullback",
+            "compression",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "low_volume"
+          ]
+        },
+        {
+          "ticker": "OVV",
+          "price": 60.849998474121094,
+          "chg_value": null,
+          "chg_pct": -1.1372880123741218,
+          "volume_ratio_20": 0.6791866761298294,
+          "section_key": "pullback_reentry",
+          "rank": 16,
+          "label": "PULLBACK",
+          "reason": "pullback+pre_high+RS11+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 3,
+            "multi_sell": 0,
+            "chg_5d": 9.18715050052073,
+            "label": "pullback",
+            "membership": [
+              "pullback_reentry"
+            ],
+            "membership_count": 1,
+            "board_risk": "low_volume"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "pullback",
+            "pre_high",
+            "RS11",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "low_volume"
+          ]
+        },
+        {
+          "ticker": "SBAC",
+          "price": 218.5800018310547,
+          "chg_value": null,
+          "chg_pct": -1.1844462718507829,
+          "volume_ratio_20": 0.41481577610755227,
+          "section_key": "pullback_reentry",
+          "rank": 17,
+          "label": "PULLBACK",
+          "reason": "pullback+compression+RS90+CMF+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 3,
+            "multi_sell": 0,
+            "chg_5d": -0.4055221145023084,
+            "label": "pullback",
+            "membership": [
+              "pullback_reentry"
+            ],
+            "membership_count": 1,
+            "board_risk": "low_volume"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "pullback",
+            "compression",
+            "RS90",
+            "CMF+"
+          ],
+          "risk_flags": [
+            "low_volume"
+          ]
+        },
+        {
+          "ticker": "IBKR",
+          "price": 80.45999908447266,
+          "chg_value": null,
+          "chg_pct": 1.2075460182045992,
+          "volume_ratio_20": 0.857733770135929,
+          "section_key": "pullback_reentry",
+          "rank": 18,
+          "label": "PULLBACK",
+          "reason": "pullback+compression+RS82+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 1,
+            "multi_sell": 0,
+            "chg_5d": 5.011741321115946,
+            "label": "pullback",
+            "membership": [
+              "pullback_reentry"
+            ],
+            "membership_count": 1,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "pullback",
+            "compression",
+            "RS82",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "FLR",
+          "price": 53.0,
+          "chg_value": null,
+          "chg_pct": -0.656042144576387,
+          "volume_ratio_20": 0.9347830058645966,
+          "section_key": "pullback_reentry",
+          "rank": 19,
+          "label": "PULLBACK",
+          "reason": "pullback+compression+pre_high+OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 3,
+            "multi_sell": 0,
+            "chg_5d": 9.890110933105966,
+            "label": "pullback",
+            "membership": [
+              "pullback_reentry"
+            ],
+            "membership_count": 1,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "pullback",
+            "compression",
+            "pre_high",
+            "OBV+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "CVLT",
+          "price": 99.56999969482422,
+          "chg_value": null,
+          "chg_pct": 0.6978180224235381,
+          "volume_ratio_20": 0.3921110720387851,
+          "section_key": "pullback_reentry",
+          "rank": 20,
+          "label": "PULLBACK",
+          "reason": "pullback+compression+RS87+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 2,
+            "multi_sell": 1,
+            "chg_5d": 6.015759833933942,
+            "label": "pullback",
+            "membership": [
+              "pullback_reentry"
+            ],
+            "membership_count": 1,
+            "board_risk": "low_volume"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "pullback",
+            "compression",
+            "RS87",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "low_volume"
+          ]
         }
       ],
-      "item_count": 10,
+      "item_count": 20,
       "quality_floor": "상승추세 내 눌림목 또는 재진입",
       "ranked": true
     },
@@ -3007,9 +4587,272 @@
             "pre_high"
           ],
           "risk_flags": []
+        },
+        {
+          "ticker": "TROW",
+          "price": 103.41999816894531,
+          "chg_value": null,
+          "chg_pct": 0.5248842631645807,
+          "volume_ratio_20": 1.0468311466675988,
+          "section_key": "steady_uptrend",
+          "rank": 11,
+          "label": "STEADY",
+          "reason": "HMA+compression+pre_high+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 2,
+            "multi_sell": 1,
+            "chg_5d": 4.401373629928299,
+            "label": "STEADY",
+            "membership": [
+              "hma_ema_trend"
+            ],
+            "membership_count": 1,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "HMA",
+            "compression",
+            "pre_high",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "PAG",
+          "price": 169.83999633789062,
+          "chg_value": null,
+          "chg_pct": -0.9794822135741124,
+          "volume_ratio_20": 1.1161826910918304,
+          "section_key": "steady_uptrend",
+          "rank": 12,
+          "label": "STEADY",
+          "reason": "HMA+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 2,
+            "multi_sell": 0,
+            "chg_5d": 5.872084700452808,
+            "label": "STEADY",
+            "membership": [
+              "hma_ema_trend"
+            ],
+            "membership_count": 1,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "HMA",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "NWSA",
+          "price": 26.239999771118164,
+          "chg_value": null,
+          "chg_pct": -0.3039510814348016,
+          "volume_ratio_20": 1.196926350080643,
+          "section_key": "steady_uptrend",
+          "rank": 13,
+          "label": "STEADY",
+          "reason": "HMA+OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 1,
+            "multi_sell": 0,
+            "chg_5d": 0.152667965702087,
+            "label": "STEADY",
+            "membership": [
+              "hma_ema_trend"
+            ],
+            "membership_count": 1,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "HMA",
+            "OBV+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "LNC",
+          "price": 37.529998779296875,
+          "chg_value": null,
+          "chg_pct": -0.7405516631161364,
+          "volume_ratio_20": 1.0348668570008814,
+          "section_key": "steady_uptrend",
+          "rank": 14,
+          "label": "STEADY",
+          "reason": "HMA+compression+CMF+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 1,
+            "multi_sell": 0,
+            "chg_5d": 1.5147350286809091,
+            "label": "STEADY",
+            "membership": [
+              "hma_ema_trend"
+            ],
+            "membership_count": 1,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "HMA",
+            "compression",
+            "CMF+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "ZETA",
+          "price": 18.600000381469727,
+          "chg_value": null,
+          "chg_pct": 0.9772003497841288,
+          "volume_ratio_20": 2.49009509659256,
+          "section_key": "steady_uptrend",
+          "rank": 15,
+          "label": "STEADY",
+          "reason": "HMA+OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 1,
+            "multi_sell": 1,
+            "chg_5d": 6.103820039433044,
+            "label": "STEADY",
+            "membership": [
+              "hma_ema_trend"
+            ],
+            "membership_count": 1,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "HMA",
+            "OBV+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "CHD",
+          "price": 96.0199966430664,
+          "chg_value": null,
+          "chg_pct": -1.0715031338214385,
+          "volume_ratio_20": 1.806478601602135,
+          "section_key": "steady_uptrend",
+          "rank": 16,
+          "label": "STEADY",
+          "reason": "HMA+OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 0,
+            "multi_sell": 1,
+            "chg_5d": 1.0524100561236653,
+            "label": "STEADY",
+            "membership": [
+              "hma_ema_trend"
+            ],
+            "membership_count": 1,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "HMA",
+            "OBV+"
+          ],
+          "risk_flags": []
         }
       ],
-      "item_count": 10,
+      "item_count": 16,
       "quality_floor": "trend_continuation 또는 HMA/EMA 정렬 기반 추세 지속",
       "ranked": true
     },
@@ -3465,9 +5308,463 @@
           "risk_flags": [
             "low_volume"
           ]
+        },
+        {
+          "ticker": "ELV",
+          "price": 372.67999267578125,
+          "chg_value": null,
+          "chg_pct": -0.9935764886399004,
+          "volume_ratio_20": 0.3237144290525362,
+          "section_key": "breakout_wait",
+          "rank": 11,
+          "label": "BREAKOUT_WAIT",
+          "reason": "compression+pre_high+RS85+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 1,
+            "multi_sell": 0,
+            "chg_5d": 8.098382097487708,
+            "label": "BREAKOUT_WAIT",
+            "membership": [],
+            "membership_count": 0,
+            "board_risk": "low_volume"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "compression",
+            "pre_high",
+            "RS85",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "low_volume"
+          ]
+        },
+        {
+          "ticker": "SNX",
+          "price": 228.1999969482422,
+          "chg_value": null,
+          "chg_pct": 0.008766882769323855,
+          "volume_ratio_20": 0.4874216003051405,
+          "section_key": "breakout_wait",
+          "rank": 12,
+          "label": "BREAKOUT_WAIT",
+          "reason": "compression+pre_high+RS94+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 1,
+            "multi_sell": 0,
+            "chg_5d": 0.2151816872021375,
+            "label": "BREAKOUT_WAIT",
+            "membership": [],
+            "membership_count": 0,
+            "board_risk": "low_volume"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "compression",
+            "pre_high",
+            "RS94",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "low_volume"
+          ]
+        },
+        {
+          "ticker": "APLS",
+          "price": 40.959999084472656,
+          "chg_value": null,
+          "chg_pct": 0.024415925145114526,
+          "volume_ratio_20": 0.41541715636321563,
+          "section_key": "breakout_wait",
+          "rank": 13,
+          "label": "BREAKOUT_WAIT",
+          "reason": "compression+pre_high+RS99+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 2,
+            "multi_sell": 0,
+            "chg_5d": 0.048853098276910326,
+            "label": "BREAKOUT_WAIT",
+            "membership": [],
+            "membership_count": 0,
+            "board_risk": "low_volume"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "compression",
+            "pre_high",
+            "RS99",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "low_volume"
+          ]
+        },
+        {
+          "ticker": "CASY",
+          "price": 835.9199829101562,
+          "chg_value": null,
+          "chg_pct": 1.6748717493388694,
+          "volume_ratio_20": 0.463131635944436,
+          "section_key": "breakout_wait",
+          "rank": 14,
+          "label": "BREAKOUT_WAIT",
+          "reason": "pre_high+RS71+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 1,
+            "multi_sell": 0,
+            "chg_5d": 4.548808163649794,
+            "label": "BREAKOUT_WAIT",
+            "membership": [],
+            "membership_count": 0,
+            "board_risk": "low_volume"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "pre_high",
+            "RS71",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "low_volume"
+          ]
+        },
+        {
+          "ticker": "PNFP",
+          "price": 98.63999938964844,
+          "chg_value": null,
+          "chg_pct": -0.3032171461037499,
+          "volume_ratio_20": 0.4696195266349483,
+          "section_key": "breakout_wait",
+          "rank": 15,
+          "label": "BREAKOUT_WAIT",
+          "reason": "pocket+compression+pre_high+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 1,
+            "multi_sell": 0,
+            "chg_5d": 2.9215391890106144,
+            "label": "BREAKOUT_WAIT",
+            "membership": [
+              "pocket_pivot"
+            ],
+            "membership_count": 1,
+            "board_risk": "low_volume"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "pocket",
+            "compression",
+            "pre_high",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "low_volume"
+          ]
+        },
+        {
+          "ticker": "UNH",
+          "price": 368.7799987792969,
+          "chg_value": null,
+          "chg_pct": -0.45886745751958685,
+          "volume_ratio_20": 0.5077288410649381,
+          "section_key": "breakout_wait",
+          "rank": 16,
+          "label": "BREAKOUT_WAIT",
+          "reason": "compression+pre_high+RS93+CMF+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 1,
+            "multi_sell": 1,
+            "chg_5d": 3.9051011008666454,
+            "label": "BREAKOUT_WAIT",
+            "membership": [],
+            "membership_count": 0,
+            "board_risk": "low_volume"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "compression",
+            "pre_high",
+            "RS93",
+            "CMF+"
+          ],
+          "risk_flags": [
+            "low_volume"
+          ]
+        },
+        {
+          "ticker": "SEIC",
+          "price": 90.22000122070312,
+          "chg_value": null,
+          "chg_pct": -0.5072773300888495,
+          "volume_ratio_20": 0.6246049266067087,
+          "section_key": "breakout_wait",
+          "rank": 17,
+          "label": "BREAKOUT_WAIT",
+          "reason": "compression+CMF+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 0,
+            "multi_sell": 0,
+            "chg_5d": 1.5533599051083282,
+            "label": "BREAKOUT_WAIT",
+            "membership": [],
+            "membership_count": 0,
+            "board_risk": "low_volume"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "compression",
+            "CMF+"
+          ],
+          "risk_flags": [
+            "low_volume"
+          ]
+        },
+        {
+          "ticker": "NUE",
+          "price": 226.0399932861328,
+          "chg_value": null,
+          "chg_pct": 0.3329042666566427,
+          "volume_ratio_20": 0.718375719028479,
+          "section_key": "breakout_wait",
+          "rank": 18,
+          "label": "BREAKOUT_WAIT",
+          "reason": "compression+pre_high+RS93+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 1,
+            "multi_sell": 1,
+            "chg_5d": 5.483223840653491,
+            "label": "BREAKOUT_WAIT",
+            "membership": [],
+            "membership_count": 0,
+            "board_risk": "low_volume"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "compression",
+            "pre_high",
+            "RS93",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "low_volume"
+          ]
+        },
+        {
+          "ticker": "VMI",
+          "price": 510.3599853515625,
+          "chg_value": null,
+          "chg_pct": 0.4566523832021171,
+          "volume_ratio_20": 0.7893684305956257,
+          "section_key": "breakout_wait",
+          "rank": 19,
+          "label": "BREAKOUT_WAIT",
+          "reason": "compression+pre_high+RS87+CMF+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 0,
+            "multi_sell": 0,
+            "chg_5d": 2.292947088899479,
+            "label": "BREAKOUT_WAIT",
+            "membership": [],
+            "membership_count": 0,
+            "board_risk": "low_volume"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "compression",
+            "pre_high",
+            "RS87",
+            "CMF+"
+          ],
+          "risk_flags": [
+            "low_volume"
+          ]
+        },
+        {
+          "ticker": "CVS",
+          "price": 82.08999633789062,
+          "chg_value": null,
+          "chg_pct": -1.4407546697637361,
+          "volume_ratio_20": 0.5059920515321745,
+          "section_key": "breakout_wait",
+          "rank": 20,
+          "label": "BREAKOUT_WAIT",
+          "reason": "compression+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 0,
+            "multi_sell": 0,
+            "chg_5d": 5.324600675505827,
+            "label": "BREAKOUT_WAIT",
+            "membership": [],
+            "membership_count": 0,
+            "board_risk": "low_volume"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "compression",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "low_volume"
+          ]
         }
       ],
-      "item_count": 10,
+      "item_count": 20,
       "quality_floor": "gap setup / 저변동 압축 / 신고가 직전",
       "ranked": true
     },
@@ -3958,9 +6255,474 @@
             "OBV+"
           ],
           "risk_flags": []
+        },
+        {
+          "ticker": "KVYO",
+          "price": 22.200000762939453,
+          "chg_value": null,
+          "chg_pct": 10.502740638753869,
+          "volume_ratio_20": 1.3351341881867531,
+          "section_key": "accumulation",
+          "rank": 11,
+          "label": "ACCUMULATION",
+          "reason": "pocket+5D+pre_high+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 2,
+            "multi_sell": 0,
+            "chg_5d": 14.138816926115103,
+            "label": "ACCUMULATION",
+            "membership": [
+              "pocket_pivot",
+              "five_day_top"
+            ],
+            "membership_count": 2,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "pocket",
+            "5D",
+            "pre_high",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "PAYC",
+          "price": 131.9600067138672,
+          "chg_value": null,
+          "chg_pct": 4.102243996531502,
+          "volume_ratio_20": 0.9206005633630153,
+          "section_key": "accumulation",
+          "rank": 12,
+          "label": "ACCUMULATION",
+          "reason": "buy_turn+pocket+compression+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": true,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": true,
+            "buy_turn_hull": true,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 1,
+            "multi_sell": 0,
+            "chg_5d": 6.660204826917826,
+            "label": "ACCUMULATION",
+            "membership": [
+              "buy_turn",
+              "pocket_pivot"
+            ],
+            "membership_count": 2,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "buy_turn",
+            "pocket",
+            "compression",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "RDDT",
+          "price": 166.47999572753906,
+          "chg_value": null,
+          "chg_pct": 13.074781334384925,
+          "volume_ratio_20": 2.9129398705474943,
+          "section_key": "accumulation",
+          "rank": 13,
+          "label": "ACCUMULATION",
+          "reason": "buy_turn+pocket+RS81+CMF+",
+          "source_flags": {
+            "same_session_buy_turn": true,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": true,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 0,
+            "multi_sell": 0,
+            "chg_5d": 7.482727344284052,
+            "label": "ACCUMULATION",
+            "membership": [
+              "buy_turn",
+              "pocket_pivot"
+            ],
+            "membership_count": 2,
+            "board_risk": "extended_day"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "buy_turn",
+            "pocket",
+            "RS81",
+            "CMF+"
+          ],
+          "risk_flags": [
+            "extended_day"
+          ]
+        },
+        {
+          "ticker": "ATOM",
+          "price": 11.09000015258789,
+          "chg_value": null,
+          "chg_pct": 35.574568934561626,
+          "volume_ratio_20": 2.6469515830550385,
+          "section_key": "accumulation",
+          "rank": 14,
+          "label": "ACCUMULATION",
+          "reason": "5D+pre_high+RS99+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 1,
+            "multi_sell": 0,
+            "chg_5d": 28.953484426388208,
+            "label": "ACCUMULATION",
+            "membership": [
+              "five_day_top"
+            ],
+            "membership_count": 1,
+            "board_risk": "extended_day"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "5D",
+            "pre_high",
+            "RS99",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "extended_day"
+          ]
+        },
+        {
+          "ticker": "ILMN",
+          "price": 135.77999877929688,
+          "chg_value": null,
+          "chg_pct": 7.132713482640478,
+          "volume_ratio_20": 1.8378341664999625,
+          "section_key": "accumulation",
+          "rank": 15,
+          "label": "ACCUMULATION",
+          "reason": "pocket+pre_high+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 3,
+            "multi_sell": 0,
+            "chg_5d": 6.177667888296545,
+            "label": "ACCUMULATION",
+            "membership": [
+              "pocket_pivot"
+            ],
+            "membership_count": 1,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "pocket",
+            "pre_high",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "DINO",
+          "price": 69.16999816894531,
+          "chg_value": null,
+          "chg_pct": 2.9162313810021603,
+          "volume_ratio_20": 1.6759144654408795,
+          "section_key": "accumulation",
+          "rank": 16,
+          "label": "ACCUMULATION",
+          "reason": "5D+pre_high+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 2,
+            "multi_sell": 0,
+            "chg_5d": 14.785927805491204,
+            "label": "ACCUMULATION",
+            "membership": [
+              "five_day_top"
+            ],
+            "membership_count": 1,
+            "board_risk": "chase_risk"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "5D",
+            "pre_high",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "chase_risk"
+          ]
+        },
+        {
+          "ticker": "SLRC",
+          "price": 15.850000381469727,
+          "chg_value": null,
+          "chg_pct": 0.3164568995649978,
+          "volume_ratio_20": 1.5167236446721275,
+          "section_key": "accumulation",
+          "rank": 17,
+          "label": "ACCUMULATION",
+          "reason": "pocket+compression+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 1,
+            "multi_sell": 0,
+            "chg_5d": 0.9554176689611747,
+            "label": "ACCUMULATION",
+            "membership": [
+              "pocket_pivot"
+            ],
+            "membership_count": 1,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "pocket",
+            "compression",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "WMB",
+          "price": 75.54000091552734,
+          "chg_value": null,
+          "chg_pct": -1.0090376984682423,
+          "volume_ratio_20": 0.6709842059481621,
+          "section_key": "accumulation",
+          "rank": 18,
+          "label": "ACCUMULATION",
+          "reason": "pocket+compression+pre_high+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 7,
+            "multi_sell": 0,
+            "chg_5d": 4.655029919846964,
+            "label": "ACCUMULATION",
+            "membership": [
+              "pocket_pivot"
+            ],
+            "membership_count": 1,
+            "board_risk": "low_volume"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "pocket",
+            "compression",
+            "pre_high",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "low_volume"
+          ]
+        },
+        {
+          "ticker": "BXP",
+          "price": 59.369998931884766,
+          "chg_value": null,
+          "chg_pct": 1.5566196744156486,
+          "volume_ratio_20": 0.6742699076475075,
+          "section_key": "accumulation",
+          "rank": 19,
+          "label": "ACCUMULATION",
+          "reason": "pocket+pre_high+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 1,
+            "multi_sell": 0,
+            "chg_5d": 2.8408096356359467,
+            "label": "ACCUMULATION",
+            "membership": [
+              "pocket_pivot"
+            ],
+            "membership_count": 1,
+            "board_risk": "low_volume"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "pocket",
+            "pre_high",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "low_volume"
+          ]
+        },
+        {
+          "ticker": "HUN",
+          "price": 14.630000114440918,
+          "chg_value": null,
+          "chg_pct": 1.8093265897873758,
+          "volume_ratio_20": 1.732519523746079,
+          "section_key": "accumulation",
+          "rank": 20,
+          "label": "ACCUMULATION",
+          "reason": "pocket+OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 5,
+            "multi_sell": 1,
+            "chg_5d": 7.415567087872827,
+            "label": "ACCUMULATION",
+            "membership": [
+              "pocket_pivot"
+            ],
+            "membership_count": 1,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "pocket",
+            "OBV+"
+          ],
+          "risk_flags": []
         }
       ],
-      "item_count": 10,
+      "item_count": 20,
       "quality_floor": "pocket pivot / CMF / OBV / 거래량 매집",
       "ranked": true
     },
@@ -4451,9 +7213,471 @@
           "risk_flags": [
             "chase_risk"
           ]
+        },
+        {
+          "ticker": "ALGM",
+          "price": 48.97999954223633,
+          "chg_value": null,
+          "chg_pct": 0.9896897778068622,
+          "volume_ratio_20": 1.2505859383586202,
+          "section_key": "rs_leader",
+          "rank": 11,
+          "label": "RS_LEADER",
+          "reason": "final+pre_high+RS96+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 1,
+            "multi_sell": 0,
+            "chg_5d": 10.990252337939122,
+            "label": "RS_LEADER",
+            "membership": [
+              "final_top"
+            ],
+            "membership_count": 1,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "final",
+            "pre_high",
+            "RS96",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "SNDK",
+          "price": 1187.0,
+          "chg_value": null,
+          "chg_pct": 8.252545752292486,
+          "volume_ratio_20": 1.480585879899542,
+          "section_key": "rs_leader",
+          "rank": 12,
+          "label": "RS_LEADER",
+          "reason": "5D+pre_high+RS98+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 4,
+            "multi_sell": 0,
+            "chg_5d": 19.91109917414176,
+            "label": "RS_LEADER",
+            "membership": [
+              "five_day_top"
+            ],
+            "membership_count": 1,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "5D",
+            "pre_high",
+            "RS98",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "GNRC",
+          "price": 259.3399963378906,
+          "chg_value": null,
+          "chg_pct": 0.04242770778893369,
+          "volume_ratio_20": 1.0224200314408878,
+          "section_key": "rs_leader",
+          "rank": 13,
+          "label": "RS_LEADER",
+          "reason": "5D+pre_high+RS78+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 4,
+            "multi_sell": 0,
+            "chg_5d": 17.38559948194845,
+            "label": "RS_LEADER",
+            "membership": [
+              "five_day_top"
+            ],
+            "membership_count": 1,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "5D",
+            "pre_high",
+            "RS78",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "KEYS",
+          "price": 352.4100036621094,
+          "chg_value": null,
+          "chg_pct": 0.7144694275200332,
+          "volume_ratio_20": 0.866395919943031,
+          "section_key": "rs_leader",
+          "rank": 14,
+          "label": "RS_LEADER",
+          "reason": "buy_turn+compression+pre_high+RS85+CMF+",
+          "source_flags": {
+            "same_session_buy_turn": true,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": true,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 2,
+            "multi_sell": 0,
+            "chg_5d": 1.5707898147492543,
+            "label": "RS_LEADER",
+            "membership": [
+              "buy_turn"
+            ],
+            "membership_count": 1,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "buy_turn",
+            "compression",
+            "pre_high",
+            "RS85",
+            "CMF+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "VSAT",
+          "price": 65.12000274658203,
+          "chg_value": null,
+          "chg_pct": -1.198605479643605,
+          "volume_ratio_20": 0.7037197954703437,
+          "section_key": "rs_leader",
+          "rank": 15,
+          "label": "RS_LEADER",
+          "reason": "buy_turn+RS92+CMF+",
+          "source_flags": {
+            "same_session_buy_turn": true,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": true,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 6,
+            "multi_sell": 1,
+            "chg_5d": 5.049203070440454,
+            "label": "RS_LEADER",
+            "membership": [
+              "buy_turn"
+            ],
+            "membership_count": 1,
+            "board_risk": "low_volume"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "buy_turn",
+            "RS92",
+            "CMF+"
+          ],
+          "risk_flags": [
+            "low_volume"
+          ]
+        },
+        {
+          "ticker": "ACHC",
+          "price": 27.850000381469727,
+          "chg_value": null,
+          "chg_pct": 7.528960585560457,
+          "volume_ratio_20": 1.5780970810664074,
+          "section_key": "rs_leader",
+          "rank": 16,
+          "label": "RS_LEADER",
+          "reason": "buy_turn+RS82+CMF+",
+          "source_flags": {
+            "same_session_buy_turn": true,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": true,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 3,
+            "multi_sell": 1,
+            "chg_5d": 1.7165859573020001,
+            "label": "RS_LEADER",
+            "membership": [
+              "buy_turn"
+            ],
+            "membership_count": 1,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "buy_turn",
+            "RS82",
+            "CMF+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "NXPI",
+          "price": 295.239990234375,
+          "chg_value": null,
+          "chg_pct": 0.5620061708728689,
+          "volume_ratio_20": 0.7973645684945887,
+          "section_key": "rs_leader",
+          "rank": 17,
+          "label": "RS_LEADER",
+          "reason": "5D+pre_high+RS91+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 5,
+            "multi_sell": 1,
+            "chg_5d": 20.980166512384322,
+            "label": "RS_LEADER",
+            "membership": [
+              "five_day_top"
+            ],
+            "membership_count": 1,
+            "board_risk": "chase_risk+low_volume"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "5D",
+            "pre_high",
+            "RS91",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "chase_risk",
+            "low_volume"
+          ]
+        },
+        {
+          "ticker": "QCOM",
+          "price": 177.00999450683594,
+          "chg_value": null,
+          "chg_pct": -1.4311211148313507,
+          "volume_ratio_20": 1.2102216373827623,
+          "section_key": "rs_leader",
+          "rank": 18,
+          "label": "RS_LEADER",
+          "reason": "5D+compression+RS80+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 2,
+            "multi_sell": 1,
+            "chg_5d": 18.91836563562977,
+            "label": "RS_LEADER",
+            "membership": [
+              "five_day_top"
+            ],
+            "membership_count": 1,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "5D",
+            "compression",
+            "RS80",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "PUBM",
+          "price": 10.229999542236328,
+          "chg_value": null,
+          "chg_pct": 4.601225169240628,
+          "volume_ratio_20": 1.2161199627587267,
+          "section_key": "rs_leader",
+          "rank": 19,
+          "label": "RS_LEADER",
+          "reason": "buy_turn+pre_high+RS84+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": true,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": true,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 1,
+            "multi_sell": 0,
+            "chg_5d": 6.340952847545641,
+            "label": "RS_LEADER",
+            "membership": [
+              "buy_turn"
+            ],
+            "membership_count": 1,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "buy_turn",
+            "pre_high",
+            "RS84",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "Q",
+          "price": 143.3300018310547,
+          "chg_value": null,
+          "chg_pct": 1.8981928760354139,
+          "volume_ratio_20": 0.7802789382885411,
+          "section_key": "rs_leader",
+          "rank": 20,
+          "label": "RS_LEADER",
+          "reason": "buy_turn+compression+RS88+CMF+",
+          "source_flags": {
+            "same_session_buy_turn": true,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": true,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 0,
+            "multi_sell": 0,
+            "chg_5d": -0.7959537171173772,
+            "label": "RS_LEADER",
+            "membership": [
+              "buy_turn"
+            ],
+            "membership_count": 1,
+            "board_risk": "low_volume"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "buy_turn",
+            "compression",
+            "RS88",
+            "CMF+"
+          ],
+          "risk_flags": [
+            "low_volume"
+          ]
         }
       ],
-      "item_count": 10,
+      "item_count": 20,
       "quality_floor": "52주 신고가 / RS rank / 20D 수익률 리더",
       "ranked": true
     },
@@ -4913,9 +8137,451 @@
             "OBV+"
           ],
           "risk_flags": []
+        },
+        {
+          "ticker": "CNC",
+          "price": 53.34000015258789,
+          "chg_value": null,
+          "chg_pct": -0.6518876570560782,
+          "volume_ratio_20": 0.8798009567968383,
+          "section_key": "chase_risk",
+          "rank": 11,
+          "label": "CHASE_RISK",
+          "reason": "5D+compression+RS95+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 4,
+            "multi_sell": 0,
+            "chg_5d": 27.54662970308301,
+            "label": "CHASE_RISK",
+            "membership": [
+              "five_day_top"
+            ],
+            "membership_count": 1,
+            "board_risk": "chase_risk"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "5D",
+            "compression",
+            "RS95",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "chase_risk"
+          ]
+        },
+        {
+          "ticker": "RUM",
+          "price": 7.340000152587891,
+          "chg_value": null,
+          "chg_pct": -2.523241061440751,
+          "volume_ratio_20": 0.9694867437342507,
+          "section_key": "chase_risk",
+          "rank": 12,
+          "label": "CHASE_RISK",
+          "reason": "compression+RS95+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 3,
+            "multi_sell": 0,
+            "chg_5d": 12.576689786199235,
+            "label": "CHASE_RISK",
+            "membership": [],
+            "membership_count": 0,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "compression",
+            "RS95",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "GTLB",
+          "price": 24.049999237060547,
+          "chg_value": null,
+          "chg_pct": 8.626919151159193,
+          "volume_ratio_20": 1.5173696983751708,
+          "section_key": "chase_risk",
+          "rank": 13,
+          "label": "CHASE_RISK",
+          "reason": "pre_high+OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 1,
+            "multi_sell": 0,
+            "chg_5d": 11.808456444218034,
+            "label": "CHASE_RISK",
+            "membership": [],
+            "membership_count": 0,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "pre_high",
+            "OBV+"
+          ],
+          "risk_flags": []
+        },
+        {
+          "ticker": "CORT",
+          "price": 51.41999816894531,
+          "chg_value": null,
+          "chg_pct": 10.53309901755146,
+          "volume_ratio_20": 2.897474292302499,
+          "section_key": "chase_risk",
+          "rank": 14,
+          "label": "CHASE_RISK",
+          "reason": "pre_high+RS88+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 3,
+            "multi_sell": 0,
+            "chg_5d": 11.6369879197668,
+            "label": "CHASE_RISK",
+            "membership": [],
+            "membership_count": 0,
+            "board_risk": "chase_risk"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "pre_high",
+            "RS88",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "chase_risk"
+          ]
+        },
+        {
+          "ticker": "SGML",
+          "price": 21.969999313354492,
+          "chg_value": null,
+          "chg_pct": -0.45310549548026646,
+          "volume_ratio_20": 0.4868281942181334,
+          "section_key": "chase_risk",
+          "rank": 15,
+          "label": "CHASE_RISK",
+          "reason": "compression+RS99+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 3,
+            "multi_sell": 0,
+            "chg_5d": 11.579475456860356,
+            "label": "CHASE_RISK",
+            "membership": [],
+            "membership_count": 0,
+            "board_risk": "low_volume"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "compression",
+            "RS99",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "low_volume"
+          ]
+        },
+        {
+          "ticker": "STM",
+          "price": 55.75,
+          "chg_value": null,
+          "chg_pct": 1.106276055683235,
+          "volume_ratio_20": 0.6776631004216396,
+          "section_key": "chase_risk",
+          "rank": 16,
+          "label": "CHASE_RISK",
+          "reason": "pre_high+RS97+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 3,
+            "multi_sell": 1,
+            "chg_5d": 10.461657720608466,
+            "label": "CHASE_RISK",
+            "membership": [],
+            "membership_count": 0,
+            "board_risk": "low_volume"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "pre_high",
+            "RS97",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "low_volume"
+          ]
+        },
+        {
+          "ticker": "MOH",
+          "price": 192.6999969482422,
+          "chg_value": null,
+          "chg_pct": -0.9865369525825004,
+          "volume_ratio_20": 0.6639615769494392,
+          "section_key": "chase_risk",
+          "rank": 17,
+          "label": "CHASE_RISK",
+          "reason": "compression+RS91+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 1,
+            "multi_sell": 0,
+            "chg_5d": 9.525971509758028,
+            "label": "CHASE_RISK",
+            "membership": [],
+            "membership_count": 0,
+            "board_risk": "low_volume"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "compression",
+            "RS91",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "low_volume"
+          ]
+        },
+        {
+          "ticker": "DTM",
+          "price": 147.4600067138672,
+          "chg_value": null,
+          "chg_pct": -0.3581314680884694,
+          "volume_ratio_20": 1.3736227958368263,
+          "section_key": "chase_risk",
+          "rank": 18,
+          "label": "CHASE_RISK",
+          "reason": "pre_high+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 6,
+            "multi_sell": 1,
+            "chg_5d": 9.513563607905425,
+            "label": "CHASE_RISK",
+            "membership": [],
+            "membership_count": 0,
+            "board_risk": "chase_risk"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "pre_high",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "chase_risk"
+          ]
+        },
+        {
+          "ticker": "FSLR",
+          "price": 211.7100067138672,
+          "chg_value": null,
+          "chg_pct": 4.864038513005342,
+          "volume_ratio_20": 2.2930914492300127,
+          "section_key": "chase_risk",
+          "rank": 19,
+          "label": "CHASE_RISK",
+          "reason": "OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 0,
+            "multi_sell": 1,
+            "chg_5d": 9.264044547853228,
+            "label": "CHASE_RISK",
+            "membership": [],
+            "membership_count": 0,
+            "board_risk": "chase_risk"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "OBV+"
+          ],
+          "risk_flags": [
+            "chase_risk"
+          ]
+        },
+        {
+          "ticker": "SWKS",
+          "price": 69.4000015258789,
+          "chg_value": null,
+          "chg_pct": -1.0973302880990794,
+          "volume_ratio_20": 1.3435955072681385,
+          "section_key": "chase_risk",
+          "rank": 20,
+          "label": "CHASE_RISK",
+          "reason": "compression+pre_high+RS79+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": false,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 4,
+            "multi_sell": 0,
+            "chg_5d": 9.033778259474442,
+            "label": "CHASE_RISK",
+            "membership": [],
+            "membership_count": 0,
+            "board_risk": "-"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "compression",
+            "pre_high",
+            "RS79",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": []
         }
       ],
-      "item_count": 10,
+      "item_count": 20,
       "quality_floor": "5일 급등 / 당일 급등 / 과열 이격",
       "ranked": true
     },
@@ -5387,9 +9053,467 @@
             "multi_sell",
             "low_volume"
           ]
+        },
+        {
+          "ticker": "INGM",
+          "price": 27.90999984741211,
+          "chg_value": null,
+          "chg_pct": -9.294769476124422,
+          "volume_ratio_20": 2.050003158086419,
+          "section_key": "sell_risk",
+          "rank": 11,
+          "label": "SELL_RISK",
+          "reason": "sell_turn+RS93+CMF+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": true,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": true,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 0,
+            "multi_sell": 1,
+            "chg_5d": -8.039540373605286,
+            "label": "SELL_RISK",
+            "membership": [
+              "sell_turn"
+            ],
+            "membership_count": 1,
+            "board_risk": "sell_turn"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "sell_turn",
+            "RS93",
+            "CMF+"
+          ],
+          "risk_flags": [
+            "sell_turn"
+          ]
+        },
+        {
+          "ticker": "AIZ",
+          "price": 231.50999450683594,
+          "chg_value": null,
+          "chg_pct": -2.014648359736715,
+          "volume_ratio_20": 1.7195627782573066,
+          "section_key": "sell_risk",
+          "rank": 12,
+          "label": "SELL_RISK",
+          "reason": "HMA+sell_turn+CMF++OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": true,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": true,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 1,
+            "multi_sell": 1,
+            "chg_5d": 0.7441215980719478,
+            "label": "SELL_RISK",
+            "membership": [
+              "hma_ema_trend",
+              "sell_turn"
+            ],
+            "membership_count": 2,
+            "board_risk": "sell_turn"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "HMA",
+            "sell_turn",
+            "CMF+",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "sell_turn"
+          ]
+        },
+        {
+          "ticker": "LPLA",
+          "price": 318.6300048828125,
+          "chg_value": null,
+          "chg_pct": -4.63891293014413,
+          "volume_ratio_20": 1.6564809473412403,
+          "section_key": "sell_risk",
+          "rank": 13,
+          "label": "SELL_RISK",
+          "reason": "sell_turn+OBV+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": true,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": true,
+            "sell_turn_hull": true,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 1,
+            "multi_sell": 1,
+            "chg_5d": -0.5865666673522196,
+            "label": "SELL_RISK",
+            "membership": [
+              "sell_turn"
+            ],
+            "membership_count": 1,
+            "board_risk": "sell_turn"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "sell_turn",
+            "OBV+"
+          ],
+          "risk_flags": [
+            "sell_turn"
+          ]
+        },
+        {
+          "ticker": "AMGN",
+          "price": 329.82000732421875,
+          "chg_value": null,
+          "chg_pct": -4.74512423849278,
+          "volume_ratio_20": 1.488690370410651,
+          "section_key": "sell_risk",
+          "rank": 14,
+          "label": "SELL_RISK",
+          "reason": "sell_turn+CMF+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": true,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": true,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 1,
+            "multi_sell": 1,
+            "chg_5d": -4.275135971736231,
+            "label": "SELL_RISK",
+            "membership": [
+              "sell_turn"
+            ],
+            "membership_count": 1,
+            "board_risk": "sell_turn"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "sell_turn",
+            "CMF+"
+          ],
+          "risk_flags": [
+            "sell_turn"
+          ]
+        },
+        {
+          "ticker": "KEX",
+          "price": 147.22000122070312,
+          "chg_value": null,
+          "chg_pct": -2.205388742856755,
+          "volume_ratio_20": 1.1225044162398767,
+          "section_key": "sell_risk",
+          "rank": 15,
+          "label": "SELL_RISK",
+          "reason": "HMA+sell_turn+CMF+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": true,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": true,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 2,
+            "multi_sell": 1,
+            "chg_5d": -2.2443590609745647,
+            "label": "SELL_RISK",
+            "membership": [
+              "hma_ema_trend",
+              "sell_turn"
+            ],
+            "membership_count": 2,
+            "board_risk": "sell_turn"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "HMA",
+            "sell_turn",
+            "CMF+"
+          ],
+          "risk_flags": [
+            "sell_turn"
+          ]
+        },
+        {
+          "ticker": "AZO",
+          "price": 3594.080078125,
+          "chg_value": null,
+          "chg_pct": -2.9683871432528983,
+          "volume_ratio_20": 1.0651209773245671,
+          "section_key": "sell_risk",
+          "rank": 16,
+          "label": "SELL_RISK",
+          "reason": "sell_turn+CMF+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": true,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": true,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 3,
+            "multi_sell": 1,
+            "chg_5d": 0.4519444707340827,
+            "label": "SELL_RISK",
+            "membership": [
+              "sell_turn"
+            ],
+            "membership_count": 1,
+            "board_risk": "sell_turn"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "sell_turn",
+            "CMF+"
+          ],
+          "risk_flags": [
+            "sell_turn"
+          ]
+        },
+        {
+          "ticker": "APH",
+          "price": 142.3000030517578,
+          "chg_value": null,
+          "chg_pct": -3.3747545844490077,
+          "volume_ratio_20": 0.7741370998147531,
+          "section_key": "sell_risk",
+          "rank": 17,
+          "label": "SELL_RISK",
+          "reason": "sell_turn+RS81",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": true,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": true,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 0,
+            "multi_sell": 1,
+            "chg_5d": -4.949571391224183,
+            "label": "SELL_RISK",
+            "membership": [
+              "sell_turn"
+            ],
+            "membership_count": 1,
+            "board_risk": "sell_turn+low_volume"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "sell_turn",
+            "RS81"
+          ],
+          "risk_flags": [
+            "sell_turn",
+            "low_volume"
+          ]
+        },
+        {
+          "ticker": "COHU",
+          "price": 45.59000015258789,
+          "chg_value": null,
+          "chg_pct": -3.7169976309399915,
+          "volume_ratio_20": 2.413969448805536,
+          "section_key": "sell_risk",
+          "rank": 18,
+          "label": "SELL_RISK",
+          "reason": "sell_turn+RS97+CMF+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": true,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": true,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": true,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "LONG_ALIGNED",
+            "multi_buy": 2,
+            "multi_sell": 0,
+            "chg_5d": -2.855316735295452,
+            "label": "SELL_RISK",
+            "membership": [
+              "sell_turn"
+            ],
+            "membership_count": 1,
+            "board_risk": "sell_turn"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "sell_turn",
+            "RS97",
+            "CMF+"
+          ],
+          "risk_flags": [
+            "sell_turn"
+          ]
+        },
+        {
+          "ticker": "UGI",
+          "price": 35.400001525878906,
+          "chg_value": null,
+          "chg_pct": -1.9118831360257196,
+          "volume_ratio_20": 1.4524713737614063,
+          "section_key": "sell_risk",
+          "rank": 19,
+          "label": "SELL_RISK",
+          "reason": "sell_turn",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": true,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": false,
+            "sell_turn_hull": true,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 1,
+            "multi_sell": 0,
+            "chg_5d": -4.1170008625431835,
+            "label": "SELL_RISK",
+            "membership": [
+              "sell_turn"
+            ],
+            "membership_count": 1,
+            "board_risk": "sell_turn"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "sell_turn"
+          ],
+          "risk_flags": [
+            "sell_turn"
+          ]
+        },
+        {
+          "ticker": "BMY",
+          "price": 58.220001220703125,
+          "chg_value": null,
+          "chg_pct": -3.911534784479678,
+          "volume_ratio_20": 1.4120536629838512,
+          "section_key": "sell_risk",
+          "rank": 20,
+          "label": "SELL_RISK",
+          "reason": "sell_turn+compression+CMF+",
+          "source_flags": {
+            "same_session_buy_turn": false,
+            "same_session_sell_turn": true,
+            "buy_turn_utbot": false,
+            "buy_turn_hull": false,
+            "sell_turn_utbot": true,
+            "sell_turn_hull": false,
+            "turn_engine": "",
+            "thin_trade_risk": false,
+            "bearish_gap_failure": false,
+            "hma_ema_long_aligned": false,
+            "hma_ema_long_entry": false,
+            "hma_ema_short_aligned": false,
+            "hma_ema_short_entry": false,
+            "hma_ema_signal_state": "NEUTRAL",
+            "multi_buy": 3,
+            "multi_sell": 0,
+            "chg_5d": -0.8346071732423574,
+            "label": "SELL_RISK",
+            "membership": [
+              "sell_turn"
+            ],
+            "membership_count": 1,
+            "board_risk": "sell_turn"
+          },
+          "qbs_score": null,
+          "bucket": "",
+          "tags": [
+            "sell_turn",
+            "compression",
+            "CMF+"
+          ],
+          "risk_flags": [
+            "sell_turn"
+          ]
         }
       ],
-      "item_count": 10,
+      "item_count": 20,
       "quality_floor": "매도전환 / 갭 실패 / high conflict / hard risk",
       "ranked": true
     }
