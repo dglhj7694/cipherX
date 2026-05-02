@@ -99,6 +99,22 @@ html,body,[class*="css"]{{
   font-family:{FONT_STACK}!important;
   color:var(--sigl-text)!important;
 }}
+[data-testid="stIconMaterial"],
+.material-symbols-rounded,
+.material-icons{{
+  font-family:"Material Symbols Rounded","Material Icons"!important;
+  font-weight:400!important;
+  font-style:normal!important;
+  line-height:1!important;
+  letter-spacing:normal!important;
+  text-transform:none!important;
+  white-space:nowrap!important;
+  word-wrap:normal!important;
+  direction:ltr!important;
+  font-feature-settings:"liga"!important;
+  -webkit-font-feature-settings:"liga"!important;
+  -webkit-font-smoothing:antialiased!important;
+}}
 html,body{{
   overflow-x:hidden!important;
 }}
