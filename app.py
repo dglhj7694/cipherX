@@ -19,12 +19,12 @@ from app_ui.pages import (
 from sectors import SECTOR_GROUPS
 from bootstrap import build_default_session_state, ensure_session_defaults as _ensure_session_defaults, reset_session_state as _reset_session_state
 from chart import load_chart_figure, serialize_chart_figure
-from config import GEMINI_API_KEY, GEMINI_API_KEY_FROM_SECRETS, COMBINED_SCAN_REGISTRY, CTX_KOR, JT
+from config import COMBINED_SCAN_REGISTRY, CTX_KOR, JT
 from domain import AnalysisRequest
 from infrastructure.etf import FunctionHoldingsProvider, HoldingsProviderRegistry
 from etf_sources import resolve_etf_universe as resolve_shared_etf_universe
 from utils import _valid_fmt, _sf, resolve_analysis_ticker, _compute_cached
-from ai_agent import build_prompt_text, build_ai_prompt, parse_ai_signal_assisted_response
+from ai_agent import build_prompt_text, build_ai_prompt
 from localization import (
     localize_action_label,
     localize_combo,
@@ -47,12 +47,6 @@ from scanner_filters import (
     compute_scanner_profile_flags,
     has_long_pullback_strategy,
     has_pullback_combo,
-)
-from services.ai_signal_service import (
-    build_ai_client,
-    generate_ai_signal_assisted,
-    mask_secret as _service_mask_secret,
-    resolve_ai_key,
 )
 from workflows import AnalysisWorkflow
 from strategy import build_strategy_payload
@@ -219,33 +213,6 @@ def _render_sidebar_choice_buttons(label, options, state_key, columns=2, default
 
     return str(st.session_state.get(state_key, current))
 
-
-def _active_gemini_api_key():
-    key_state = resolve_ai_key(
-        st.session_state.get("runtime_gemini_api_key"),
-        GEMINI_API_KEY,
-        GEMINI_API_KEY_FROM_SECRETS,
-    )
-    return key_state.active_key
-
-
-def _mask_secret(value):
-    return _service_mask_secret(value)
-
-
-def get_gemini_model(api_key):
-    return build_ai_client(api_key)
-
-
-def _generate_ai_signal_assisted(ticker, prompt, engine_judgment=""):
-    return generate_ai_signal_assisted(
-        runtime_key=st.session_state.get("runtime_gemini_api_key"),
-        configured_key=GEMINI_API_KEY,
-        configured_from_secrets=GEMINI_API_KEY_FROM_SECRETS,
-        prompt=prompt,
-        engine_judgment=engine_judgment,
-        parser=parse_ai_signal_assisted_response,
-    )
 
 def analyze(ticker, chart_days=252, refresh=False):
     try:
@@ -2981,7 +2948,7 @@ else:
             "티커를 입력하거나 빠른 시작을 눌러 개별 종목 분석을 시작하세요.",
             badges=[
                 ("직접 입력", "accent"),
-                ("AI SIGNAL-ASSISTED", "muted"),
+                ("PROMPT TAPE", "muted"),
             ],
             eyebrow="Workspace",
             tight=True,
@@ -3000,47 +2967,6 @@ else:
         )
         _render_quick_analysis_grid(key_prefix="analysis_quick")
 
-    key_state = resolve_ai_key(
-        st.session_state.get("runtime_gemini_api_key"),
-        GEMINI_API_KEY,
-        GEMINI_API_KEY_FROM_SECRETS,
-    )
-    active_gemini_key = key_state.active_key
-    key_source = key_state.source
-    if GEMINI_API_KEY_FROM_SECRETS and not st.session_state.get("show_runtime_gemini_key_setup", False):
-        info_col, action_col = st.columns([3, 1])
-        info_col.caption(f"현재 AI 키: {key_source} · {_mask_secret(active_gemini_key)}")
-        if action_col.button("AI 키 변경", key="show_runtime_gemini_key_setup_btn", use_container_width=True):
-            st.session_state["show_runtime_gemini_key_setup"] = True
-            st.rerun()
-    else:
-        with st.expander("AI Key Setup", expanded=not bool(active_gemini_key)):
-            st.caption("Gemini API 키를 여기서 직접 입력해 현재 세션에만 적용할 수 있습니다.")
-            if GEMINI_API_KEY_FROM_SECRETS:
-                st.caption("`.streamlit/secrets.toml` 키가 기본으로 적용되어 있으며, 아래 입력값은 현재 세션에서만 덮어씁니다.")
-            st.text_input(
-                "Gemini API Key",
-                key="runtime_gemini_api_key_input",
-                type="password",
-                placeholder="AIza...",
-                help="세션 입력값이 있으면 `.streamlit/secrets.toml`이나 환경변수보다 우선합니다.",
-            )
-            c1, c2 = st.columns(2)
-            if c1.button("적용", key="apply_runtime_gemini_key", use_container_width=True):
-                entered_key = str(st.session_state.get("runtime_gemini_api_key_input", "")).strip()
-                if entered_key:
-                    st.session_state["runtime_gemini_api_key"] = entered_key
-                    st.toast("AI 키를 현재 세션에 적용했습니다.", icon="🔐")
-                    st.rerun()
-                st.warning("적용할 API 키를 먼저 입력해 주세요.")
-            if c2.button("초기화", key="clear_runtime_gemini_key", use_container_width=True):
-                st.session_state["runtime_gemini_api_key"] = ""
-                st.session_state["runtime_gemini_api_key_input"] = ""
-                st.toast("세션 API 키를 초기화했습니다.", icon="🧹")
-                st.rerun()
-            st.caption(f"현재 상태: {key_source} · {_mask_secret(active_gemini_key)}")
-            st.caption("영구 저장을 원하면 `.streamlit/secrets.toml` 또는 `GOOGLE_API_KEY` 환경변수를 사용하면 됩니다.")
-
     for i, msg in enumerate(st.session_state.messages):
         with st.chat_message(msg["role"]):
             if msg.get("type") == "analysis":
@@ -3051,7 +2977,7 @@ else:
                     with st.expander(f"{msg.get('ticker', '')} 지난 분석", expanded=False):
                         render_analysis_message(msg, key_prefix=f"analysis_{i}_{msg.get('ticker', 'na')}")
             elif msg.get("type") == "report":
-                with st.expander(f"{msg.get('ticker', '')} AI SIGNAL-ASSISTED", expanded=i == latest_report_idx):
+                with st.expander(f"{msg.get('ticker', '')} 리포트", expanded=i == latest_report_idx):
                     st.markdown(msg["content"])
                 st.download_button(
                     "📥", key=f"dl_{i}",
@@ -3065,13 +2991,10 @@ else:
             if msg.get("prompt") and msg.get("type") == "analysis":
                 with st.expander(f"{msg.get('ticker', '')} PROMPT TAPE"):
                     st.markdown(
-                        "<div class='prompt-caption'>독립 AI Signal-Assisted 판단에 실제로 사용된 프롬프트입니다. 코드 블록 우측 상단 복사 아이콘을 사용하세요.</div>",
+                        "<div class='prompt-caption'>수동 검토 또는 외부 AI 복사용으로 구성한 프롬프트입니다. 코드 블록 우측 상단 복사 아이콘을 사용하세요.</div>",
                         unsafe_allow_html=True,
                     )
                     st.code(msg["prompt"], language="markdown")
-            if msg.get("ai_raw") and msg.get("type") == "analysis":
-                with st.expander(f"{msg.get('ticker', '')} AI SIGNAL-ASSISTED RAW"):
-                    st.code(msg["ai_raw"], language="json")
 
     def process_ticker(tv, refresh=False):
         raw_tv = str(tv or "").strip().upper()
@@ -3104,28 +3027,16 @@ else:
                 if fj and meta:
                     act = meta.get('action_label', '')
                     es  = meta.get('ensemble_score', 0)
-                    status.update(label=f"ASSEMBLING AI SIGNAL-ASSISTED · {tv}", state="running", expanded=True)
-                    st.write("4. 독립 AI Signal-Assisted 프롬프트를 구성합니다.")
+                    meta.pop("ai_signal_assisted", None)
+                    status.update(label=f"ASSEMBLING PROMPT TAPE · {tv}", state="running", expanded=True)
+                    st.write("4. 수동 검토용 PROMPT TAPE를 구성합니다.")
                     st.write(f"📍 {act} | ES {es:+.1f}")
                     _show_analysis_toasts(tv, meta)
                     prompt = build_ai_prompt(tv, phist)
-                    st.write("5. 같은 데이터만 사용한 독립 AI 2차 의견을 생성합니다.")
-                    ai_result = _generate_ai_signal_assisted(tv, prompt, meta.get("judgment", ""))
-                    ai_raw = ai_result.pop("raw_text", "")
-                    meta["ai_signal_assisted"] = ai_result
-                    if ai_result.get("available"):
-                        st.write(
-                            f"🤖 {ai_result.get('AI_Judgment', 'NEUTRAL')} | "
-                            f"신뢰도 {ai_result.get('AI_Confidence', 0)}% | "
-                            f"{ai_result.get('AI_Agreement', 'ALIGNED')}"
-                        )
-                    else:
-                        st.write(f"🤖 AI 보조 판단 미사용: {ai_result.get('AI_Reason', '')}")
-                    st.write("6. 엔진 판단과 AI 판단을 함께 표시할 준비가 끝났습니다.")
+                    st.write("5. PROMPT TAPE를 세션에 저장할 준비가 끝났습니다.")
                     status.update(label=f"SIGNAL READY · {tv} | {act}", state="complete", expanded=False)
                 else:
                     prompt = None
-                    ai_raw = ""
                     status.update(label=f"SIGNAL BUILD FAILED · {tv}", state="error")
             if fj:
                 syn  = meta.get('reversal_synergy', 0)
@@ -3150,20 +3061,11 @@ else:
                 veto = meta.get('veto_flags', '')
                 if veto:
                     content += f"\n🚫 {veto}"
-                ai_meta = meta.get("ai_signal_assisted", {})
-                if ai_meta:
-                    if ai_meta.get("available"):
-                        content += (
-                            f"\n🤖 AI:{ai_meta.get('AI_Judgment', 'NEUTRAL')} "
-                            f"{ai_meta.get('AI_Confidence', 0)}% · {ai_meta.get('AI_Agreement', 'ALIGNED')}"
-                        )
-                    else:
-                        content += "\n🤖 AI: 사용 불가"
                 st.session_state.messages.append(_normalize_session_message({
                     "role": "assistant", "type": "analysis",
                     "ticker": tv, "content": content,
                     "analyzed_at": datetime.now().isoformat(timespec="seconds"),
-                    "fig_json": fj, "indicator_lab_json": lab_fj, "meta": meta, "prompt": prompt, "audit": audit, "ai_raw": ai_raw,
+                    "fig_json": fj, "indicator_lab_json": lab_fj, "meta": meta, "prompt": prompt, "audit": audit,
                 }))
                 st.rerun()
             else:
