@@ -400,6 +400,64 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertEqual(len(chase_items), BOARD_SECTION_LIMIT)
         self.assertEqual([item.ticker for item in chase_items], [f"C{i:02d}" for i in range(20)])
 
+    def test_qbs_watch_sections_limit_to_top20(self):
+        chase_rows = [
+            self._row(
+                f"Q{i:02d}",
+                chg=15.0 + (i * 0.01),
+                chg_value=1.0,
+                final_entry_score=200 - i,
+                scan_score=250 - i,
+            )
+            for i in range(25)
+        ]
+        pullback_rows = [
+            self._row(
+                f"P{i:02d}",
+                final_entry_eligible=False,
+                final_entry_selected=False,
+                latest_session_utbot_buy_turn=False,
+                latest_session_hull_buy_turn=False,
+                utbot_buy_last_date="N/A",
+                hull_turn_bull_last_date="N/A",
+                chg=-1.0 + (i * 0.001),
+                chg_value=-0.1,
+                chg_5d=2.0,
+                pullback_reentry=True,
+                pullback_ready=True,
+                uptrend_persistent=True,
+                bull_strength_recent=True,
+                gap_setup_candidate=False,
+                pocket_pivot_candidate=False,
+                new_52w_high=False,
+                hma_ema_long_entry=False,
+                hma_ema_long_aligned=False,
+                hma25_ema25_cross_bull=False,
+                volume_ratio_20=1.2,
+                final_entry_score=0,
+                scan_score=180 - i,
+            )
+            for i in range(25)
+        ]
+        digest = build_post_close_digest(
+            [*chase_rows, *pullback_rows],
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=50,
+            result_count=50,
+            skip_count=0,
+        )
+
+        qbs_chase_items = digest.section_map()["qbs_chase_watch"].items
+        qbs_pullback_items = digest.section_map()["qbs_pullback_wait"].items
+
+        self.assertEqual(len(qbs_chase_items), 20)
+        self.assertEqual([item.ticker for item in qbs_chase_items], [f"Q{i:02d}" for i in range(20)])
+        self.assertEqual(len(qbs_pullback_items), 20)
+        self.assertEqual([item.ticker for item in qbs_pullback_items], [f"P{i:02d}" for i in range(20)])
+
     def test_hma_selector_applies_price_over_ema50_gate(self):
         ok = self._row("OK", price=101.0, ema50=100.0)
         blocked = self._row("BLOCKED", price=99.0, ema50=100.0)
