@@ -180,6 +180,72 @@ def _render_ticker_button_row(tickers: list[str], *, key_prefix: str, on_select_
                     on_select_ticker(ticker)
 
 
+def _home_float(value: Any) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _home_signed_pct(value: Any, *, decimals: int = 2) -> str:
+    numeric = _home_float(value)
+    if numeric is None:
+        return "--"
+    return f"{numeric:+.{decimals}f}%"
+
+
+def _home_ratio(value: Any) -> str:
+    numeric = _home_float(value)
+    if numeric is None:
+        return "x--"
+    return f"x{numeric:.2f}"
+
+
+def _home_rsi(value: Any) -> str:
+    numeric = _home_float(value)
+    if numeric is None:
+        return "--"
+    return f"{numeric:.1f}"
+
+
+def _home_status(item: Mapping[str, Any]) -> str:
+    status = str(item.get("status") or "").strip()
+    if status:
+        return status
+    tags = [str(tag or "").strip() for tag in list(item.get("status_tags") or []) if str(tag or "").strip()]
+    return "/".join(tags) if tags else "-"
+
+
+def _render_five_day_top_table(
+    items: list[dict[str, Any]],
+    *,
+    key_prefix: str,
+    on_select_ticker: Callable[[str], None],
+) -> None:
+    rows = [dict(item or {}) for item in items if str(dict(item or {}).get("ticker") or "").strip()]
+    if not rows:
+        st.caption("5일 상승률 Top30 후보가 없습니다.")
+        return
+
+    widths = [1.1, 1.0, 0.8, 0.9, 1.0, 2.2]
+    headers = ["티커", "5일 상승률", "RSI", "Vol20", "MA20이격", "상태"]
+    header_cols = st.columns(widths)
+    for column, label in zip(header_cols, headers):
+        column.caption(label)
+
+    for idx, item in enumerate(rows):
+        ticker = str(item.get("ticker") or "").strip().upper()
+        cols = st.columns(widths)
+        with cols[0]:
+            if st.button(ticker, key=f"{key_prefix}_{idx}_{ticker}", use_container_width=True):
+                on_select_ticker(ticker)
+        cols[1].caption(_home_signed_pct(item.get("chg_5d"), decimals=2))
+        cols[2].caption(_home_rsi(item.get("rsi")))
+        cols[3].caption(_home_ratio(item.get("volume_ratio_20")))
+        cols[4].caption(_home_signed_pct(item.get("ma20_dist_pct"), decimals=1))
+        cols[5].caption(_home_status(item))
+
+
 def render_home_page(
     *,
     render_brand_board: Callable[..., None],
@@ -222,6 +288,7 @@ def render_home_page(
         final_top = extract_section_candidates(payload, "qbs_buy_now", limit=5)
         entry_now = extract_section_candidates(payload, "entry_now", limit=5)
         sell_risk = extract_section_candidates(payload, "sell_risk", limit=5)
+        five_day_top = extract_section_candidates(payload, "five_day_top", limit=30)
 
         render_section_heading(
             "오늘 최우선 후보 Top 5",
@@ -256,6 +323,18 @@ def render_home_page(
                 tight=True,
             )
             _render_ticker_button_row([str(item.get("ticker") or "") for item in sell_risk], key_prefix="home_sell", on_select_ticker=on_select_ticker, columns=2)
+
+        render_section_heading(
+            "5일 상승률 Top30",
+            "최근 5거래일 상승률 상위 종목의 모멘텀, 거래량, 과열 여부를 함께 확인합니다.",
+            badges=[
+                (f"{len(five_day_top)}개", "accent"),
+                (str(payload.get("market_date") or "US close"), "muted"),
+            ],
+            eyebrow="5D Momentum",
+            tight=True,
+        )
+        _render_five_day_top_table(five_day_top, key_prefix="home_five_day", on_select_ticker=on_select_ticker)
 
     recent = _collect_recent_tickers(recent_tickers)
     render_section_heading(

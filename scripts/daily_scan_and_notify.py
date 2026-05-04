@@ -661,6 +661,7 @@ def _compute_post_close_row_metrics(frame: Any) -> dict[str, Any]:
         "ema50": 0.0,
         "ema200": 0.0,
         "hma25": 0.0,
+        "rsi": 0.0,
         "hma20_slope_pct": 0.0,
         "hma60_slope_pct": 0.0,
         "hma200_slope_pct": 0.0,
@@ -774,6 +775,7 @@ def _compute_post_close_row_metrics(frame: Any) -> dict[str, Any]:
     metrics["ema50"] = _safe_float(latest.get("EMA50", 0))
     metrics["ema200"] = _safe_float(latest.get("EMA200", 0))
     metrics["hma25"] = _safe_float(latest.get("HMA25", 0))
+    metrics["rsi"] = _safe_float(latest.get("RSI", 0.0))
     metrics["hma20_slope_pct"] = _safe_slope_pct(latest.get("HMA"), previous.get("HMA"))
     metrics["hma60_slope_pct"] = _safe_slope_pct(latest.get("HMA60"), previous.get("HMA60"))
     metrics["hma200_slope_pct"] = _safe_slope_pct(latest.get("HMA200"), previous.get("HMA200"))
