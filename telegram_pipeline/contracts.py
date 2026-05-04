@@ -20,6 +20,11 @@ class TelegramCandidate:
     bucket: str = ""
     tags: list[str] = field(default_factory=list)
     risk_flags: list[str] = field(default_factory=list)
+    chg_5d: float | None = None
+    rsi: float | None = None
+    ma20_dist_pct: float | None = None
+    status_tags: list[str] = field(default_factory=list)
+    status: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

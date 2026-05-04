@@ -34,6 +34,7 @@ class TelegramPipelineTests(unittest.TestCase):
             "chg_value": 1.75,
             "chg": 2.35,
             "chg_5d": 12.0,
+            "rsi": 68.2,
             "volume_ratio_20": 1.45,
             "dollar_volume_20": 125_000_000,
             "final_entry_eligible": True,
@@ -48,6 +49,7 @@ class TelegramPipelineTests(unittest.TestCase):
             "multi_buy": 2,
             "multi_sell": 0,
             "thin_trade_risk": False,
+            "entry_chase_risk": False,
             "bearish_gap_failure": False,
             "utbot_buy_recent": True,
             "hull_turn_bull_recent": False,
@@ -129,6 +131,7 @@ class TelegramPipelineTests(unittest.TestCase):
                 "rs_leader",
                 "chase_risk",
                 "sell_risk",
+                "five_day_top",
             ],
         )
         self.assertEqual([item.ticker for item in section_map["qbs_buy_now"].items], ["ALPHA"])
@@ -140,7 +143,7 @@ class TelegramPipelineTests(unittest.TestCase):
         general_tickers = [
             item.ticker
             for key in digest.section_order
-            if not key.startswith("qbs_")
+            if not key.startswith("qbs_") and key != "five_day_top"
             for item in section_map[key].items
         ]
         self.assertEqual(len(general_tickers), len(set(general_tickers)))
@@ -348,7 +351,44 @@ class TelegramPipelineTests(unittest.TestCase):
 
         self.assertEqual(section_map["qbs_buy_now"].item_count, 20)
         self.assertEqual(section_map["confluence"].item_count, BOARD_SECTION_LIMIT)
-        self.assertTrue(all(section.item_count <= BOARD_SECTION_LIMIT for key, section in section_map.items() if not key.startswith("qbs_")))
+        self.assertEqual(section_map["five_day_top"].item_count, 30)
+        self.assertTrue(all(section.item_count <= BOARD_SECTION_LIMIT for key, section in section_map.items() if not key.startswith("qbs_") and key != "five_day_top"))
+
+    def test_five_day_top_section_keeps_top30_sorted_and_positive_only(self):
+        rows = [
+            self._row(
+                f"F{i:02d}",
+                chg_5d=40.0 - i,
+                scan_score=100.0 + i,
+                es=float(i),
+                rsi=55.0 + (i % 10),
+                dist_sma20_pct=3.0 + i,
+            )
+            for i in range(32)
+        ]
+        rows.extend(
+            [
+                self._row("ZERO", chg_5d=0.0),
+                self._row("NEG", chg_5d=-1.0),
+            ]
+        )
+        digest = build_post_close_digest(
+            rows,
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=len(rows),
+            result_count=len(rows),
+            skip_count=0,
+        )
+        items = digest.section_map()["five_day_top"].items
+
+        self.assertEqual(len(items), 30)
+        self.assertEqual([item.ticker for item in items[:3]], ["F00", "F01", "F02"])
+        self.assertNotIn("ZERO", [item.ticker for item in items])
+        self.assertNotIn("NEG", [item.ticker for item in items])
+        self.assertEqual(items[0].chg_5d, 40.0)
 
     def test_five_day_only_candidates_land_in_chase_risk_top20(self):
         rows = [
@@ -620,6 +660,9 @@ class TelegramPipelineTests(unittest.TestCase):
 
         self.assertIn("## 8. 단기 급등 / 추격주의 후보", message)
         self.assertIn("FIVE | CHASE_RISK | +1.00% | x1.45 | 5D", message)
+        self.assertIn("## 10. 5일 상승률 Top30 (Top 1)", message)
+        self.assertIn("티커 | 5일 상승률 | RSI | Vol20 | MA20이격 | 상태", message)
+        self.assertIn("FIVE | +17.42% | RSI 68.2 | x1.45 | +9.0% | 강한상승/거래량동반", message)
 
     def test_split_telegram_message_text_prefers_section_boundaries(self):
         text = "\n\n".join(
@@ -707,9 +750,17 @@ class HomeDigestLoaderTests(unittest.TestCase):
         payload = {
             "sections": [
                 {"key": "final_top", "items": [{"ticker": "AAPL"}, {"ticker": "MSFT"}]},
+                {
+                    "key": "five_day_top",
+                    "items": [
+                        {"ticker": "NVDA", "chg_5d": 12.3, "status": "강한상승"},
+                        {"ticker": "AMD", "chg_5d": 9.8, "status": "정상상승"},
+                    ],
+                },
             ]
         }
         self.assertEqual([item["ticker"] for item in extract_section_candidates(payload, "final_top", limit=1)], ["AAPL"])
+        self.assertEqual([item["ticker"] for item in extract_section_candidates(payload, "five_day_top", limit=1)], ["NVDA"])
 
     def test_build_telegram_digest_message_uses_actual_formatter_structure(self):
         payload = {

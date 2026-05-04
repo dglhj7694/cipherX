@@ -204,6 +204,11 @@ def _candidate_from_payload(item: Mapping[str, Any], *, section_key: str, fallba
         bucket=str(payload.get("bucket") or ""),
         tags=_text_list(payload.get("tags")),
         risk_flags=_text_list(payload.get("risk_flags")),
+        chg_5d=_optional_float(payload.get("chg_5d")),
+        rsi=_optional_float(payload.get("rsi")),
+        ma20_dist_pct=_optional_float(payload.get("ma20_dist_pct")),
+        status_tags=_text_list(payload.get("status_tags")),
+        status=str(payload.get("status") or ""),
     )
 
 
@@ -289,7 +294,6 @@ def _render_ticker_button_row(tickers: list[str], *, key_prefix: str, on_select_
                 ticker = row_items[idx]
                 if st.button(ticker, key=f"{key_prefix}_{start}_{idx}", use_container_width=True):
                     on_select_ticker(ticker)
-
 
 def _html_text(value: Any) -> str:
     return html.escape(str(value or "").strip())
@@ -405,6 +409,14 @@ def _candidate_tags_html(item: TelegramCandidate) -> str:
     for flag in list(item.risk_flags or [])[:3]:
         badges.append(_badge_html(flag, "negative"))
     return "".join(badges) or _badge_html("reason --", "muted")
+
+
+def _candidate_status_text(item: TelegramCandidate) -> str:
+    status = str(item.status or "").strip()
+    if status:
+        return status
+    tags = [str(tag or "").strip() for tag in list(item.status_tags or []) if str(tag or "").strip()]
+    return "/".join(tags) if tags else "-"
 
 
 def _render_telegram_digest_styles() -> None:
@@ -647,6 +659,42 @@ def _render_telegram_section_table(section: TelegramSection) -> None:
 
     if not section.items:
         st.markdown("<div class='cpx-digest-empty'>해당 티커가 없습니다.</div>", unsafe_allow_html=True)
+        return
+
+    if section.key == "five_day_top":
+        rows = [
+            "<tr>"
+            f"<td class='cpx-digest-rank'>#{item.rank or idx}</td>"
+            f"<td><span class='cpx-digest-ticker'>{_html_text(item.ticker)}</span></td>"
+            f"<td>{_badge_html(_format_float(item.chg_5d, 2, signed=True, suffix='%'), _change_tone(item.chg_5d))}</td>"
+            f"<td class='cpx-digest-num'>{_html_text(_format_float(item.rsi, 1))}</td>"
+            f"<td>{_badge_html(_format_ratio(item.volume_ratio_20), _volume_tone(item.volume_ratio_20))}</td>"
+            f"<td>{_badge_html(_format_float(item.ma20_dist_pct, 1, signed=True, suffix='%'), _change_tone(item.ma20_dist_pct))}</td>"
+            f"<td><div class='cpx-digest-tags'>{''.join(_badge_html(tag, _signal_tone(tag, section.key)) for tag in (_candidate_status_text(item).split('/') if _candidate_status_text(item) != '-' else ['-']))}</div></td>"
+            "</tr>"
+            for idx, item in enumerate(section.items, start=1)
+        ]
+        st.markdown(
+            f"""
+            <div class='cpx-digest-table-wrap'>
+                <table class='cpx-digest-table'>
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>티커</th>
+                            <th>5일 상승률</th>
+                            <th>RSI</th>
+                            <th>Vol20</th>
+                            <th>MA20이격</th>
+                            <th>상태</th>
+                        </tr>
+                    </thead>
+                    <tbody>{''.join(rows)}</tbody>
+                </table>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         return
 
     rows: list[str] = []

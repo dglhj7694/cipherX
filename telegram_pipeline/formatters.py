@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from datetime import date, datetime
 from typing import Any, Iterable, Mapping
 
@@ -31,6 +32,8 @@ from .selectors import (
     BOARD_SECTION_LIMIT,
     BOARD_SECTION_ORDER,
     BOARD_SECTION_TITLES,
+    CORE_QUALITY_FLOORS,
+    FIVE_DAY_TOP_LIMIT,
     select_post_close_sections,
     select_post_close_board_sections,
 )
@@ -54,6 +57,7 @@ QBS_DISPLAY_NUMBERS: dict[str, str] = {
 }
 
 BOARD_SECTION_KEYS = set(BOARD_SECTION_ORDER)
+FIVE_DAY_TOP_SECTION_KEY = "five_day_top"
 
 
 def _signed(value: Any, decimals: int = 2) -> str:
@@ -68,6 +72,58 @@ def _ratio(value: Any, decimals: int = 2) -> str:
         return f"x{float(value):.{decimals}f}"
     except (TypeError, ValueError):
         return "x--"
+
+
+def _number(value: Any, decimals: int = 1) -> str:
+    try:
+        return f"{float(value):.{decimals}f}"
+    except (TypeError, ValueError):
+        return "--"
+
+
+def _optional_float(row: Mapping[str, Any], *keys: str) -> float | None:
+    for key in keys:
+        value = row.get(key)
+        if value is None:
+            continue
+        if isinstance(value, str) and not value.strip():
+            continue
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(numeric):
+            return numeric
+    return None
+
+
+def _five_day_status_tags(row: Mapping[str, Any]) -> list[str]:
+    chg_5d = safe_float(row.get("chg_5d", 0.0))
+    chg_pct = safe_float(row.get("chg", 0.0))
+    rsi = safe_float(row.get("rsi", row.get("RSI", 0.0)))
+    volume_ratio = safe_float(row.get("volume_ratio_20", 0.0))
+    ma20_dist = safe_float(row.get("ma20_dist_pct", row.get("dist_sma20_pct", 0.0)))
+    zscore20 = safe_float(row.get("zscore20", 0.0))
+    entry_judgment = str(row.get("entry_judgment") or "").strip().upper()
+
+    tags: list[str] = []
+    if chg_5d >= 10.0 or is_truthy(row.get("strong_trend_persistent")):
+        tags.append("강한상승")
+    if volume_ratio >= 1.2 or is_truthy(row.get("volume_bullish")):
+        tags.append("거래량동반")
+    if rsi >= 75.0 or ma20_dist >= 20.0 or zscore20 >= 3.0:
+        tags.append("과열주의")
+    if is_truthy(row.get("entry_chase_risk")) or chg_5d >= 20.0 or chg_pct >= 12.0:
+        tags.append("추격주의")
+    if is_truthy(row.get("thin_trade_risk")) or volume_ratio < 0.8:
+        tags.append("저유동성주의")
+    if entry_judgment == "WAIT_PULLBACK" or is_truthy(row.get("pullback_reentry")):
+        tags.append("눌림대기")
+    return tags or ["정상상승"]
+
+
+def _five_day_status(row: Mapping[str, Any]) -> str:
+    return "/".join(_five_day_status_tags(row))
 
 
 def _turn_engine_text(*, utbot: bool, hull: bool) -> str:
@@ -307,6 +363,10 @@ def _candidate_source_flags(section_key: str, row: Mapping[str, Any], target_dat
         "multi_buy": int(safe_float(row.get("multi_buy", 0.0))),
         "multi_sell": int(safe_float(row.get("multi_sell", 0.0))),
         "chg_5d": safe_float(row.get("chg_5d", 0.0)),
+        "rsi": safe_float(row.get("rsi", row.get("RSI", 0.0))),
+        "ma20_dist_pct": safe_float(row.get("ma20_dist_pct", row.get("dist_sma20_pct", 0.0))),
+        "status_tags": _five_day_status_tags(row) if section_key == FIVE_DAY_TOP_SECTION_KEY else [],
+        "status": _five_day_status(row) if section_key == FIVE_DAY_TOP_SECTION_KEY else "",
         "label": _candidate_label(section_key),
         "membership": list(row.get("source_membership") or []),
         "membership_count": int(safe_float(row.get("membership_count", 0.0))),
@@ -315,6 +375,7 @@ def _candidate_source_flags(section_key: str, row: Mapping[str, Any], target_dat
 
 
 def _build_candidate(section_key: str, row: Mapping[str, Any], rank: int, target_date: date) -> TelegramCandidate:
+    status_tags = _five_day_status_tags(row) if section_key == FIVE_DAY_TOP_SECTION_KEY else []
     return TelegramCandidate(
         ticker=str(row.get("ticker") or "").strip().upper(),
         price=safe_float(row.get("price")) if row.get("price") is not None else None,
@@ -328,6 +389,11 @@ def _build_candidate(section_key: str, row: Mapping[str, Any], rank: int, target
         source_flags=_candidate_source_flags(section_key, row, target_date),
         tags=list(row.get("board_tags") or []),
         risk_flags=list(row.get("board_risk_flags") or []),
+        chg_5d=_optional_float(row, "chg_5d"),
+        rsi=_optional_float(row, "rsi", "RSI"),
+        ma20_dist_pct=_optional_float(row, "ma20_dist_pct", "dist_sma20_pct"),
+        status_tags=status_tags,
+        status="/".join(status_tags) if status_tags else "",
     )
 
 
@@ -409,6 +475,21 @@ def build_post_close_digest(
                 ranked=True,
             )
         )
+    five_day_rows = list(section_rows.get(FIVE_DAY_TOP_SECTION_KEY) or [])
+    five_day_items = [
+        _build_candidate(FIVE_DAY_TOP_SECTION_KEY, row, idx, market_date)
+        for idx, row in enumerate(five_day_rows, start=1)
+    ]
+    sections.append(
+        TelegramSection(
+            key=FIVE_DAY_TOP_SECTION_KEY,
+            title=f"5일 상승률 Top{FIVE_DAY_TOP_LIMIT}",
+            items=five_day_items,
+            item_count=len(five_day_items),
+            quality_floor=CORE_QUALITY_FLOORS[FIVE_DAY_TOP_SECTION_KEY],
+            ranked=True,
+        )
+    )
 
     return TelegramDigest(
         version="2.0",
@@ -416,7 +497,7 @@ def build_post_close_digest(
         run_stamp=str(run_stamp or "").strip(),
         market_date=market_date.isoformat(),
         generated_at=generated_at.isoformat(),
-        section_order=[*QBS_OUTPUT_KEYS, *BOARD_SECTION_ORDER],
+        section_order=[*QBS_OUTPUT_KEYS, *BOARD_SECTION_ORDER, FIVE_DAY_TOP_SECTION_KEY],
         sections=sections,
         briefing_refs={
             "mode": "separate_message",
@@ -439,6 +520,17 @@ def _format_candidate_line(candidate: TelegramCandidate) -> str:
         f" | {_ratio(candidate.volume_ratio_20)}"
         f" | {str(candidate.reason or '-')}"
         f" | {risk or '-'}"
+    )
+
+
+def _format_five_day_candidate_line(candidate: TelegramCandidate) -> str:
+    return (
+        f"{candidate.ticker}"
+        f" | {_signed(candidate.chg_5d, 2)}%"
+        f" | RSI {_number(candidate.rsi, 1)}"
+        f" | {_ratio(candidate.volume_ratio_20, 2)}"
+        f" | {_signed(candidate.ma20_dist_pct, 1)}%"
+        f" | {str(candidate.status or '-')}"
     )
 
 
@@ -469,10 +561,16 @@ def _qbs_section_block(display_number: str, section: TelegramSection) -> str:
 
 
 def _section_block(index: int, section: TelegramSection) -> str:
-    descriptor = f"Top {min(section.item_count, BOARD_SECTION_LIMIT)}"
+    section_limit = FIVE_DAY_TOP_LIMIT if section.key == FIVE_DAY_TOP_SECTION_KEY else BOARD_SECTION_LIMIT
+    descriptor = f"Top {min(section.item_count, section_limit)}"
     lines = [f"## {index}. {section.title} ({descriptor})"]
     if not section.items:
         lines.append("- 해당 없음")
+        return "\n".join(lines)
+    if section.key == FIVE_DAY_TOP_SECTION_KEY:
+        lines.append("티커 | 5일 상승률 | RSI | Vol20 | MA20이격 | 상태")
+        for item in section.items:
+            lines.append(_format_five_day_candidate_line(item))
         return "\n".join(lines)
     for item in section.items:
         lines.append(_format_candidate_line(item))
