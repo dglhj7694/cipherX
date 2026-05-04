@@ -389,6 +389,9 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertNotIn("ZERO", [item.ticker for item in items])
         self.assertNotIn("NEG", [item.ticker for item in items])
         self.assertEqual(items[0].chg_5d, 40.0)
+        self.assertEqual(items[0].chg_pct, 40.0)
+        self.assertEqual(items[0].reason, items[0].status)
+        self.assertIn("추격주의", items[0].reason)
 
     def test_five_day_only_candidates_land_in_chase_risk_top20(self):
         rows = [
@@ -663,6 +666,8 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertIn("## 10. 5일 상승률 Top30 (Top 1)", message)
         self.assertIn("티커 | 5일 상승률 | RSI | Vol20 | MA20이격 | 상태", message)
         self.assertIn("FIVE | +17.42% | RSI 68.2 | x1.45 | +9.0% | 강한상승/거래량동반", message)
+        self.assertEqual(digest.section_map()["five_day_top"].items[0].chg_pct, 17.42)
+        self.assertEqual(digest.section_map()["five_day_top"].items[0].reason, "강한상승/거래량동반")
 
     def test_split_telegram_message_text_prefers_section_boundaries(self):
         text = "\n\n".join(

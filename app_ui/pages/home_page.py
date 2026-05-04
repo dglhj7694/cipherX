@@ -189,11 +189,13 @@ def _text_list(value: Any) -> list[str]:
 
 def _candidate_from_payload(item: Mapping[str, Any], *, section_key: str, fallback_rank: int) -> TelegramCandidate:
     payload = dict(item or {})
+    chg_5d = _optional_float(payload.get("chg_5d"))
+    chg_pct = chg_5d if section_key == "five_day_top" and chg_5d is not None else _optional_float(payload.get("chg_pct"))
     return TelegramCandidate(
         ticker=str(payload.get("ticker") or "").strip().upper(),
         price=_optional_float(payload.get("price")),
         chg_value=_optional_float(payload.get("chg_value")),
-        chg_pct=_optional_float(payload.get("chg_pct")),
+        chg_pct=chg_pct,
         volume_ratio_20=_optional_float(payload.get("volume_ratio_20")),
         section_key=str(payload.get("section_key") or section_key),
         rank=_safe_int(payload.get("rank"), fallback_rank),
@@ -204,7 +206,7 @@ def _candidate_from_payload(item: Mapping[str, Any], *, section_key: str, fallba
         bucket=str(payload.get("bucket") or ""),
         tags=_text_list(payload.get("tags")),
         risk_flags=_text_list(payload.get("risk_flags")),
-        chg_5d=_optional_float(payload.get("chg_5d")),
+        chg_5d=chg_5d,
         rsi=_optional_float(payload.get("rsi")),
         ma20_dist_pct=_optional_float(payload.get("ma20_dist_pct")),
         status_tags=_text_list(payload.get("status_tags")),

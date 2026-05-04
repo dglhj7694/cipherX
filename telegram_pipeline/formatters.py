@@ -328,7 +328,7 @@ def _candidate_reason(section_key: str, row: Mapping[str, Any], target_date: dat
     if section_key == "pocket_pivot":
         return _build_pocket_pivot_reason(row)
     if section_key == "five_day_top":
-        return _build_five_day_top_reason(row)
+        return _five_day_status(row)
     if section_key == "new_52w_high":
         return _build_new_52w_high_reason(row)
     return "-"
@@ -375,12 +375,13 @@ def _candidate_source_flags(section_key: str, row: Mapping[str, Any], target_dat
 
 
 def _build_candidate(section_key: str, row: Mapping[str, Any], rank: int, target_date: date) -> TelegramCandidate:
+    chg_pct = _optional_float(row, "chg_5d") if section_key == FIVE_DAY_TOP_SECTION_KEY else _optional_float(row, "chg")
     status_tags = _five_day_status_tags(row) if section_key == FIVE_DAY_TOP_SECTION_KEY else []
     return TelegramCandidate(
         ticker=str(row.get("ticker") or "").strip().upper(),
         price=safe_float(row.get("price")) if row.get("price") is not None else None,
         chg_value=safe_float(row.get("chg_value")) if row.get("chg_value") is not None else None,
-        chg_pct=safe_float(row.get("chg")) if row.get("chg") is not None else None,
+        chg_pct=chg_pct,
         volume_ratio_20=safe_float(row.get("volume_ratio_20")) if row.get("volume_ratio_20") is not None else None,
         section_key=section_key,
         rank=rank,
