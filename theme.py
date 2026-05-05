@@ -1,61 +1,8 @@
 FONT_FACE_CSS = """
-@font-face {
-  font-family: 'A2Z';
-  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2601-6@1.0/%EC%97%90%EC%9D%B4%ED%88%AC%EC%A7%80%EC%B2%B4-1Thin.woff2') format('woff2');
-  font-weight: 100;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'A2Z';
-  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2601-6@1.0/%EC%97%90%EC%9D%B4%ED%88%AC%EC%A7%80%EC%B2%B4-2ExtraLight.woff2') format('woff2');
-  font-weight: 200;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'A2Z';
-  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2601-6@1.0/%EC%97%90%EC%9D%B4%ED%88%AC%EC%A7%80%EC%B2%B4-3Light.woff2') format('woff2');
-  font-weight: 300;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'A2Z';
-  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2601-6@1.0/%EC%97%90%EC%9D%B4%ED%88%AC%EC%A7%80%EC%B2%B4-4Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'A2Z';
-  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2601-6@1.0/%EC%97%90%EC%9D%B4%ED%88%AC%EC%A7%80%EC%B2%B4-5Medium.woff2') format('woff2');
-  font-weight: 500;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'A2Z';
-  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2601-6@1.0/%EC%97%90%EC%9D%B4%ED%88%AC%EC%A7%80%EC%B2%B4-6SemiBold.woff2') format('woff2');
-  font-weight: 600;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'A2Z';
-  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2601-6@1.0/%EC%97%90%EC%9D%B4%ED%88%AC%EC%A7%80%EC%B2%B4-7Bold.woff2') format('woff2');
-  font-weight: 700;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'A2Z';
-  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2601-6@1.0/%EC%97%90%EC%9D%B4%ED%88%AC%EC%A7%80%EC%B2%B4-8ExtraBold.woff2') format('woff2');
-  font-weight: 800;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'A2Z';
-  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2601-6@1.0/%EC%97%90%EC%9D%B4%ED%88%AC%EC%A7%80%EC%B2%B4-9Black.woff2') format('woff2');
-  font-weight: 900;
-  font-display: swap;
-}
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 """.strip()
-FONT_STACK = "'A2Z','A2z','Malgun Gothic','Apple SD Gothic Neo',sans-serif"
-PLOTLY_FONT_FAMILY = "A2Z, A2z, Malgun Gothic, Apple SD Gothic Neo, sans-serif"
+FONT_STACK = "'Pretendard','Malgun Gothic','Apple SD Gothic Neo','Segoe UI',sans-serif"
+PLOTLY_FONT_FAMILY = "Pretendard, Malgun Gothic, Apple SD Gothic Neo, Segoe UI, sans-serif"
 
 
 def _css_vars(scope=":root"):
