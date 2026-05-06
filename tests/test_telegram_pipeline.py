@@ -12,6 +12,7 @@ from app_ui.pages.home_page import extract_section_candidates, load_latest_teleg
 from scripts.daily_scan_and_notify import _build_post_close_digest_bundle, _send_telegram_if_enabled
 from telegram_pipeline import (
     BOARD_SECTION_LIMIT,
+    STEADY_WINNER_SECTION_KEY,
     TelegramCandidate,
     annotate_rows_with_qbs,
     build_post_close_digest,
@@ -122,6 +123,7 @@ class TelegramPipelineTests(unittest.TestCase):
                 "qbs_buy_now",
                 "qbs_chase_watch",
                 "qbs_pullback_wait",
+                STEADY_WINNER_SECTION_KEY,
                 "confluence",
                 "entry_now",
                 "pullback_reentry",
@@ -143,7 +145,7 @@ class TelegramPipelineTests(unittest.TestCase):
         general_tickers = [
             item.ticker
             for key in digest.section_order
-            if not key.startswith("qbs_") and key != "five_day_top"
+            if not key.startswith("qbs_") and key not in {"five_day_top", STEADY_WINNER_SECTION_KEY}
             for item in section_map[key].items
         ]
         self.assertEqual(len(general_tickers), len(set(general_tickers)))
@@ -350,6 +352,7 @@ class TelegramPipelineTests(unittest.TestCase):
         section_map = digest.section_map()
 
         self.assertEqual(section_map["qbs_buy_now"].item_count, 20)
+        self.assertEqual(section_map[STEADY_WINNER_SECTION_KEY].item_count, 20)
         self.assertEqual(section_map["confluence"].item_count, BOARD_SECTION_LIMIT)
         self.assertEqual(section_map["five_day_top"].item_count, 30)
         self.assertTrue(all(section.item_count <= BOARD_SECTION_LIMIT for key, section in section_map.items() if not key.startswith("qbs_") and key != "five_day_top"))
@@ -392,6 +395,120 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertEqual(items[0].chg_pct, 40.0)
         self.assertEqual(items[0].reason, items[0].status)
         self.assertIn("추격주의", items[0].reason)
+
+    def test_steady_winner_section_scores_structure_without_hard_momentum_gates(self):
+        calm = self._row(
+            "CALM",
+            chg=1.2,
+            chg_5d=4.1,
+            rs_rank_vs_index=75.0,
+            ret20_pct=6.0,
+            ret60_pct=14.0,
+            ret20_percentile=76.0,
+            ret60_percentile=78.0,
+            ema200=90.0,
+            dist_ema21_pct=2.0,
+            drawdown_from_52w_high_pct=-7.0,
+            near_52w_high_2pct=False,
+            breakout_dist_20d_high_pct=-4.0,
+        )
+        fast = self._row(
+            "FAST",
+            chg=8.2,
+            chg_5d=16.0,
+            rs_rank_vs_index=92.0,
+            ret20_pct=18.0,
+            ret60_pct=33.0,
+            ret20_percentile=92.0,
+            ret60_percentile=94.0,
+            ret120_percentile=90.0,
+            ema200=90.0,
+            dist_ema21_pct=5.0,
+            near_52w_high_2pct=True,
+        )
+        low_volume = self._row(
+            "LOWVOL",
+            chg=1.1,
+            chg_5d=5.0,
+            volume_ratio_20=0.7,
+            rs_rank_vs_index=82.0,
+            ret20_pct=7.0,
+            ret60_pct=15.0,
+            ret20_percentile=86.0,
+            ret60_percentile=87.0,
+            ema200=90.0,
+            dist_ema21_pct=2.0,
+            drawdown_from_52w_high_pct=-6.0,
+        )
+        high_conflict = self._row(
+            "HICON",
+            chg=1.0,
+            chg_5d=6.0,
+            strategy_conflict_level="HIGH",
+            low_conflict_bullish=False,
+            rs_rank_vs_index=91.0,
+            ret20_pct=9.0,
+            ret60_pct=18.0,
+            ret20_percentile=90.0,
+            ret60_percentile=92.0,
+            ema200=90.0,
+            dist_ema21_pct=2.0,
+            drawdown_from_52w_high_pct=-5.0,
+        )
+        sell_turn = self._row(
+            "SELLX",
+            chg=1.0,
+            chg_5d=5.0,
+            ret20_pct=8.0,
+            ret60_pct=16.0,
+            ema200=90.0,
+            dist_ema21_pct=2.0,
+            utbot_sell_last_date=self.market_date.isoformat(),
+        )
+        below_ema50 = self._row(
+            "BELOW",
+            price=90.0,
+            ema50=100.0,
+            chg=1.0,
+            chg_5d=5.0,
+            ret20_pct=8.0,
+            ret60_pct=16.0,
+            ema200=80.0,
+            dist_ema21_pct=2.0,
+        )
+
+        digest = build_post_close_digest(
+            [calm, fast, low_volume, high_conflict, sell_turn, below_ema50],
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=6,
+            result_count=6,
+            skip_count=0,
+        )
+        items = {item.ticker: item for item in digest.section_map()[STEADY_WINNER_SECTION_KEY].items}
+
+        self.assertIn("CALM", items)
+        self.assertEqual(items["CALM"].bucket, "STEADY_WINNER")
+        self.assertIn("RS70", items["CALM"].tags)
+        self.assertIn("FAST", items)
+        self.assertIn("acceleration_day", items["FAST"].risk_flags)
+        self.assertIn("five_day_acceleration", items["FAST"].risk_flags)
+        self.assertEqual(items["FAST"].entry_type, "extended_wait")
+        self.assertIn("LOWVOL", items)
+        self.assertIn("low_volume", items["LOWVOL"].risk_flags)
+        self.assertIn("HICON", items)
+        self.assertIn("high_conflict", items["HICON"].risk_flags)
+        self.assertNotIn("SELLX", items)
+        self.assertNotIn("BELOW", items)
+
+        message = build_post_close_message_texts(digest)[0]
+        self.assertIn("## 0-3. 계속 우상향 주도주 Top 20", message)
+        self.assertIn("FAST | PUL", message)
+        self.assertIn("근거:", message)
+        self.assertIn("진입유형: extended_wait", message)
+        self.assertIn("주의: acceleration_day+five_day_acceleration", message)
 
     def test_five_day_only_candidates_land_in_chase_risk_top20(self):
         rows = [
@@ -540,8 +657,9 @@ class TelegramPipelineTests(unittest.TestCase):
         qbs_0 = message.index("## 0. ")
         qbs_01 = message.index("## 0-1. ")
         qbs_02 = message.index("## 0-2. ")
+        qbs_03 = message.index("## 0-3. ")
         normal_1 = message.index("## 1. ")
-        self.assertTrue(qbs_0 < qbs_01 < qbs_02 < normal_1)
+        self.assertTrue(qbs_0 < qbs_01 < qbs_02 < qbs_03 < normal_1)
         self.assertIn("QBS", message)
 
     def test_empty_qbs_blocks_are_always_rendered(self):
@@ -560,6 +678,7 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertIn("## 0. ", message)
         self.assertIn("## 0-1. ", message)
         self.assertIn("## 0-2. ", message)
+        self.assertIn("## 0-3. ", message)
         self.assertGreaterEqual(message.count("- 해당 없음"), 3)
 
     def test_chunk_split_keeps_qbs_before_existing_sections(self):
@@ -578,7 +697,7 @@ class TelegramPipelineTests(unittest.TestCase):
         joined = "\n".join(chunks)
 
         self.assertGreater(len(chunks), 1)
-        self.assertTrue(joined.index("## 0. ") < joined.index("## 0-1. ") < joined.index("## 0-2. ") < joined.index("## 1. "))
+        self.assertTrue(joined.index("## 0. ") < joined.index("## 0-1. ") < joined.index("## 0-2. ") < joined.index("## 0-3. ") < joined.index("## 1. "))
 
     def test_message_lines_show_board_label_change_volume_reason_and_risk(self):
         buy_hull_only = self._row(
@@ -762,10 +881,17 @@ class HomeDigestLoaderTests(unittest.TestCase):
                         {"ticker": "AMD", "chg_5d": 9.8, "status": "정상상승"},
                     ],
                 },
+                {
+                    "key": STEADY_WINNER_SECTION_KEY,
+                    "items": [
+                        {"ticker": "META", "pul_score": 84.0, "entry_type": "steady_hold_watch"},
+                    ],
+                },
             ]
         }
         self.assertEqual([item["ticker"] for item in extract_section_candidates(payload, "final_top", limit=1)], ["AAPL"])
         self.assertEqual([item["ticker"] for item in extract_section_candidates(payload, "five_day_top", limit=1)], ["NVDA"])
+        self.assertEqual([item["ticker"] for item in extract_section_candidates(payload, STEADY_WINNER_SECTION_KEY, limit=1)], ["META"])
 
     def test_build_telegram_digest_message_uses_actual_formatter_structure(self):
         payload = {
@@ -774,7 +900,7 @@ class HomeDigestLoaderTests(unittest.TestCase):
             "run_stamp": "run-1",
             "market_date": "2026-05-01",
             "generated_at": "2026-05-02T06:16:51+09:00",
-            "section_order": ["qbs_buy_now", "sell_risk"],
+            "section_order": ["qbs_buy_now", STEADY_WINNER_SECTION_KEY, "sell_risk"],
             "universe_count": 10,
             "result_count": 2,
             "skip_count": 1,
@@ -798,6 +924,29 @@ class HomeDigestLoaderTests(unittest.TestCase):
                             "qbs_score": 88.0,
                             "tags": ["final", "buy"],
                             "risk_flags": [],
+                        }
+                    ],
+                },
+                {
+                    "key": STEADY_WINNER_SECTION_KEY,
+                    "title": "계속 우상향 주도주 Top 20",
+                    "item_count": 1,
+                    "ranked": True,
+                    "items": [
+                        {
+                            "ticker": "META",
+                            "price": 300.0,
+                            "chg_pct": 1.2,
+                            "chg_5d": 4.1,
+                            "volume_ratio_20": 0.96,
+                            "section_key": STEADY_WINNER_SECTION_KEY,
+                            "rank": 1,
+                            "label": "STEADY_WINNER",
+                            "bucket": "STEADY_WINNER",
+                            "reason": "EMA정배열+HMA상승",
+                            "risk_flags": [],
+                            "pul_score": 78.0,
+                            "entry_type": "steady_hold_watch",
                         }
                     ],
                 },
@@ -826,10 +975,13 @@ class HomeDigestLoaderTests(unittest.TestCase):
         message = home_page.build_telegram_digest_message(payload)
 
         self.assertIn("## 0. 오늘 매수 최종 후보 Top 20", message)
+        self.assertIn("## 0-3. 계속 우상향 주도주 Top 20", message)
         self.assertIn("## 1. 매도전환 / 위험 후보", message)
         self.assertIn("AAPL", message)
+        self.assertIn("META | PUL 78", message)
         self.assertIn("TSLA", message)
-        self.assertLess(message.index("AAPL"), message.index("TSLA"))
+        self.assertLess(message.index("AAPL"), message.index("META"))
+        self.assertLess(message.index("META"), message.index("TSLA"))
 
     def test_resolve_github_digest_config_uses_default_repo_when_unconfigured(self):
         with patch.dict(os.environ, {}, clear=True), patch("app_ui.pages.home_page._read_secret", return_value=""):

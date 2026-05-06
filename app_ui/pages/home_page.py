@@ -11,8 +11,8 @@ import requests
 import streamlit as st
 
 from telegram_pipeline.contracts import TelegramCandidate, TelegramDigest, TelegramSection
-from telegram_pipeline.formatters import QBS_DISPLAY_NUMBERS, build_main_message
-from telegram_pipeline.selectors import BOARD_MANDATORY_SECTION_KEYS
+from telegram_pipeline.formatters import QBS_DISPLAY_NUMBERS, STEADY_WINNER_DISPLAY_NUMBER, build_main_message
+from telegram_pipeline.selectors import BOARD_MANDATORY_SECTION_KEYS, STEADY_WINNER_SECTION_KEY
 from theme import FONT_STACK
 
 
@@ -211,6 +211,8 @@ def _candidate_from_payload(item: Mapping[str, Any], *, section_key: str, fallba
         ma20_dist_pct=_optional_float(payload.get("ma20_dist_pct")),
         status_tags=_text_list(payload.get("status_tags")),
         status=str(payload.get("status") or ""),
+        pul_score=_optional_float(payload.get("pul_score")),
+        entry_type=str(payload.get("entry_type") or ""),
     )
 
 
@@ -267,6 +269,9 @@ def _visible_telegram_sections(digest: TelegramDigest) -> list[TelegramSection]:
         if section.key in QBS_DISPLAY_NUMBERS:
             visible.append(section)
             continue
+        if section.key == STEADY_WINNER_SECTION_KEY:
+            visible.append(section)
+            continue
         if section.key in mandatory or section.item_count > 0:
             visible.append(section)
     return visible
@@ -314,6 +319,13 @@ def _format_qbs(value: Any) -> str:
     if number is None:
         return "QBS --"
     return f"QBS {number:.0f}" if float(number).is_integer() else f"QBS {number:.1f}"
+
+
+def _format_pul(value: Any) -> str:
+    number = _optional_float(value)
+    if number is None:
+        return "PUL --"
+    return f"PUL {number:.0f}" if float(number).is_integer() else f"PUL {number:.1f}"
 
 
 def _format_ratio(value: Any) -> str:
@@ -663,6 +675,44 @@ def _render_telegram_section_table(section: TelegramSection) -> None:
         st.markdown("<div class='cpx-digest-empty'>해당 티커가 없습니다.</div>", unsafe_allow_html=True)
         return
 
+    if section.key == STEADY_WINNER_SECTION_KEY:
+        rows = [
+            "<tr>"
+            f"<td class='cpx-digest-rank'>#{item.rank or idx}</td>"
+            f"<td><span class='cpx-digest-ticker'>{_html_text(item.ticker)}</span></td>"
+            f"<td>{_badge_html(_format_pul(item.pul_score), _qbs_tone(item.pul_score))}</td>"
+            f"<td>{_badge_html(item.bucket or item.label or '-', _signal_tone(item.bucket or item.label, section.key))}</td>"
+            f"<td>{_badge_html(_format_float(item.chg_pct, 2, signed=True, suffix='%') + ' / 5D ' + _format_float(item.chg_5d, 2, signed=True, suffix='%'), _change_tone(item.chg_pct))}</td>"
+            f"<td>{_badge_html(_format_ratio(item.volume_ratio_20), _volume_tone(item.volume_ratio_20))}</td>"
+            f"<td>{_badge_html(item.entry_type or '-', 'info' if item.entry_type else 'muted')}</td>"
+            f"<td><div class='cpx-digest-tags'>{_candidate_tags_html(item)}</div></td>"
+            "</tr>"
+            for idx, item in enumerate(section.items, start=1)
+        ]
+        st.markdown(
+            f"""
+            <div class='cpx-digest-table-wrap'>
+                <table class='cpx-digest-table'>
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Ticker</th>
+                            <th>PUL</th>
+                            <th>Bucket</th>
+                            <th>Change/5D</th>
+                            <th>Vol20</th>
+                            <th>Entry Type</th>
+                            <th>Reason/Risk</th>
+                        </tr>
+                    </thead>
+                    <tbody>{''.join(rows)}</tbody>
+                </table>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+
     if section.key == "five_day_top":
         rows = [
             "<tr>"
@@ -768,6 +818,8 @@ def _render_telegram_message_board(
         ticker_list = [item.ticker for item in section.items if item.ticker]
         if section.key in QBS_DISPLAY_NUMBERS:
             display_number = QBS_DISPLAY_NUMBERS[section.key]
+        elif section.key == STEADY_WINNER_SECTION_KEY:
+            display_number = STEADY_WINNER_DISPLAY_NUMBER
         else:
             display_number = str(board_display_index)
             board_display_index += 1

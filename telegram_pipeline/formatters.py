@@ -34,6 +34,9 @@ from .selectors import (
     BOARD_SECTION_TITLES,
     CORE_QUALITY_FLOORS,
     FIVE_DAY_TOP_LIMIT,
+    STEADY_WINNER_QUALITY_FLOOR,
+    STEADY_WINNER_SECTION_KEY,
+    STEADY_WINNER_SECTION_TITLE,
     select_post_close_sections,
     select_post_close_board_sections,
 )
@@ -58,6 +61,7 @@ QBS_DISPLAY_NUMBERS: dict[str, str] = {
 
 BOARD_SECTION_KEYS = set(BOARD_SECTION_ORDER)
 FIVE_DAY_TOP_SECTION_KEY = "five_day_top"
+STEADY_WINNER_DISPLAY_NUMBER = "0-3"
 
 
 def _signed(value: Any, decimals: int = 2) -> str:
@@ -303,6 +307,7 @@ def _candidate_label(section_key: str) -> str:
         "gap_setup": "gap setup",
         "pocket_pivot": "pocket pivot",
         "five_day_top": "5D top",
+        STEADY_WINNER_SECTION_KEY: "PUL",
         "new_52w_high": "52W high",
     }.get(section_key, section_key)
 
@@ -329,6 +334,8 @@ def _candidate_reason(section_key: str, row: Mapping[str, Any], target_date: dat
         return _build_pocket_pivot_reason(row)
     if section_key == "five_day_top":
         return _five_day_status(row)
+    if section_key == STEADY_WINNER_SECTION_KEY:
+        return str(row.get("pul_reason") or "-")
     if section_key == "new_52w_high":
         return _build_new_52w_high_reason(row)
     return "-"
@@ -367,6 +374,8 @@ def _candidate_source_flags(section_key: str, row: Mapping[str, Any], target_dat
         "ma20_dist_pct": safe_float(row.get("ma20_dist_pct", row.get("dist_sma20_pct", 0.0))),
         "status_tags": _five_day_status_tags(row) if section_key == FIVE_DAY_TOP_SECTION_KEY else [],
         "status": _five_day_status(row) if section_key == FIVE_DAY_TOP_SECTION_KEY else "",
+        "pul_score": safe_float(row.get("pul_score", 0.0)) if section_key == STEADY_WINNER_SECTION_KEY else 0.0,
+        "entry_type": str(row.get("entry_type") or "") if section_key == STEADY_WINNER_SECTION_KEY else "",
         "label": _candidate_label(section_key),
         "membership": list(row.get("source_membership") or []),
         "membership_count": int(safe_float(row.get("membership_count", 0.0))),
@@ -377,6 +386,7 @@ def _candidate_source_flags(section_key: str, row: Mapping[str, Any], target_dat
 def _build_candidate(section_key: str, row: Mapping[str, Any], rank: int, target_date: date) -> TelegramCandidate:
     chg_pct = _optional_float(row, "chg_5d") if section_key == FIVE_DAY_TOP_SECTION_KEY else _optional_float(row, "chg")
     status_tags = _five_day_status_tags(row) if section_key == FIVE_DAY_TOP_SECTION_KEY else []
+    steady_risk_tags = list(row.get("pul_risk_tags") or []) if section_key == STEADY_WINNER_SECTION_KEY else []
     return TelegramCandidate(
         ticker=str(row.get("ticker") or "").strip().upper(),
         price=safe_float(row.get("price")) if row.get("price") is not None else None,
@@ -385,16 +395,19 @@ def _build_candidate(section_key: str, row: Mapping[str, Any], rank: int, target
         volume_ratio_20=safe_float(row.get("volume_ratio_20")) if row.get("volume_ratio_20") is not None else None,
         section_key=section_key,
         rank=rank,
-        label=str(row.get("board_label") or _candidate_label(section_key)),
+        label=str(row.get("pul_bucket") or row.get("board_label") or _candidate_label(section_key)),
         reason=_candidate_reason(section_key, row, target_date),
         source_flags=_candidate_source_flags(section_key, row, target_date),
-        tags=list(row.get("board_tags") or []),
-        risk_flags=list(row.get("board_risk_flags") or []),
+        bucket=str(row.get("pul_bucket") or ""),
+        tags=list(row.get("pul_tags") or row.get("board_tags") or []),
+        risk_flags=steady_risk_tags or list(row.get("board_risk_flags") or []),
         chg_5d=_optional_float(row, "chg_5d"),
         rsi=_optional_float(row, "rsi", "RSI"),
         ma20_dist_pct=_optional_float(row, "ma20_dist_pct", "dist_sma20_pct"),
         status_tags=status_tags,
         status="/".join(status_tags) if status_tags else "",
+        pul_score=_optional_float(row, "pul_score"),
+        entry_type=str(row.get("entry_type") or ""),
     )
 
 
@@ -451,6 +464,21 @@ def build_post_close_digest(
     section_rows = select_post_close_sections(row_list, target_date=market_date)
 
     sections: list[TelegramSection] = _build_qbs_sections(section_rows, market_date)
+    steady_rows = list(section_rows.get(STEADY_WINNER_SECTION_KEY) or [])
+    steady_items = [
+        _build_candidate(STEADY_WINNER_SECTION_KEY, row, idx, market_date)
+        for idx, row in enumerate(steady_rows, start=1)
+    ]
+    sections.append(
+        TelegramSection(
+            key=STEADY_WINNER_SECTION_KEY,
+            title=STEADY_WINNER_SECTION_TITLE,
+            items=steady_items,
+            item_count=len(steady_items),
+            quality_floor=STEADY_WINNER_QUALITY_FLOOR,
+            ranked=True,
+        )
+    )
     qbs_top_tickers = {
         item.ticker
         for section in sections
@@ -498,7 +526,7 @@ def build_post_close_digest(
         run_stamp=str(run_stamp or "").strip(),
         market_date=market_date.isoformat(),
         generated_at=generated_at.isoformat(),
-        section_order=[*QBS_OUTPUT_KEYS, *BOARD_SECTION_ORDER, FIVE_DAY_TOP_SECTION_KEY],
+        section_order=[*QBS_OUTPUT_KEYS, STEADY_WINNER_SECTION_KEY, *BOARD_SECTION_ORDER, FIVE_DAY_TOP_SECTION_KEY],
         sections=sections,
         briefing_refs={
             "mode": "separate_message",
@@ -551,6 +579,24 @@ def _format_qbs_candidate_line(candidate: TelegramCandidate) -> str:
     return line
 
 
+def _format_steady_winner_candidate_line(candidate: TelegramCandidate) -> str:
+    risk = "+".join(list(candidate.risk_flags or [])) or "-"
+    return "\n".join(
+        [
+            (
+                f"{candidate.rank}. {candidate.ticker}"
+                f" | PUL {safe_float(candidate.pul_score):.0f}"
+                f" | {str(candidate.bucket or candidate.label or '-')}"
+                f" | {_signed(candidate.chg_pct, 2)}% / 5D {_signed(candidate.chg_5d, 2)}%"
+                f" | {_ratio(candidate.volume_ratio_20, 2)}"
+            ),
+            f"   근거: {str(candidate.reason or '-')}",
+            f"   진입유형: {str(candidate.entry_type or '-')}",
+            f"   주의: {risk}",
+        ]
+    )
+
+
 def _qbs_section_block(display_number: str, section: TelegramSection) -> str:
     lines = [f"## {display_number}. {section.title}"]
     if not section.items:
@@ -558,6 +604,16 @@ def _qbs_section_block(display_number: str, section: TelegramSection) -> str:
         return "\n".join(lines)
     for item in section.items:
         lines.append(_format_qbs_candidate_line(item))
+    return "\n".join(lines)
+
+
+def _steady_winner_section_block(section: TelegramSection) -> str:
+    lines = [f"## {STEADY_WINNER_DISPLAY_NUMBER}. {section.title}"]
+    if not section.items:
+        lines.append("- 해당 없음")
+        return "\n".join(lines)
+    for item in section.items:
+        lines.append(_format_steady_winner_candidate_line(item))
     return "\n".join(lines)
 
 
@@ -594,6 +650,9 @@ def build_main_message(digest: TelegramDigest) -> str:
     for section in digest.sections:
         if section.key in QBS_DISPLAY_NUMBERS:
             blocks.append(_qbs_section_block(QBS_DISPLAY_NUMBERS[section.key], section))
+            continue
+        if section.key == STEADY_WINNER_SECTION_KEY:
+            blocks.append(_steady_winner_section_block(section))
             continue
         if section.key not in BOARD_MANDATORY_SECTION_KEYS and section.item_count <= 0:
             continue

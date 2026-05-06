@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from datetime import date
 from typing import Any, Iterable, Mapping
 
@@ -23,6 +24,8 @@ from .rankers import (
 
 FINAL_TOP_LIMIT = 20
 FIVE_DAY_TOP_LIMIT = 30
+STEADY_WINNER_LIMIT = 20
+STEADY_WINNER_MIN_SCORE = 55.0
 HMA_EMA_TOP_LIMIT = 20
 BOARD_SECTION_LIMIT = 20
 GAP_SETUP_MIN_SCORE = 8.0
@@ -119,6 +122,9 @@ BOARD_QUALITY_FLOORS: dict[str, str] = {
 }
 
 BOARD_MANDATORY_SECTION_KEYS: tuple[str, ...] = BOARD_SECTION_ORDER
+STEADY_WINNER_SECTION_KEY = "steady_winner"
+STEADY_WINNER_SECTION_TITLE = f"계속 우상향 주도주 Top {STEADY_WINNER_LIMIT}"
+STEADY_WINNER_QUALITY_FLOOR = "PUL>=55 + persistent uptrend structure; acceleration/RS90 are tags, not hard filters"
 
 BOARD_LABELS: dict[str, str] = {
     "confluence": "CONFLUENCE",
@@ -179,6 +185,26 @@ def _unique_append(items: list[str], value: str) -> None:
     text = str(value or "").strip()
     if text and text not in items:
         items.append(text)
+
+
+def _optional_number(row: Mapping[str, Any], *keys: str) -> float | None:
+    for key in keys:
+        value = row.get(key)
+        if value is None:
+            continue
+        if isinstance(value, str) and not value.strip():
+            continue
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(number):
+            return number
+    return None
+
+
+def _row_bool(row: Mapping[str, Any], *keys: str) -> bool:
+    return any(is_truthy(row.get(key)) for key in keys)
 
 
 def _source_membership(
@@ -541,6 +567,318 @@ def select_five_day_top_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str
     return selected[:FIVE_DAY_TOP_LIMIT]
 
 
+def _price_above_level(row: Mapping[str, Any], raw_level_keys: tuple[str, ...], dist_keys: tuple[str, ...] = ()) -> bool | None:
+    price = _optional_number(row, "price", "close", "Close")
+    for key in raw_level_keys:
+        level = _optional_number(row, key)
+        if price is not None and level is not None and level > 0.0:
+            return price > level
+    for key in dist_keys:
+        distance = _optional_number(row, key)
+        if distance is not None:
+            return distance > 0.0
+    return None
+
+
+def _left_above_right(row: Mapping[str, Any], left_keys: tuple[str, ...], right_keys: tuple[str, ...]) -> bool | None:
+    left = _optional_number(row, *left_keys)
+    right = _optional_number(row, *right_keys)
+    if left is None or right is None or right <= 0.0:
+        return None
+    return left > right
+
+
+def _steady_hard_excluded(row: Mapping[str, Any], target_date: date) -> bool:
+    if same_session_sell_turn(row, target_date) or is_truthy(row.get("same_session_sell_turn")):
+        return True
+    if safe_float(row.get("multi_sell", 0.0)) >= 2.0:
+        return True
+    if is_truthy(row.get("thin_trade_risk")):
+        return True
+    if is_truthy(row.get("bearish_gap_failure")):
+        return True
+    if _row_bool(row, "hma_ema_short_entry", "hma_ema_short_aligned"):
+        return True
+    price_over_ema50 = _price_above_level(row, ("ema50", "EMA50"), ("dist_ema50_pct",))
+    if price_over_ema50 is False:
+        return True
+
+    ret20 = _optional_number(row, "ret20_pct", "ret20")
+    ret60 = _optional_number(row, "ret60_pct", "ret60")
+    if ret20 is not None and ret60 is not None and ret20 <= 0.0 and ret60 <= 0.0:
+        return True
+    return False
+
+
+def _score_steady_ma_structure(row: Mapping[str, Any], tags: list[str]) -> float:
+    score = 0.0
+    if _price_above_level(
+        row,
+        ("ema21", "EMA21", "ema25", "EMA25", "ma20", "MA20", "sma20", "SMA20"),
+        ("dist_ema21_pct", "dist_sma20_pct", "ma20_dist_pct"),
+    ):
+        score += 5.0
+        _unique_append(tags, "EMA21상회")
+    if _price_above_level(row, ("ema50", "EMA50"), ("dist_ema50_pct",)):
+        score += 5.0
+        _unique_append(tags, "EMA50상회")
+    if _price_above_level(row, ("ema200", "EMA200", "sma200", "SMA200", "ma200", "MA200"), ("dist_ema200_pct",)):
+        score += 4.0
+        _unique_append(tags, "EMA200상회")
+
+    short_mid_aligned = (
+        _left_above_right(row, ("ema21", "EMA21", "ema25", "EMA25", "ma20", "MA20", "sma20", "SMA20"), ("ema50", "EMA50", "ma50", "MA50", "sma50", "SMA50"))
+        or _row_bool(row, "hma_ema_long_entry", "hma_ema_long_aligned")
+    )
+    if short_mid_aligned:
+        score += 6.0
+        _unique_append(tags, "EMA정배열")
+
+    mid_long_aligned = _left_above_right(
+        row,
+        ("ema50", "EMA50", "ma50", "MA50", "sma50", "SMA50"),
+        ("ema200", "EMA200", "ma200", "MA200", "sma200", "SMA200"),
+    )
+    if mid_long_aligned:
+        score += 5.0
+        _unique_append(tags, "장기정배열")
+    return min(score, 25.0)
+
+
+def _score_steady_trend(row: Mapping[str, Any], tags: list[str]) -> float:
+    score = 0.0
+    if safe_float(row.get("hma20_slope_pct", 0.0)) > 0.0:
+        score += 5.0
+        _unique_append(tags, "HMA20상승")
+    if safe_float(row.get("hma60_slope_pct", 0.0)) > 0.0:
+        score += 5.0
+        _unique_append(tags, "HMA60상승")
+    if safe_float(row.get("hma200_slope_pct", 0.0)) > 0.0:
+        score += 3.0
+        _unique_append(tags, "HMA200상승")
+    if safe_float(row.get("ret20_pct", 0.0)) > 0.0:
+        score += 4.0
+        _unique_append(tags, "RET20")
+    if safe_float(row.get("ret60_pct", 0.0)) > 0.0:
+        score += 4.0
+        _unique_append(tags, "RET60")
+    if is_truthy(row.get("uptrend_persistent")):
+        score += 2.0
+        _unique_append(tags, "지속추세")
+    if is_truthy(row.get("bull_strength_recent")):
+        score += 2.0
+        _unique_append(tags, "최근강세")
+    return min(score, 25.0)
+
+
+def _score_steady_rs(row: Mapping[str, Any], tags: list[str]) -> float:
+    score = 0.0
+    rs_rank = safe_float(row.get("rs_rank_vs_index", 0.0))
+    if rs_rank >= 90.0:
+        score += 12.0
+        _unique_append(tags, "RS90")
+    elif rs_rank >= 80.0:
+        score += 9.0
+        _unique_append(tags, "RS80")
+    elif rs_rank >= 70.0:
+        score += 6.0
+        _unique_append(tags, "RS70")
+
+    ret20_pctile = safe_float(row.get("ret20_percentile", 0.0))
+    if ret20_pctile >= 85.0:
+        score += 4.0
+        _unique_append(tags, "RET20상위")
+    elif ret20_pctile >= 70.0:
+        score += 2.0
+
+    ret60_pctile = safe_float(row.get("ret60_percentile", 0.0))
+    if ret60_pctile >= 85.0:
+        score += 4.0
+        _unique_append(tags, "RET60상위")
+    elif ret60_pctile >= 70.0:
+        score += 2.0
+
+    if safe_float(row.get("ret120_percentile", 0.0)) >= 85.0:
+        score += 2.0
+        _unique_append(tags, "RET120상위")
+    return min(score, 20.0)
+
+
+def _score_steady_drawdown(row: Mapping[str, Any], tags: list[str]) -> float:
+    score = 0.0
+    dd20 = _optional_number(row, "drawdown_from_20d_high_pct")
+    if dd20 is not None:
+        if dd20 > -5.0:
+            score += 6.0
+            _unique_append(tags, "얕은하락")
+        elif dd20 > -10.0:
+            score += 4.0
+
+    dd52 = _optional_number(row, "drawdown_from_52w_high_pct")
+    if dd52 is not None and dd52 > -10.0:
+        score += 3.0
+        _unique_append(tags, "52W근처")
+
+    pullback_atr = _optional_number(row, "pullback_atr_multiple")
+    if pullback_atr is not None and pullback_atr <= 2.5:
+        score += 3.0
+
+    breakout_dist = _optional_number(row, "breakout_dist_20d_high_pct")
+    if is_truthy(row.get("near_52w_high_2pct")) or (breakout_dist is not None and breakout_dist >= -3.0):
+        score += 3.0
+        _unique_append(tags, "고점근처")
+    return min(score, 15.0)
+
+
+def _score_steady_flow(row: Mapping[str, Any], tags: list[str]) -> float:
+    score = 0.0
+    cmf = safe_float(row.get("cmf", 0.0))
+    if cmf > 0.05:
+        score += 4.0
+        _unique_append(tags, "CMF+")
+    elif cmf > 0.0:
+        score += 2.0
+
+    if safe_float(row.get("obv_slope", 0.0)) > 0.0:
+        score += 3.0
+        _unique_append(tags, "OBV+")
+
+    volume_ratio = safe_float(row.get("volume_ratio_20", 0.0))
+    if volume_ratio >= 1.0:
+        score += 3.0
+        _unique_append(tags, "VolumeOK")
+    elif volume_ratio >= 0.8:
+        score += 2.0
+
+    if is_truthy(row.get("pocket_pivot_candidate")):
+        score += 3.0
+        _unique_append(tags, "Pocket")
+    if is_truthy(row.get("volume_bullish")):
+        score += 3.0
+        _unique_append(tags, "수급유지")
+    return min(score, 15.0)
+
+
+def _steady_risk_tags_and_penalty(row: Mapping[str, Any]) -> tuple[list[str], float]:
+    risk_tags: list[str] = []
+    penalty = 0.0
+    chg_pct = safe_float(row.get("chg", 0.0))
+    chg_5d = safe_float(row.get("chg_5d", 0.0))
+    volume_ratio = safe_float(row.get("volume_ratio_20", 0.0))
+    ma20_dist = safe_float(row.get("ma20_dist_pct", row.get("dist_sma20_pct", 0.0)))
+    rsi = safe_float(row.get("rsi", row.get("RSI", 0.0)))
+    zscore20 = safe_float(row.get("zscore20", 0.0))
+
+    if chg_pct >= 7.0:
+        _unique_append(risk_tags, "acceleration_day")
+    if chg_5d >= 15.0:
+        _unique_append(risk_tags, "five_day_acceleration")
+    if ma20_dist >= 20.0:
+        _unique_append(risk_tags, "ma20_extension")
+        penalty -= 4.0
+    if rsi >= 80.0:
+        _unique_append(risk_tags, "rsi_hot")
+        penalty -= 3.0
+    if zscore20 >= 3.0:
+        _unique_append(risk_tags, "zscore_hot")
+        penalty -= 4.0
+    if volume_ratio >= 4.0 and chg_pct >= 10.0:
+        _unique_append(risk_tags, "volume_climax")
+        penalty -= 5.0
+    if volume_ratio < 0.8:
+        _unique_append(risk_tags, "low_volume")
+        penalty -= 8.0
+    if str(row.get("strategy_conflict_level") or "").strip().upper() == "HIGH":
+        _unique_append(risk_tags, "high_conflict")
+        penalty -= 15.0
+    if _row_bool(row, "utbot_sell_recent", "hull_turn_bear_recent") or safe_float(row.get("multi_sell", 0.0)) > 0.0:
+        _unique_append(risk_tags, "sell_pressure")
+        penalty -= 8.0
+    return risk_tags, penalty
+
+
+def _steady_bucket(score: float) -> str:
+    if score >= 85.0:
+        return "CORE_LEADER"
+    if score >= 75.0:
+        return "STEADY_WINNER"
+    if score >= 65.0:
+        return "UPTREND_WATCH"
+    return "PULLBACK_CHECK"
+
+
+def _steady_entry_type(row: Mapping[str, Any], risk_tags: list[str]) -> str:
+    if any(tag in risk_tags for tag in {"acceleration_day", "five_day_acceleration", "ma20_extension", "rsi_hot", "zscore_hot", "volume_climax"}):
+        return "extended_wait"
+
+    dd20 = _optional_number(row, "drawdown_from_20d_high_pct")
+    pullback_atr = _optional_number(row, "pullback_atr_multiple")
+    if (
+        is_truthy(row.get("uptrend_persistent"))
+        and ((dd20 is not None and -10.0 <= dd20 <= -2.0) or (pullback_atr is not None and pullback_atr <= 2.5))
+    ):
+        return "trend_follow_pullback"
+
+    breakout_dist = _optional_number(row, "breakout_dist_20d_high_pct")
+    if is_truthy(row.get("near_52w_high_2pct")) or (breakout_dist is not None and breakout_dist >= -3.0):
+        return "breakout_continuation"
+    return "steady_hold_watch"
+
+
+def _decorate_steady_winner_row(row: Mapping[str, Any], *, target_date: date) -> dict[str, Any] | None:
+    row_dict = dict(row or {})
+    ticker = _ticker(row_dict)
+    if not ticker or _steady_hard_excluded(row_dict, target_date):
+        return None
+
+    reason_tags: list[str] = []
+    score = 0.0
+    score += _score_steady_ma_structure(row_dict, reason_tags)
+    score += _score_steady_trend(row_dict, reason_tags)
+    score += _score_steady_rs(row_dict, reason_tags)
+    score += _score_steady_drawdown(row_dict, reason_tags)
+    score += _score_steady_flow(row_dict, reason_tags)
+    risk_tags, penalty = _steady_risk_tags_and_penalty(row_dict)
+    score = round(score + penalty, 1)
+    if score < STEADY_WINNER_MIN_SCORE:
+        return None
+
+    row_dict["ticker"] = ticker
+    row_dict["pul_score"] = score
+    row_dict["pul_bucket"] = _steady_bucket(score)
+    row_dict["pul_reason"] = "+".join(reason_tags[:8]) if reason_tags else "-"
+    row_dict["pul_tags"] = reason_tags
+    row_dict["pul_risk_tags"] = risk_tags
+    row_dict["entry_type"] = _steady_entry_type(row_dict, risk_tags)
+    return row_dict
+
+
+def _steady_winner_sort_key(row: Mapping[str, Any]) -> tuple[float, float, float, float, str]:
+    return (
+        -safe_float(row.get("pul_score", 0.0)),
+        -safe_float(row.get("rs_rank_vs_index", 0.0)),
+        -safe_float(row.get("ret60_pct", 0.0)),
+        -safe_float(row.get("ret20_pct", 0.0)),
+        str(row.get("ticker", "")),
+    )
+
+
+def select_steady_winner_rows(rows: Iterable[Mapping[str, Any]], *, target_date: date) -> list[dict[str, Any]]:
+    best_by_ticker: dict[str, dict[str, Any]] = {}
+    for raw_row in _base_rows(rows):
+        row = _decorate_steady_winner_row(raw_row, target_date=target_date)
+        if not row:
+            continue
+        ticker = _ticker(row)
+        existing = best_by_ticker.get(ticker)
+        if existing is None or safe_float(row.get("pul_score", 0.0)) > safe_float(existing.get("pul_score", 0.0)):
+            best_by_ticker[ticker] = row
+
+    selected = list(best_by_ticker.values())
+    selected.sort(key=_steady_winner_sort_key)
+    return selected[:STEADY_WINNER_LIMIT]
+
+
 def select_new_52w_high_rows(rows: Iterable[Mapping[str, Any]], *, target_date: date) -> list[dict[str, Any]]:
     selected: list[dict[str, Any]] = []
     for row in _base_rows(rows):
@@ -565,6 +903,7 @@ def select_post_close_sections(rows: Iterable[Mapping[str, Any]], *, target_date
         "gap_setup": select_gap_setup_rows(rows, target_date=target_date),
         "pocket_pivot": select_pocket_pivot_rows(rows),
         "five_day_top": select_five_day_top_rows(rows),
+        STEADY_WINNER_SECTION_KEY: select_steady_winner_rows(rows, target_date=target_date),
         "new_52w_high": select_new_52w_high_rows(rows, target_date=target_date),
     }
 

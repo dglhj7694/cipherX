@@ -25,6 +25,8 @@ class TelegramCandidate:
     ma20_dist_pct: float | None = None
     status_tags: list[str] = field(default_factory=list)
     status: str = ""
+    pul_score: float | None = None
+    entry_type: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
