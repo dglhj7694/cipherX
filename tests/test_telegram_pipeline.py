@@ -504,11 +504,163 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertNotIn("BELOW", items)
 
         message = build_post_close_message_texts(digest)[0]
-        self.assertIn("## 0-3. 계속 우상향 주도주 Top 20", message)
+        self.assertIn("## 0-3. 계속 우상향 주도주 Top 30", message)
         self.assertIn("FAST | PUL", message)
         self.assertIn("근거:", message)
         self.assertIn("진입유형: extended_wait", message)
         self.assertIn("주의: acceleration_day+five_day_acceleration", message)
+
+    def test_steady_winner_includes_runaway_leader_like_sndk(self):
+        sndk = self._row(
+            "SNDK",
+            chg=11.98,
+            chg_5d=40.30,
+            dist_sma20_pct=41.2,
+            rsi=81.1,
+            rs_rank_vs_index=99.0,
+            ret20_pct=35.0,
+            ret60_pct=74.0,
+            ret20_percentile=99.0,
+            ret60_percentile=98.0,
+            ret120_percentile=95.0,
+            ema50=80.0,
+            ema200=60.0,
+            dist_ema21_pct=24.0,
+            near_52w_high_2pct=True,
+            breakout_dist_20d_high_pct=-1.0,
+            drawdown_from_52w_high_pct=-2.0,
+            cmf=0.12,
+            obv_slope=1.4,
+            volume_ratio_20=1.23,
+            zscore20=2.8,
+        )
+        digest = build_post_close_digest(
+            [sndk],
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=1,
+            result_count=1,
+            skip_count=0,
+        )
+        item = digest.section_map()[STEADY_WINNER_SECTION_KEY].items[0]
+
+        self.assertEqual(item.ticker, "SNDK")
+        self.assertEqual(item.bucket, "RUNAWAY_LEADER")
+        self.assertEqual(item.entry_type, "extended_wait")
+        self.assertIn("runaway_leader", item.tags)
+        self.assertIn("acceleration_day", item.risk_flags)
+        self.assertIn("five_day_acceleration", item.risk_flags)
+        self.assertIn("ma20_extension", item.risk_flags)
+        self.assertIn("rsi_hot", item.risk_flags)
+        self.assertNotIn("volume_climax", item.risk_flags)
+
+        message = build_post_close_message_texts(digest)[0]
+        self.assertIn("SNDK | PUL", message)
+        self.assertIn("RUNAWAY_LEADER", message)
+        self.assertIn("진입유형: extended_wait", message)
+
+    def test_steady_winner_uses_stable_and_runaway_quotas_for_top30(self):
+        stable_rows = [
+            self._row(
+                f"ST{i:02d}",
+                chg=1.0 + (i * 0.01),
+                chg_5d=5.0 + (i * 0.01),
+                rs_rank_vs_index=88.0 + (i * 0.01),
+                ret20_pct=7.0,
+                ret60_pct=14.0,
+                ret20_percentile=90.0,
+                ret60_percentile=90.0,
+                ema50=90.0,
+                ema200=70.0,
+                dist_ema21_pct=2.0,
+                drawdown_from_52w_high_pct=-6.0,
+                near_52w_high_2pct=False,
+                breakout_dist_20d_high_pct=-5.0,
+            )
+            for i in range(25)
+        ]
+        runaway_rows = [
+            self._row(
+                f"RW{i:02d}",
+                chg=9.0 + (i * 0.01),
+                chg_5d=25.0 + (i * 0.1),
+                dist_sma20_pct=25.0,
+                rsi=82.0,
+                rs_rank_vs_index=99.0 - (i * 0.01),
+                ret20_pct=25.0,
+                ret60_pct=50.0,
+                ret20_percentile=96.0,
+                ret60_percentile=97.0,
+                ema50=85.0,
+                ema200=65.0,
+                dist_ema21_pct=10.0,
+                near_52w_high_2pct=True,
+                breakout_dist_20d_high_pct=-1.0,
+                drawdown_from_52w_high_pct=-2.0,
+                cmf=0.10,
+                obv_slope=1.1,
+                volume_ratio_20=1.2,
+            )
+            for i in range(12)
+        ]
+        duplicate_stable = self._row(
+            "DUP",
+            chg=1.0,
+            chg_5d=5.0,
+            rs_rank_vs_index=88.0,
+            ret20_pct=7.0,
+            ret60_pct=14.0,
+            ret20_percentile=90.0,
+            ret60_percentile=90.0,
+            ema50=90.0,
+            ema200=70.0,
+            dist_ema21_pct=2.0,
+        )
+        duplicate_runaway = self._row(
+            "DUP",
+            chg=12.0,
+            chg_5d=35.0,
+            dist_sma20_pct=28.0,
+            rsi=83.0,
+            rs_rank_vs_index=100.0,
+            ret20_pct=30.0,
+            ret60_pct=60.0,
+            ret20_percentile=99.0,
+            ret60_percentile=99.0,
+            ema50=85.0,
+            ema200=65.0,
+            dist_ema21_pct=12.0,
+            near_52w_high_2pct=True,
+            breakout_dist_20d_high_pct=-0.5,
+            drawdown_from_52w_high_pct=-1.0,
+            cmf=0.15,
+            obv_slope=1.5,
+            volume_ratio_20=1.4,
+        )
+
+        digest = build_post_close_digest(
+            [*stable_rows, *runaway_rows, duplicate_stable, duplicate_runaway],
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=39,
+            result_count=39,
+            skip_count=0,
+        )
+        items = digest.section_map()[STEADY_WINNER_SECTION_KEY].items
+        tickers = [item.ticker for item in items]
+        runaway_items = [item for item in items if item.bucket == "RUNAWAY_LEADER"]
+        stable_items = [item for item in items if item.bucket != "RUNAWAY_LEADER"]
+
+        self.assertEqual(len(items), 30)
+        self.assertEqual(len(stable_items), 20)
+        self.assertEqual(len(runaway_items), 10)
+        self.assertEqual(len(tickers), len(set(tickers)))
+        self.assertEqual(tickers.count("DUP"), 1)
+        self.assertIn("DUP", [item.ticker for item in runaway_items])
 
     def test_five_day_only_candidates_land_in_chase_risk_top20(self):
         rows = [
@@ -929,7 +1081,7 @@ class HomeDigestLoaderTests(unittest.TestCase):
                 },
                 {
                     "key": STEADY_WINNER_SECTION_KEY,
-                    "title": "계속 우상향 주도주 Top 20",
+                    "title": "계속 우상향 주도주 Top 30",
                     "item_count": 1,
                     "ranked": True,
                     "items": [
@@ -975,7 +1127,7 @@ class HomeDigestLoaderTests(unittest.TestCase):
         message = home_page.build_telegram_digest_message(payload)
 
         self.assertIn("## 0. 오늘 매수 최종 후보 Top 20", message)
-        self.assertIn("## 0-3. 계속 우상향 주도주 Top 20", message)
+        self.assertIn("## 0-3. 계속 우상향 주도주 Top 30", message)
         self.assertIn("## 1. 매도전환 / 위험 후보", message)
         self.assertIn("AAPL", message)
         self.assertIn("META | PUL 78", message)

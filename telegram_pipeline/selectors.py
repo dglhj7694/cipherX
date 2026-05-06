@@ -24,7 +24,9 @@ from .rankers import (
 
 FINAL_TOP_LIMIT = 20
 FIVE_DAY_TOP_LIMIT = 30
-STEADY_WINNER_LIMIT = 20
+STEADY_WINNER_LIMIT = 30
+STEADY_WINNER_STABLE_LIMIT = 20
+STEADY_WINNER_RUNAWAY_LIMIT = 10
 STEADY_WINNER_MIN_SCORE = 55.0
 HMA_EMA_TOP_LIMIT = 20
 BOARD_SECTION_LIMIT = 20
@@ -775,16 +777,13 @@ def _steady_risk_tags_and_penalty(row: Mapping[str, Any]) -> tuple[list[str], fl
         _unique_append(risk_tags, "five_day_acceleration")
     if ma20_dist >= 20.0:
         _unique_append(risk_tags, "ma20_extension")
-        penalty -= 4.0
     if rsi >= 80.0:
         _unique_append(risk_tags, "rsi_hot")
-        penalty -= 3.0
     if zscore20 >= 3.0:
         _unique_append(risk_tags, "zscore_hot")
-        penalty -= 4.0
     if volume_ratio >= 4.0 and chg_pct >= 10.0:
         _unique_append(risk_tags, "volume_climax")
-        penalty -= 5.0
+        penalty -= 12.0
     if volume_ratio < 0.8:
         _unique_append(risk_tags, "low_volume")
         penalty -= 8.0
@@ -797,7 +796,59 @@ def _steady_risk_tags_and_penalty(row: Mapping[str, Any]) -> tuple[list[str], fl
     return risk_tags, penalty
 
 
-def _steady_bucket(score: float) -> str:
+def _is_runaway_setup(row: Mapping[str, Any]) -> bool:
+    return bool(
+        safe_float(row.get("chg", 0.0)) >= 7.0
+        or safe_float(row.get("chg_5d", 0.0)) >= 15.0
+        or safe_float(row.get("ma20_dist_pct", row.get("dist_sma20_pct", 0.0))) >= 20.0
+    )
+
+
+def _runaway_quality_tags(row: Mapping[str, Any]) -> list[str]:
+    tags: list[str] = []
+    volume_ratio = safe_float(row.get("volume_ratio_20", 0.0))
+    breakout_dist = _optional_number(row, "breakout_dist_20d_high_pct")
+    dd52 = _optional_number(row, "drawdown_from_52w_high_pct")
+
+    if safe_float(row.get("rs_rank_vs_index", 0.0)) >= 95.0:
+        _unique_append(tags, "RS95")
+    if safe_float(row.get("ret20_percentile", 0.0)) >= 85.0:
+        _unique_append(tags, "RET20상위")
+    if safe_float(row.get("ret60_percentile", 0.0)) >= 85.0:
+        _unique_append(tags, "RET60상위")
+    if (
+        is_truthy(row.get("near_52w_high_2pct"))
+        or (breakout_dist is not None and breakout_dist >= -3.0)
+        or (dd52 is not None and dd52 > -5.0)
+    ):
+        _unique_append(tags, "고점근처")
+    if safe_float(row.get("cmf", 0.0)) > 0.0:
+        _unique_append(tags, "CMF+")
+    if safe_float(row.get("obv_slope", 0.0)) > 0.0:
+        _unique_append(tags, "OBV+")
+    if 1.0 <= volume_ratio <= 2.5:
+        _unique_append(tags, "VOL질서")
+    return tags
+
+
+def _runaway_leader_bonus(row: Mapping[str, Any], tags: list[str]) -> tuple[float, bool]:
+    if not _is_runaway_setup(row):
+        return 0.0, False
+
+    quality_tags = _runaway_quality_tags(row)
+    is_leader = "RS95" in quality_tags and len(quality_tags) >= 5
+    if not is_leader:
+        return 0.0, False
+
+    for tag in quality_tags:
+        _unique_append(tags, tag)
+    _unique_append(tags, "runaway_leader")
+    return min(15.0, 6.0 + (len(quality_tags) * 1.5)), True
+
+
+def _steady_bucket(score: float, *, runaway_leader: bool = False) -> str:
+    if runaway_leader:
+        return "RUNAWAY_LEADER"
     if score >= 85.0:
         return "CORE_LEADER"
     if score >= 75.0:
@@ -838,6 +889,8 @@ def _decorate_steady_winner_row(row: Mapping[str, Any], *, target_date: date) ->
     score += _score_steady_rs(row_dict, reason_tags)
     score += _score_steady_drawdown(row_dict, reason_tags)
     score += _score_steady_flow(row_dict, reason_tags)
+    runaway_bonus, runaway_leader = _runaway_leader_bonus(row_dict, reason_tags)
+    score += runaway_bonus
     risk_tags, penalty = _steady_risk_tags_and_penalty(row_dict)
     score = round(score + penalty, 1)
     if score < STEADY_WINNER_MIN_SCORE:
@@ -845,10 +898,11 @@ def _decorate_steady_winner_row(row: Mapping[str, Any], *, target_date: date) ->
 
     row_dict["ticker"] = ticker
     row_dict["pul_score"] = score
-    row_dict["pul_bucket"] = _steady_bucket(score)
+    row_dict["pul_bucket"] = _steady_bucket(score, runaway_leader=runaway_leader)
     row_dict["pul_reason"] = "+".join(reason_tags[:8]) if reason_tags else "-"
     row_dict["pul_tags"] = reason_tags
     row_dict["pul_risk_tags"] = risk_tags
+    row_dict["pul_runaway_leader"] = runaway_leader
     row_dict["entry_type"] = _steady_entry_type(row_dict, risk_tags)
     return row_dict
 
@@ -876,7 +930,28 @@ def select_steady_winner_rows(rows: Iterable[Mapping[str, Any]], *, target_date:
 
     selected = list(best_by_ticker.values())
     selected.sort(key=_steady_winner_sort_key)
-    return selected[:STEADY_WINNER_LIMIT]
+    stable_pool = [
+        row
+        for row in selected
+        if str(row.get("pul_bucket") or "").strip().upper() != "RUNAWAY_LEADER"
+    ][:STEADY_WINNER_STABLE_LIMIT]
+    runaway_pool = [
+        row
+        for row in selected
+        if str(row.get("pul_bucket") or "").strip().upper() == "RUNAWAY_LEADER"
+    ][:STEADY_WINNER_RUNAWAY_LIMIT]
+
+    combined: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for row in [*stable_pool, *runaway_pool]:
+        ticker = _ticker(row)
+        if not ticker or ticker in seen:
+            continue
+        seen.add(ticker)
+        combined.append(row)
+
+    combined.sort(key=_steady_winner_sort_key)
+    return combined[:STEADY_WINNER_LIMIT]
 
 
 def select_new_52w_high_rows(rows: Iterable[Mapping[str, Any]], *, target_date: date) -> list[dict[str, Any]]:
