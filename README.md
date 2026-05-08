@@ -30,6 +30,8 @@
 - **Telegram 알림 자동화**
   - scheduled script가 scan/briefing 결과를 Telegram message와 CSV document로 발송합니다.
   - `telegram_pipeline/`은 digest contract, section selector, formatter, publisher, sender를 담당합니다.
+  - 장마감 digest는 QBS, 계속 우상향 주도주, 초기 반전 포착, 5일 상승률 Top30 섹션을 함께 구성합니다.
+  - 홈 `Telegram Digest / 텔레그램 종목판`은 같은 digest payload를 보드형 UI로 복원하고 `5D`, `1M`, `1Y`, RSI, Vol20, MA20, 고점 대비 위치, ERS/PUL/QBS를 표시합니다.
 
 - **배치 산출물**
   - 스캔 결과와 메타데이터를 `artifacts/` 하위에 CSV, JSON, TXT 형태로 저장합니다.
@@ -142,8 +144,14 @@ cipherX/
 - `telegram_pipeline/selectors.py`
   - post-close board/core section 후보를 선택합니다.
 
+- `telegram_pipeline/final_buy_ranker.py`
+  - QBS 기반의 오늘 매수/추격주의/눌림 대기 후보를 점수화합니다.
+
+- `telegram_pipeline/early_reversal_ranker.py`
+  - `early_reversal` 섹션의 ERS 점수를 계산해 하락추세/박스권에서 첫 전환이 나타나는 watchlist 후보를 선별합니다.
+
 - `telegram_pipeline/formatters.py`
-  - Telegram message text를 구성합니다.
+  - Telegram message text를 구성하며 QBS, `steady_winner`, `early_reversal`, 상세 보드, `five_day_top` 순서를 고정합니다.
 
 - `telegram_pipeline/sender.py`
   - Telegram `sendMessage`, `sendDocument` 호출과 message chunking을 담당합니다.
