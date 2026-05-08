@@ -13,6 +13,7 @@ from scripts.daily_scan_and_notify import _build_post_close_digest_bundle, _send
 from telegram_pipeline import (
     BOARD_SECTION_LIMIT,
     EARLY_REVERSAL_KEY,
+    HULL_BUY_TURN_KEY,
     STEADY_WINNER_SECTION_KEY,
     TelegramCandidate,
     annotate_rows_with_qbs,
@@ -163,6 +164,29 @@ class TelegramPipelineTests(unittest.TestCase):
         row.update(overrides)
         return row
 
+    def _hull_buy_turn_row(self, ticker: str, **overrides):
+        row = self._row(
+            ticker,
+            latest_session_hull_buy_turn=True,
+            hull_turn_bull_last_date=self.market_date.isoformat(),
+            days_since_hull_turn_bull=0,
+            latest_session_utbot_buy_turn=False,
+            utbot_buy_last_date="N/A",
+            days_since_utbot_buy=99,
+            first_close_above_ma20_after_5bars=True,
+            volume_ratio_20=1.3,
+            cmf=0.12,
+            obv_slope=0.8,
+            rs_rank_vs_index=76.0,
+            dist_sma20_pct=3.1,
+            ma20_dist_pct=3.1,
+            chg=2.1,
+            chg_5d=4.8,
+            zscore20=1.1,
+        )
+        row.update(overrides)
+        return row
+
     def test_build_post_close_digest_uses_trader_board_sections_and_tags_overlap(self):
         digest = build_post_close_digest(
             [self._row("ALPHA")],
@@ -184,6 +208,7 @@ class TelegramPipelineTests(unittest.TestCase):
                 "qbs_pullback_wait",
                 STEADY_WINNER_SECTION_KEY,
                 EARLY_REVERSAL_KEY,
+                HULL_BUY_TURN_KEY,
                 "confluence",
                 "entry_now",
                 "pullback_reentry",
@@ -205,7 +230,7 @@ class TelegramPipelineTests(unittest.TestCase):
         general_tickers = [
             item.ticker
             for key in digest.section_order
-            if not key.startswith("qbs_") and key not in {"five_day_top", STEADY_WINNER_SECTION_KEY, EARLY_REVERSAL_KEY}
+            if not key.startswith("qbs_") and key not in {"five_day_top", STEADY_WINNER_SECTION_KEY, EARLY_REVERSAL_KEY, HULL_BUY_TURN_KEY}
             for item in section_map[key].items
         ]
         self.assertEqual(len(general_tickers), len(set(general_tickers)))
@@ -961,6 +986,108 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertIn("confirmed_reversal_watch", message)
         self.assertIn("MA20", message)
 
+    def test_hull_buy_turn_section_sits_after_early_reversal_and_includes_all_hull_rows(self):
+        by_date = self._hull_buy_turn_row("DATE", latest_session_hull_buy_turn=False)
+        by_flag = self._hull_buy_turn_row("FLAG", hull_turn_bull_last_date="N/A")
+        digest = build_post_close_digest(
+            [by_date, by_flag],
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=2,
+            result_count=2,
+            skip_count=0,
+        )
+        section_map = digest.section_map()
+        items = section_map[HULL_BUY_TURN_KEY].items
+
+        self.assertEqual(
+            digest.section_order[:6],
+            [
+                "qbs_buy_now",
+                "qbs_chase_watch",
+                "qbs_pullback_wait",
+                STEADY_WINNER_SECTION_KEY,
+                EARLY_REVERSAL_KEY,
+                HULL_BUY_TURN_KEY,
+            ],
+        )
+        self.assertEqual({item.ticker for item in items}, {"DATE", "FLAG"})
+        self.assertTrue(all(item.bucket == "HULL_BUY_TURN" for item in items))
+
+    def test_hull_buy_turn_sorts_utbot_overlap_first_and_keeps_risk_rows(self):
+        solo = self._hull_buy_turn_row(
+            "SOLO",
+            volume_ratio_20=5.0,
+            cmf=0.2,
+            obv_slope=1.0,
+            scan_score=200.0,
+        )
+        dual = self._hull_buy_turn_row(
+            "DUAL",
+            latest_session_utbot_buy_turn=True,
+            utbot_buy_last_date=self.market_date.isoformat(),
+            volume_ratio_20=1.0,
+            cmf=0.01,
+            obv_slope=0.1,
+            scan_score=100.0,
+        )
+        risky = self._hull_buy_turn_row(
+            "RISK",
+            thin_trade_risk=True,
+            strategy_conflict_level="HIGH",
+            volume_ratio_20=0.5,
+            chg_5d=18.0,
+            chg=13.0,
+            dist_sma20_pct=18.0,
+            zscore20=2.8,
+            multi_sell=2,
+        )
+        digest = build_post_close_digest(
+            [solo, dual, risky],
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=3,
+            result_count=3,
+            skip_count=0,
+        )
+        items = digest.section_map()[HULL_BUY_TURN_KEY].items
+        by_ticker = {item.ticker: item for item in items}
+
+        self.assertEqual(items[0].ticker, "DUAL")
+        self.assertIn("UTBot동시", by_ticker["DUAL"].tags)
+        self.assertIn("RISK", by_ticker)
+        self.assertIn("thin_trade", by_ticker["RISK"].risk_flags)
+        self.assertIn("high_conflict", by_ticker["RISK"].risk_flags)
+        self.assertIn("low_volume", by_ticker["RISK"].risk_flags)
+        self.assertIn("multi_sell", by_ticker["RISK"].risk_flags)
+        self.assertIn("chase_risk", by_ticker["RISK"].risk_flags)
+        self.assertIn("extended_day", by_ticker["RISK"].risk_flags)
+
+    def test_hull_buy_turn_message_contains_hull_fields(self):
+        row = self._hull_buy_turn_row("HULLX", volume_ratio_20=1.42, rs_rank_vs_index=78.0)
+        digest = build_post_close_digest(
+            [row],
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=1,
+            result_count=1,
+            skip_count=0,
+        )
+        message = build_post_close_message_texts(digest)[0]
+
+        self.assertIn("## 0-5.", message)
+        self.assertIn("HULLX | HULL BUY", message)
+        self.assertIn("근거:", message)
+        self.assertIn("확인:", message)
+        self.assertIn("주의:", message)
+        self.assertIn("RS 78", message)
+
     def test_five_day_only_candidates_land_in_chase_risk_top20(self):
         rows = [
             self._row(
@@ -1110,8 +1237,9 @@ class TelegramPipelineTests(unittest.TestCase):
         qbs_02 = message.index("## 0-2. ")
         qbs_03 = message.index("## 0-3. ")
         qbs_04 = message.index("## 0-4. ")
+        qbs_05 = message.index("## 0-5. ")
         normal_1 = message.index("## 1. ")
-        self.assertTrue(qbs_0 < qbs_01 < qbs_02 < qbs_03 < qbs_04 < normal_1)
+        self.assertTrue(qbs_0 < qbs_01 < qbs_02 < qbs_03 < qbs_04 < qbs_05 < normal_1)
         self.assertIn("QBS", message)
 
     def test_empty_qbs_blocks_are_always_rendered(self):
@@ -1132,6 +1260,7 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertIn("## 0-2. ", message)
         self.assertIn("## 0-3. ", message)
         self.assertIn("## 0-4. ", message)
+        self.assertIn("## 0-5. ", message)
         self.assertGreaterEqual(message.count("- 해당 없음"), 3)
 
     def test_chunk_split_keeps_qbs_before_existing_sections(self):
@@ -1156,6 +1285,7 @@ class TelegramPipelineTests(unittest.TestCase):
             < joined.index("## 0-2. ")
             < joined.index("## 0-3. ")
             < joined.index("## 0-4. ")
+            < joined.index("## 0-5. ")
             < joined.index("## 1. ")
         )
 
@@ -1385,17 +1515,24 @@ class HomeDigestLoaderTests(unittest.TestCase):
                         },
                     ],
                 },
+                {
+                    "key": HULL_BUY_TURN_KEY,
+                    "items": [
+                        {"ticker": "HULLX", "bucket": "HULL_BUY_TURN", "reason": "HULL"},
+                    ],
+                },
             ]
         }
         self.assertEqual([item["ticker"] for item in extract_section_candidates(payload, "final_top", limit=1)], ["AAPL"])
         self.assertEqual([item["ticker"] for item in extract_section_candidates(payload, "five_day_top", limit=1)], ["NVDA"])
         self.assertEqual([item["ticker"] for item in extract_section_candidates(payload, STEADY_WINNER_SECTION_KEY, limit=1)], ["META"])
         self.assertEqual([item["ticker"] for item in extract_section_candidates(payload, EARLY_REVERSAL_KEY, limit=1)], ["MELI"])
+        self.assertEqual([item["ticker"] for item in extract_section_candidates(payload, HULL_BUY_TURN_KEY, limit=1)], ["HULLX"])
 
     def test_telegram_board_rows_keep_five_day_and_tolerate_missing_long_returns(self):
         payload = {
             "version": "2.0",
-            "section_order": [STEADY_WINNER_SECTION_KEY, EARLY_REVERSAL_KEY, "five_day_top"],
+            "section_order": [STEADY_WINNER_SECTION_KEY, EARLY_REVERSAL_KEY, HULL_BUY_TURN_KEY, "five_day_top"],
             "sections": [
                 {
                     "key": STEADY_WINNER_SECTION_KEY,
@@ -1478,6 +1615,33 @@ class HomeDigestLoaderTests(unittest.TestCase):
                         }
                     ],
                 },
+                {
+                    "key": HULL_BUY_TURN_KEY,
+                    "title": "hull",
+                    "item_count": 1,
+                    "ranked": True,
+                    "items": [
+                        {
+                            "ticker": "HULLX",
+                            "price": 90.0,
+                            "chg_pct": 2.1,
+                            "chg_5d": 4.8,
+                            "ret_1m_pct": 9.0,
+                            "ret_1y_pct": 33.0,
+                            "high_pos_pct": -5.5,
+                            "rsi": 61.0,
+                            "ma20_dist_pct": 3.1,
+                            "volume_ratio_20": 1.3,
+                            "section_key": HULL_BUY_TURN_KEY,
+                            "rank": 1,
+                            "bucket": "HULL_BUY_TURN",
+                            "reason": "HULL+거래량동반",
+                            "risk_flags": [],
+                            "source_flags": {"rs_rank_vs_index": 76.0, "hull_confirm": "MA20 +3.1% / HULL D+0"},
+                            "entry_type": "hull_buy_turn_watch",
+                        }
+                    ],
+                },
             ],
         }
 
@@ -1497,6 +1661,11 @@ class HomeDigestLoaderTests(unittest.TestCase):
         self.assertEqual(rows_by_ticker["MELI"]["one_year_pct"], -18.5)
         self.assertEqual(rows_by_ticker["MELI"]["rsi"], 52.0)
         self.assertEqual(rows_by_ticker["MELI"]["ma20"], 3.2)
+        self.assertEqual(rows_by_ticker["HULLX"]["section"], "HULL")
+        self.assertEqual(rows_by_ticker["HULLX"]["bucket"], "HULL_BUY_TURN")
+        self.assertEqual(rows_by_ticker["HULLX"]["score"], "HULL")
+        self.assertIsNone(rows_by_ticker["HULLX"]["score_value"])
+        self.assertEqual(rows_by_ticker["HULLX"]["entry"], "hull_buy_turn_watch")
         self.assertEqual(rows_by_ticker["NVDA"]["five_day_pct"], 12.3)
         self.assertEqual(rows_by_ticker["NVDA"]["today_pct"], 1.1)
         self.assertIsNone(rows_by_ticker["NVDA"]["one_month_pct"])
@@ -1630,7 +1799,7 @@ class HomeDigestLoaderTests(unittest.TestCase):
             "run_stamp": "run-1",
             "market_date": "2026-05-01",
             "generated_at": "2026-05-02T06:16:51+09:00",
-            "section_order": ["qbs_buy_now", STEADY_WINNER_SECTION_KEY, EARLY_REVERSAL_KEY, "sell_risk"],
+            "section_order": ["qbs_buy_now", STEADY_WINNER_SECTION_KEY, EARLY_REVERSAL_KEY, HULL_BUY_TURN_KEY, "sell_risk"],
             "universe_count": 10,
             "result_count": 2,
             "skip_count": 1,
@@ -1707,6 +1876,29 @@ class HomeDigestLoaderTests(unittest.TestCase):
                     ],
                 },
                 {
+                    "key": HULL_BUY_TURN_KEY,
+                    "title": "당일 HULL 매수전환",
+                    "item_count": 1,
+                    "ranked": True,
+                    "items": [
+                        {
+                            "ticker": "HULLX",
+                            "price": 90.0,
+                            "chg_pct": 2.1,
+                            "chg_5d": 4.8,
+                            "volume_ratio_20": 1.3,
+                            "section_key": HULL_BUY_TURN_KEY,
+                            "rank": 1,
+                            "label": "HULL BUY",
+                            "bucket": "HULL_BUY_TURN",
+                            "reason": "HULL",
+                            "risk_flags": [],
+                            "source_flags": {"rs_rank_vs_index": 76.0, "hull_confirm": "MA20 +3.1% / HULL D+0"},
+                            "entry_type": "hull_buy_turn_watch",
+                        }
+                    ],
+                },
+                {
                     "key": "sell_risk",
                     "title": "매도전환 / 위험 후보",
                     "item_count": 1,
@@ -1733,14 +1925,17 @@ class HomeDigestLoaderTests(unittest.TestCase):
         self.assertIn("## 0. 오늘 매수 최종 후보 Top 20", message)
         self.assertIn("## 0-3. 계속 우상향 주도주 Top 30", message)
         self.assertIn("## 0-4. 초기 반전 포착 Top 20", message)
+        self.assertIn("## 0-5. 당일 HULL 매수전환", message)
         self.assertIn("## 1. 매도전환 / 위험 후보", message)
         self.assertIn("AAPL", message)
         self.assertIn("META | PUL 78", message)
         self.assertIn("MELI | ERS 84", message)
+        self.assertIn("HULLX | HULL BUY", message)
         self.assertIn("TSLA", message)
         self.assertLess(message.index("AAPL"), message.index("META"))
         self.assertLess(message.index("META"), message.index("MELI"))
-        self.assertLess(message.index("MELI"), message.index("TSLA"))
+        self.assertLess(message.index("MELI"), message.index("HULLX"))
+        self.assertLess(message.index("HULLX"), message.index("TSLA"))
 
     def test_resolve_github_digest_config_uses_default_repo_when_unconfigured(self):
         with patch.dict(os.environ, {}, clear=True), patch("app_ui.pages.home_page._read_secret", return_value=""):

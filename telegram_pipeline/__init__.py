@@ -7,6 +7,7 @@ from .early_reversal_ranker import (
 )
 from .final_buy_ranker import annotate_rows_with_qbs, build_final_buy_sections
 from .formatters import build_post_close_digest, build_post_close_message_texts
+from .hull_buy_turn_ranker import HULL_BUY_TURN_KEY, select_hull_buy_turn_rows
 from .publisher import publish_digest_if_configured, publish_digest_to_github, write_local_digest_artifacts
 from .selectors import (
     BOARD_MANDATORY_SECTION_KEYS,
@@ -38,6 +39,8 @@ __all__ = [
     "EARLY_REVERSAL_LIMIT",
     "build_early_reversal_section",
     "rank_early_reversal_candidates",
+    "HULL_BUY_TURN_KEY",
+    "select_hull_buy_turn_rows",
     "build_final_buy_sections",
     "build_post_close_digest",
     "build_post_close_message_texts",

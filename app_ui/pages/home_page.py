@@ -13,6 +13,7 @@ import streamlit as st
 from telegram_pipeline.contracts import TelegramCandidate, TelegramDigest, TelegramSection
 from telegram_pipeline.early_reversal_ranker import EARLY_REVERSAL_KEY
 from telegram_pipeline.formatters import QBS_DISPLAY_NUMBERS, STEADY_WINNER_DISPLAY_NUMBER, build_main_message
+from telegram_pipeline.hull_buy_turn_ranker import HULL_BUY_TURN_KEY
 from telegram_pipeline.selectors import BOARD_MANDATORY_SECTION_KEYS, STEADY_WINNER_SECTION_KEY
 from theme import FONT_STACK
 
@@ -302,6 +303,9 @@ def _visible_telegram_sections(digest: TelegramDigest) -> list[TelegramSection]:
         if section.key == EARLY_REVERSAL_KEY:
             visible.append(section)
             continue
+        if section.key == HULL_BUY_TURN_KEY:
+            visible.append(section)
+            continue
         if section.key in mandatory or section.item_count > 0:
             visible.append(section)
     return visible
@@ -416,6 +420,8 @@ def _section_tone(section_key: str) -> str:
     if key in {"qbs_pullback_wait", "pullback_reentry", "breakout_wait"}:
         return "info"
     if key == EARLY_REVERSAL_KEY:
+        return "info"
+    if key == HULL_BUY_TURN_KEY:
         return "info"
     return "positive"
 
@@ -533,6 +539,7 @@ def _board_entry_text(item: TelegramCandidate, section_key: str, fallback_entry:
         "qbs_pullback_wait": "pullback_wait",
         STEADY_WINNER_SECTION_KEY: "watchlist",
         EARLY_REVERSAL_KEY: "reversal_watch",
+        HULL_BUY_TURN_KEY: "hull_buy_turn_watch",
         "five_day_top": "momentum_watch",
     }
     return defaults.get(str(section_key or ""), "-")
@@ -545,6 +552,7 @@ def _board_section_label(section_key: str) -> str:
         "qbs_pullback_wait": "PULLBACK",
         STEADY_WINNER_SECTION_KEY: "STEADY",
         EARLY_REVERSAL_KEY: "REVERSAL",
+        HULL_BUY_TURN_KEY: "HULL",
         "five_day_top": "5D TOP",
     }
     return labels.get(str(section_key or ""), str(section_key or "-"))
@@ -555,6 +563,8 @@ def _board_bucket_label(item: TelegramCandidate, section_key: str) -> str:
         return _candidate_status_text(item)
     if section_key == EARLY_REVERSAL_KEY:
         return str(item.reversal_phase or item.bucket or item.label or "-").strip() or "-"
+    if section_key == HULL_BUY_TURN_KEY:
+        return "HULL_BUY_TURN"
     return str(item.bucket or item.label or "-").strip() or "-"
 
 
@@ -563,6 +573,8 @@ def _board_score_text(item: TelegramCandidate, section_key: str) -> str:
         return _format_pul(item.pul_score)
     if section_key == EARLY_REVERSAL_KEY:
         return _format_ers(item.early_reversal_score)
+    if section_key == HULL_BUY_TURN_KEY:
+        return "HULL"
     if section_key in QBS_DISPLAY_NUMBERS:
         return _format_qbs(item.qbs_score)
     return "--"
@@ -651,6 +663,8 @@ def _collect_digest_metric_lookup(digest: TelegramDigest) -> dict[str, dict[str,
             elif section.key == EARLY_REVERSAL_KEY and item.early_reversal_score is not None:
                 metrics["score"] = _first_text(metrics.get("score"), _format_ers(item.early_reversal_score))
                 metrics["score_value"] = _first_number(metrics.get("score_value"), item.early_reversal_score)
+            elif section.key == HULL_BUY_TURN_KEY:
+                metrics["score"] = _first_text(metrics.get("score"), "HULL")
             elif section.key in QBS_DISPLAY_NUMBERS and item.qbs_score is not None:
                 metrics["score"] = _first_text(metrics.get("score"), _format_qbs(item.qbs_score))
                 metrics["score_value"] = _first_number(metrics.get("score_value"), item.qbs_score)
@@ -662,7 +676,7 @@ def _build_telegram_board_rows(
     *,
     market_metric_lookup: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    board_section_keys = {*QBS_DISPLAY_NUMBERS.keys(), STEADY_WINNER_SECTION_KEY, EARLY_REVERSAL_KEY, "five_day_top"}
+    board_section_keys = {*QBS_DISPLAY_NUMBERS.keys(), STEADY_WINNER_SECTION_KEY, EARLY_REVERSAL_KEY, HULL_BUY_TURN_KEY, "five_day_top"}
     metric_lookup = _collect_digest_metric_lookup(digest)
     market_lookup = {str(ticker or "").strip().upper(): dict(metrics or {}) for ticker, metrics in dict(market_metric_lookup or {}).items()}
     rows: list[dict[str, Any]] = []
@@ -707,6 +721,8 @@ def _build_telegram_board_rows(
                     if section.key == STEADY_WINNER_SECTION_KEY
                     else item.early_reversal_score
                     if section.key == EARLY_REVERSAL_KEY
+                    else None
+                    if section.key == HULL_BUY_TURN_KEY
                     else item.qbs_score,
                     fallback.get("score_value"),
                 ),
@@ -734,6 +750,8 @@ def _filter_telegram_board_rows(rows: list[dict[str, Any]], filter_key: str) -> 
         return [row for row in rows if row.get("section_key") == STEADY_WINNER_SECTION_KEY]
     if filter_key == "reversal":
         return [row for row in rows if row.get("section_key") == EARLY_REVERSAL_KEY]
+    if filter_key == "hull":
+        return [row for row in rows if row.get("section_key") == HULL_BUY_TURN_KEY]
     if filter_key == "five_day":
         return [row for row in rows if row.get("section_key") == "five_day_top"]
     if filter_key == "risk":
@@ -996,6 +1014,7 @@ def _render_telegram_visual_board(digest: TelegramDigest, *, on_select_ticker: C
         "qbs": "QBS",
         "steady": "Steady Winner",
         "reversal": "Reversal",
+        "hull": "HULL",
         "five_day": "5D Top",
         "risk": "Risk",
     }
@@ -1463,6 +1482,44 @@ def _render_telegram_section_table(section: TelegramSection) -> None:
         )
         return
 
+    if section.key == HULL_BUY_TURN_KEY:
+        rows = [
+            "<tr>"
+            f"<td class='cpx-digest-rank'>#{item.rank or idx}</td>"
+            f"<td><span class='cpx-digest-ticker'>{_html_text(item.ticker)}</span></td>"
+            f"<td>{_badge_html(_format_float(item.chg_pct, 2, signed=True, suffix='%') + ' / 5D ' + _format_float(item.chg_5d, 2, signed=True, suffix='%'), _change_tone(item.chg_pct))}</td>"
+            f"<td class='cpx-digest-num'>{_html_text(_format_float(item.rsi, 1))}</td>"
+            f"<td>{_badge_html(_format_ratio(item.volume_ratio_20), _volume_tone(item.volume_ratio_20))}</td>"
+            f"<td>{_badge_html(_format_float(item.ma20_dist_pct, 1, signed=True, suffix='%'), _change_tone(item.ma20_dist_pct))}</td>"
+            f"<td class='cpx-digest-num'>{_html_text(_format_float((item.source_flags or {}).get('rs_rank_vs_index'), 0))}</td>"
+            f"<td><div class='cpx-digest-tags'>{_candidate_tags_html(item)}</div></td>"
+            "</tr>"
+            for idx, item in enumerate(section.items, start=1)
+        ]
+        st.markdown(
+            f"""
+            <div class='cpx-digest-table-wrap'>
+                <table class='cpx-digest-table'>
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Ticker</th>
+                            <th>Today/5D</th>
+                            <th>RSI</th>
+                            <th>Vol20</th>
+                            <th>MA20</th>
+                            <th>RS</th>
+                            <th>Reason/Risk</th>
+                        </tr>
+                    </thead>
+                    <tbody>{''.join(rows)}</tbody>
+                </table>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+
     if section.key == "five_day_top":
         rows = [
             "<tr>"
@@ -1574,6 +1631,8 @@ def _render_telegram_message_board(
             display_number = STEADY_WINNER_DISPLAY_NUMBER
         elif section.key == EARLY_REVERSAL_KEY:
             display_number = "0-4"
+        elif section.key == HULL_BUY_TURN_KEY:
+            display_number = "0-5"
         else:
             display_number = str(board_display_index)
             board_display_index += 1

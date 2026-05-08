@@ -21,6 +21,12 @@ from .final_buy_ranker import (
     QBS_PULLBACK_WAIT_KEY,
     build_final_buy_sections,
 )
+from .hull_buy_turn_ranker import (
+    HULL_BUY_TURN_KEY,
+    HULL_BUY_TURN_QUALITY_FLOOR,
+    HULL_BUY_TURN_SECTION_TITLE,
+    select_hull_buy_turn_rows,
+)
 from .rankers import (
     is_truthy,
     safe_float,
@@ -70,6 +76,7 @@ BOARD_SECTION_KEYS = set(BOARD_SECTION_ORDER)
 FIVE_DAY_TOP_SECTION_KEY = "five_day_top"
 STEADY_WINNER_DISPLAY_NUMBER = "0-3"
 EARLY_REVERSAL_DISPLAY_NUMBER = "0-4"
+HULL_BUY_TURN_DISPLAY_NUMBER = "0-5"
 
 
 def _signed(value: Any, decimals: int = 2) -> str:
@@ -317,6 +324,7 @@ def _candidate_label(section_key: str) -> str:
         "five_day_top": "5D top",
         STEADY_WINNER_SECTION_KEY: "PUL",
         EARLY_REVERSAL_KEY: "ERS",
+        HULL_BUY_TURN_KEY: "HULL BUY",
         "new_52w_high": "52W high",
     }.get(section_key, section_key)
 
@@ -347,6 +355,8 @@ def _candidate_reason(section_key: str, row: Mapping[str, Any], target_date: dat
         return str(row.get("pul_reason") or "-")
     if section_key == EARLY_REVERSAL_KEY:
         return str(row.get("reversal_reason") or "-")
+    if section_key == HULL_BUY_TURN_KEY:
+        return str(row.get("hull_reason") or "HULL")
     if section_key == "new_52w_high":
         return _build_new_52w_high_reason(row)
     return "-"
@@ -360,6 +370,8 @@ def _candidate_source_flags(section_key: str, row: Mapping[str, Any], target_dat
     turn_engine = ""
     if section_key == "buy_turn":
         turn_engine = _turn_engine_text(utbot=buy_turn_utbot, hull=buy_turn_hull)
+    elif section_key == HULL_BUY_TURN_KEY:
+        turn_engine = "HULL"
     elif section_key == "sell_turn":
         turn_engine = _turn_engine_text(utbot=sell_turn_utbot, hull=sell_turn_hull)
 
@@ -387,6 +399,7 @@ def _candidate_source_flags(section_key: str, row: Mapping[str, Any], target_dat
         "rsi": safe_float(row.get("rsi", row.get("RSI", 0.0))),
         "ma20_dist_pct": safe_float(row.get("ma20_dist_pct", row.get("dist_sma20_pct", 0.0))),
         "high_pos_pct": _optional_float(row, "high_pos_pct", "drawdown_from_52w_high_pct"),
+        "rs_rank_vs_index": safe_float(row.get("rs_rank_vs_index", 0.0)),
         "status_tags": _five_day_status_tags(row) if section_key == FIVE_DAY_TOP_SECTION_KEY else [],
         "status": _five_day_status(row) if section_key == FIVE_DAY_TOP_SECTION_KEY else "",
         "pul_score": safe_float(row.get("pul_score", 0.0)) if section_key == STEADY_WINNER_SECTION_KEY else 0.0,
@@ -394,7 +407,9 @@ def _candidate_source_flags(section_key: str, row: Mapping[str, Any], target_dat
         "reversal_type": str(row.get("reversal_type") or "") if section_key == EARLY_REVERSAL_KEY else "",
         "reversal_phase": str(row.get("reversal_phase") or "") if section_key == EARLY_REVERSAL_KEY else "",
         "reversal_confirm": str(row.get("reversal_confirm") or "") if section_key == EARLY_REVERSAL_KEY else "",
-        "entry_type": str(row.get("entry_type") or "") if section_key in {STEADY_WINNER_SECTION_KEY, EARLY_REVERSAL_KEY} else "",
+        "hull_confirm": str(row.get("hull_confirm") or "") if section_key == HULL_BUY_TURN_KEY else "",
+        "hull_utbot_same_turn": int(safe_float(row.get("hull_utbot_same_turn", 0.0))) if section_key == HULL_BUY_TURN_KEY else 0,
+        "entry_type": str(row.get("entry_type") or "") if section_key in {STEADY_WINNER_SECTION_KEY, EARLY_REVERSAL_KEY, HULL_BUY_TURN_KEY} else "",
         "label": _candidate_label(section_key),
         "membership": list(row.get("source_membership") or []),
         "membership_count": int(safe_float(row.get("membership_count", 0.0))),
@@ -407,6 +422,7 @@ def _build_candidate(section_key: str, row: Mapping[str, Any], rank: int, target
     status_tags = _five_day_status_tags(row) if section_key == FIVE_DAY_TOP_SECTION_KEY else []
     steady_risk_tags = list(row.get("pul_risk_tags") or []) if section_key == STEADY_WINNER_SECTION_KEY else []
     reversal_risk_tags = list(row.get("reversal_risk_flags") or []) if section_key == EARLY_REVERSAL_KEY else []
+    hull_risk_tags = list(row.get("hull_risk_flags") or []) if section_key == HULL_BUY_TURN_KEY else []
     return TelegramCandidate(
         ticker=str(row.get("ticker") or "").strip().upper(),
         price=safe_float(row.get("price")) if row.get("price") is not None else None,
@@ -415,12 +431,12 @@ def _build_candidate(section_key: str, row: Mapping[str, Any], rank: int, target
         volume_ratio_20=safe_float(row.get("volume_ratio_20")) if row.get("volume_ratio_20") is not None else None,
         section_key=section_key,
         rank=rank,
-        label=str(row.get("pul_bucket") or row.get("reversal_phase") or row.get("board_label") or _candidate_label(section_key)),
+        label=str(row.get("pul_bucket") or row.get("reversal_phase") or row.get("hull_bucket") or row.get("board_label") or _candidate_label(section_key)),
         reason=_candidate_reason(section_key, row, target_date),
         source_flags=_candidate_source_flags(section_key, row, target_date),
-        bucket=str(row.get("pul_bucket") or row.get("reversal_phase") or ""),
-        tags=list(row.get("pul_tags") or row.get("reversal_tags") or row.get("board_tags") or []),
-        risk_flags=steady_risk_tags or reversal_risk_tags or list(row.get("board_risk_flags") or []),
+        bucket=str(row.get("pul_bucket") or row.get("reversal_phase") or row.get("hull_bucket") or ""),
+        tags=list(row.get("pul_tags") or row.get("reversal_tags") or row.get("hull_tags") or row.get("board_tags") or []),
+        risk_flags=steady_risk_tags or reversal_risk_tags or hull_risk_tags or list(row.get("board_risk_flags") or []),
         chg_5d=_optional_float(row, "chg_5d"),
         rsi=_optional_float(row, "rsi", "RSI"),
         ma20_dist_pct=_optional_float(row, "ma20_dist_pct", "dist_sma20_pct"),
@@ -526,6 +542,21 @@ def build_post_close_digest(
             ranked=True,
         )
     )
+    hull_rows = select_hull_buy_turn_rows(row_list, target_date=market_date)
+    hull_items = [
+        _build_candidate(HULL_BUY_TURN_KEY, row, idx, market_date)
+        for idx, row in enumerate(hull_rows, start=1)
+    ]
+    sections.append(
+        TelegramSection(
+            key=HULL_BUY_TURN_KEY,
+            title=HULL_BUY_TURN_SECTION_TITLE,
+            items=hull_items,
+            item_count=len(hull_items),
+            quality_floor=HULL_BUY_TURN_QUALITY_FLOOR,
+            ranked=True,
+        )
+    )
     qbs_top_tickers = {
         item.ticker
         for section in sections
@@ -573,7 +604,14 @@ def build_post_close_digest(
         run_stamp=str(run_stamp or "").strip(),
         market_date=market_date.isoformat(),
         generated_at=generated_at.isoformat(),
-        section_order=[*QBS_OUTPUT_KEYS, STEADY_WINNER_SECTION_KEY, EARLY_REVERSAL_KEY, *BOARD_SECTION_ORDER, FIVE_DAY_TOP_SECTION_KEY],
+        section_order=[
+            *QBS_OUTPUT_KEYS,
+            STEADY_WINNER_SECTION_KEY,
+            EARLY_REVERSAL_KEY,
+            HULL_BUY_TURN_KEY,
+            *BOARD_SECTION_ORDER,
+            FIVE_DAY_TOP_SECTION_KEY,
+        ],
         sections=sections,
         briefing_refs={
             "mode": "separate_message",
@@ -665,6 +703,25 @@ def _format_early_reversal_candidate_line(candidate: TelegramCandidate) -> str:
     )
 
 
+def _format_hull_buy_turn_candidate_line(candidate: TelegramCandidate) -> str:
+    risk = "+".join(list(candidate.risk_flags or [])) or "-"
+    confirm = str(candidate.source_flags.get("hull_confirm") or "HULL D+0")
+    return "\n".join(
+        [
+            (
+                f"{candidate.rank}. {candidate.ticker}"
+                f" | HULL BUY"
+                f" | {_signed(candidate.chg_pct, 2)}% / 5D {_signed(candidate.chg_5d, 2)}%"
+                f" | {_ratio(candidate.volume_ratio_20, 2)}"
+                f" | RS {_number((candidate.source_flags or {}).get('rs_rank_vs_index'), 0)}"
+            ),
+            f"   근거: {str(candidate.reason or '-')}",
+            f"   확인: {confirm}",
+            f"   주의: {risk}",
+        ]
+    )
+
+
 def _qbs_section_block(display_number: str, section: TelegramSection) -> str:
     lines = [f"## {display_number}. {section.title}"]
     if not section.items:
@@ -692,6 +749,16 @@ def _early_reversal_section_block(section: TelegramSection) -> str:
         return "\n".join(lines)
     for item in section.items:
         lines.append(_format_early_reversal_candidate_line(item))
+    return "\n".join(lines)
+
+
+def _hull_buy_turn_section_block(section: TelegramSection) -> str:
+    lines = [f"## {HULL_BUY_TURN_DISPLAY_NUMBER}. {section.title}"]
+    if not section.items:
+        lines.append("- 해당 없음")
+        return "\n".join(lines)
+    for item in section.items:
+        lines.append(_format_hull_buy_turn_candidate_line(item))
     return "\n".join(lines)
 
 
@@ -734,6 +801,9 @@ def build_main_message(digest: TelegramDigest) -> str:
             continue
         if section.key == EARLY_REVERSAL_KEY:
             blocks.append(_early_reversal_section_block(section))
+            continue
+        if section.key == HULL_BUY_TURN_KEY:
+            blocks.append(_hull_buy_turn_section_block(section))
             continue
         if section.key not in BOARD_MANDATORY_SECTION_KEYS and section.item_count <= 0:
             continue
