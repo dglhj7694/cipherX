@@ -23,9 +23,15 @@ class TelegramCandidate:
     chg_5d: float | None = None
     rsi: float | None = None
     ma20_dist_pct: float | None = None
+    ret_1m_pct: float | None = None
+    ret_1y_pct: float | None = None
+    high_pos_pct: float | None = None
     status_tags: list[str] = field(default_factory=list)
     status: str = ""
     pul_score: float | None = None
+    early_reversal_score: float | None = None
+    reversal_type: str = ""
+    reversal_phase: str = ""
     entry_type: str = ""
 
     def to_dict(self) -> dict[str, Any]:

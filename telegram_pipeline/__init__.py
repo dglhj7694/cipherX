@@ -1,4 +1,10 @@
 from .contracts import TelegramCandidate, TelegramDigest, TelegramSection
+from .early_reversal_ranker import (
+    EARLY_REVERSAL_KEY,
+    EARLY_REVERSAL_LIMIT,
+    build_early_reversal_section,
+    rank_early_reversal_candidates,
+)
 from .final_buy_ranker import annotate_rows_with_qbs, build_final_buy_sections
 from .formatters import build_post_close_digest, build_post_close_message_texts
 from .publisher import publish_digest_if_configured, publish_digest_to_github, write_local_digest_artifacts
@@ -28,6 +34,10 @@ __all__ = [
     "TelegramDigest",
     "TelegramSection",
     "annotate_rows_with_qbs",
+    "EARLY_REVERSAL_KEY",
+    "EARLY_REVERSAL_LIMIT",
+    "build_early_reversal_section",
+    "rank_early_reversal_candidates",
     "build_final_buy_sections",
     "build_post_close_digest",
     "build_post_close_message_texts",

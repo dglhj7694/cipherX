@@ -135,6 +135,7 @@ class DailyScanNotifyTests(unittest.TestCase):
             "latest_session_utbot_buy_turn": True,
             "latest_session_hull_buy_turn": False,
             "chg_5d": 3.42,
+            "ret252_pct": 64.25,
             "gap_risk_2pct": True,
             "atr_contracting": True,
             "weekly_trend_context": "STRONG_UPTREND",
@@ -165,6 +166,7 @@ class DailyScanNotifyTests(unittest.TestCase):
         utbot_idx = next(i for i, name in enumerate(extra_header) if str(name).endswith("(latest_session_utbot_buy_turn)"))
         hull_idx = next(i for i, name in enumerate(extra_header) if str(name).endswith("(latest_session_hull_buy_turn)"))
         chg_5d_idx = next(i for i, name in enumerate(extra_header) if str(name).endswith("(chg_5d)"))
+        ret252_idx = next(i for i, name in enumerate(extra_header) if str(name).endswith("(ret252_pct)"))
         gap_risk_idx = next(i for i, name in enumerate(extra_header) if str(name).endswith("(gap_risk_2pct)"))
         atr_contracting_idx = next(i for i, name in enumerate(extra_header) if str(name).endswith("(atr_contracting)"))
         weekly_trend_idx = next(i for i, name in enumerate(extra_header) if str(name).endswith("(weekly_trend_context)"))
@@ -174,6 +176,7 @@ class DailyScanNotifyTests(unittest.TestCase):
         self.assertEqual(extra_data[utbot_idx], "Y")
         self.assertEqual(extra_data[hull_idx], "N")
         self.assertEqual(extra_data[chg_5d_idx], "3.42")
+        self.assertEqual(extra_data[ret252_idx], "64.25")
         self.assertEqual(extra_data[gap_risk_idx], "Y")
         self.assertEqual(extra_data[atr_contracting_idx], "Y")
         self.assertEqual(extra_data[weekly_trend_idx], "STRONG_UPTREND")
@@ -184,6 +187,7 @@ class DailyScanNotifyTests(unittest.TestCase):
         self.assertFalse(any(str(name).endswith("(latest_session_utbot_buy_turn)") for name in base_header))
         self.assertFalse(any(str(name).endswith("(latest_session_hull_buy_turn)") for name in base_header))
         self.assertFalse(any(str(name).endswith("(chg_5d)") for name in base_header))
+        self.assertFalse(any(str(name).endswith("(ret252_pct)") for name in base_header))
         self.assertFalse(any(str(name).endswith("(gap_risk_2pct)") for name in base_header))
 
     def test_write_scan_csv_post_close_final_entry_columns(self):
@@ -1900,6 +1904,19 @@ class DailyScanNotifyTests(unittest.TestCase):
         self.assertEqual(metrics["days_since_hull_turn_bear"], 8)
         self.assertEqual(metrics["system_turn_bull_last_date"], idx[-5].date().isoformat())
         self.assertTrue(metrics["volume_climax_flag"])
+
+    def test_compute_post_close_row_metrics_ret252_pct(self):
+        idx = pd.date_range("2025-01-01", periods=253, freq="D")
+        close = pd.Series([100.0 + i for i in range(253)], index=idx, dtype=float)
+        frame = pd.DataFrame(index=idx)
+        frame["Open"] = close
+        frame["Close"] = close
+        frame["High"] = close + 1.0
+        frame["Low"] = close - 1.0
+
+        metrics = _compute_post_close_row_metrics(frame)
+
+        self.assertAlmostEqual(metrics["ret252_pct"], 252.0)
 
     def test_compute_post_close_row_metrics_accuracy_boosters(self):
         idx = pd.date_range("2026-01-01", periods=40, freq="D")

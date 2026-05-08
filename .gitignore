@@ -2,6 +2,9 @@ _tmp_test.txt
 tests/test_trendlines.py
 BRAND_GUIDE.md
 
+# Local Streamlit digest cache
+artifacts/app_cache/
+
 # Python bytecode caches
 __pycache__/
 *.py[cod]

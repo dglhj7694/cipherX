@@ -12,6 +12,7 @@ from app_ui.pages.home_page import extract_section_candidates, load_latest_teleg
 from scripts.daily_scan_and_notify import _build_post_close_digest_bundle, _send_telegram_if_enabled
 from telegram_pipeline import (
     BOARD_SECTION_LIMIT,
+    EARLY_REVERSAL_KEY,
     STEADY_WINNER_SECTION_KEY,
     TelegramCandidate,
     annotate_rows_with_qbs,
@@ -67,6 +68,7 @@ class TelegramPipelineTests(unittest.TestCase):
             "hma20_slope_pct": 1.8,
             "hma60_slope_pct": 2.2,
             "pullback_from_swing_high_pct": -4.5,
+            "drawdown_from_52w_high_pct": -6.0,
             "drawdown_from_20d_high_pct": -4.0,
             "pullback_atr_multiple": 1.8,
             "pullback_ready": True,
@@ -76,6 +78,10 @@ class TelegramPipelineTests(unittest.TestCase):
             "volume_bullish": True,
             "adx": 24.0,
             "rs_rank_vs_index": 83.0,
+            "ret20_pct": 8.5,
+            "ret60_pct": 18.0,
+            "ret120_pct": 32.0,
+            "ret252_pct": 64.0,
             "dist_sma20_pct": 9.0,
             "zscore20": 1.9,
             "utbot_sell_recent": False,
@@ -104,6 +110,59 @@ class TelegramPipelineTests(unittest.TestCase):
         row.update(overrides)
         return row
 
+    def _early_reversal_row(self, ticker: str, **overrides):
+        row = self._row(
+            ticker,
+            final_entry_eligible=False,
+            final_entry_selected=False,
+            final_entry_score=0.0,
+            scan_score=120.0,
+            chg=2.1,
+            chg_value=2.0,
+            chg_5d=4.8,
+            ret20_pct=-4.0,
+            ret60_pct=-12.0,
+            dist_sma50_pct=-3.0,
+            drawdown_from_52w_high_pct=-22.0,
+            drawdown_from_20d_high_pct=-3.0,
+            atr_contracting=True,
+            nr7_flag=True,
+            inside_day_flag=True,
+            three_weeks_tight=False,
+            volume_dry_up_score=14.0,
+            bb_percent_b=0.68,
+            first_higher_low_pivot2=True,
+            first_higher_high_pivot2=False,
+            tight_close_near_high_3d=True,
+            latest_session_utbot_buy_turn=False,
+            latest_session_hull_buy_turn=True,
+            days_since_utbot_buy=99,
+            days_since_hull_turn_bull=0,
+            first_close_above_ma20_after_5bars=True,
+            volume_ratio_20=1.42,
+            volume_expansion_score=30.0,
+            obv_slope=0.4,
+            cmf=0.12,
+            volume_bullish=True,
+            dist_sma20_pct=3.2,
+            ma20_dist_pct=3.2,
+            zscore20=1.1,
+            breakout_dist_20d_high_pct=-1.8,
+            thin_trade_risk=False,
+            bearish_gap_failure=False,
+            multi_sell=0,
+            strategy_conflict_level="LOW",
+            low_conflict_bullish=True,
+            utbot_sell_last_date="N/A",
+            hull_turn_bear_last_date="N/A",
+            hma_ema_short_entry=False,
+            hma_ema_short_aligned=False,
+            new_52w_high=False,
+            new_52w_closing_high=False,
+        )
+        row.update(overrides)
+        return row
+
     def test_build_post_close_digest_uses_trader_board_sections_and_tags_overlap(self):
         digest = build_post_close_digest(
             [self._row("ALPHA")],
@@ -124,6 +183,7 @@ class TelegramPipelineTests(unittest.TestCase):
                 "qbs_chase_watch",
                 "qbs_pullback_wait",
                 STEADY_WINNER_SECTION_KEY,
+                EARLY_REVERSAL_KEY,
                 "confluence",
                 "entry_now",
                 "pullback_reentry",
@@ -145,7 +205,7 @@ class TelegramPipelineTests(unittest.TestCase):
         general_tickers = [
             item.ticker
             for key in digest.section_order
-            if not key.startswith("qbs_") and key not in {"five_day_top", STEADY_WINNER_SECTION_KEY}
+            if not key.startswith("qbs_") and key not in {"five_day_top", STEADY_WINNER_SECTION_KEY, EARLY_REVERSAL_KEY}
             for item in section_map[key].items
         ]
         self.assertEqual(len(general_tickers), len(set(general_tickers)))
@@ -662,6 +722,245 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertEqual(tickers.count("DUP"), 1)
         self.assertIn("DUP", [item.ticker for item in runaway_items])
 
+    def test_early_reversal_section_sits_after_steady_and_includes_downtrend_reversal(self):
+        row = self._early_reversal_row("MELI")
+        digest = build_post_close_digest(
+            [row],
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=1,
+            result_count=1,
+            skip_count=0,
+        )
+        section_map = digest.section_map()
+        item = section_map[EARLY_REVERSAL_KEY].items[0]
+
+        self.assertEqual(
+            digest.section_order[:5],
+            ["qbs_buy_now", "qbs_chase_watch", "qbs_pullback_wait", STEADY_WINNER_SECTION_KEY, EARLY_REVERSAL_KEY],
+        )
+        self.assertEqual(item.ticker, "MELI")
+        self.assertEqual(item.reversal_phase, "CONFIRMED")
+        self.assertEqual(item.reversal_type, "MIXED_REVERSAL")
+        self.assertIsNotNone(item.early_reversal_score)
+        self.assertGreaterEqual(item.early_reversal_score or 0.0, 80.0)
+        self.assertEqual(item.entry_type, "confirmed_reversal_watch")
+
+    def test_early_reversal_includes_box_breakout_context(self):
+        row = self._early_reversal_row(
+            "BOX",
+            ret20_pct=3.0,
+            ret60_pct=6.0,
+            dist_sma50_pct=2.0,
+            drawdown_from_52w_high_pct=-5.0,
+            atr_contracting=True,
+            nr7_flag=True,
+            inside_day_flag=True,
+            first_higher_low_pivot2=False,
+            first_higher_high_pivot2=True,
+            latest_session_hull_buy_turn=False,
+            latest_session_utbot_buy_turn=True,
+            days_since_hull_turn_bull=99,
+            days_since_utbot_buy=0,
+            first_close_above_ma20_after_5bars=True,
+            breakout_dist_20d_high_pct=-1.0,
+        )
+        digest = build_post_close_digest(
+            [row],
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=1,
+            result_count=1,
+            skip_count=0,
+        )
+        item = digest.section_map()[EARLY_REVERSAL_KEY].items[0]
+
+        self.assertEqual(item.ticker, "BOX")
+        self.assertEqual(item.reversal_type, "BOX_BREAKOUT")
+        self.assertIn(item.reversal_phase, {"TRIGGERED", "CONFIRMED"})
+
+    def test_early_reversal_requires_context_trigger_and_volume(self):
+        weak_without_trigger = self._early_reversal_row(
+            "WEAK",
+            latest_session_hull_buy_turn=False,
+            latest_session_utbot_buy_turn=False,
+            days_since_hull_turn_bull=99,
+            days_since_utbot_buy=99,
+            first_close_above_ma20_after_5bars=False,
+            first_higher_low_pivot2=False,
+            first_higher_high_pivot2=False,
+            atr_contracting=False,
+            nr7_flag=False,
+            inside_day_flag=False,
+            three_weeks_tight=False,
+            volume_dry_up_score=0.0,
+            bb_percent_b=0.95,
+        )
+        trigger_without_context = self._early_reversal_row(
+            "TRIG",
+            ret20_pct=8.0,
+            ret60_pct=16.0,
+            dist_sma50_pct=3.0,
+            drawdown_from_52w_high_pct=-4.0,
+            atr_contracting=False,
+            nr7_flag=False,
+            inside_day_flag=False,
+            three_weeks_tight=False,
+            volume_dry_up_score=0.0,
+            bb_percent_b=0.95,
+        )
+        no_volume = self._early_reversal_row(
+            "NOVOL",
+            volume_ratio_20=0.9,
+            volume_expansion_score=0.0,
+            obv_slope=0.0,
+            cmf=0.0,
+            volume_bullish=False,
+        )
+        digest = build_post_close_digest(
+            [weak_without_trigger, trigger_without_context, no_volume],
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=3,
+            result_count=3,
+            skip_count=0,
+        )
+        tickers = [item.ticker for item in digest.section_map()[EARLY_REVERSAL_KEY].items]
+
+        self.assertNotIn("WEAK", tickers)
+        self.assertNotIn("TRIG", tickers)
+        self.assertNotIn("NOVOL", tickers)
+
+    def test_early_reversal_allows_only_strong_prep_in_top20(self):
+        weak_prep = self._early_reversal_row(
+            "PREPLOW",
+            latest_session_hull_buy_turn=False,
+            latest_session_utbot_buy_turn=False,
+            days_since_hull_turn_bull=99,
+            days_since_utbot_buy=99,
+            first_close_above_ma20_after_5bars=False,
+            first_higher_low_pivot2=True,
+            volume_ratio_20=0.9,
+            volume_expansion_score=0.0,
+            obv_slope=0.0,
+            cmf=0.0,
+            volume_bullish=False,
+        )
+        strong_prep = self._early_reversal_row(
+            "PREPHI",
+            latest_session_hull_buy_turn=False,
+            latest_session_utbot_buy_turn=False,
+            days_since_hull_turn_bull=99,
+            days_since_utbot_buy=99,
+            first_close_above_ma20_after_5bars=False,
+            first_higher_low_pivot2=True,
+            first_higher_high_pivot2=False,
+            volume_ratio_20=1.6,
+            volume_expansion_score=35.0,
+            obv_slope=0.5,
+            cmf=0.1,
+            volume_bullish=True,
+            breakout_dist_20d_high_pct=-1.0,
+        )
+        digest = build_post_close_digest(
+            [weak_prep, strong_prep],
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=2,
+            result_count=2,
+            skip_count=0,
+        )
+        items = {item.ticker: item for item in digest.section_map()[EARLY_REVERSAL_KEY].items}
+
+        self.assertNotIn("PREPLOW", items)
+        self.assertIn("PREPHI", items)
+        self.assertEqual(items["PREPHI"].reversal_phase, "PREP")
+        self.assertIn("watch_only_prep", items["PREPHI"].risk_flags)
+        self.assertGreaterEqual(items["PREPHI"].early_reversal_score or 0.0, 80.0)
+
+    def test_early_reversal_late_chase_gets_penalized_and_ranked_lower(self):
+        early = self._early_reversal_row("EARLY", scan_score=200.0)
+        late = self._early_reversal_row(
+            "LATE",
+            scan_score=220.0,
+            chg_5d=18.0,
+            dist_sma20_pct=13.0,
+            ma20_dist_pct=13.0,
+            zscore20=2.4,
+            bb_percent_b=1.2,
+            breakout_dist_20d_high_pct=12.0,
+        )
+        digest = build_post_close_digest(
+            [late, early],
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=2,
+            result_count=2,
+            skip_count=0,
+        )
+        items = digest.section_map()[EARLY_REVERSAL_KEY].items
+        by_ticker = {item.ticker: item for item in items}
+        tickers = [item.ticker for item in items]
+
+        self.assertLess(tickers.index("EARLY"), tickers.index("LATE"))
+        self.assertIn("late_chase", by_ticker["LATE"].risk_flags)
+        self.assertIn("ma20_extended", by_ticker["LATE"].risk_flags)
+        self.assertIn("zscore_hot", by_ticker["LATE"].risk_flags)
+        self.assertIn("bb_overextended", by_ticker["LATE"].risk_flags)
+
+    def test_early_reversal_hard_risks_are_excluded(self):
+        rows = [
+            self._early_reversal_row("SELL", utbot_sell_last_date=self.market_date.isoformat()),
+            self._early_reversal_row("THIN", thin_trade_risk=True),
+            self._early_reversal_row("GAP", bearish_gap_failure=True),
+            self._early_reversal_row("MULTI", multi_sell=2),
+            self._early_reversal_row("HIGHC", strategy_conflict_level="HIGH"),
+            self._early_reversal_row("LOWV", volume_ratio_20=0.79),
+        ]
+        digest = build_post_close_digest(
+            rows,
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=len(rows),
+            result_count=len(rows),
+            skip_count=0,
+        )
+
+        self.assertEqual(digest.section_map()[EARLY_REVERSAL_KEY].items, [])
+
+    def test_early_reversal_message_contains_ers_phase_type_and_watch_fields(self):
+        row = self._early_reversal_row("MELI")
+        digest = build_post_close_digest(
+            [row],
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=1,
+            result_count=1,
+            skip_count=0,
+        )
+        message = build_post_close_message_texts(digest)[0]
+
+        self.assertIn("## 0-4.", message)
+        self.assertIn("MELI | ERS", message)
+        self.assertIn("CONFIRMED", message)
+        self.assertIn("MIXED_REVERSAL", message)
+        self.assertIn("confirmed_reversal_watch", message)
+        self.assertIn("MA20", message)
+
     def test_five_day_only_candidates_land_in_chase_risk_top20(self):
         rows = [
             self._row(
@@ -810,8 +1109,9 @@ class TelegramPipelineTests(unittest.TestCase):
         qbs_01 = message.index("## 0-1. ")
         qbs_02 = message.index("## 0-2. ")
         qbs_03 = message.index("## 0-3. ")
+        qbs_04 = message.index("## 0-4. ")
         normal_1 = message.index("## 1. ")
-        self.assertTrue(qbs_0 < qbs_01 < qbs_02 < qbs_03 < normal_1)
+        self.assertTrue(qbs_0 < qbs_01 < qbs_02 < qbs_03 < qbs_04 < normal_1)
         self.assertIn("QBS", message)
 
     def test_empty_qbs_blocks_are_always_rendered(self):
@@ -831,6 +1131,7 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertIn("## 0-1. ", message)
         self.assertIn("## 0-2. ", message)
         self.assertIn("## 0-3. ", message)
+        self.assertIn("## 0-4. ", message)
         self.assertGreaterEqual(message.count("- 해당 없음"), 3)
 
     def test_chunk_split_keeps_qbs_before_existing_sections(self):
@@ -849,7 +1150,14 @@ class TelegramPipelineTests(unittest.TestCase):
         joined = "\n".join(chunks)
 
         self.assertGreater(len(chunks), 1)
-        self.assertTrue(joined.index("## 0. ") < joined.index("## 0-1. ") < joined.index("## 0-2. ") < joined.index("## 0-3. ") < joined.index("## 1. "))
+        self.assertTrue(
+            joined.index("## 0. ")
+            < joined.index("## 0-1. ")
+            < joined.index("## 0-2. ")
+            < joined.index("## 0-3. ")
+            < joined.index("## 0-4. ")
+            < joined.index("## 1. ")
+        )
 
     def test_message_lines_show_board_label_change_volume_reason_and_risk(self):
         buy_hull_only = self._row(
@@ -975,6 +1283,33 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertEqual(versioned_payload["run_stamp"], "20260424_050000")
         self.assertIn("items", latest_payload["sections"][0])
 
+    def test_digest_candidates_carry_one_month_and_one_year_returns(self):
+        digest = build_post_close_digest(
+            [self._row("RET", ret20_pct=7.25, ret252_pct=123.45)],
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=1,
+            result_count=1,
+            skip_count=0,
+        )
+        section_map = digest.section_map()
+
+        steady_item = section_map[STEADY_WINNER_SECTION_KEY].items[0]
+        five_day_item = section_map["five_day_top"].items[0]
+        qbs_item = section_map["qbs_buy_now"].items[0]
+
+        self.assertEqual(steady_item.ret_1m_pct, 7.25)
+        self.assertEqual(steady_item.ret_1y_pct, 123.45)
+        self.assertEqual(steady_item.high_pos_pct, -6.0)
+        self.assertEqual(five_day_item.ret_1m_pct, 7.25)
+        self.assertEqual(five_day_item.ret_1y_pct, 123.45)
+        self.assertEqual(five_day_item.high_pos_pct, -6.0)
+        self.assertEqual(qbs_item.ret_1m_pct, 7.25)
+        self.assertEqual(qbs_item.ret_1y_pct, 123.45)
+        self.assertEqual(qbs_item.high_pos_pct, -6.0)
+
     def test_build_post_close_digest_bundle_keeps_publish_failure_non_blocking(self):
         with tempfile.TemporaryDirectory() as temp_dir, patch(
             "scripts.daily_scan_and_notify.publish_digest_if_configured",
@@ -1039,11 +1374,254 @@ class HomeDigestLoaderTests(unittest.TestCase):
                         {"ticker": "META", "pul_score": 84.0, "entry_type": "steady_hold_watch"},
                     ],
                 },
+                {
+                    "key": EARLY_REVERSAL_KEY,
+                    "items": [
+                        {
+                            "ticker": "MELI",
+                            "early_reversal_score": 84.0,
+                            "reversal_phase": "TRIGGERED",
+                            "reversal_type": "DOWN_TREND_REVERSAL",
+                        },
+                    ],
+                },
             ]
         }
         self.assertEqual([item["ticker"] for item in extract_section_candidates(payload, "final_top", limit=1)], ["AAPL"])
         self.assertEqual([item["ticker"] for item in extract_section_candidates(payload, "five_day_top", limit=1)], ["NVDA"])
         self.assertEqual([item["ticker"] for item in extract_section_candidates(payload, STEADY_WINNER_SECTION_KEY, limit=1)], ["META"])
+        self.assertEqual([item["ticker"] for item in extract_section_candidates(payload, EARLY_REVERSAL_KEY, limit=1)], ["MELI"])
+
+    def test_telegram_board_rows_keep_five_day_and_tolerate_missing_long_returns(self):
+        payload = {
+            "version": "2.0",
+            "section_order": [STEADY_WINNER_SECTION_KEY, EARLY_REVERSAL_KEY, "five_day_top"],
+            "sections": [
+                {
+                    "key": STEADY_WINNER_SECTION_KEY,
+                    "title": "steady",
+                    "item_count": 1,
+                    "ranked": True,
+                    "items": [
+                        {
+                            "ticker": "META",
+                            "price": 300.0,
+                            "chg_pct": 1.2,
+                            "chg_5d": 4.1,
+                            "ret_1m_pct": 8.8,
+                            "ret_1y_pct": 52.5,
+                            "high_pos_pct": -3.2,
+                            "volume_ratio_20": 0.96,
+                            "section_key": STEADY_WINNER_SECTION_KEY,
+                            "rank": 1,
+                            "bucket": "STEADY_WINNER",
+                            "pul_score": 78.0,
+                            "entry_type": "steady_hold_watch",
+                        }
+                    ],
+                },
+                {
+                    "key": EARLY_REVERSAL_KEY,
+                    "title": "reversal",
+                    "item_count": 1,
+                    "ranked": True,
+                    "items": [
+                        {
+                            "ticker": "MELI",
+                            "price": 1500.0,
+                            "chg_pct": 2.1,
+                            "chg_5d": 4.8,
+                            "ret_1m_pct": -4.0,
+                            "ret_1y_pct": -18.5,
+                            "high_pos_pct": -22.0,
+                            "rsi": 52.0,
+                            "ma20_dist_pct": 3.2,
+                            "volume_ratio_20": 1.42,
+                            "section_key": EARLY_REVERSAL_KEY,
+                            "rank": 1,
+                            "bucket": "TRIGGERED",
+                            "reason": "MA20+HULL",
+                            "risk_flags": ["watch_only"],
+                            "early_reversal_score": 84.0,
+                            "reversal_phase": "TRIGGERED",
+                            "reversal_type": "DOWN_TREND_REVERSAL",
+                            "entry_type": "reversal_trigger_watch",
+                        }
+                    ],
+                },
+                {
+                    "key": "five_day_top",
+                    "title": "5D",
+                    "item_count": 1,
+                    "ranked": True,
+                    "items": [
+                        {
+                            "ticker": "NVDA",
+                            "price": 120.0,
+                            "chg_pct": 99.0,
+                            "chg_5d": 12.3,
+                            "volume_ratio_20": 1.5,
+                            "section_key": "five_day_top",
+                            "rank": 1,
+                            "status": "strong",
+                            "source_flags": {"today_chg_pct": 1.1},
+                        },
+                        {
+                            "ticker": "FIVE",
+                            "price": 110.0,
+                            "chg_value": 10.0,
+                            "chg_5d": 20.0,
+                            "volume_ratio_20": 1.1,
+                            "section_key": "five_day_top",
+                            "rank": 2,
+                            "status": "strong",
+                        }
+                    ],
+                },
+            ],
+        }
+
+        digest = home_page.telegram_digest_from_payload(payload)
+        board_rows = home_page._build_telegram_board_rows(digest)
+        rows_by_ticker = {row["ticker"]: row for row in board_rows}
+
+        self.assertEqual(rows_by_ticker["META"]["one_month_pct"], 8.8)
+        self.assertEqual(rows_by_ticker["META"]["one_year_pct"], 52.5)
+        self.assertEqual(rows_by_ticker["META"]["high_pos_pct"], -3.2)
+        self.assertEqual(rows_by_ticker["MELI"]["section"], "REVERSAL")
+        self.assertEqual(rows_by_ticker["MELI"]["bucket"], "TRIGGERED")
+        self.assertEqual(rows_by_ticker["MELI"]["score"], "ERS 84")
+        self.assertEqual(rows_by_ticker["MELI"]["score_value"], 84.0)
+        self.assertEqual(rows_by_ticker["MELI"]["entry"], "reversal_trigger_watch")
+        self.assertEqual(rows_by_ticker["MELI"]["one_month_pct"], -4.0)
+        self.assertEqual(rows_by_ticker["MELI"]["one_year_pct"], -18.5)
+        self.assertEqual(rows_by_ticker["MELI"]["rsi"], 52.0)
+        self.assertEqual(rows_by_ticker["MELI"]["ma20"], 3.2)
+        self.assertEqual(rows_by_ticker["NVDA"]["five_day_pct"], 12.3)
+        self.assertEqual(rows_by_ticker["NVDA"]["today_pct"], 1.1)
+        self.assertIsNone(rows_by_ticker["NVDA"]["one_month_pct"])
+        self.assertIsNone(rows_by_ticker["NVDA"]["one_year_pct"])
+        self.assertEqual(rows_by_ticker["FIVE"]["today_pct"], 10.0)
+        self.assertEqual(rows_by_ticker["FIVE"]["entry"], "momentum_watch")
+
+    def test_telegram_board_rows_enrich_qbs_from_matching_detail_sections(self):
+        payload = {
+            "version": "2.0",
+            "section_order": ["qbs_buy_now", "confluence"],
+            "sections": [
+                {
+                    "key": "qbs_buy_now",
+                    "title": "buy",
+                    "item_count": 1,
+                    "ranked": True,
+                    "items": [
+                        {
+                            "ticker": "AAPL",
+                            "price": 200.0,
+                            "chg_pct": 1.25,
+                            "volume_ratio_20": 1.2,
+                            "section_key": "qbs_buy_now",
+                            "rank": 1,
+                            "bucket": "BUY_NOW",
+                            "qbs_score": 88.0,
+                        }
+                    ],
+                },
+                {
+                    "key": "confluence",
+                    "title": "detail",
+                    "item_count": 1,
+                    "ranked": True,
+                    "items": [
+                        {
+                            "ticker": "AAPL",
+                            "price": 200.0,
+                            "chg_pct": 1.25,
+                            "chg_5d": 6.5,
+                            "ret_1m_pct": 11.2,
+                            "ret_1y_pct": 45.6,
+                            "high_pos_pct": -8.9,
+                            "rsi": 66.7,
+                            "ma20_dist_pct": 4.4,
+                            "volume_ratio_20": 1.2,
+                            "section_key": "confluence",
+                            "rank": 1,
+                        }
+                    ],
+                },
+            ],
+        }
+
+        digest = home_page.telegram_digest_from_payload(payload)
+        qbs_row = home_page._build_telegram_board_rows(digest)[0]
+
+        self.assertEqual(qbs_row["today_pct"], 1.25)
+        self.assertEqual(qbs_row["five_day_pct"], 6.5)
+        self.assertEqual(qbs_row["one_month_pct"], 11.2)
+        self.assertEqual(qbs_row["one_year_pct"], 45.6)
+        self.assertEqual(qbs_row["high_pos_pct"], -8.9)
+        self.assertEqual(qbs_row["rsi"], 66.7)
+        self.assertEqual(qbs_row["ma20"], 4.4)
+        self.assertEqual(qbs_row["entry"], "buy_now")
+
+    def test_telegram_board_rows_enrich_remaining_fields_from_market_lookup(self):
+        payload = {
+            "version": "2.0",
+            "section_order": ["qbs_buy_now"],
+            "sections": [
+                {
+                    "key": "qbs_buy_now",
+                    "title": "buy",
+                    "item_count": 1,
+                    "ranked": True,
+                    "items": [
+                        {
+                            "ticker": "AAPL",
+                            "price": 200.0,
+                            "chg_pct": 1.25,
+                            "volume_ratio_20": 1.2,
+                            "section_key": "qbs_buy_now",
+                            "rank": 1,
+                            "bucket": "BUY_NOW",
+                            "qbs_score": 88.0,
+                        }
+                    ],
+                }
+            ],
+        }
+
+        digest = home_page.telegram_digest_from_payload(payload)
+        base_rows = home_page._build_telegram_board_rows(digest)
+        self.assertEqual(home_page._board_missing_metric_tickers(base_rows), ["AAPL"])
+
+        rows = home_page._build_telegram_board_rows(
+            digest,
+            market_metric_lookup={
+                "AAPL": {
+                    "price": 201.0,
+                    "today_pct": 1.5,
+                    "five_day_pct": 6.5,
+                    "one_month_pct": 12.0,
+                    "one_year_pct": 55.0,
+                    "high_pos_pct": -2.5,
+                    "rsi": 67.0,
+                    "vol20": 1.4,
+                    "ma20": 5.5,
+                }
+            },
+        )
+        row = rows[0]
+
+        self.assertEqual(row["price"], 200.0)
+        self.assertEqual(row["today_pct"], 1.25)
+        self.assertEqual(row["five_day_pct"], 6.5)
+        self.assertEqual(row["one_month_pct"], 12.0)
+        self.assertEqual(row["one_year_pct"], 55.0)
+        self.assertEqual(row["high_pos_pct"], -2.5)
+        self.assertEqual(row["rsi"], 67.0)
+        self.assertEqual(row["vol20"], 1.2)
+        self.assertEqual(row["ma20"], 5.5)
+        self.assertEqual(home_page._board_missing_metric_tickers(rows), [])
 
     def test_build_telegram_digest_message_uses_actual_formatter_structure(self):
         payload = {
@@ -1052,7 +1630,7 @@ class HomeDigestLoaderTests(unittest.TestCase):
             "run_stamp": "run-1",
             "market_date": "2026-05-01",
             "generated_at": "2026-05-02T06:16:51+09:00",
-            "section_order": ["qbs_buy_now", STEADY_WINNER_SECTION_KEY, "sell_risk"],
+            "section_order": ["qbs_buy_now", STEADY_WINNER_SECTION_KEY, EARLY_REVERSAL_KEY, "sell_risk"],
             "universe_count": 10,
             "result_count": 2,
             "skip_count": 1,
@@ -1103,6 +1681,32 @@ class HomeDigestLoaderTests(unittest.TestCase):
                     ],
                 },
                 {
+                    "key": EARLY_REVERSAL_KEY,
+                    "title": "초기 반전 포착 Top 20",
+                    "item_count": 1,
+                    "ranked": True,
+                    "items": [
+                        {
+                            "ticker": "MELI",
+                            "price": 1500.0,
+                            "chg_pct": 2.1,
+                            "chg_5d": 4.8,
+                            "volume_ratio_20": 1.42,
+                            "section_key": EARLY_REVERSAL_KEY,
+                            "rank": 1,
+                            "label": "TRIGGERED",
+                            "bucket": "TRIGGERED",
+                            "reason": "MA20+HULL",
+                            "risk_flags": [],
+                            "early_reversal_score": 84.0,
+                            "reversal_phase": "TRIGGERED",
+                            "reversal_type": "DOWN_TREND_REVERSAL",
+                            "entry_type": "reversal_trigger_watch",
+                            "source_flags": {"reversal_confirm": "20D -1.8% / MA20 hold"},
+                        }
+                    ],
+                },
+                {
                     "key": "sell_risk",
                     "title": "매도전환 / 위험 후보",
                     "item_count": 1,
@@ -1128,12 +1732,15 @@ class HomeDigestLoaderTests(unittest.TestCase):
 
         self.assertIn("## 0. 오늘 매수 최종 후보 Top 20", message)
         self.assertIn("## 0-3. 계속 우상향 주도주 Top 30", message)
+        self.assertIn("## 0-4. 초기 반전 포착 Top 20", message)
         self.assertIn("## 1. 매도전환 / 위험 후보", message)
         self.assertIn("AAPL", message)
         self.assertIn("META | PUL 78", message)
+        self.assertIn("MELI | ERS 84", message)
         self.assertIn("TSLA", message)
         self.assertLess(message.index("AAPL"), message.index("META"))
-        self.assertLess(message.index("META"), message.index("TSLA"))
+        self.assertLess(message.index("META"), message.index("MELI"))
+        self.assertLess(message.index("MELI"), message.index("TSLA"))
 
     def test_resolve_github_digest_config_uses_default_repo_when_unconfigured(self):
         with patch.dict(os.environ, {}, clear=True), patch("app_ui.pages.home_page._read_secret", return_value=""):

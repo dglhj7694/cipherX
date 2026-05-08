@@ -157,6 +157,7 @@ POST_CLOSE_LATEST_SESSION_FIELD_SPECS: tuple[dict[str, str], ...] = (
     {"group": "momentum", "key": "ret20_pct", "label": "Return20(%)", "type": "number", "description": "20-bar return", "rule": "(close-close_20)/close_20*100", "example": "8.4"},
     {"group": "momentum", "key": "ret60_pct", "label": "Return60(%)", "type": "number", "description": "60-bar return", "rule": "(close-close_60)/close_60*100", "example": "16.2"},
     {"group": "momentum", "key": "ret120_pct", "label": "Return120(%)", "type": "number", "description": "120-bar return", "rule": "(close-close_120)/close_120*100", "example": "24.1"},
+    {"group": "momentum", "key": "ret252_pct", "label": "Return252(%)", "type": "number", "description": "252-bar return", "rule": "(close-close_252)/close_252*100", "example": "42.0"},
     {"group": "momentum", "key": "rs_rank_vs_index", "label": "RSRankVsIndex", "type": "number", "description": "Cross-sectional rank of RS ratio", "rule": "percentile rank of RS_Ratio", "example": "86.5"},
     {"group": "momentum", "key": "ret20_percentile", "label": "Return20Percentile", "type": "number", "description": "Cross-sectional percentile of 20-bar return", "rule": "percentile rank of ret20_pct", "example": "82.1"},
     {"group": "momentum", "key": "ret60_percentile", "label": "Return60Percentile", "type": "number", "description": "Cross-sectional percentile of 60-bar return", "rule": "percentile rank of ret60_pct", "example": "79.4"},
@@ -710,6 +711,7 @@ def _compute_post_close_row_metrics(frame: Any) -> dict[str, Any]:
         "ret20_pct": 0.0,
         "ret60_pct": 0.0,
         "ret120_pct": 0.0,
+        "ret252_pct": "",
         "rs_ratio": 0.0,
         "rs_rank_vs_index": "",
         "ret20_percentile": "",
@@ -879,6 +881,7 @@ def _compute_post_close_row_metrics(frame: Any) -> dict[str, Any]:
     metrics["ret20_pct"] = _series_return_pct(close_series, 20)
     metrics["ret60_pct"] = _series_return_pct(close_series, 60)
     metrics["ret120_pct"] = _series_return_pct(close_series, 120)
+    metrics["ret252_pct"] = _series_return_pct(close_series, 252) if len(close_series) > 252 else ""
     metrics["rs_ratio"] = _safe_float(latest.get("RS_Ratio", 0))
     try:
         close_up = close_series.diff().gt(0).fillna(False)
