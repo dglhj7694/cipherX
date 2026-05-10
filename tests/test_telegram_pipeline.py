@@ -11,6 +11,8 @@ from app_ui.pages import home_page
 from app_ui.pages.home_page import extract_section_candidates, load_latest_telegram_digest
 from scripts.daily_scan_and_notify import _build_post_close_digest_bundle, _send_telegram_if_enabled
 from telegram_pipeline import (
+    AGGRESSIVE_NEXT_DAY_LIMIT,
+    AGGRESSIVE_NEXT_DAY_SECTION_KEYS,
     BOARD_SECTION_LIMIT,
     EARLY_REVERSAL_KEY,
     HULL_BUY_TURN_KEY,
@@ -19,6 +21,7 @@ from telegram_pipeline import (
     annotate_rows_with_qbs,
     build_post_close_digest,
     build_post_close_message_texts,
+    select_aggressive_next_day_sections,
     select_post_close_sections,
     split_telegram_message_text,
     write_local_digest_artifacts,
@@ -206,6 +209,7 @@ class TelegramPipelineTests(unittest.TestCase):
                 "qbs_buy_now",
                 "qbs_chase_watch",
                 "qbs_pullback_wait",
+                *AGGRESSIVE_NEXT_DAY_SECTION_KEYS,
                 STEADY_WINNER_SECTION_KEY,
                 EARLY_REVERSAL_KEY,
                 HULL_BUY_TURN_KEY,
@@ -230,10 +234,116 @@ class TelegramPipelineTests(unittest.TestCase):
         general_tickers = [
             item.ticker
             for key in digest.section_order
-            if not key.startswith("qbs_") and key not in {"five_day_top", STEADY_WINNER_SECTION_KEY, EARLY_REVERSAL_KEY, HULL_BUY_TURN_KEY}
+            if not key.startswith("qbs_")
+            and key
+            not in {
+                "five_day_top",
+                STEADY_WINNER_SECTION_KEY,
+                EARLY_REVERSAL_KEY,
+                HULL_BUY_TURN_KEY,
+                *AGGRESSIVE_NEXT_DAY_SECTION_KEYS,
+            }
             for item in section_map[key].items
         ]
         self.assertEqual(len(general_tickers), len(set(general_tickers)))
+
+    def _aggressive_trend_row(self, ticker: str, **overrides):
+        row = self._row(
+            ticker,
+            final_entry_eligible=False,
+            final_entry_selected=False,
+            final_entry_score=0.0,
+            scan_score=0.0,
+            es=0.0,
+            strength=0.0,
+            chg=15.0,
+            chg_5d=32.0,
+            atr_pct=6.0,
+            volume_ratio_20=1.5,
+            volume_expansion_score=50.0,
+            dollar_volume_20=2_000_000_000.0,
+            bull_strength_recent=True,
+            strong_trend_persistent=True,
+            uptrend_persistent=True,
+            hma_ema_long_aligned=True,
+            hma20_slope_pct=5.0,
+            hma60_slope_pct=3.5,
+            adx=40.0,
+            rs_rank_vs_index=97.0,
+            ret20_pct=75.0,
+            ret20_percentile=98.0,
+            ret60_percentile=96.0,
+            cmf=0.32,
+            obv_slope=0.8,
+            gap_risk_2pct=True,
+            gap_risk_atr=False,
+            dist_vwap_pct=35.0,
+            breakout_dist_20d_high_pct=-0.1,
+            drawdown_from_52w_high_pct=-0.1,
+            near_52w_high_2pct=True,
+            dist_bb_upper_pct=4.0,
+            dist_sma20_pct=42.0,
+            zscore20=2.4,
+            bb_percent_b=1.08,
+            utbot_sell_recent=False,
+            hull_turn_bear_recent=False,
+            utbot_sell_last_date="N/A",
+            hull_turn_bear_last_date="N/A",
+            hma_ema_short_entry=False,
+            hma25_ema25_cross_bear=False,
+            bearish_gap_failure=False,
+            thin_trade_risk=False,
+        )
+        row.update(overrides)
+        return row
+
+    def test_aggressive_selector_ignores_program_scores_and_keeps_metric_candidate(self):
+        high_score_bad_metrics = self._aggressive_trend_row(
+            "BAD",
+            final_entry_score=999.0,
+            scan_score=999.0,
+            es=99.0,
+            atr_pct=1.5,
+        )
+        low_score_good_metrics = self._aggressive_trend_row("GOOD")
+
+        sections = select_aggressive_next_day_sections(
+            [high_score_bad_metrics, low_score_good_metrics],
+            target_date=self.market_date,
+        )
+        part2_tickers = [row["ticker"] for row in sections[AGGRESSIVE_NEXT_DAY_SECTION_KEYS[1]]]
+
+        self.assertNotIn("BAD", part2_tickers)
+        self.assertIn("GOOD", part2_tickers)
+
+    def test_aggressive_strong_trend_includes_sndk_mu_style_and_allows_cross_part_duplicates(self):
+        sndk = self._aggressive_trend_row("SNDK", rs_rank_vs_index=98.9, chg=16.6, chg_5d=31.6)
+        mu = self._aggressive_trend_row("MU", rs_rank_vs_index=97.3, chg=15.5, chg_5d=37.7)
+
+        sections = select_aggressive_next_day_sections([sndk, mu], target_date=self.market_date)
+        part2_tickers = [row["ticker"] for row in sections[AGGRESSIVE_NEXT_DAY_SECTION_KEYS[1]]]
+        part7_tickers = [row["ticker"] for row in sections[AGGRESSIVE_NEXT_DAY_SECTION_KEYS[6]]]
+
+        self.assertIn("SNDK", part2_tickers)
+        self.assertIn("MU", part2_tickers)
+        self.assertIn("SNDK", part7_tickers)
+        self.assertIn("MU", part7_tickers)
+
+    def test_aggressive_sections_apply_top20_limit(self):
+        rows = [
+            self._aggressive_trend_row(
+                f"HV{i:02d}",
+                chg=5.0 + (i * 0.1),
+                chg_5d=18.0 + i,
+                atr_pct=12.0 - (i * 0.1),
+                rs_rank_vs_index=90.0 - (i * 0.1),
+            )
+            for i in range(25)
+        ]
+
+        sections = select_aggressive_next_day_sections(rows, target_date=self.market_date)
+
+        self.assertEqual(len(sections[AGGRESSIVE_NEXT_DAY_SECTION_KEYS[3]]), AGGRESSIVE_NEXT_DAY_LIMIT)
 
     def test_qbs_scores_confluence_above_single_buy_turn(self):
         confluence = self._row("ALPHA")
@@ -763,8 +873,15 @@ class TelegramPipelineTests(unittest.TestCase):
         item = section_map[EARLY_REVERSAL_KEY].items[0]
 
         self.assertEqual(
-            digest.section_order[:5],
-            ["qbs_buy_now", "qbs_chase_watch", "qbs_pullback_wait", STEADY_WINNER_SECTION_KEY, EARLY_REVERSAL_KEY],
+            digest.section_order[:13],
+            [
+                "qbs_buy_now",
+                "qbs_chase_watch",
+                "qbs_pullback_wait",
+                *AGGRESSIVE_NEXT_DAY_SECTION_KEYS,
+                STEADY_WINNER_SECTION_KEY,
+                EARLY_REVERSAL_KEY,
+            ],
         )
         self.assertEqual(item.ticker, "MELI")
         self.assertEqual(item.reversal_phase, "CONFIRMED")
@@ -1003,11 +1120,12 @@ class TelegramPipelineTests(unittest.TestCase):
         items = section_map[HULL_BUY_TURN_KEY].items
 
         self.assertEqual(
-            digest.section_order[:6],
+            digest.section_order[:14],
             [
                 "qbs_buy_now",
                 "qbs_chase_watch",
                 "qbs_pullback_wait",
+                *AGGRESSIVE_NEXT_DAY_SECTION_KEYS,
                 STEADY_WINNER_SECTION_KEY,
                 EARLY_REVERSAL_KEY,
                 HULL_BUY_TURN_KEY,
@@ -1235,12 +1353,35 @@ class TelegramPipelineTests(unittest.TestCase):
         qbs_0 = message.index("## 0. ")
         qbs_01 = message.index("## 0-1. ")
         qbs_02 = message.index("## 0-2. ")
+        aggressive_1 = message.index("## PART 1 ")
+        aggressive_8 = message.index("## PART 8 ")
         qbs_03 = message.index("## 0-3. ")
         qbs_04 = message.index("## 0-4. ")
         qbs_05 = message.index("## 0-5. ")
         normal_1 = message.index("## 1. ")
-        self.assertTrue(qbs_0 < qbs_01 < qbs_02 < qbs_03 < qbs_04 < qbs_05 < normal_1)
+        self.assertTrue(qbs_0 < qbs_01 < qbs_02 < aggressive_1 < aggressive_8 < qbs_03 < qbs_04 < qbs_05 < normal_1)
         self.assertIn("QBS", message)
+
+    def test_aggressive_message_contains_conditions_and_core_metrics(self):
+        digest = build_post_close_digest(
+            [self._aggressive_trend_row("SNDK")],
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=1,
+            result_count=1,
+            skip_count=0,
+        )
+        message = build_post_close_message_texts(digest)[0]
+
+        self.assertIn("## PART 2 강추세 지속형", message)
+        self.assertIn("조건:", message)
+        self.assertIn("SNDK", message)
+        self.assertIn("ATR", message)
+        self.assertIn("Vol20", message)
+        self.assertIn("RS", message)
+        self.assertIn("ADX", message)
 
     def test_empty_qbs_blocks_are_always_rendered(self):
         digest = build_post_close_digest(
@@ -1258,6 +1399,8 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertIn("## 0. ", message)
         self.assertIn("## 0-1. ", message)
         self.assertIn("## 0-2. ", message)
+        self.assertIn("## PART 1 ", message)
+        self.assertIn("## PART 8 ", message)
         self.assertIn("## 0-3. ", message)
         self.assertIn("## 0-4. ", message)
         self.assertIn("## 0-5. ", message)
@@ -1283,6 +1426,8 @@ class TelegramPipelineTests(unittest.TestCase):
             joined.index("## 0. ")
             < joined.index("## 0-1. ")
             < joined.index("## 0-2. ")
+            < joined.index("## PART 1 ")
+            < joined.index("## PART 8 ")
             < joined.index("## 0-3. ")
             < joined.index("## 0-4. ")
             < joined.index("## 0-5. ")

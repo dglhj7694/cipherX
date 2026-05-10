@@ -30,7 +30,8 @@
 - **Telegram 알림 자동화**
   - scheduled script가 scan/briefing 결과를 Telegram message와 CSV document로 발송합니다.
   - `telegram_pipeline/`은 digest contract, section selector, formatter, publisher, sender를 담당합니다.
-  - 장마감 digest는 QBS, 계속 우상향 주도주, 초기 반전 포착, 당일 HULL 매수전환, 5일 상승률 Top30 섹션을 함께 구성합니다.
+  - 장마감 digest는 QBS, 다음 거래일 공격형 8-PART 후보, 계속 우상향 주도주, 초기 반전 포착, 당일 HULL 매수전환, 5일 상승률 Top30 섹션을 함께 구성합니다.
+  - 공격형 8-PART는 프로그램 자체 점수 대신 ATR, 거래량, RS, ADX, HMA/EMA, BB, 고점 거리, 포켓피봇/갭 지표를 사용하며, 같은 종목이 여러 PART에 걸리면 모두 보여줍니다.
   - 홈 `Telegram Digest / 텔레그램 종목판`은 같은 digest payload를 보드형 UI로 복원하고 `5D`, `1M`, `1Y`, RSI, Vol20, MA20, 고점 대비 위치, ERS/PUL/QBS를 표시합니다.
 
 - **배치 산출물**
@@ -147,6 +148,10 @@ cipherX/
 - `telegram_pipeline/final_buy_ranker.py`
   - QBS 기반의 오늘 매수/추격주의/눌림 대기 후보를 점수화합니다.
 
+- `telegram_pipeline/aggressive_next_day_ranker.py`
+  - 다음 거래일 공격형 매수 후보를 초기 전환, 강추세 지속, 눌림목 재진입, 초고변동 위성, 포켓피봇/거래량 선행, 압축 후 발사 대기, 갭업 추격, 신고가 근처 돌파 대기 8개 PART로 선별합니다.
+  - 각 PART는 Top20까지 독립 표시하며, 같은 종목이 여러 PART에 걸리면 중복 제거하지 않고 모두 보여줍니다.
+
 - `telegram_pipeline/early_reversal_ranker.py`
   - `early_reversal` 섹션의 ERS 점수를 계산해 하락추세/박스권에서 첫 전환이 나타나는 watchlist 후보를 선별합니다.
 
@@ -154,7 +159,7 @@ cipherX/
   - `hull_buy_turn` 섹션의 당일 HULL 매수전환 후보를 선별하고 태그/리스크를 부여합니다.
 
 - `telegram_pipeline/formatters.py`
-  - Telegram message text를 구성하며 QBS, `steady_winner`, `early_reversal`, `hull_buy_turn`, 상세 보드, `five_day_top` 순서를 고정합니다.
+  - Telegram message text를 구성하며 QBS, 다음 거래일 공격형 8-PART, `steady_winner`, `early_reversal`, `hull_buy_turn`, 상세 보드, `five_day_top` 순서를 고정합니다.
 
 - `telegram_pipeline/sender.py`
   - Telegram `sendMessage`, `sendDocument` 호출과 message chunking을 담당합니다.

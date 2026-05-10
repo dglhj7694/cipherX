@@ -4,6 +4,13 @@ import math
 from datetime import date, datetime
 from typing import Any, Iterable, Mapping
 
+from .aggressive_next_day_ranker import (
+    AGGRESSIVE_NEXT_DAY_LIMIT,
+    AGGRESSIVE_NEXT_DAY_QUALITY_FLOORS,
+    AGGRESSIVE_NEXT_DAY_SECTION_KEYS,
+    AGGRESSIVE_NEXT_DAY_SECTION_TITLES,
+    select_aggressive_next_day_sections,
+)
 from .contracts import TelegramCandidate, TelegramDigest, TelegramSection
 from .early_reversal_ranker import (
     EARLY_REVERSAL_KEY,
@@ -77,6 +84,7 @@ FIVE_DAY_TOP_SECTION_KEY = "five_day_top"
 STEADY_WINNER_DISPLAY_NUMBER = "0-3"
 EARLY_REVERSAL_DISPLAY_NUMBER = "0-4"
 HULL_BUY_TURN_DISPLAY_NUMBER = "0-5"
+AGGRESSIVE_SECTION_KEYS = set(AGGRESSIVE_NEXT_DAY_SECTION_KEYS)
 
 
 def _signed(value: Any, decimals: int = 2) -> str:
@@ -304,6 +312,8 @@ def _build_new_52w_high_reason(row: Mapping[str, Any]) -> str:
 
 
 def _candidate_label(section_key: str) -> str:
+    if section_key in AGGRESSIVE_SECTION_KEYS:
+        return str(AGGRESSIVE_NEXT_DAY_SECTION_TITLES.get(section_key, section_key))
     return {
         "confluence": "CONFLUENCE",
         "entry_now": "ENTRY",
@@ -330,6 +340,8 @@ def _candidate_label(section_key: str) -> str:
 
 
 def _candidate_reason(section_key: str, row: Mapping[str, Any], target_date: date) -> str:
+    if section_key in AGGRESSIVE_SECTION_KEYS:
+        return str(row.get("aggressive_reason") or "-")
     board_reason = str(row.get("board_reason") or "").strip()
     if section_key in BOARD_SECTION_KEYS and board_reason:
         return board_reason
@@ -399,6 +411,20 @@ def _candidate_source_flags(section_key: str, row: Mapping[str, Any], target_dat
         "rsi": safe_float(row.get("rsi", row.get("RSI", 0.0))),
         "ma20_dist_pct": safe_float(row.get("ma20_dist_pct", row.get("dist_sma20_pct", 0.0))),
         "high_pos_pct": _optional_float(row, "high_pos_pct", "drawdown_from_52w_high_pct"),
+        "atr_pct": safe_float(row.get("atr_pct", 0.0)),
+        "adx": safe_float(row.get("adx", 0.0)),
+        "ret20_percentile": safe_float(row.get("ret20_percentile", 0.0)),
+        "ret60_percentile": safe_float(row.get("ret60_percentile", 0.0)),
+        "ret20_pct": safe_float(row.get("ret20_pct", 0.0)),
+        "zscore20": safe_float(row.get("zscore20", 0.0)),
+        "bb_percent_b": safe_float(row.get("bb_percent_b", 0.0)),
+        "dist_sma20_pct": safe_float(row.get("dist_sma20_pct", row.get("ma20_dist_pct", 0.0))),
+        "drawdown_from_20d_high_pct": safe_float(row.get("drawdown_from_20d_high_pct", 0.0)),
+        "breakout_dist_20d_high_pct": safe_float(row.get("breakout_dist_20d_high_pct", 0.0)),
+        "volume_expansion_score": safe_float(row.get("volume_expansion_score", 0.0)),
+        "cmf": safe_float(row.get("cmf", 0.0)),
+        "obv_slope": safe_float(row.get("obv_slope", 0.0)),
+        "compression_count": int(safe_float(row.get("compression_count", 0.0))),
         "rs_rank_vs_index": safe_float(row.get("rs_rank_vs_index", 0.0)),
         "status_tags": _five_day_status_tags(row) if section_key == FIVE_DAY_TOP_SECTION_KEY else [],
         "status": _five_day_status(row) if section_key == FIVE_DAY_TOP_SECTION_KEY else "",
@@ -409,7 +435,7 @@ def _candidate_source_flags(section_key: str, row: Mapping[str, Any], target_dat
         "reversal_confirm": str(row.get("reversal_confirm") or "") if section_key == EARLY_REVERSAL_KEY else "",
         "hull_confirm": str(row.get("hull_confirm") or "") if section_key == HULL_BUY_TURN_KEY else "",
         "hull_utbot_same_turn": int(safe_float(row.get("hull_utbot_same_turn", 0.0))) if section_key == HULL_BUY_TURN_KEY else 0,
-        "entry_type": str(row.get("entry_type") or "") if section_key in {STEADY_WINNER_SECTION_KEY, EARLY_REVERSAL_KEY, HULL_BUY_TURN_KEY} else "",
+        "entry_type": str(row.get("entry_type") or "") if section_key in {STEADY_WINNER_SECTION_KEY, EARLY_REVERSAL_KEY, HULL_BUY_TURN_KEY, *AGGRESSIVE_SECTION_KEYS} else "",
         "label": _candidate_label(section_key),
         "membership": list(row.get("source_membership") or []),
         "membership_count": int(safe_float(row.get("membership_count", 0.0))),
@@ -423,6 +449,7 @@ def _build_candidate(section_key: str, row: Mapping[str, Any], rank: int, target
     steady_risk_tags = list(row.get("pul_risk_tags") or []) if section_key == STEADY_WINNER_SECTION_KEY else []
     reversal_risk_tags = list(row.get("reversal_risk_flags") or []) if section_key == EARLY_REVERSAL_KEY else []
     hull_risk_tags = list(row.get("hull_risk_flags") or []) if section_key == HULL_BUY_TURN_KEY else []
+    aggressive_risk_tags = list(row.get("aggressive_risk_flags") or []) if section_key in AGGRESSIVE_SECTION_KEYS else []
     return TelegramCandidate(
         ticker=str(row.get("ticker") or "").strip().upper(),
         price=safe_float(row.get("price")) if row.get("price") is not None else None,
@@ -431,12 +458,30 @@ def _build_candidate(section_key: str, row: Mapping[str, Any], rank: int, target
         volume_ratio_20=safe_float(row.get("volume_ratio_20")) if row.get("volume_ratio_20") is not None else None,
         section_key=section_key,
         rank=rank,
-        label=str(row.get("pul_bucket") or row.get("reversal_phase") or row.get("hull_bucket") or row.get("board_label") or _candidate_label(section_key)),
+        label=str(
+            row.get("aggressive_label")
+            or row.get("pul_bucket")
+            or row.get("reversal_phase")
+            or row.get("hull_bucket")
+            or row.get("board_label")
+            or _candidate_label(section_key)
+        ),
         reason=_candidate_reason(section_key, row, target_date),
         source_flags=_candidate_source_flags(section_key, row, target_date),
-        bucket=str(row.get("pul_bucket") or row.get("reversal_phase") or row.get("hull_bucket") or ""),
-        tags=list(row.get("pul_tags") or row.get("reversal_tags") or row.get("hull_tags") or row.get("board_tags") or []),
-        risk_flags=steady_risk_tags or reversal_risk_tags or hull_risk_tags or list(row.get("board_risk_flags") or []),
+        bucket=str(row.get("aggressive_bucket") or row.get("pul_bucket") or row.get("reversal_phase") or row.get("hull_bucket") or ""),
+        tags=list(
+            row.get("aggressive_tags")
+            or row.get("pul_tags")
+            or row.get("reversal_tags")
+            or row.get("hull_tags")
+            or row.get("board_tags")
+            or []
+        ),
+        risk_flags=aggressive_risk_tags
+        or steady_risk_tags
+        or reversal_risk_tags
+        or hull_risk_tags
+        or list(row.get("board_risk_flags") or []),
         chg_5d=_optional_float(row, "chg_5d"),
         rsi=_optional_float(row, "rsi", "RSI"),
         ma20_dist_pct=_optional_float(row, "ma20_dist_pct", "dist_sma20_pct"),
@@ -497,6 +542,29 @@ def _build_qbs_sections(section_rows: Mapping[str, Iterable[Mapping[str, Any]]],
     return sections
 
 
+def _build_aggressive_next_day_sections(rows: Iterable[Mapping[str, Any]], target_date: date) -> list[TelegramSection]:
+    aggressive_rows = select_aggressive_next_day_sections(
+        rows,
+        target_date=target_date,
+        limit=AGGRESSIVE_NEXT_DAY_LIMIT,
+    )
+    sections: list[TelegramSection] = []
+    for section_key in AGGRESSIVE_NEXT_DAY_SECTION_KEYS:
+        row_list = list(aggressive_rows.get(section_key) or [])
+        items = [_build_candidate(section_key, row, idx, target_date) for idx, row in enumerate(row_list, start=1)]
+        sections.append(
+            TelegramSection(
+                key=section_key,
+                title=AGGRESSIVE_NEXT_DAY_SECTION_TITLES[section_key],
+                items=items,
+                item_count=len(items),
+                quality_floor=AGGRESSIVE_NEXT_DAY_QUALITY_FLOORS[section_key],
+                ranked=True,
+            )
+        )
+    return sections
+
+
 def build_post_close_digest(
     rows: Iterable[Mapping[str, Any]],
     *,
@@ -512,6 +580,7 @@ def build_post_close_digest(
     section_rows = select_post_close_sections(row_list, target_date=market_date)
 
     sections: list[TelegramSection] = _build_qbs_sections(section_rows, market_date)
+    sections.extend(_build_aggressive_next_day_sections(row_list, market_date))
     steady_rows = list(section_rows.get(STEADY_WINNER_SECTION_KEY) or [])
     steady_items = [
         _build_candidate(STEADY_WINNER_SECTION_KEY, row, idx, market_date)
@@ -606,6 +675,7 @@ def build_post_close_digest(
         generated_at=generated_at.isoformat(),
         section_order=[
             *QBS_OUTPUT_KEYS,
+            *AGGRESSIVE_NEXT_DAY_SECTION_KEYS,
             STEADY_WINNER_SECTION_KEY,
             EARLY_REVERSAL_KEY,
             HULL_BUY_TURN_KEY,
@@ -662,6 +732,21 @@ def _format_qbs_candidate_line(candidate: TelegramCandidate) -> str:
     if risk_flags:
         line += f" | 주의:{risk_flags}"
     return line
+
+
+def _format_aggressive_candidate_line(candidate: TelegramCandidate) -> str:
+    flags = dict(candidate.source_flags or {})
+    risk = "+".join(list(candidate.risk_flags or [])) or "-"
+    return (
+        f"{candidate.rank}. {candidate.ticker}"
+        f" | {_signed(candidate.chg_pct, 2)}% / 5D {_signed(candidate.chg_5d, 2)}%"
+        f" | ATR {_number(flags.get('atr_pct'), 1)}"
+        f" | Vol20 {_ratio(candidate.volume_ratio_20, 2)}"
+        f" | RS {_number(flags.get('rs_rank_vs_index'), 0)}"
+        f" | ADX {_number(flags.get('adx'), 0)}"
+        f" | {str(candidate.reason or '-')}"
+        f" | {risk}"
+    )
 
 
 def _format_steady_winner_candidate_line(candidate: TelegramCandidate) -> str:
@@ -732,6 +817,19 @@ def _qbs_section_block(display_number: str, section: TelegramSection) -> str:
     return "\n".join(lines)
 
 
+def _aggressive_section_block(section: TelegramSection) -> str:
+    descriptor = f"Top {min(section.item_count, AGGRESSIVE_NEXT_DAY_LIMIT)}"
+    lines = [f"## {section.title} ({descriptor})"]
+    if section.quality_floor:
+        lines.append(f"조건: {section.quality_floor}")
+    if not section.items:
+        lines.append("- ?대떦 ?놁쓬")
+        return "\n".join(lines)
+    for item in section.items:
+        lines.append(_format_aggressive_candidate_line(item))
+    return "\n".join(lines)
+
+
 def _steady_winner_section_block(section: TelegramSection) -> str:
     lines = [f"## {STEADY_WINNER_DISPLAY_NUMBER}. {section.title}"]
     if not section.items:
@@ -795,6 +893,9 @@ def build_main_message(digest: TelegramDigest) -> str:
     for section in digest.sections:
         if section.key in QBS_DISPLAY_NUMBERS:
             blocks.append(_qbs_section_block(QBS_DISPLAY_NUMBERS[section.key], section))
+            continue
+        if section.key in AGGRESSIVE_SECTION_KEYS:
+            blocks.append(_aggressive_section_block(section))
             continue
         if section.key == STEADY_WINNER_SECTION_KEY:
             blocks.append(_steady_winner_section_block(section))
