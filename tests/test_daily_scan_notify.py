@@ -17,6 +17,7 @@ from scripts.daily_scan_and_notify import (
     POST_CLOSE_FINAL_ENTRY_FIELD_SPECS,
     POST_CLOSE_LATEST_SESSION_FIELD_SPECS,
     POST_CLOSE_QBS_FIELD_SPECS,
+    POST_CLOSE_TECHNICAL_BUY_FIELD_SPECS,
     RUSSELL2000_UNIVERSE_ITEMS,
     ScanRunResult,
     _compute_post_close_row_metrics,
@@ -50,7 +51,7 @@ from scripts.daily_scan_and_notify import (
     split_tickers_for_shard,
     write_scan_csv,
 )
-from telegram_pipeline import annotate_rows_with_qbs
+from telegram_pipeline import annotate_rows_with_qbs, annotate_rows_with_technical_buy
 
 
 class DailyScanNotifyTests(unittest.TestCase):
@@ -317,6 +318,80 @@ class DailyScanNotifyTests(unittest.TestCase):
         self.assertIn("sell_turn", by_ticker["SELLX"]["QBSRiskFlags(qbs_risk_flags)"])
         self.assertEqual(by_ticker["BLANK"]["QBSBucket(qbs_bucket)"], "")
         self.assertEqual(by_ticker["BLANK"]["QBSScore(qbs_score)"], "")
+
+    def test_write_scan_csv_post_close_technical_buy_columns(self):
+        target_date = datetime(2026, 4, 23).date()
+        signal = lambda key, label=None: {
+            "group": "core",
+            "key": key,
+            "label": label or key,
+            "dir": "buy",
+            "date": target_date.isoformat(),
+            "days_ago": 0,
+        }
+        row = {
+            "ticker": "ALPHA",
+            "price": 101.25,
+            "chg": 2.35,
+            "chg_value": 1.75,
+            "chg_5d": 5.0,
+            "volume_ratio_20": 1.65,
+            "dollar_volume_20": 125_000_000,
+            "atr_pct": 4.6,
+            "rsi": 61.0,
+            "cmf": 0.18,
+            "obv_slope": 0.4,
+            "multi_sell": 0,
+            "thin_trade_risk": False,
+            "bearish_gap_failure": False,
+            "utbot_sell_last_date": "N/A",
+            "hull_turn_bear_last_date": "N/A",
+            "detected_signals": [
+                signal("TK_Cross_Bull", "TK골든"),
+                signal("DMI_Cross_Bull", "DMI강세교차"),
+                signal("ADX_New_Uptrend", "신규상승추세"),
+                signal("CMF_Bull", "CMF강세"),
+            ],
+        }
+        weak = {
+            "ticker": "WEAK",
+            "chg": 0.5,
+            "volume_ratio_20": 1.0,
+            "dollar_volume_20": 100_000_000,
+            "thin_trade_risk": False,
+            "bearish_gap_failure": False,
+            "detected_signals": [signal("Stoch_Oversold", "Stoch과매도")],
+        }
+        rows = annotate_rows_with_technical_buy([row, weak], target_date=target_date)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            csv_path = write_scan_csv(
+                rows,
+                out_dir=Path(temp_dir),
+                run_label="post_close_technical_buy",
+                extra_field_specs=[
+                    *POST_CLOSE_LATEST_SESSION_FIELD_SPECS,
+                    *POST_CLOSE_FINAL_ENTRY_FIELD_SPECS,
+                    *POST_CLOSE_QBS_FIELD_SPECS,
+                    *POST_CLOSE_TECHNICAL_BUY_FIELD_SPECS,
+                ],
+            )
+            csv_rows = list(csv.DictReader(io.StringIO(csv_path.read_text(encoding="utf-8-sig"))))
+
+        first_row = csv_rows[0]
+        self.assertIn("TechnicalBuyScore(technical_buy_score)", first_row)
+        self.assertIn("TechnicalBuySignalCount(technical_buy_signal_count)", first_row)
+        self.assertIn("TechnicalBuyHits(technical_buy_hits)", first_row)
+        self.assertIn("TechnicalBuyBucket(technical_buy_bucket)", first_row)
+        self.assertIn("TechnicalBuyReason(technical_buy_reason)", first_row)
+        self.assertIn("TechnicalBuyRiskFlags(technical_buy_risk_flags)", first_row)
+
+        by_ticker = {row["티커(ticker)"]: row for row in csv_rows}
+        self.assertNotEqual(by_ticker["ALPHA"]["TechnicalBuyScore(technical_buy_score)"], "")
+        self.assertEqual(by_ticker["ALPHA"]["TechnicalBuyBucket(technical_buy_bucket)"], "추세전환형")
+        self.assertIn("+", by_ticker["ALPHA"]["TechnicalBuyHits(technical_buy_hits)"])
+        self.assertEqual(by_ticker["ALPHA"]["TechnicalBuyRiskFlags(technical_buy_risk_flags)"], "특이사항 없음")
+        self.assertEqual(by_ticker["WEAK"]["TechnicalBuyScore(technical_buy_score)"], "")
 
     def test_filter_turn_rows_for_telegram_uses_volume_ratio_gt_one(self):
         rows = [

@@ -33,6 +33,12 @@ class TelegramCandidate:
     reversal_type: str = ""
     reversal_phase: str = ""
     entry_type: str = ""
+    technical_buy_score: float | None = None
+    technical_buy_signal_count: int = 0
+    technical_buy_hits: list[str] = field(default_factory=list)
+    technical_buy_bucket: str = ""
+    technical_buy_reason: str = ""
+    technical_buy_risk_flags: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

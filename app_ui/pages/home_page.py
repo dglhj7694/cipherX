@@ -13,9 +13,17 @@ import streamlit as st
 from telegram_pipeline.contracts import TelegramCandidate, TelegramDigest, TelegramSection
 from telegram_pipeline.aggressive_next_day_ranker import AGGRESSIVE_NEXT_DAY_SECTION_KEYS
 from telegram_pipeline.early_reversal_ranker import EARLY_REVERSAL_KEY
-from telegram_pipeline.formatters import QBS_DISPLAY_NUMBERS, STEADY_WINNER_DISPLAY_NUMBER, build_main_message
+from telegram_pipeline.formatters import (
+    EARLY_REVERSAL_DISPLAY_NUMBER,
+    HULL_BUY_TURN_DISPLAY_NUMBER,
+    QBS_DISPLAY_NUMBERS,
+    STEADY_WINNER_DISPLAY_NUMBER,
+    TECHNICAL_BUY_DISPLAY_NUMBER,
+    build_main_message,
+)
 from telegram_pipeline.hull_buy_turn_ranker import HULL_BUY_TURN_KEY
 from telegram_pipeline.selectors import BOARD_MANDATORY_SECTION_KEYS, STEADY_WINNER_SECTION_KEY
+from telegram_pipeline.technical_buy_signal_ranker import TECHNICAL_BUY_CLUSTER_KEY
 from theme import FONT_STACK
 
 
@@ -208,9 +216,15 @@ def _safe_int(value: Any, default: int = 0) -> int:
 
 
 def _text_list(value: Any) -> list[str]:
-    if not isinstance(value, (list, tuple)):
+    if value is None:
         return []
-    return [str(item) for item in value if str(item or "").strip()]
+    if isinstance(value, str):
+        parts = value.replace("|", "+").split("+")
+    elif isinstance(value, (list, tuple, set)):
+        parts = list(value)
+    else:
+        parts = [value]
+    return [str(item).strip() for item in parts if str(item or "").strip()]
 
 
 def _candidate_from_payload(item: Mapping[str, Any], *, section_key: str, fallback_rank: int) -> TelegramCandidate:
@@ -265,6 +279,16 @@ def _candidate_from_payload(item: Mapping[str, Any], *, section_key: str, fallba
         reversal_type=str(payload.get("reversal_type") or source_flags.get("reversal_type") or ""),
         reversal_phase=str(payload.get("reversal_phase") or source_flags.get("reversal_phase") or ""),
         entry_type=str(payload.get("entry_type") or ""),
+        technical_buy_score=_optional_float(payload.get("technical_buy_score") if payload.get("technical_buy_score") is not None else source_flags.get("technical_buy_score")),
+        technical_buy_signal_count=_safe_int(
+            payload.get("technical_buy_signal_count")
+            if payload.get("technical_buy_signal_count") is not None
+            else source_flags.get("technical_buy_signal_count")
+        ),
+        technical_buy_hits=_text_list(payload.get("technical_buy_hits") or source_flags.get("technical_buy_hits")),
+        technical_buy_bucket=str(payload.get("technical_buy_bucket") or source_flags.get("technical_buy_bucket") or ""),
+        technical_buy_reason=str(payload.get("technical_buy_reason") or source_flags.get("technical_buy_reason") or ""),
+        technical_buy_risk_flags=_text_list(payload.get("technical_buy_risk_flags") or source_flags.get("technical_buy_risk_flags")),
     )
 
 
@@ -319,6 +343,9 @@ def _visible_telegram_sections(digest: TelegramDigest) -> list[TelegramSection]:
     visible: list[TelegramSection] = []
     for section in digest.sections:
         if section.key in QBS_DISPLAY_NUMBERS:
+            visible.append(section)
+            continue
+        if section.key == TECHNICAL_BUY_CLUSTER_KEY:
             visible.append(section)
             continue
         if section.key == STEADY_WINNER_SECTION_KEY:
@@ -393,6 +420,13 @@ def _format_ers(value: Any) -> str:
     return f"ERS {number:.0f}" if float(number).is_integer() else f"ERS {number:.1f}"
 
 
+def _format_technical_buy(value: Any) -> str:
+    number = _optional_float(value)
+    if number is None:
+        return "TBS --"
+    return f"TBS {number:.0f}" if float(number).is_integer() else f"TBS {number:.1f}"
+
+
 def _format_ratio(value: Any) -> str:
     number = _optional_float(value)
     if number is None:
@@ -435,6 +469,19 @@ def _qbs_tone(value: Any) -> str:
     return "muted"
 
 
+def _technical_buy_tone(value: Any) -> str:
+    number = _optional_float(value)
+    if number is None:
+        return "muted"
+    if number >= 10:
+        return "positive"
+    if number >= 7:
+        return "info"
+    if number >= 5:
+        return "warning"
+    return "muted"
+
+
 def _section_tone(section_key: str) -> str:
     key = str(section_key or "")
     if key in AGGRESSIVE_SECTION_KEY_SET:
@@ -449,6 +496,8 @@ def _section_tone(section_key: str) -> str:
         return "negative"
     if key in {"qbs_pullback_wait", "pullback_reentry", "breakout_wait"}:
         return "info"
+    if key == TECHNICAL_BUY_CLUSTER_KEY:
+        return "positive"
     if key == EARLY_REVERSAL_KEY:
         return "info"
     if key == HULL_BUY_TURN_KEY:
@@ -497,7 +546,11 @@ def _candidate_tags_html(item: TelegramCandidate) -> str:
 
     for tag in list(item.tags or [])[:3]:
         badges.append(_badge_html(tag, "muted"))
+    for hit in list(item.technical_buy_hits or [])[:4]:
+        badges.append(_badge_html(hit, "accent"))
     for flag in list(item.risk_flags or [])[:3]:
+        badges.append(_badge_html(flag, "negative"))
+    for flag in list(item.technical_buy_risk_flags or [])[:3]:
         badges.append(_badge_html(flag, "negative"))
     return "".join(badges) or _badge_html("reason --", "muted")
 
@@ -571,6 +624,7 @@ def _board_entry_text(item: TelegramCandidate, section_key: str, fallback_entry:
         "qbs_buy_now": "buy_now",
         "qbs_chase_watch": "chase_watch",
         "qbs_pullback_wait": "pullback_wait",
+        TECHNICAL_BUY_CLUSTER_KEY: "technical_cluster_watch",
         STEADY_WINNER_SECTION_KEY: "watchlist",
         EARLY_REVERSAL_KEY: "reversal_watch",
         HULL_BUY_TURN_KEY: "hull_buy_turn_watch",
@@ -587,6 +641,7 @@ def _board_section_label(section_key: str) -> str:
         "qbs_buy_now": "BUY_NOW",
         "qbs_chase_watch": "CHASE",
         "qbs_pullback_wait": "PULLBACK",
+        TECHNICAL_BUY_CLUSTER_KEY: "TECH BUY",
         STEADY_WINNER_SECTION_KEY: "STEADY",
         EARLY_REVERSAL_KEY: "REVERSAL",
         HULL_BUY_TURN_KEY: "HULL",
@@ -600,6 +655,8 @@ def _board_bucket_label(item: TelegramCandidate, section_key: str) -> str:
         return _board_section_label(section_key)
     if section_key == "five_day_top":
         return _candidate_status_text(item)
+    if section_key == TECHNICAL_BUY_CLUSTER_KEY:
+        return str(item.technical_buy_bucket or item.bucket or item.label or "-").strip() or "-"
     if section_key == EARLY_REVERSAL_KEY:
         return str(item.reversal_phase or item.bucket or item.label or "-").strip() or "-"
     if section_key == HULL_BUY_TURN_KEY:
@@ -616,6 +673,8 @@ def _board_score_text(item: TelegramCandidate, section_key: str) -> str:
         return _format_ers(item.early_reversal_score)
     if section_key == HULL_BUY_TURN_KEY:
         return "HULL"
+    if section_key == TECHNICAL_BUY_CLUSTER_KEY:
+        return _format_technical_buy(item.technical_buy_score)
     if section_key in QBS_DISPLAY_NUMBERS:
         return _format_qbs(item.qbs_score)
     return "--"
@@ -635,6 +694,10 @@ def _board_setup_parts(item: TelegramCandidate, *, limit: int = 4) -> list[str]:
         text = str(tag or "").strip()
         if text and text not in parts:
             parts.append(text)
+    for hit in list(item.technical_buy_hits or []):
+        text = str(hit or "").strip()
+        if text and text not in parts:
+            parts.append(text)
     return parts[: max(0, int(limit or 0))]
 
 
@@ -649,6 +712,7 @@ def _board_risk_parts(text: str, *, limit: int = 4) -> list[str]:
 def _board_risk_text(item: TelegramCandidate, section_key: str) -> str:
     parts: list[str] = []
     parts.extend(str(flag).strip() for flag in list(item.risk_flags or []) if str(flag or "").strip())
+    parts.extend(str(flag).strip() for flag in list(item.technical_buy_risk_flags or []) if str(flag or "").strip())
     if str(section_key or "") in AGGRESSIVE_SECTION_KEY_SET:
         seen: list[str] = []
         for part in parts:
@@ -750,6 +814,9 @@ def _collect_digest_metric_lookup(digest: TelegramDigest) -> dict[str, dict[str,
                 metrics["score_value"] = _first_number(metrics.get("score_value"), item.early_reversal_score)
             elif section.key == HULL_BUY_TURN_KEY:
                 metrics["score"] = _first_text(metrics.get("score"), "HULL")
+            elif section.key == TECHNICAL_BUY_CLUSTER_KEY and item.technical_buy_score is not None:
+                metrics["score"] = _first_text(metrics.get("score"), _format_technical_buy(item.technical_buy_score))
+                metrics["score_value"] = _first_number(metrics.get("score_value"), item.technical_buy_score)
             elif section.key in QBS_DISPLAY_NUMBERS and item.qbs_score is not None:
                 metrics["score"] = _first_text(metrics.get("score"), _format_qbs(item.qbs_score))
                 metrics["score_value"] = _first_number(metrics.get("score_value"), item.qbs_score)
@@ -773,6 +840,8 @@ def _build_telegram_board_row(
         score_value = item.pul_score
     elif section_key == EARLY_REVERSAL_KEY:
         score_value = item.early_reversal_score
+    elif section_key == TECHNICAL_BUY_CLUSTER_KEY:
+        score_value = item.technical_buy_score
     elif section_key in QBS_DISPLAY_NUMBERS:
         score_value = item.qbs_score
     row = {
@@ -840,6 +909,7 @@ def _build_telegram_board_rows(
     board_section_keys = {
         *QBS_DISPLAY_NUMBERS.keys(),
         *AGGRESSIVE_SECTION_KEY_SET,
+        TECHNICAL_BUY_CLUSTER_KEY,
         STEADY_WINNER_SECTION_KEY,
         EARLY_REVERSAL_KEY,
         HULL_BUY_TURN_KEY,
@@ -870,8 +940,10 @@ def _filter_telegram_board_rows(rows: list[dict[str, Any]], filter_key: str) -> 
         return [row for row in rows if str(row.get("section_key") or "") in AGGRESSIVE_SECTION_KEY_SET]
     if filter_key == "qbs":
         return [row for row in rows if str(row.get("section_key") or "") in QBS_DISPLAY_NUMBERS]
+    if filter_key == "technical":
+        return [row for row in rows if str(row.get("section_key") or "") == TECHNICAL_BUY_CLUSTER_KEY]
     if filter_key == "entry":
-        entry_keys = {"qbs_buy_now", "qbs_chase_watch", HULL_BUY_TURN_KEY, *AGGRESSIVE_ENTRY_SECTION_KEYS}
+        entry_keys = {"qbs_buy_now", "qbs_chase_watch", TECHNICAL_BUY_CLUSTER_KEY, HULL_BUY_TURN_KEY, *AGGRESSIVE_ENTRY_SECTION_KEYS}
         return [row for row in rows if str(row.get("section_key") or "") in entry_keys]
     if filter_key == "trend":
         trend_keys = {STEADY_WINNER_SECTION_KEY, "five_day_top", *AGGRESSIVE_TREND_SECTION_KEYS}
@@ -1193,6 +1265,8 @@ def _board_rows_html(rows: list[dict[str, Any]]) -> str:
         score_tone = _qbs_tone(row.get("score_value"))
         if section_key == STEADY_WINNER_SECTION_KEY:
             score_tone = _qbs_tone(row.get("score_value"))
+        if section_key == TECHNICAL_BUY_CLUSTER_KEY:
+            score_tone = _technical_buy_tone(row.get("score_value"))
         risk_tone = "warning" if row.get("has_warning") else "muted"
         body_rows.append(
             "<tr>"
@@ -1287,7 +1361,7 @@ def _board_table_html(rows: list[dict[str, Any]]) -> str:
                     <th>1M</th>
                     <th>1Y</th>
                     <th>High</th>
-                    <th>PUL/QBS</th>
+                    <th>PUL/QBS/TBS</th>
                     <th>RSI</th>
                     <th>Vol20</th>
                     <th>MA20</th>
@@ -1302,13 +1376,19 @@ def _board_table_html(rows: list[dict[str, Any]]) -> str:
 
 
 def _default_telegram_board_filter(rows: Iterable[Mapping[str, Any]]) -> str:
-    return "aggressive" if any(str(row.get("section_key") or "") in AGGRESSIVE_SECTION_KEY_SET for row in rows) else "all"
+    row_list = list(rows)
+    if any(str(row.get("section_key") or "") in AGGRESSIVE_SECTION_KEY_SET for row in row_list):
+        return "aggressive"
+    if any(str(row.get("section_key") or "") == TECHNICAL_BUY_CLUSTER_KEY for row in row_list):
+        return "technical"
+    return "all"
 
 
 def _telegram_board_overview_html(rows: list[dict[str, Any]], filter_label: str) -> str:
     unique_tickers = _collect_recent_tickers(str(row.get("ticker") or "") for row in rows)
     aggressive_count = sum(1 for row in rows if str(row.get("section_key") or "") in AGGRESSIVE_SECTION_KEY_SET)
     qbs_count = sum(1 for row in rows if str(row.get("section_key") or "") in QBS_DISPLAY_NUMBERS)
+    technical_count = sum(1 for row in rows if str(row.get("section_key") or "") == TECHNICAL_BUY_CLUSTER_KEY)
     warning_count = sum(1 for row in rows if row.get("has_warning"))
     items = [
         ("View", filter_label),
@@ -1316,6 +1396,7 @@ def _telegram_board_overview_html(rows: list[dict[str, Any]], filter_label: str)
         ("Tickers", f"{len(unique_tickers):,}"),
         ("Aggressive", f"{aggressive_count:,}"),
         ("QBS", f"{qbs_count:,}"),
+        ("Tech", f"{technical_count:,}"),
         ("Risk", f"{warning_count:,}"),
     ]
     metric_html = "".join(
@@ -1346,6 +1427,7 @@ def _render_telegram_visual_board(digest: TelegramDigest, *, on_select_ticker: C
     filter_options = {
         "aggressive": "Aggressive",
         "qbs": "QBS",
+        "technical": "Tech Buy",
         "entry": "Entry",
         "trend": "Trend",
         "reversal": "Reversal",
@@ -1966,6 +2048,44 @@ def _render_telegram_section_table(section: TelegramSection) -> None:
         _render_aggressive_board_table(rows, include_rank=True)
         return
 
+    if section.key == TECHNICAL_BUY_CLUSTER_KEY:
+        rows = [
+            "<tr>"
+            f"<td class='cpx-digest-rank'>#{item.rank or idx}</td>"
+            f"<td><span class='cpx-digest-ticker'>{_html_text(item.ticker)}</span></td>"
+            f"<td>{_badge_html(_format_technical_buy(item.technical_buy_score), _technical_buy_tone(item.technical_buy_score))}</td>"
+            f"<td>{_badge_html(item.technical_buy_bucket or item.bucket or '-', _signal_tone(item.technical_buy_bucket or item.bucket, section.key))}</td>"
+            f"<td>{_badge_html(_format_float(item.chg_pct, 2, signed=True, suffix='%'), _change_tone(item.chg_pct))}</td>"
+            f"<td>{_badge_html(_format_ratio(item.volume_ratio_20), _volume_tone(item.volume_ratio_20))}</td>"
+            f"<td>{_badge_html(str(item.technical_buy_signal_count or '-'), 'accent')}</td>"
+            f"<td><div class='cpx-digest-tags'>{_candidate_tags_html(item)}</div></td>"
+            "</tr>"
+            for idx, item in enumerate(section.items, start=1)
+        ]
+        st.markdown(
+            f"""
+            <div class='cpx-digest-table-wrap'>
+                <table class='cpx-digest-table'>
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Ticker</th>
+                            <th>TBS</th>
+                            <th>Bucket</th>
+                            <th>Today</th>
+                            <th>Vol20</th>
+                            <th>Signals</th>
+                            <th>Reason/Risk</th>
+                        </tr>
+                    </thead>
+                    <tbody>{''.join(rows)}</tbody>
+                </table>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+
     if section.key == STEADY_WINNER_SECTION_KEY:
         rows = [
             "<tr>"
@@ -2193,12 +2313,14 @@ def _render_telegram_message_board(
         ticker_list = [item.ticker for item in section.items if item.ticker]
         if section.key in QBS_DISPLAY_NUMBERS:
             display_number = QBS_DISPLAY_NUMBERS[section.key]
+        elif section.key == TECHNICAL_BUY_CLUSTER_KEY:
+            display_number = TECHNICAL_BUY_DISPLAY_NUMBER
         elif section.key == STEADY_WINNER_SECTION_KEY:
             display_number = STEADY_WINNER_DISPLAY_NUMBER
         elif section.key == EARLY_REVERSAL_KEY:
-            display_number = "0-4"
+            display_number = EARLY_REVERSAL_DISPLAY_NUMBER
         elif section.key == HULL_BUY_TURN_KEY:
-            display_number = "0-5"
+            display_number = HULL_BUY_TURN_DISPLAY_NUMBER
         elif section.key in AGGRESSIVE_SECTION_KEY_SET:
             display_number = f"PART {AGGRESSIVE_NEXT_DAY_SECTION_KEYS.index(section.key) + 1}"
         else:

@@ -17,8 +17,10 @@ from telegram_pipeline import (
     EARLY_REVERSAL_KEY,
     HULL_BUY_TURN_KEY,
     STEADY_WINNER_SECTION_KEY,
+    TECHNICAL_BUY_CLUSTER_KEY,
     TelegramCandidate,
     annotate_rows_with_qbs,
+    annotate_rows_with_technical_buy,
     build_post_close_digest,
     build_post_close_message_texts,
     select_aggressive_next_day_sections,
@@ -190,6 +192,72 @@ class TelegramPipelineTests(unittest.TestCase):
         row.update(overrides)
         return row
 
+    def _technical_signal(self, key: str, *, label: str | None = None, direction: str = "buy", days_ago: int = 0):
+        return {
+            "group": "core",
+            "key": key,
+            "label": label or key,
+            "dir": direction,
+            "date": self.market_date.isoformat(),
+            "days_ago": days_ago,
+        }
+
+    def _technical_base_row(self, ticker: str, *, signals: list[dict] | None = None, **overrides):
+        row = self._row(
+            ticker,
+            final_entry_eligible=False,
+            final_entry_selected=False,
+            final_entry_score=0.0,
+            scan_score=0.0,
+            es=0.0,
+            chg=1.2,
+            chg_value=1.0,
+            chg_5d=3.0,
+            rsi=55.0,
+            volume_ratio_20=1.0,
+            dollar_volume_20=150_000_000,
+            latest_session_utbot_buy_turn=False,
+            latest_session_hull_buy_turn=False,
+            utbot_buy_recent=False,
+            hull_turn_bull_recent=False,
+            bull_turn_recent=False,
+            utbot_buy_last_date="N/A",
+            hull_turn_bull_last_date="N/A",
+            days_since_utbot_buy=99,
+            days_since_hull_turn_bull=99,
+            cmf=0.0,
+            obv_slope=0.0,
+            uptrend_persistent=False,
+            hma20_slope_pct=0.0,
+            hma60_slope_pct=0.0,
+            pullback_ready=False,
+            pullback_reentry=False,
+            bull_strength_recent=False,
+            volume_bullish=False,
+            gap_setup_candidate=False,
+            pocket_pivot_candidate=False,
+            pocket_pivot_recent=False,
+            new_52w_high=False,
+            new_52w_closing_high=False,
+            hma_ema_long_entry=False,
+            hma_ema_long_aligned=False,
+            hma25_ema25_cross_bull=False,
+            hma_ema_short_entry=False,
+            hma25_ema25_cross_bear=False,
+            volume_surge=False,
+            volume_climax_flag=False,
+            nr7_flag=False,
+            atr_contracting=False,
+            inside_day_flag=False,
+            thin_trade_risk=False,
+            bearish_gap_failure=False,
+            multi_sell=0,
+            strategy_conflict_level="LOW",
+            detected_signals=list(signals or []),
+        )
+        row.update(overrides)
+        return row
+
     def test_build_post_close_digest_uses_trader_board_sections_and_tags_overlap(self):
         digest = build_post_close_digest(
             [self._row("ALPHA")],
@@ -209,6 +277,7 @@ class TelegramPipelineTests(unittest.TestCase):
                 "qbs_buy_now",
                 "qbs_chase_watch",
                 "qbs_pullback_wait",
+                TECHNICAL_BUY_CLUSTER_KEY,
                 *AGGRESSIVE_NEXT_DAY_SECTION_KEYS,
                 STEADY_WINNER_SECTION_KEY,
                 EARLY_REVERSAL_KEY,
@@ -238,6 +307,7 @@ class TelegramPipelineTests(unittest.TestCase):
             and key
             not in {
                 "five_day_top",
+                TECHNICAL_BUY_CLUSTER_KEY,
                 STEADY_WINNER_SECTION_KEY,
                 EARLY_REVERSAL_KEY,
                 HULL_BUY_TURN_KEY,
@@ -388,6 +458,110 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertIn("chase_risk", by_ticker["CHASE"]["qbs_risk_flags"])
         self.assertEqual(by_ticker["EXTREME"]["qbs_bucket"], "CHASE_WATCH")
         self.assertIn("extreme_chase", by_ticker["EXTREME"]["qbs_risk_flags"])
+
+    def test_technical_buy_cluster_selects_multisignal_sorts_and_formats(self):
+        trend = self._technical_base_row(
+            "TREND",
+            signals=[
+                self._technical_signal("TK_Cross_Bull", label="TK골든"),
+                self._technical_signal("DMI_Cross_Bull", label="DMI강세교차"),
+                self._technical_signal("ADX_New_Uptrend", label="신규상승추세"),
+                self._technical_signal("MACD_Zero_Cross_Buy", label="MACD0"),
+                self._technical_signal("CMF_Bull", label="CMF강세"),
+            ],
+            volume_ratio_20=1.82,
+            cmf=0.18,
+            obv_slope=0.5,
+            atr_pct=4.6,
+            chg=3.21,
+        )
+        reversal = self._technical_base_row(
+            "REV",
+            signals=[
+                self._technical_signal("Green_Dot_T2"),
+                self._technical_signal("StochRSI_Cross_Buy"),
+                self._technical_signal("Bull_Divergence"),
+            ],
+            volume_ratio_20=1.25,
+            atr_pct=6.2,
+            chg=1.4,
+        )
+        weak = self._technical_base_row(
+            "WEAK",
+            signals=[self._technical_signal("Stoch_Oversold")],
+            volume_ratio_20=1.5,
+        )
+        sell_turn = self._technical_base_row(
+            "SELLX",
+            signals=[
+                self._technical_signal("TK_Cross_Bull"),
+                self._technical_signal("DMI_Cross_Bull"),
+                self._technical_signal("UTBot_Sell", direction="sell"),
+            ],
+            utbot_sell_last_date=self.market_date.isoformat(),
+        )
+        low_liquidity = self._technical_base_row(
+            "THIN",
+            signals=[
+                self._technical_signal("Pocket_Pivot"),
+                self._technical_signal("CMF_Bull"),
+            ],
+            dollar_volume_20=10_000_000,
+        )
+
+        digest = build_post_close_digest(
+            [reversal, trend, weak, sell_turn, low_liquidity],
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=5,
+            result_count=5,
+            skip_count=0,
+        )
+        section = digest.section_map()[TECHNICAL_BUY_CLUSTER_KEY]
+        tickers = [item.ticker for item in section.items]
+
+        self.assertIn("TREND", tickers)
+        self.assertIn("REV", tickers)
+        self.assertNotIn("WEAK", tickers)
+        self.assertNotIn("SELLX", tickers)
+        self.assertNotIn("THIN", tickers)
+        self.assertEqual(tickers[0], "TREND")
+        self.assertGreaterEqual(section.items[0].technical_buy_score, section.items[1].technical_buy_score)
+        self.assertEqual(section.items[0].technical_buy_bucket, "추세전환형")
+        self.assertEqual(section.items[1].technical_buy_bucket, "반전초입형")
+        self.assertGreaterEqual(section.items[0].technical_buy_signal_count, 5)
+        self.assertIn("TK골든", section.items[0].technical_buy_hits)
+
+        message = build_post_close_message_texts(digest)[0]
+        self.assertIn("기술적 매수시그널 클러스터 Top 20", message)
+        self.assertIn("점수", message)
+        self.assertIn("분류: 추세전환형", message)
+        self.assertIn("리스크: 특이사항 없음", message)
+        self.assertIn("이유:", message)
+
+    def test_technical_buy_annotation_writes_digest_payload_fields(self):
+        row = self._technical_base_row(
+            "FLOW",
+            signals=[
+                self._technical_signal("CMF_Bull"),
+                self._technical_signal("MF_Cross_Bull"),
+                self._technical_signal("Pocket_Pivot"),
+            ],
+            volume_ratio_20=1.55,
+            cmf=0.2,
+        )
+        weak = self._technical_base_row("WEAK", signals=[self._technical_signal("Stoch_Oversold")])
+
+        annotated = annotate_rows_with_technical_buy([row, weak], target_date=self.market_date)
+        by_ticker = {item["ticker"]: item for item in annotated}
+
+        self.assertNotEqual(by_ticker["FLOW"]["technical_buy_score"], "")
+        self.assertEqual(by_ticker["FLOW"]["technical_buy_bucket"], "수급매집형")
+        self.assertIn("+", by_ticker["FLOW"]["technical_buy_hits"])
+        self.assertEqual(by_ticker["FLOW"]["technical_buy_risk_flags"], "특이사항 없음")
+        self.assertEqual(by_ticker["WEAK"]["technical_buy_score"], "")
 
     def test_qbs_high_conflict_extreme_strength_stays_chase_watch(self):
         row = self._row(
@@ -699,7 +873,7 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertNotIn("BELOW", items)
 
         message = build_post_close_message_texts(digest)[0]
-        self.assertIn("## 0-3. 계속 우상향 주도주 Top 30", message)
+        self.assertIn("## 0-4. 계속 우상향 주도주 Top 30", message)
         self.assertIn("FAST | PUL", message)
         self.assertIn("근거:", message)
         self.assertIn("진입유형: extended_wait", message)
@@ -873,11 +1047,12 @@ class TelegramPipelineTests(unittest.TestCase):
         item = section_map[EARLY_REVERSAL_KEY].items[0]
 
         self.assertEqual(
-            digest.section_order[:13],
+            digest.section_order[:14],
             [
                 "qbs_buy_now",
                 "qbs_chase_watch",
                 "qbs_pullback_wait",
+                TECHNICAL_BUY_CLUSTER_KEY,
                 *AGGRESSIVE_NEXT_DAY_SECTION_KEYS,
                 STEADY_WINNER_SECTION_KEY,
                 EARLY_REVERSAL_KEY,
@@ -1096,7 +1271,7 @@ class TelegramPipelineTests(unittest.TestCase):
         )
         message = build_post_close_message_texts(digest)[0]
 
-        self.assertIn("## 0-4.", message)
+        self.assertIn("## 0-5.", message)
         self.assertIn("MELI | ERS", message)
         self.assertIn("CONFIRMED", message)
         self.assertIn("MIXED_REVERSAL", message)
@@ -1120,11 +1295,12 @@ class TelegramPipelineTests(unittest.TestCase):
         items = section_map[HULL_BUY_TURN_KEY].items
 
         self.assertEqual(
-            digest.section_order[:14],
+            digest.section_order[:15],
             [
                 "qbs_buy_now",
                 "qbs_chase_watch",
                 "qbs_pullback_wait",
+                TECHNICAL_BUY_CLUSTER_KEY,
                 *AGGRESSIVE_NEXT_DAY_SECTION_KEYS,
                 STEADY_WINNER_SECTION_KEY,
                 EARLY_REVERSAL_KEY,
@@ -1199,7 +1375,7 @@ class TelegramPipelineTests(unittest.TestCase):
         )
         message = build_post_close_message_texts(digest)[0]
 
-        self.assertIn("## 0-5.", message)
+        self.assertIn("## 0-6.", message)
         self.assertIn("HULLX | HULL BUY", message)
         self.assertIn("근거:", message)
         self.assertIn("확인:", message)
@@ -1353,13 +1529,14 @@ class TelegramPipelineTests(unittest.TestCase):
         qbs_0 = message.index("## 0. ")
         qbs_01 = message.index("## 0-1. ")
         qbs_02 = message.index("## 0-2. ")
+        tech_03 = message.index("## 0-3. ")
         aggressive_1 = message.index("## PART 1 ")
         aggressive_8 = message.index("## PART 8 ")
-        qbs_03 = message.index("## 0-3. ")
-        qbs_04 = message.index("## 0-4. ")
-        qbs_05 = message.index("## 0-5. ")
+        steady_04 = message.index("## 0-4. ")
+        early_05 = message.index("## 0-5. ")
+        hull_06 = message.index("## 0-6. ")
         normal_1 = message.index("## 1. ")
-        self.assertTrue(qbs_0 < qbs_01 < qbs_02 < aggressive_1 < aggressive_8 < qbs_03 < qbs_04 < qbs_05 < normal_1)
+        self.assertTrue(qbs_0 < qbs_01 < qbs_02 < tech_03 < aggressive_1 < aggressive_8 < steady_04 < early_05 < hull_06 < normal_1)
         self.assertIn("QBS", message)
 
     def test_aggressive_message_contains_conditions_and_core_metrics(self):
@@ -1404,6 +1581,7 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertIn("## 0-3. ", message)
         self.assertIn("## 0-4. ", message)
         self.assertIn("## 0-5. ", message)
+        self.assertIn("## 0-6. ", message)
         self.assertGreaterEqual(message.count("- 해당 없음"), 3)
 
     def test_chunk_split_keeps_qbs_before_existing_sections(self):
@@ -1426,11 +1604,12 @@ class TelegramPipelineTests(unittest.TestCase):
             joined.index("## 0. ")
             < joined.index("## 0-1. ")
             < joined.index("## 0-2. ")
+            < joined.index("## 0-3. ")
             < joined.index("## PART 1 ")
             < joined.index("## PART 8 ")
-            < joined.index("## 0-3. ")
             < joined.index("## 0-4. ")
             < joined.index("## 0-5. ")
+            < joined.index("## 0-6. ")
             < joined.index("## 1. ")
         )
 
@@ -1677,8 +1856,30 @@ class HomeDigestLoaderTests(unittest.TestCase):
     def test_telegram_board_rows_keep_five_day_and_tolerate_missing_long_returns(self):
         payload = {
             "version": "2.0",
-            "section_order": [STEADY_WINNER_SECTION_KEY, EARLY_REVERSAL_KEY, HULL_BUY_TURN_KEY, "five_day_top"],
+            "section_order": [TECHNICAL_BUY_CLUSTER_KEY, STEADY_WINNER_SECTION_KEY, EARLY_REVERSAL_KEY, HULL_BUY_TURN_KEY, "five_day_top"],
             "sections": [
+                {
+                    "key": TECHNICAL_BUY_CLUSTER_KEY,
+                    "title": "기술적 매수시그널 클러스터 Top 20",
+                    "item_count": 1,
+                    "ranked": True,
+                    "items": [
+                        {
+                            "ticker": "FLOW",
+                            "price": 42.0,
+                            "chg_pct": 2.4,
+                            "volume_ratio_20": 1.8,
+                            "section_key": TECHNICAL_BUY_CLUSTER_KEY,
+                            "rank": 1,
+                            "technical_buy_score": 12.5,
+                            "technical_buy_signal_count": 4,
+                            "technical_buy_hits": ["CMF강세", "MF강세전환", "Pocket Pivot"],
+                            "technical_buy_bucket": "수급매집형",
+                            "technical_buy_reason": "수급매집형 / CMF강세 + Pocket Pivot",
+                            "technical_buy_risk_flags": [],
+                        }
+                    ],
+                },
                 {
                     "key": STEADY_WINNER_SECTION_KEY,
                     "title": "steady",
@@ -1795,6 +1996,12 @@ class HomeDigestLoaderTests(unittest.TestCase):
         rows_by_ticker = {row["ticker"]: row for row in board_rows}
 
         self.assertEqual(rows_by_ticker["META"]["one_month_pct"], 8.8)
+        self.assertEqual(rows_by_ticker["FLOW"]["section"], "TECH BUY")
+        self.assertEqual(rows_by_ticker["FLOW"]["bucket"], "수급매집형")
+        self.assertEqual(rows_by_ticker["FLOW"]["score"], "TBS 12.5")
+        self.assertEqual(rows_by_ticker["FLOW"]["score_value"], 12.5)
+        self.assertEqual(rows_by_ticker["FLOW"]["entry"], "technical_cluster_watch")
+        self.assertIn("CMF강세", rows_by_ticker["FLOW"]["setup"])
         self.assertEqual(rows_by_ticker["META"]["one_year_pct"], 52.5)
         self.assertEqual(rows_by_ticker["META"]["high_pos_pct"], -3.2)
         self.assertEqual(rows_by_ticker["MELI"]["section"], "REVERSAL")
@@ -2244,9 +2451,9 @@ class HomeDigestLoaderTests(unittest.TestCase):
         message = home_page.build_telegram_digest_message(payload)
 
         self.assertIn("## 0. 오늘 매수 최종 후보 Top 20", message)
-        self.assertIn("## 0-3. 계속 우상향 주도주 Top 30", message)
-        self.assertIn("## 0-4. 초기 반전 포착 Top 20", message)
-        self.assertIn("## 0-5. 당일 HULL 매수전환", message)
+        self.assertIn("## 0-4. 계속 우상향 주도주 Top 30", message)
+        self.assertIn("## 0-5. 초기 반전 포착 Top 20", message)
+        self.assertIn("## 0-6. 당일 HULL 매수전환", message)
         self.assertIn("## 1. 매도전환 / 위험 후보", message)
         self.assertIn("AAPL", message)
         self.assertIn("META | PUL 78", message)

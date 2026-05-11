@@ -50,6 +50,7 @@ from strategy import build_strategy_payload
 from etf_sources import resolve_etf_universe
 from telegram_pipeline import (
     annotate_rows_with_qbs,
+    annotate_rows_with_technical_buy,
     build_post_close_digest,
     build_post_close_message_texts,
     publish_digest_if_configured,
@@ -236,6 +237,14 @@ POST_CLOSE_QBS_FIELD_SPECS: tuple[dict[str, str], ...] = (
     {"group": "qbs", "key": "qbs_tags", "label": "QBSTags", "type": "text", "description": "Compact section and trigger tags used by QBS", "rule": "tags joined with +", "example": "final+buy+HMA+pocket"},
     {"group": "qbs", "key": "qbs_risk_flags", "label": "QBSRiskFlags", "type": "text", "description": "Risk flags applied by QBS", "rule": "flags joined with +", "example": "chase_risk+low_volume"},
     {"group": "qbs", "key": "qbs_membership_count", "label": "QBSMembershipCount", "type": "number", "description": "Number of post-close sections containing this ticker", "rule": "count of selected section memberships", "example": "4"},
+)
+POST_CLOSE_TECHNICAL_BUY_FIELD_SPECS: tuple[dict[str, str], ...] = (
+    {"group": "technical_buy", "key": "technical_buy_score", "label": "TechnicalBuyScore", "type": "number", "description": "Technical buy signal cluster score", "rule": "weighted buy signals + cluster/volume/flow bonuses - risk penalties", "example": "13.5"},
+    {"group": "technical_buy", "key": "technical_buy_signal_count", "label": "TechnicalBuySignalCount", "type": "number", "description": "Number of recent technical buy signals used", "rule": "unique recent buy hits in 5-bar window", "example": "5"},
+    {"group": "technical_buy", "key": "technical_buy_hits", "label": "TechnicalBuyHits", "type": "text", "description": "Recent technical buy signal labels", "rule": "labels joined with +", "example": "TK골든+DMI강세교차+신규상승추세"},
+    {"group": "technical_buy", "key": "technical_buy_bucket", "label": "TechnicalBuyBucket", "type": "text", "description": "Technical buy candidate type", "rule": "dominant signal family or 혼합형", "example": "추세전환형"},
+    {"group": "technical_buy", "key": "technical_buy_reason", "label": "TechnicalBuyReason", "type": "text", "description": "Compact reason for technical buy cluster selection", "rule": "bucket + top hits + volume context", "example": "추세전환형 / TK골든 + DMI강세교차 / Vol20 x1.82"},
+    {"group": "technical_buy", "key": "technical_buy_risk_flags", "label": "TechnicalBuyRiskFlags", "type": "text", "description": "Risk flags attached to technical buy cluster candidate", "rule": "flags joined with + or 특이사항 없음", "example": "extended_day+ma20_extended"},
 )
 EARLY_SESSION_CORE_TOP_N = 20
 EARLY_SESSION_EXTENDED_SECTION_TOTAL = 10
@@ -3393,13 +3402,19 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
             top_n=FINAL_TOP_LIMIT,
         )
         csv_rows = annotate_rows_with_qbs(csv_rows, target_date=latest_session_date)
+        csv_rows = annotate_rows_with_technical_buy(csv_rows, target_date=latest_session_date)
         csv_path = write_scan_csv(
             csv_rows,
             out_dir=out_dir,
             run_label=run_label,
-            extra_field_specs=[*POST_CLOSE_LATEST_SESSION_FIELD_SPECS, *POST_CLOSE_FINAL_ENTRY_FIELD_SPECS, *POST_CLOSE_QBS_FIELD_SPECS],
+            extra_field_specs=[
+                *POST_CLOSE_LATEST_SESSION_FIELD_SPECS,
+                *POST_CLOSE_FINAL_ENTRY_FIELD_SPECS,
+                *POST_CLOSE_QBS_FIELD_SPECS,
+                *POST_CLOSE_TECHNICAL_BUY_FIELD_SPECS,
+            ],
         )
-        rows_path = write_scan_rows_json(merged_rows, out_dir=out_dir, run_label=run_label)
+        rows_path = write_scan_rows_json(csv_rows, out_dir=out_dir, run_label=run_label)
 
         detected_turn_rows = select_us_session_turn_rows(csv_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
         turn_rows = filter_turn_rows_for_telegram(detected_turn_rows, min_volume_ratio_20_exclusive=1.0)
@@ -3504,13 +3519,19 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
             top_n=FINAL_TOP_LIMIT,
         )
         csv_rows = annotate_rows_with_qbs(csv_rows, target_date=latest_session_date)
+        csv_rows = annotate_rows_with_technical_buy(csv_rows, target_date=latest_session_date)
         csv_path = write_scan_csv(
             csv_rows,
             out_dir=out_dir,
             run_label=run_label,
-            extra_field_specs=[*POST_CLOSE_LATEST_SESSION_FIELD_SPECS, *POST_CLOSE_FINAL_ENTRY_FIELD_SPECS, *POST_CLOSE_QBS_FIELD_SPECS],
+            extra_field_specs=[
+                *POST_CLOSE_LATEST_SESSION_FIELD_SPECS,
+                *POST_CLOSE_FINAL_ENTRY_FIELD_SPECS,
+                *POST_CLOSE_QBS_FIELD_SPECS,
+                *POST_CLOSE_TECHNICAL_BUY_FIELD_SPECS,
+            ],
         )
-        rows_path = write_scan_rows_json(scan_result.rows, out_dir=out_dir, run_label=run_label)
+        rows_path = write_scan_rows_json(csv_rows, out_dir=out_dir, run_label=run_label)
         detected_turn_rows = select_us_session_turn_rows(csv_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
         turn_rows = filter_turn_rows_for_telegram(detected_turn_rows, min_volume_ratio_20_exclusive=1.0)
         pullback_rows = select_pullback_reentry_rows_for_telegram(csv_rows, min_volume_ratio_20_exclusive=1.0)

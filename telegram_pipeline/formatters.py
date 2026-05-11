@@ -60,6 +60,13 @@ from .selectors import (
     select_post_close_sections,
     select_post_close_board_sections,
 )
+from .technical_buy_signal_ranker import (
+    TECHNICAL_BUY_CLUSTER_KEY,
+    TECHNICAL_BUY_CLUSTER_LIMIT,
+    TECHNICAL_BUY_CLUSTER_QUALITY_FLOOR,
+    TECHNICAL_BUY_CLUSTER_TITLE,
+    select_technical_buy_rows,
+)
 
 QBS_SECTION_TITLES: dict[str, str] = {
     QBS_BUY_NOW_KEY: f"오늘 매수 최종 후보 Top {QBS_OUTPUT_LIMIT}",
@@ -81,9 +88,10 @@ QBS_DISPLAY_NUMBERS: dict[str, str] = {
 
 BOARD_SECTION_KEYS = set(BOARD_SECTION_ORDER)
 FIVE_DAY_TOP_SECTION_KEY = "five_day_top"
-STEADY_WINNER_DISPLAY_NUMBER = "0-3"
-EARLY_REVERSAL_DISPLAY_NUMBER = "0-4"
-HULL_BUY_TURN_DISPLAY_NUMBER = "0-5"
+TECHNICAL_BUY_DISPLAY_NUMBER = "0-3"
+STEADY_WINNER_DISPLAY_NUMBER = "0-4"
+EARLY_REVERSAL_DISPLAY_NUMBER = "0-5"
+HULL_BUY_TURN_DISPLAY_NUMBER = "0-6"
 AGGRESSIVE_SECTION_KEYS = set(AGGRESSIVE_NEXT_DAY_SECTION_KEYS)
 
 
@@ -106,6 +114,13 @@ def _number(value: Any, decimals: int = 1) -> str:
         return f"{float(value):.{decimals}f}"
     except (TypeError, ValueError):
         return "--"
+
+
+def _usd_price(value: Any) -> str:
+    try:
+        return f"${float(value):.2f}"
+    except (TypeError, ValueError):
+        return "$--"
 
 
 def _optional_float(row: Mapping[str, Any], *keys: str) -> float | None:
@@ -188,6 +203,23 @@ def _hit_summary(*values: Any) -> str:
             if len(hits) >= 2:
                 return " + ".join(hits)
     return ""
+
+
+def _text_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        parts = value.replace("|", "+").split("+")
+    elif isinstance(value, (list, tuple, set)):
+        parts = list(value)
+    else:
+        parts = [value]
+    items: list[str] = []
+    for part in parts:
+        text = str(part or "").strip()
+        if text and text not in items:
+            items.append(text)
+    return items
 
 
 def _build_final_top_reason(row: Mapping[str, Any], target_date: date) -> str:
@@ -335,6 +367,7 @@ def _candidate_label(section_key: str) -> str:
         STEADY_WINNER_SECTION_KEY: "PUL",
         EARLY_REVERSAL_KEY: "ERS",
         HULL_BUY_TURN_KEY: "HULL BUY",
+        TECHNICAL_BUY_CLUSTER_KEY: "TECH BUY",
         "new_52w_high": "52W high",
     }.get(section_key, section_key)
 
@@ -342,6 +375,8 @@ def _candidate_label(section_key: str) -> str:
 def _candidate_reason(section_key: str, row: Mapping[str, Any], target_date: date) -> str:
     if section_key in AGGRESSIVE_SECTION_KEYS:
         return str(row.get("aggressive_reason") or "-")
+    if section_key == TECHNICAL_BUY_CLUSTER_KEY:
+        return str(row.get("technical_buy_reason") or "-")
     board_reason = str(row.get("board_reason") or "").strip()
     if section_key in BOARD_SECTION_KEYS and board_reason:
         return board_reason
@@ -436,6 +471,12 @@ def _candidate_source_flags(section_key: str, row: Mapping[str, Any], target_dat
         "hull_confirm": str(row.get("hull_confirm") or "") if section_key == HULL_BUY_TURN_KEY else "",
         "hull_utbot_same_turn": int(safe_float(row.get("hull_utbot_same_turn", 0.0))) if section_key == HULL_BUY_TURN_KEY else 0,
         "entry_type": str(row.get("entry_type") or "") if section_key in {STEADY_WINNER_SECTION_KEY, EARLY_REVERSAL_KEY, HULL_BUY_TURN_KEY, *AGGRESSIVE_SECTION_KEYS} else "",
+        "technical_buy_score": safe_float(row.get("technical_buy_score", 0.0)) if section_key == TECHNICAL_BUY_CLUSTER_KEY else 0.0,
+        "technical_buy_signal_count": int(safe_float(row.get("technical_buy_signal_count", 0.0))) if section_key == TECHNICAL_BUY_CLUSTER_KEY else 0,
+        "technical_buy_hits": _text_list(row.get("technical_buy_hits")) if section_key == TECHNICAL_BUY_CLUSTER_KEY else [],
+        "technical_buy_bucket": str(row.get("technical_buy_bucket") or "") if section_key == TECHNICAL_BUY_CLUSTER_KEY else "",
+        "technical_buy_reason": str(row.get("technical_buy_reason") or "") if section_key == TECHNICAL_BUY_CLUSTER_KEY else "",
+        "technical_buy_risk_flags": _text_list(row.get("technical_buy_risk_flags")) if section_key == TECHNICAL_BUY_CLUSTER_KEY else [],
         "label": _candidate_label(section_key),
         "membership": list(row.get("source_membership") or []),
         "membership_count": int(safe_float(row.get("membership_count", 0.0))),
@@ -450,6 +491,10 @@ def _build_candidate(section_key: str, row: Mapping[str, Any], rank: int, target
     reversal_risk_tags = list(row.get("reversal_risk_flags") or []) if section_key == EARLY_REVERSAL_KEY else []
     hull_risk_tags = list(row.get("hull_risk_flags") or []) if section_key == HULL_BUY_TURN_KEY else []
     aggressive_risk_tags = list(row.get("aggressive_risk_flags") or []) if section_key in AGGRESSIVE_SECTION_KEYS else []
+    technical_hits = _text_list(row.get("technical_buy_hits")) if section_key == TECHNICAL_BUY_CLUSTER_KEY else []
+    technical_risk_tags = _text_list(row.get("technical_buy_risk_flags")) if section_key == TECHNICAL_BUY_CLUSTER_KEY else []
+    if technical_risk_tags == ["특이사항 없음"]:
+        technical_risk_tags = []
     return TelegramCandidate(
         ticker=str(row.get("ticker") or "").strip().upper(),
         price=safe_float(row.get("price")) if row.get("price") is not None else None,
@@ -460,6 +505,7 @@ def _build_candidate(section_key: str, row: Mapping[str, Any], rank: int, target
         rank=rank,
         label=str(
             row.get("aggressive_label")
+            or row.get("technical_buy_bucket")
             or row.get("pul_bucket")
             or row.get("reversal_phase")
             or row.get("hull_bucket")
@@ -468,9 +514,10 @@ def _build_candidate(section_key: str, row: Mapping[str, Any], rank: int, target
         ),
         reason=_candidate_reason(section_key, row, target_date),
         source_flags=_candidate_source_flags(section_key, row, target_date),
-        bucket=str(row.get("aggressive_bucket") or row.get("pul_bucket") or row.get("reversal_phase") or row.get("hull_bucket") or ""),
+        bucket=str(row.get("aggressive_bucket") or row.get("technical_buy_bucket") or row.get("pul_bucket") or row.get("reversal_phase") or row.get("hull_bucket") or ""),
         tags=list(
             row.get("aggressive_tags")
+            or technical_hits
             or row.get("pul_tags")
             or row.get("reversal_tags")
             or row.get("hull_tags")
@@ -478,6 +525,7 @@ def _build_candidate(section_key: str, row: Mapping[str, Any], rank: int, target
             or []
         ),
         risk_flags=aggressive_risk_tags
+        or technical_risk_tags
         or steady_risk_tags
         or reversal_risk_tags
         or hull_risk_tags
@@ -495,6 +543,12 @@ def _build_candidate(section_key: str, row: Mapping[str, Any], rank: int, target
         reversal_type=str(row.get("reversal_type") or ""),
         reversal_phase=str(row.get("reversal_phase") or ""),
         entry_type=str(row.get("entry_type") or ""),
+        technical_buy_score=_optional_float(row, "technical_buy_score"),
+        technical_buy_signal_count=int(safe_float(row.get("technical_buy_signal_count", 0.0))) if section_key == TECHNICAL_BUY_CLUSTER_KEY else 0,
+        technical_buy_hits=technical_hits,
+        technical_buy_bucket=str(row.get("technical_buy_bucket") or ""),
+        technical_buy_reason=str(row.get("technical_buy_reason") or ""),
+        technical_buy_risk_flags=technical_risk_tags,
     )
 
 
@@ -542,6 +596,26 @@ def _build_qbs_sections(section_rows: Mapping[str, Iterable[Mapping[str, Any]]],
     return sections
 
 
+def _build_technical_buy_cluster_section(rows: Iterable[Mapping[str, Any]], target_date: date) -> TelegramSection:
+    tech_rows = select_technical_buy_rows(
+        rows,
+        target_date=target_date,
+        limit=TECHNICAL_BUY_CLUSTER_LIMIT,
+    )
+    items = [
+        _build_candidate(TECHNICAL_BUY_CLUSTER_KEY, row, idx, target_date)
+        for idx, row in enumerate(tech_rows, start=1)
+    ]
+    return TelegramSection(
+        key=TECHNICAL_BUY_CLUSTER_KEY,
+        title=TECHNICAL_BUY_CLUSTER_TITLE,
+        items=items,
+        item_count=len(items),
+        quality_floor=TECHNICAL_BUY_CLUSTER_QUALITY_FLOOR,
+        ranked=True,
+    )
+
+
 def _build_aggressive_next_day_sections(rows: Iterable[Mapping[str, Any]], target_date: date) -> list[TelegramSection]:
     aggressive_rows = select_aggressive_next_day_sections(
         rows,
@@ -580,6 +654,7 @@ def build_post_close_digest(
     section_rows = select_post_close_sections(row_list, target_date=market_date)
 
     sections: list[TelegramSection] = _build_qbs_sections(section_rows, market_date)
+    sections.append(_build_technical_buy_cluster_section(row_list, market_date))
     sections.extend(_build_aggressive_next_day_sections(row_list, market_date))
     steady_rows = list(section_rows.get(STEADY_WINNER_SECTION_KEY) or [])
     steady_items = [
@@ -675,6 +750,7 @@ def build_post_close_digest(
         generated_at=generated_at.isoformat(),
         section_order=[
             *QBS_OUTPUT_KEYS,
+            TECHNICAL_BUY_CLUSTER_KEY,
             *AGGRESSIVE_NEXT_DAY_SECTION_KEYS,
             STEADY_WINNER_SECTION_KEY,
             EARLY_REVERSAL_KEY,
@@ -746,6 +822,37 @@ def _format_aggressive_candidate_line(candidate: TelegramCandidate) -> str:
         f" | ADX {_number(flags.get('adx'), 0)}"
         f" | {str(candidate.reason or '-')}"
         f" | {risk}"
+    )
+
+
+def _format_technical_buy_candidate_line(candidate: TelegramCandidate) -> str:
+    flags = dict(candidate.source_flags or {})
+    hits = list(candidate.technical_buy_hits or candidate.tags or flags.get("technical_buy_hits") or [])
+    risk_flags = list(candidate.technical_buy_risk_flags or candidate.risk_flags or flags.get("technical_buy_risk_flags") or [])
+    risk = "+".join(risk_flags) if risk_flags else "특이사항 없음"
+    bucket = str(candidate.technical_buy_bucket or candidate.bucket or flags.get("technical_buy_bucket") or "-")
+    reason = str(candidate.technical_buy_reason or candidate.reason or flags.get("technical_buy_reason") or "-")
+    score = candidate.technical_buy_score
+    if score is None:
+        score = flags.get("technical_buy_score")
+    signal_count = candidate.technical_buy_signal_count or int(safe_float(flags.get("technical_buy_signal_count", 0.0)))
+    return "\n".join(
+        [
+            (
+                f"{candidate.rank}. {candidate.ticker}"
+                f" | {_usd_price(candidate.price)}"
+                f" | {_signed(candidate.chg_pct, 2)}%"
+            ),
+            (
+                f"   점수 {safe_float(score):.1f} / 신호 {int(signal_count)}개"
+                f" / Vol20 {_ratio(candidate.volume_ratio_20, 2)}"
+                f" / ATR {_number(flags.get('atr_pct'), 1)}%"
+            ),
+            f"   분류: {bucket}",
+            f"   신호: {' + '.join(hits[:8]) if hits else '-'}",
+            f"   리스크: {risk}",
+            f"   이유: {reason}",
+        ]
     )
 
 
@@ -830,6 +937,18 @@ def _aggressive_section_block(section: TelegramSection) -> str:
     return "\n".join(lines)
 
 
+def _technical_buy_section_block(section: TelegramSection) -> str:
+    lines = [f"## {TECHNICAL_BUY_DISPLAY_NUMBER}. {section.title}"]
+    if section.quality_floor:
+        lines.append(f"조건: {section.quality_floor}")
+    if not section.items:
+        lines.append("- 해당 없음")
+        return "\n".join(lines)
+    for item in section.items:
+        lines.append(_format_technical_buy_candidate_line(item))
+    return "\n".join(lines)
+
+
 def _steady_winner_section_block(section: TelegramSection) -> str:
     lines = [f"## {STEADY_WINNER_DISPLAY_NUMBER}. {section.title}"]
     if not section.items:
@@ -893,6 +1012,9 @@ def build_main_message(digest: TelegramDigest) -> str:
     for section in digest.sections:
         if section.key in QBS_DISPLAY_NUMBERS:
             blocks.append(_qbs_section_block(QBS_DISPLAY_NUMBERS[section.key], section))
+            continue
+        if section.key == TECHNICAL_BUY_CLUSTER_KEY:
+            blocks.append(_technical_buy_section_block(section))
             continue
         if section.key in AGGRESSIVE_SECTION_KEYS:
             blocks.append(_aggressive_section_block(section))

@@ -33,13 +33,15 @@
 - **Telegram 알림 자동화**
   - scheduled script가 scan/briefing 결과를 Telegram message와 CSV document로 발송합니다.
   - `telegram_pipeline/`은 digest contract, section selector, formatter, publisher, sender를 담당합니다.
-  - 장마감 digest는 QBS, 다음 거래일 공격형 8-PART 후보, 계속 우상향 주도주, 초기 반전 포착, 당일 HULL 매수전환, 5일 상승률 Top30 섹션을 함께 구성합니다.
+  - 장마감 digest는 QBS, 기술적 매수시그널 클러스터 Top 20, 다음 거래일 공격형 8-PART 후보, 계속 우상향 주도주, 초기 반전 포착, 당일 HULL 매수전환, 5일 상승률 Top30 섹션을 함께 구성합니다.
+  - 기술적 매수시그널 클러스터는 최근 5봉의 UTBot/Hull/TK/DMI/ADX/MACD/Stoch/수급/스퀴즈/눌림/신고가/캔들 반전 신호를 점수화하고, 매도전환·저유동성·과열 리스크를 반영해 다중 시그널 종목을 우선 노출합니다.
   - 공격형 8-PART는 프로그램 자체 점수 대신 ATR, 거래량, RS, ADX, HMA/EMA, BB, 고점 거리, 포켓피봇/갭 지표를 사용하며, 같은 종목이 여러 PART에 걸리면 모두 보여줍니다.
   - 홈 `Telegram Digest Dashboard`는 텔레그램 메시지 구조와 섹션 순서를 유지하면서 상단 요약, 통합 후보 압축표, 섹션별 상세표로 후보를 비교합니다.
   - 통합 종목판은 공격형 8-PART 후보를 기본 압축표로 보여주며 `Today`, `5D`, ATR, Vol20, RS, ADX, MA20, 고점 거리, 근거/주의를 한 화면에서 비교합니다.
 
 - **배치 산출물**
   - 스캔 결과와 메타데이터를 `artifacts/` 하위에 CSV, JSON, TXT 형태로 저장합니다.
+  - 장마감 CSV/JSON에는 `technical_buy_score`, `technical_buy_signal_count`, `technical_buy_hits`, `technical_buy_bucket`, `technical_buy_reason`, `technical_buy_risk_flags`가 포함되어 Dashboard와 사후 분석에서 같은 기술적 매수 클러스터 판단을 재사용할 수 있습니다.
   - GitHub Actions artifact 업로드와 digest branch publish 흐름을 지원합니다.
 
 ## 기술 스택
@@ -161,6 +163,9 @@ cipherX/
 - `telegram_pipeline/final_buy_ranker.py`
   - QBS 기반의 오늘 매수/추격주의/눌림 대기 후보를 점수화합니다.
 
+- `telegram_pipeline/technical_buy_signal_ranker.py`
+  - 개별 종목에서 탐지된 최근 매수 시그널을 `technical_buy_score`, 신호 수, 유형, 리스크 태그로 정리하고 `technical_buy_cluster` 섹션 후보를 선별합니다.
+
 - `telegram_pipeline/aggressive_next_day_ranker.py`
   - 다음 거래일 공격형 매수 후보를 초기 전환, 강추세 지속, 눌림목 재진입, 초고변동 위성, 포켓피봇/거래량 선행, 압축 후 발사 대기, 갭업 추격, 신고가 근처 돌파 대기 8개 PART로 선별합니다.
   - 각 PART는 Top20까지 독립 표시하며, 같은 종목이 여러 PART에 걸리면 중복 제거하지 않고 모두 보여줍니다.
@@ -172,7 +177,7 @@ cipherX/
   - `hull_buy_turn` 섹션의 당일 HULL 매수전환 후보를 선별하고 태그/리스크를 부여합니다.
 
 - `telegram_pipeline/formatters.py`
-  - Telegram message text를 구성하며 QBS, 다음 거래일 공격형 8-PART, `steady_winner`, `early_reversal`, `hull_buy_turn`, 상세 보드, `five_day_top` 순서를 고정합니다.
+  - Telegram message text를 구성하며 QBS, `technical_buy_cluster`, 다음 거래일 공격형 8-PART, `steady_winner`, `early_reversal`, `hull_buy_turn`, 상세 보드, `five_day_top` 순서를 고정합니다.
 
 - `telegram_pipeline/sender.py`
   - Telegram `sendMessage`, `sendDocument` 호출과 message chunking을 담당합니다.
