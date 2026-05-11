@@ -1818,6 +1818,117 @@ class HomeDigestLoaderTests(unittest.TestCase):
         self.assertEqual(rows_by_ticker["FIVE"]["today_pct"], 10.0)
         self.assertEqual(rows_by_ticker["FIVE"]["entry"], "momentum_watch")
 
+    def test_telegram_board_rows_include_aggressive_payload_and_filters(self):
+        part2_key = AGGRESSIVE_NEXT_DAY_SECTION_KEYS[1]
+        part7_key = AGGRESSIVE_NEXT_DAY_SECTION_KEYS[6]
+        payload = {
+            "version": "2.0",
+            "section_order": [part2_key, part7_key, "qbs_buy_now"],
+            "sections": [
+                {
+                    "key": part2_key,
+                    "title": "PART 2 강추세 지속형",
+                    "item_count": 1,
+                    "ranked": True,
+                    "quality_floor": "조건: strong trend",
+                    "items": [
+                        {
+                            "ticker": "SNDK",
+                            "price": 156.23,
+                            "chg_pct": 16.59,
+                            "chg_5d": 31.62,
+                            "volume_ratio_20": 1.23,
+                            "section_key": part2_key,
+                            "rank": 1,
+                            "reason": "uptrend+volume+CMF+OBV",
+                            "tags": ["near-high"],
+                            "risk_flags": ["extended_day", "extended_5d"],
+                            "source_flags": {
+                                "atr_pct": 6.4,
+                                "adx": 49.0,
+                                "rs_rank_vs_index": 98.9,
+                                "dist_sma20_pct": 43.7,
+                                "drawdown_from_52w_high_pct": -0.1,
+                                "breakout_dist_20d_high_pct": -0.1,
+                                "compression_count": 0,
+                                "ret20_pct": 75.0,
+                            },
+                        }
+                    ],
+                },
+                {
+                    "key": part7_key,
+                    "title": "PART 7 갭업 후 실패 없는 추격형",
+                    "item_count": 1,
+                    "ranked": True,
+                    "items": [
+                        {
+                            "ticker": "SNDK",
+                            "price": 156.23,
+                            "chg_pct": 16.59,
+                            "chg_5d": 31.62,
+                            "volume_ratio_20": 1.23,
+                            "section_key": part7_key,
+                            "rank": 1,
+                            "reason": "gap+near-high+CMF",
+                            "risk_flags": ["gap_chase"],
+                            "source_flags": {
+                                "atr_pct": 6.4,
+                                "adx": 49.0,
+                                "rs_rank_vs_index": 98.9,
+                                "dist_sma20_pct": 43.7,
+                                "drawdown_from_52w_high_pct": -0.1,
+                                "breakout_dist_20d_high_pct": -0.1,
+                                "compression_count": 0,
+                            },
+                        }
+                    ],
+                },
+                {
+                    "key": "qbs_buy_now",
+                    "title": "buy",
+                    "item_count": 1,
+                    "ranked": True,
+                    "items": [
+                        {
+                            "ticker": "AAPL",
+                            "price": 200.0,
+                            "chg_pct": 1.25,
+                            "volume_ratio_20": 1.2,
+                            "section_key": "qbs_buy_now",
+                            "rank": 1,
+                            "bucket": "BUY_NOW",
+                            "qbs_score": 88.0,
+                        }
+                    ],
+                },
+            ],
+        }
+
+        digest = home_page.telegram_digest_from_payload(payload)
+        board_rows = home_page._build_telegram_board_rows(digest)
+        aggressive_rows = home_page._filter_telegram_board_rows(board_rows, "aggressive")
+        part2_row = next(row for row in aggressive_rows if row["section_key"] == part2_key)
+
+        self.assertEqual([row["section_key"] for row in aggressive_rows], [part2_key, part7_key])
+        self.assertEqual([row["ticker"] for row in aggressive_rows], ["SNDK", "SNDK"])
+        self.assertEqual(part2_row["section"], "P2 강추세")
+        self.assertEqual(part2_row["entry"], "aggressive_next_day_watch")
+        self.assertEqual(part2_row["atr"], 6.4)
+        self.assertEqual(part2_row["rs"], 98.9)
+        self.assertEqual(part2_row["adx"], 49.0)
+        self.assertEqual(part2_row["ma20"], 43.7)
+        self.assertEqual(part2_row["high_pos_pct"], -0.1)
+        self.assertEqual(part2_row["breakout_dist_20d_high_pct"], -0.1)
+        self.assertEqual(part2_row["compression_count"], 0)
+        self.assertIn("uptrend", part2_row["setup_parts"])
+        self.assertIn("extended_day", part2_row["risk"])
+        self.assertTrue(part2_row["has_warning"])
+        self.assertEqual([row["ticker"] for row in home_page._filter_telegram_board_rows(board_rows, "qbs")], ["AAPL"])
+        self.assertEqual([row["section_key"] for row in home_page._filter_telegram_board_rows(board_rows, "trend")], [part2_key])
+        self.assertEqual([row["section_key"] for row in home_page._filter_telegram_board_rows(board_rows, "entry")], [part7_key, "qbs_buy_now"])
+        self.assertEqual([row["section_key"] for row in home_page._filter_telegram_board_rows(board_rows, "risk")], [part2_key, part7_key])
+
     def test_telegram_board_rows_enrich_qbs_from_matching_detail_sections(self):
         payload = {
             "version": "2.0",

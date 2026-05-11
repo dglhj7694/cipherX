@@ -32,7 +32,7 @@
   - `telegram_pipeline/`은 digest contract, section selector, formatter, publisher, sender를 담당합니다.
   - 장마감 digest는 QBS, 다음 거래일 공격형 8-PART 후보, 계속 우상향 주도주, 초기 반전 포착, 당일 HULL 매수전환, 5일 상승률 Top30 섹션을 함께 구성합니다.
   - 공격형 8-PART는 프로그램 자체 점수 대신 ATR, 거래량, RS, ADX, HMA/EMA, BB, 고점 거리, 포켓피봇/갭 지표를 사용하며, 같은 종목이 여러 PART에 걸리면 모두 보여줍니다.
-  - 홈 `Telegram Digest / 텔레그램 종목판`은 같은 digest payload를 보드형 UI로 복원하고 `5D`, `1M`, `1Y`, RSI, Vol20, MA20, 고점 대비 위치, ERS/PUL/QBS를 표시합니다.
+  - 홈 `Telegram Digest / 텔레그램 종목판`은 공격형 8-PART 후보를 기본 압축표로 보여주며 `Today`, `5D`, ATR, Vol20, RS, ADX, MA20, 고점 거리, 근거/주의를 한 화면에서 비교합니다.
 
 - **배치 산출물**
   - 스캔 결과와 메타데이터를 `artifacts/` 하위에 CSV, JSON, TXT 형태로 저장합니다.

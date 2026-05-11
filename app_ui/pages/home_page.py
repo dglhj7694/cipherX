@@ -11,6 +11,7 @@ import requests
 import streamlit as st
 
 from telegram_pipeline.contracts import TelegramCandidate, TelegramDigest, TelegramSection
+from telegram_pipeline.aggressive_next_day_ranker import AGGRESSIVE_NEXT_DAY_SECTION_KEYS
 from telegram_pipeline.early_reversal_ranker import EARLY_REVERSAL_KEY
 from telegram_pipeline.formatters import QBS_DISPLAY_NUMBERS, STEADY_WINNER_DISPLAY_NUMBER, build_main_message
 from telegram_pipeline.hull_buy_turn_ranker import HULL_BUY_TURN_KEY
@@ -22,6 +23,29 @@ DIGEST_CACHE_TTL_SEC = 900
 DEFAULT_DIGEST_REPO = "dglhj7694/cipherX"
 DEFAULT_DIGEST_BRANCH = "telegram-digest"
 DEFAULT_DIGEST_PATH = "post_close/latest.json"
+
+AGGRESSIVE_SECTION_KEY_SET = set(AGGRESSIVE_NEXT_DAY_SECTION_KEYS)
+AGGRESSIVE_SECTION_SHORT_LABELS = {
+    AGGRESSIVE_NEXT_DAY_SECTION_KEYS[0]: "P1 초기전환",
+    AGGRESSIVE_NEXT_DAY_SECTION_KEYS[1]: "P2 강추세",
+    AGGRESSIVE_NEXT_DAY_SECTION_KEYS[2]: "P3 눌림",
+    AGGRESSIVE_NEXT_DAY_SECTION_KEYS[3]: "P4 위성",
+    AGGRESSIVE_NEXT_DAY_SECTION_KEYS[4]: "P5 포켓/거래량",
+    AGGRESSIVE_NEXT_DAY_SECTION_KEYS[5]: "P6 압축",
+    AGGRESSIVE_NEXT_DAY_SECTION_KEYS[6]: "P7 갭추격",
+    AGGRESSIVE_NEXT_DAY_SECTION_KEYS[7]: "P8 신고가",
+}
+AGGRESSIVE_ENTRY_SECTION_KEYS = {
+    AGGRESSIVE_NEXT_DAY_SECTION_KEYS[0],
+    AGGRESSIVE_NEXT_DAY_SECTION_KEYS[2],
+    AGGRESSIVE_NEXT_DAY_SECTION_KEYS[4],
+    AGGRESSIVE_NEXT_DAY_SECTION_KEYS[6],
+}
+AGGRESSIVE_TREND_SECTION_KEYS = {
+    AGGRESSIVE_NEXT_DAY_SECTION_KEYS[1],
+    AGGRESSIVE_NEXT_DAY_SECTION_KEYS[5],
+    AGGRESSIVE_NEXT_DAY_SECTION_KEYS[7],
+}
 
 
 def _repo_root() -> Path:
@@ -413,6 +437,12 @@ def _qbs_tone(value: Any) -> str:
 
 def _section_tone(section_key: str) -> str:
     key = str(section_key or "")
+    if key in AGGRESSIVE_SECTION_KEY_SET:
+        if key in {AGGRESSIVE_NEXT_DAY_SECTION_KEYS[3], AGGRESSIVE_NEXT_DAY_SECTION_KEYS[6]}:
+            return "warning"
+        if key in {AGGRESSIVE_NEXT_DAY_SECTION_KEYS[5], AGGRESSIVE_NEXT_DAY_SECTION_KEYS[7]}:
+            return "info"
+        return "positive"
     if key in {"qbs_chase_watch", "chase_risk"}:
         return "warning"
     if key in {"sell_turn", "sell_risk"}:
@@ -434,6 +464,8 @@ def _signal_tone(label: str, section_key: str) -> str:
         return "warning"
     if "PULLBACK" in text or "WAIT" in text:
         return "info"
+    if str(section_key or "") in AGGRESSIVE_SECTION_KEY_SET:
+        return _section_tone(section_key)
     if text:
         return "positive"
     return _section_tone(section_key)
@@ -533,6 +565,8 @@ def _board_entry_text(item: TelegramCandidate, section_key: str, fallback_entry:
     explicit = _first_text(item.entry_type, fallback_entry)
     if explicit != "-":
         return explicit
+    if str(section_key or "") in AGGRESSIVE_SECTION_KEY_SET:
+        return "aggressive_next_day_watch"
     defaults = {
         "qbs_buy_now": "buy_now",
         "qbs_chase_watch": "chase_watch",
@@ -546,6 +580,9 @@ def _board_entry_text(item: TelegramCandidate, section_key: str, fallback_entry:
 
 
 def _board_section_label(section_key: str) -> str:
+    key = str(section_key or "")
+    if key in AGGRESSIVE_SECTION_SHORT_LABELS:
+        return AGGRESSIVE_SECTION_SHORT_LABELS[key]
     labels = {
         "qbs_buy_now": "BUY_NOW",
         "qbs_chase_watch": "CHASE",
@@ -555,10 +592,12 @@ def _board_section_label(section_key: str) -> str:
         HULL_BUY_TURN_KEY: "HULL",
         "five_day_top": "5D TOP",
     }
-    return labels.get(str(section_key or ""), str(section_key or "-"))
+    return labels.get(key, key or "-")
 
 
 def _board_bucket_label(item: TelegramCandidate, section_key: str) -> str:
+    if str(section_key or "") in AGGRESSIVE_SECTION_KEY_SET:
+        return _board_section_label(section_key)
     if section_key == "five_day_top":
         return _candidate_status_text(item)
     if section_key == EARLY_REVERSAL_KEY:
@@ -569,6 +608,8 @@ def _board_bucket_label(item: TelegramCandidate, section_key: str) -> str:
 
 
 def _board_score_text(item: TelegramCandidate, section_key: str) -> str:
+    if str(section_key or "") in AGGRESSIVE_SECTION_KEY_SET:
+        return "AGG"
     if section_key == STEADY_WINNER_SECTION_KEY:
         return _format_pul(item.pul_score)
     if section_key == EARLY_REVERSAL_KEY:
@@ -585,9 +626,35 @@ def _split_reason_parts(text: str) -> list[str]:
     return [part.strip() for part in normalized.split("+") if part.strip()]
 
 
+def _board_setup_parts(item: TelegramCandidate, *, limit: int = 4) -> list[str]:
+    parts: list[str] = []
+    for part in _split_reason_parts(str(item.reason or "")):
+        if part and part not in parts:
+            parts.append(part)
+    for tag in list(item.tags or []):
+        text = str(tag or "").strip()
+        if text and text not in parts:
+            parts.append(text)
+    return parts[: max(0, int(limit or 0))]
+
+
+def _board_risk_parts(text: str, *, limit: int = 4) -> list[str]:
+    parts: list[str] = []
+    for part in _split_reason_parts(text):
+        if part and part not in parts:
+            parts.append(part)
+    return parts[: max(0, int(limit or 0))]
+
+
 def _board_risk_text(item: TelegramCandidate, section_key: str) -> str:
     parts: list[str] = []
     parts.extend(str(flag).strip() for flag in list(item.risk_flags or []) if str(flag or "").strip())
+    if str(section_key or "") in AGGRESSIVE_SECTION_KEY_SET:
+        seen: list[str] = []
+        for part in parts:
+            if part not in seen:
+                seen.append(part)
+        return "+".join(seen[:4]) if seen else "-"
     if section_key == "five_day_top":
         parts.extend(_split_reason_parts(_candidate_status_text(item)))
     if not parts:
@@ -610,13 +677,20 @@ def _board_has_warning(row: Mapping[str, Any]) -> bool:
         "주의",
         "hot",
         "extension",
+        "extended_day",
+        "extended_5d",
         "climax",
         "low_volume",
+        "low_vol20",
         "high_conflict",
         "sell",
         "gap",
+        "gap_chase",
         "thin",
         "overheat",
+        "hot_zscore",
+        "ma20_extended",
+        "satellite_size",
     )
     if any(token in risk_text for token in warning_tokens):
         return True
@@ -656,6 +730,17 @@ def _collect_digest_metric_lookup(digest: TelegramDigest) -> dict[str, dict[str,
                 _candidate_source_number(item, "ma20_dist_pct", "dist_sma20_pct"),
             )
             metrics["vol20"] = _first_number(metrics.get("vol20"), item.volume_ratio_20)
+            metrics["atr"] = _first_number(metrics.get("atr"), _candidate_source_number(item, "atr_pct"))
+            metrics["adx"] = _first_number(metrics.get("adx"), _candidate_source_number(item, "adx"))
+            metrics["rs"] = _first_number(metrics.get("rs"), _candidate_source_number(item, "rs_rank_vs_index"))
+            metrics["breakout_dist_20d_high_pct"] = _first_number(
+                metrics.get("breakout_dist_20d_high_pct"),
+                _candidate_source_number(item, "breakout_dist_20d_high_pct"),
+            )
+            metrics["compression_count"] = _first_number(
+                metrics.get("compression_count"),
+                _candidate_source_number(item, "compression_count"),
+            )
             metrics["entry"] = _first_text(metrics.get("entry"), item.entry_type)
             if section.key == STEADY_WINNER_SECTION_KEY and item.pul_score is not None:
                 metrics["score"] = _first_text(metrics.get("score"), _format_pul(item.pul_score))
@@ -671,12 +756,95 @@ def _collect_digest_metric_lookup(digest: TelegramDigest) -> dict[str, dict[str,
     return lookup
 
 
+def _build_telegram_board_row(
+    section_key: str,
+    item: TelegramCandidate,
+    idx: int,
+    *,
+    metric_fallback: Mapping[str, Any] | None = None,
+    market_fallback: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    section_key = str(section_key or "")
+    fallback = dict(metric_fallback or {})
+    market = dict(market_fallback or {})
+    risk_text = _board_risk_text(item, section_key)
+    score_value: float | None = None
+    if section_key == STEADY_WINNER_SECTION_KEY:
+        score_value = item.pul_score
+    elif section_key == EARLY_REVERSAL_KEY:
+        score_value = item.early_reversal_score
+    elif section_key in QBS_DISPLAY_NUMBERS:
+        score_value = item.qbs_score
+    row = {
+        "rank": item.rank or idx,
+        "ticker": item.ticker,
+        "section_key": section_key,
+        "section": _board_section_label(section_key),
+        "part": _board_section_label(section_key),
+        "bucket": _board_bucket_label(item, section_key),
+        "price": _first_number(item.price, fallback.get("price"), market.get("price")),
+        "today_pct": _first_number(_board_today_pct(item, section_key), fallback.get("today_pct"), market.get("today_pct")),
+        "five_day_pct": _first_number(_board_five_day_pct(item, section_key), fallback.get("five_day_pct"), market.get("five_day_pct")),
+        "one_month_pct": _first_number(
+            item.ret_1m_pct,
+            _candidate_source_number(item, "ret_1m_pct", "ret20_pct"),
+            fallback.get("one_month_pct"),
+            market.get("one_month_pct"),
+        ),
+        "one_year_pct": _first_number(
+            item.ret_1y_pct,
+            _candidate_source_number(item, "ret_1y_pct", "ret252_pct"),
+            fallback.get("one_year_pct"),
+            market.get("one_year_pct"),
+        ),
+        "high_pos_pct": _first_number(
+            item.high_pos_pct,
+            _candidate_source_number(item, "high_pos_pct", "drawdown_from_52w_high_pct"),
+            fallback.get("high_pos_pct"),
+            market.get("high_pos_pct"),
+        ),
+        "breakout_dist_20d_high_pct": _first_number(
+            _candidate_source_number(item, "breakout_dist_20d_high_pct"),
+            fallback.get("breakout_dist_20d_high_pct"),
+        ),
+        "score": _first_text(_board_score_text(item, section_key), fallback.get("score")),
+        "score_value": _first_number(score_value, fallback.get("score_value")),
+        "rsi": _first_number(item.rsi, _candidate_source_number(item, "rsi", "RSI"), fallback.get("rsi"), market.get("rsi")),
+        "vol20": _first_number(item.volume_ratio_20, fallback.get("vol20"), market.get("vol20")),
+        "ma20": _first_number(
+            item.ma20_dist_pct,
+            _candidate_source_number(item, "ma20_dist_pct", "dist_sma20_pct"),
+            fallback.get("ma20"),
+            market.get("ma20"),
+        ),
+        "atr": _first_number(_candidate_source_number(item, "atr_pct"), fallback.get("atr")),
+        "adx": _first_number(_candidate_source_number(item, "adx"), fallback.get("adx")),
+        "rs": _first_number(_candidate_source_number(item, "rs_rank_vs_index"), fallback.get("rs")),
+        "compression_count": _first_number(_candidate_source_number(item, "compression_count"), fallback.get("compression_count")),
+        "entry": _board_entry_text(item, section_key, fallback.get("entry")),
+        "setup": "+".join(_board_setup_parts(item)) or "-",
+        "setup_parts": _board_setup_parts(item),
+        "risk": risk_text,
+        "risk_flags": list(item.risk_flags or []),
+        "risk_parts": _board_risk_parts(risk_text),
+    }
+    row["has_warning"] = _board_has_warning(row)
+    return row
+
+
 def _build_telegram_board_rows(
     digest: TelegramDigest,
     *,
     market_metric_lookup: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    board_section_keys = {*QBS_DISPLAY_NUMBERS.keys(), STEADY_WINNER_SECTION_KEY, EARLY_REVERSAL_KEY, HULL_BUY_TURN_KEY, "five_day_top"}
+    board_section_keys = {
+        *QBS_DISPLAY_NUMBERS.keys(),
+        *AGGRESSIVE_SECTION_KEY_SET,
+        STEADY_WINNER_SECTION_KEY,
+        EARLY_REVERSAL_KEY,
+        HULL_BUY_TURN_KEY,
+        "five_day_top",
+    }
     metric_lookup = _collect_digest_metric_lookup(digest)
     market_lookup = {str(ticker or "").strip().upper(): dict(metrics or {}) for ticker, metrics in dict(market_metric_lookup or {}).items()}
     rows: list[dict[str, Any]] = []
@@ -685,71 +853,35 @@ def _build_telegram_board_rows(
             continue
         for idx, item in enumerate(section.items, start=1):
             ticker = str(item.ticker or "").strip().upper()
-            fallback = metric_lookup.get(ticker, {})
-            market_fallback = market_lookup.get(ticker, {})
-            risk_text = _board_risk_text(item, section.key)
-            row = {
-                "rank": item.rank or idx,
-                "ticker": item.ticker,
-                "section_key": section.key,
-                "section": _board_section_label(section.key),
-                "bucket": _board_bucket_label(item, section.key),
-                "price": _first_number(item.price, fallback.get("price"), market_fallback.get("price")),
-                "today_pct": _first_number(_board_today_pct(item, section.key), fallback.get("today_pct"), market_fallback.get("today_pct")),
-                "five_day_pct": _first_number(_board_five_day_pct(item, section.key), fallback.get("five_day_pct"), market_fallback.get("five_day_pct")),
-                "one_month_pct": _first_number(
-                    item.ret_1m_pct,
-                    _candidate_source_number(item, "ret_1m_pct", "ret20_pct"),
-                    fallback.get("one_month_pct"),
-                    market_fallback.get("one_month_pct"),
-                ),
-                "one_year_pct": _first_number(
-                    item.ret_1y_pct,
-                    _candidate_source_number(item, "ret_1y_pct", "ret252_pct"),
-                    fallback.get("one_year_pct"),
-                    market_fallback.get("one_year_pct"),
-                ),
-                "high_pos_pct": _first_number(
-                    item.high_pos_pct,
-                    _candidate_source_number(item, "high_pos_pct", "drawdown_from_52w_high_pct"),
-                    fallback.get("high_pos_pct"),
-                    market_fallback.get("high_pos_pct"),
-                ),
-                "score": _first_text(_board_score_text(item, section.key), fallback.get("score")),
-                "score_value": _first_number(
-                    item.pul_score
-                    if section.key == STEADY_WINNER_SECTION_KEY
-                    else item.early_reversal_score
-                    if section.key == EARLY_REVERSAL_KEY
-                    else None
-                    if section.key == HULL_BUY_TURN_KEY
-                    else item.qbs_score,
-                    fallback.get("score_value"),
-                ),
-                "rsi": _first_number(item.rsi, _candidate_source_number(item, "rsi", "RSI"), fallback.get("rsi"), market_fallback.get("rsi")),
-                "vol20": _first_number(item.volume_ratio_20, fallback.get("vol20"), market_fallback.get("vol20")),
-                "ma20": _first_number(
-                    item.ma20_dist_pct,
-                    _candidate_source_number(item, "ma20_dist_pct", "dist_sma20_pct"),
-                    fallback.get("ma20"),
-                    market_fallback.get("ma20"),
-                ),
-                "entry": _board_entry_text(item, section.key, fallback.get("entry")),
-                "risk": risk_text,
-                "risk_flags": list(item.risk_flags or []),
-            }
-            row["has_warning"] = _board_has_warning(row)
-            rows.append(row)
+            rows.append(
+                _build_telegram_board_row(
+                    section.key,
+                    item,
+                    idx,
+                    metric_fallback=metric_lookup.get(ticker, {}),
+                    market_fallback=market_lookup.get(ticker, {}),
+                )
+            )
     return rows
 
 
 def _filter_telegram_board_rows(rows: list[dict[str, Any]], filter_key: str) -> list[dict[str, Any]]:
+    if filter_key == "aggressive":
+        return [row for row in rows if str(row.get("section_key") or "") in AGGRESSIVE_SECTION_KEY_SET]
     if filter_key == "qbs":
         return [row for row in rows if str(row.get("section_key") or "") in QBS_DISPLAY_NUMBERS]
-    if filter_key == "steady":
-        return [row for row in rows if row.get("section_key") == STEADY_WINNER_SECTION_KEY]
+    if filter_key == "entry":
+        entry_keys = {"qbs_buy_now", "qbs_chase_watch", HULL_BUY_TURN_KEY, *AGGRESSIVE_ENTRY_SECTION_KEYS}
+        return [row for row in rows if str(row.get("section_key") or "") in entry_keys]
+    if filter_key == "trend":
+        trend_keys = {STEADY_WINNER_SECTION_KEY, "five_day_top", *AGGRESSIVE_TREND_SECTION_KEYS}
+        return [row for row in rows if str(row.get("section_key") or "") in trend_keys]
     if filter_key == "reversal":
-        return [row for row in rows if row.get("section_key") == EARLY_REVERSAL_KEY]
+        return [
+            row
+            for row in rows
+            if str(row.get("section_key") or "") in {EARLY_REVERSAL_KEY, AGGRESSIVE_NEXT_DAY_SECTION_KEYS[0]}
+        ]
     if filter_key == "hull":
         return [row for row in rows if row.get("section_key") == HULL_BUY_TURN_KEY]
     if filter_key == "five_day":
@@ -770,6 +902,14 @@ BOARD_REQUIRED_NUMERIC_FIELDS: tuple[str, ...] = (
     "vol20",
     "ma20",
 )
+AGGRESSIVE_BOARD_REQUIRED_NUMERIC_FIELDS: tuple[str, ...] = (
+    "price",
+    "today_pct",
+    "five_day_pct",
+    "high_pos_pct",
+    "vol20",
+    "ma20",
+)
 
 
 def _board_missing_metric_tickers(rows: Iterable[Mapping[str, Any]]) -> list[str]:
@@ -778,7 +918,12 @@ def _board_missing_metric_tickers(rows: Iterable[Mapping[str, Any]]) -> list[str
         ticker = str(row.get("ticker") or "").strip().upper()
         if not ticker or ticker in tickers:
             continue
-        if any(_optional_float(row.get(field)) is None for field in BOARD_REQUIRED_NUMERIC_FIELDS):
+        required_fields = (
+            AGGRESSIVE_BOARD_REQUIRED_NUMERIC_FIELDS
+            if str(row.get("section_key") or "") in AGGRESSIVE_SECTION_KEY_SET
+            else BOARD_REQUIRED_NUMERIC_FIELDS
+        )
+        if any(_optional_float(row.get(field)) is None for field in required_fields):
             tickers.append(ticker)
     return tickers
 
@@ -961,6 +1106,45 @@ def _high_pos_tone(value: Any) -> str:
     return "negative"
 
 
+def _atr_tone(value: Any) -> str:
+    number = _optional_float(value)
+    if number is None:
+        return "muted"
+    if number >= 8:
+        return "warning"
+    if number >= 4:
+        return "positive"
+    if number >= 3:
+        return "info"
+    return "muted"
+
+
+def _adx_tone(value: Any) -> str:
+    number = _optional_float(value)
+    if number is None:
+        return "muted"
+    if number >= 35:
+        return "warning"
+    if number >= 25:
+        return "positive"
+    if number >= 18:
+        return "info"
+    return "muted"
+
+
+def _rs_tone(value: Any) -> str:
+    number = _optional_float(value)
+    if number is None:
+        return "muted"
+    if number >= 85:
+        return "positive"
+    if number >= 70:
+        return "info"
+    if number < 50:
+        return "warning"
+    return "muted"
+
+
 def _board_cell(text: Any, tone: str = "muted", *, strong: bool = False) -> str:
     if tone not in {"positive", "negative", "warning", "info", "muted", "accent"}:
         tone = "muted"
@@ -968,6 +1152,34 @@ def _board_cell(text: Any, tone: str = "muted", *, strong: bool = False) -> str:
     if strong:
         class_name += " cpx-board-cell--strong"
     return f"<span class='{class_name}' data-tone='{tone}'>{_html_text(text)}</span>"
+
+
+def _board_token_html(text: Any, tone: str = "muted") -> str:
+    label = _html_text(text)
+    if not label:
+        return ""
+    if tone not in {"positive", "negative", "warning", "info", "muted", "accent"}:
+        tone = "muted"
+    return f"<span class='cpx-board-token' data-tone='{tone}'>{label}</span>"
+
+
+def _board_tokens_html(values: Any, tone: str = "muted", *, limit: int = 4) -> str:
+    if isinstance(values, str):
+        tokens = _split_reason_parts(values)
+    else:
+        tokens = [str(value or "").strip() for value in list(values or []) if str(value or "").strip()]
+    tokens = tokens[: max(0, int(limit or 0))]
+    if not tokens:
+        return _board_cell("-", "muted")
+    return f"<div class='cpx-board-token-list'>{''.join(_board_token_html(token, tone) for token in tokens)}</div>"
+
+
+def _board_high_text(row: Mapping[str, Any]) -> str:
+    high_52w = _format_float(row.get("high_pos_pct"), 1, signed=True, suffix="%")
+    high_20d = _format_float(row.get("breakout_dist_20d_high_pct"), 1, signed=True, suffix="%")
+    if high_20d != "--":
+        return f"52W {high_52w} / 20D {high_20d}"
+    return high_52w
 
 
 def _board_rows_html(rows: list[dict[str, Any]]) -> str:
@@ -1000,6 +1212,62 @@ def _board_rows_html(rows: list[dict[str, Any]]) -> str:
     return "".join(body_rows)
 
 
+def _aggressive_board_rows_html(rows: list[dict[str, Any]], *, include_rank: bool = False) -> str:
+    body_rows: list[str] = []
+    for row in rows:
+        section_key = str(row.get("section_key") or "")
+        risk_tone = "warning" if row.get("has_warning") else "muted"
+        rank_cell = f"<td class='cpx-board-num'>#{_html_text(row.get('rank'))}</td>" if include_rank else ""
+        body_rows.append(
+            "<tr>"
+            f"{rank_cell}"
+            f"<td>{_board_cell(row.get('ticker'), 'accent', strong=True)}</td>"
+            f"<td>{_board_cell(row.get('part') or row.get('section'), _section_tone(section_key))}</td>"
+            f"<td>{_board_cell(_format_float(row.get('today_pct'), 2, signed=True, suffix='%'), _metric_tone(row.get('today_pct')))}</td>"
+            f"<td>{_board_cell(_format_float(row.get('five_day_pct'), 2, signed=True, suffix='%'), _metric_tone(row.get('five_day_pct')))}</td>"
+            f"<td>{_board_cell(_format_float(row.get('atr'), 1), _atr_tone(row.get('atr')))}</td>"
+            f"<td>{_board_cell(_format_ratio(row.get('vol20')), _volume_tone(row.get('vol20')))}</td>"
+            f"<td>{_board_cell(_format_float(row.get('rs'), 0), _rs_tone(row.get('rs')))}</td>"
+            f"<td>{_board_cell(_format_float(row.get('adx'), 0), _adx_tone(row.get('adx')))}</td>"
+            f"<td>{_board_cell(_format_float(row.get('ma20'), 1, signed=True, suffix='%'), _metric_tone(row.get('ma20'), warning_abs=20.0))}</td>"
+            f"<td>{_board_cell(_board_high_text(row), _high_pos_tone(row.get('high_pos_pct')))}</td>"
+            f"<td>{_board_tokens_html(row.get('setup_parts') or row.get('setup'), 'accent', limit=4)}</td>"
+            f"<td>{_board_tokens_html(row.get('risk_parts') or row.get('risk'), risk_tone, limit=4)}</td>"
+            "</tr>"
+        )
+    return "".join(body_rows)
+
+
+def _render_aggressive_board_table(rows: list[dict[str, Any]], *, include_rank: bool = False) -> None:
+    rank_header = "<th>Rank</th>" if include_rank else ""
+    table_html = (
+        "<div class='cpx-board-wrap cpx-board-wrap--aggressive'>"
+        "<table class='cpx-board-table cpx-board-table--aggressive'>"
+        "<thead><tr>"
+        f"{rank_header}"
+        "<th>Ticker</th>"
+        "<th>Part</th>"
+        "<th>Today</th>"
+        "<th>5D</th>"
+        "<th>ATR</th>"
+        "<th>Vol20</th>"
+        "<th>RS</th>"
+        "<th>ADX</th>"
+        "<th>MA20</th>"
+        "<th>High</th>"
+        "<th>Setup</th>"
+        "<th>Risk</th>"
+        "</tr></thead>"
+        f"<tbody>{_aggressive_board_rows_html(rows, include_rank=include_rank)}</tbody>"
+        "</table>"
+        "</div>"
+    )
+    if hasattr(st, "html"):
+        st.html(table_html)
+    else:
+        st.markdown(table_html, unsafe_allow_html=True)
+
+
 def _render_telegram_visual_board(digest: TelegramDigest, *, on_select_ticker: Callable[[str], None]) -> None:
     rows = _build_telegram_board_rows(digest)
     missing_metric_tickers = _board_missing_metric_tickers(rows)
@@ -1010,20 +1278,25 @@ def _render_telegram_visual_board(digest: TelegramDigest, *, on_select_ticker: C
     if not rows:
         return
     filter_options = {
-        "all": "All",
+        "aggressive": "Aggressive",
         "qbs": "QBS",
-        "steady": "Steady Winner",
+        "entry": "Entry",
+        "trend": "Trend",
         "reversal": "Reversal",
         "hull": "HULL",
-        "five_day": "5D Top",
+        "five_day": "5D",
         "risk": "Risk",
+        "all": "All",
     }
+    option_keys = list(filter_options)
+    default_filter = "aggressive" if any(str(row.get("section_key") or "") in AGGRESSIVE_SECTION_KEY_SET for row in rows) else "all"
     filter_key = st.radio(
         "Telegram board filter",
-        options=list(filter_options),
+        options=option_keys,
+        index=option_keys.index(default_filter),
         format_func=lambda key: filter_options.get(str(key), str(key)),
         horizontal=True,
-        key="home_telegram_digest_board_filter",
+        key="home_telegram_digest_board_filter_v2",
         label_visibility="collapsed",
     )
     filtered_rows = _filter_telegram_board_rows(rows, str(filter_key))
@@ -1031,35 +1304,38 @@ def _render_telegram_visual_board(digest: TelegramDigest, *, on_select_ticker: C
         st.markdown("<div class='cpx-digest-empty'>No board rows.</div>", unsafe_allow_html=True)
         return
 
-    st.markdown(
-        f"""
-        <div class='cpx-board-wrap'>
-            <table class='cpx-board-table'>
-                <thead>
-                    <tr>
-                        <th>Ticker</th>
-                        <th>Section</th>
-                        <th>Bucket</th>
-                        <th>Price</th>
-                        <th>Today</th>
-                        <th>5D</th>
-                        <th>1M</th>
-                        <th>1Y</th>
-                        <th>High</th>
-                        <th>PUL/QBS</th>
-                        <th>RSI</th>
-                        <th>Vol20</th>
-                        <th>MA20</th>
-                        <th>Entry</th>
-                        <th>Risk</th>
-                    </tr>
-                </thead>
-                <tbody>{_board_rows_html(filtered_rows)}</tbody>
-            </table>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    if str(filter_key) == "aggressive":
+        _render_aggressive_board_table(filtered_rows)
+    else:
+        st.markdown(
+            f"""
+            <div class='cpx-board-wrap'>
+                <table class='cpx-board-table'>
+                    <thead>
+                        <tr>
+                            <th>Ticker</th>
+                            <th>Section</th>
+                            <th>Bucket</th>
+                            <th>Price</th>
+                            <th>Today</th>
+                            <th>5D</th>
+                            <th>1M</th>
+                            <th>1Y</th>
+                            <th>High</th>
+                            <th>PUL/QBS</th>
+                            <th>RSI</th>
+                            <th>Vol20</th>
+                            <th>MA20</th>
+                            <th>Entry</th>
+                            <th>Risk</th>
+                        </tr>
+                    </thead>
+                    <tbody>{_board_rows_html(filtered_rows)}</tbody>
+                </table>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
     board_tickers = _collect_recent_tickers(str(row.get("ticker") or "") for row in filtered_rows)
     _render_ticker_button_row(
         board_tickers[:40],
@@ -1255,6 +1531,9 @@ def _render_telegram_digest_styles() -> None:
             background: rgba(15, 23, 42, .68);
             margin: 8px 0 12px;
         }}
+        .cpx-board-wrap--aggressive {{
+            max-height: 720px;
+        }}
         table.cpx-board-table {{
             width: 100%;
             min-width: 1280px;
@@ -1262,6 +1541,9 @@ def _render_telegram_digest_styles() -> None:
             border-spacing: 0;
             font-family: {FONT_STACK};
             letter-spacing: 0;
+        }}
+        table.cpx-board-table--aggressive {{
+            min-width: 1120px;
         }}
         .cpx-board-table th {{
             position: sticky;
@@ -1339,6 +1621,52 @@ def _render_telegram_digest_styles() -> None:
             background: rgba(14, 165, 233, .16);
             color: #C8EEFF;
         }}
+        .cpx-board-token-list {{
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 4px;
+            max-width: 260px;
+        }}
+        .cpx-board-token {{
+            display: inline-flex;
+            align-items: center;
+            min-height: 20px;
+            padding: 3px 6px;
+            border-radius: 6px;
+            border: 1px solid rgba(148, 163, 184, .14);
+            background: rgba(148, 163, 184, .08);
+            color: var(--sigl-text, #E2E8F0);
+            font-size: .68rem;
+            font-weight: 850;
+            line-height: 1;
+            white-space: nowrap;
+        }}
+        .cpx-board-token[data-tone="accent"] {{
+            border-color: rgba(142, 164, 255, .34);
+            background: rgba(142, 164, 255, .14);
+            color: #E5EAFF;
+        }}
+        .cpx-board-token[data-tone="positive"] {{
+            border-color: rgba(99, 217, 162, .30);
+            background: rgba(16, 185, 129, .16);
+            color: #BDF7D6;
+        }}
+        .cpx-board-token[data-tone="negative"] {{
+            border-color: rgba(255, 143, 150, .30);
+            background: rgba(239, 68, 68, .16);
+            color: #FFC4C8;
+        }}
+        .cpx-board-token[data-tone="warning"] {{
+            border-color: rgba(246, 195, 94, .36);
+            background: rgba(245, 158, 11, .16);
+            color: #FFE2A8;
+        }}
+        .cpx-board-token[data-tone="info"] {{
+            border-color: rgba(125, 211, 252, .30);
+            background: rgba(14, 165, 233, .14);
+            color: #C8EEFF;
+        }}
         @media (max-width: 760px) {{
             .cpx-digest-metrics {{
                 grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1402,6 +1730,14 @@ def _render_telegram_section_table(section: TelegramSection) -> None:
 
     if not section.items:
         st.markdown("<div class='cpx-digest-empty'>해당 티커가 없습니다.</div>", unsafe_allow_html=True)
+        return
+
+    if section.key in AGGRESSIVE_SECTION_KEY_SET:
+        rows = [
+            _build_telegram_board_row(section.key, item, idx)
+            for idx, item in enumerate(section.items, start=1)
+        ]
+        _render_aggressive_board_table(rows, include_rank=True)
         return
 
     if section.key == STEADY_WINNER_SECTION_KEY:
@@ -1633,6 +1969,8 @@ def _render_telegram_message_board(
             display_number = "0-4"
         elif section.key == HULL_BUY_TURN_KEY:
             display_number = "0-5"
+        elif section.key in AGGRESSIVE_SECTION_KEY_SET:
+            display_number = f"PART {AGGRESSIVE_NEXT_DAY_SECTION_KEYS.index(section.key) + 1}"
         else:
             display_number = str(board_display_index)
             board_display_index += 1
