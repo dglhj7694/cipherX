@@ -1929,6 +1929,71 @@ class HomeDigestLoaderTests(unittest.TestCase):
         self.assertEqual([row["section_key"] for row in home_page._filter_telegram_board_rows(board_rows, "entry")], [part7_key, "qbs_buy_now"])
         self.assertEqual([row["section_key"] for row in home_page._filter_telegram_board_rows(board_rows, "risk")], [part2_key, part7_key])
 
+    def test_home_digest_dashboard_helpers_preserve_structure_and_render_html(self):
+        part2_key = AGGRESSIVE_NEXT_DAY_SECTION_KEYS[1]
+        part7_key = AGGRESSIVE_NEXT_DAY_SECTION_KEYS[6]
+        payload = {
+            "version": "2.0",
+            "section_order": [part2_key, part7_key],
+            "sections": [
+                {
+                    "key": part2_key,
+                    "title": "PART 2 강추세 지속형",
+                    "item_count": 1,
+                    "ranked": True,
+                    "quality_floor": "조건: strong trend",
+                    "items": [
+                        {
+                            "ticker": "SNDK",
+                            "price": 156.23,
+                            "chg_pct": 16.59,
+                            "chg_5d": 31.62,
+                            "volume_ratio_20": 1.23,
+                            "section_key": part2_key,
+                            "rank": 1,
+                            "reason": "uptrend+volume",
+                            "risk_flags": ["extended_day"],
+                            "source_flags": {"atr_pct": 6.4, "adx": 49.0, "rs_rank_vs_index": 98.9},
+                        }
+                    ],
+                },
+                {
+                    "key": part7_key,
+                    "title": "PART 7 갭업 후 실패 없는 추격형",
+                    "item_count": 1,
+                    "ranked": True,
+                    "items": [
+                        {
+                            "ticker": "SNDK",
+                            "price": 156.23,
+                            "chg_pct": 16.59,
+                            "chg_5d": 31.62,
+                            "volume_ratio_20": 1.23,
+                            "section_key": part7_key,
+                            "rank": 1,
+                            "reason": "gap+near-high",
+                            "risk_flags": ["gap_chase"],
+                            "source_flags": {"atr_pct": 6.4, "adx": 49.0, "rs_rank_vs_index": 98.9},
+                        }
+                    ],
+                },
+            ],
+        }
+
+        digest = home_page.telegram_digest_from_payload(payload)
+        board_rows = home_page._build_telegram_board_rows(digest)
+        aggressive_rows = home_page._filter_telegram_board_rows(board_rows, "aggressive")
+        html = home_page._aggressive_board_table_html(aggressive_rows, include_rank=True)
+        meta_html = home_page._telegram_section_meta_html(digest.sections[0])
+
+        self.assertEqual([row["section_key"] for row in aggressive_rows], [part2_key, part7_key])
+        self.assertEqual([row["ticker"] for row in aggressive_rows], ["SNDK", "SNDK"])
+        self.assertEqual(home_page._default_telegram_board_filter(board_rows), "aggressive")
+        self.assertIn("<table", html)
+        self.assertIn("<th>Ticker</th>", html)
+        self.assertNotIn("&lt;th", html)
+        self.assertIn("조건: strong trend", meta_html)
+
     def test_telegram_board_rows_enrich_qbs_from_matching_detail_sections(self):
         payload = {
             "version": "2.0",

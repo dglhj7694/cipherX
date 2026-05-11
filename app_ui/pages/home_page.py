@@ -1174,6 +1174,10 @@ def _board_tokens_html(values: Any, tone: str = "muted", *, limit: int = 4) -> s
     return f"<div class='cpx-board-token-list'>{''.join(_board_token_html(token, tone) for token in tokens)}</div>"
 
 
+def _render_digest_html(markup: str) -> None:
+    st.markdown(markup, unsafe_allow_html=True)
+
+
 def _board_high_text(row: Mapping[str, Any]) -> str:
     high_52w = _format_float(row.get("high_pos_pct"), 1, signed=True, suffix="%")
     high_20d = _format_float(row.get("breakout_dist_20d_high_pct"), 1, signed=True, suffix="%")
@@ -1238,9 +1242,9 @@ def _aggressive_board_rows_html(rows: list[dict[str, Any]], *, include_rank: boo
     return "".join(body_rows)
 
 
-def _render_aggressive_board_table(rows: list[dict[str, Any]], *, include_rank: bool = False) -> None:
+def _aggressive_board_table_html(rows: list[dict[str, Any]], *, include_rank: bool = False) -> str:
     rank_header = "<th>Rank</th>" if include_rank else ""
-    table_html = (
+    return (
         "<div class='cpx-board-wrap cpx-board-wrap--aggressive'>"
         "<table class='cpx-board-table cpx-board-table--aggressive'>"
         "<thead><tr>"
@@ -1262,10 +1266,72 @@ def _render_aggressive_board_table(rows: list[dict[str, Any]], *, include_rank: 
         "</table>"
         "</div>"
     )
-    if hasattr(st, "html"):
-        st.html(table_html)
-    else:
-        st.markdown(table_html, unsafe_allow_html=True)
+
+
+def _render_aggressive_board_table(rows: list[dict[str, Any]], *, include_rank: bool = False) -> None:
+    _render_digest_html(_aggressive_board_table_html(rows, include_rank=include_rank))
+
+
+def _board_table_html(rows: list[dict[str, Any]]) -> str:
+    return f"""
+    <div class='cpx-board-wrap'>
+        <table class='cpx-board-table'>
+            <thead>
+                <tr>
+                    <th>Ticker</th>
+                    <th>Section</th>
+                    <th>Bucket</th>
+                    <th>Price</th>
+                    <th>Today</th>
+                    <th>5D</th>
+                    <th>1M</th>
+                    <th>1Y</th>
+                    <th>High</th>
+                    <th>PUL/QBS</th>
+                    <th>RSI</th>
+                    <th>Vol20</th>
+                    <th>MA20</th>
+                    <th>Entry</th>
+                    <th>Risk</th>
+                </tr>
+            </thead>
+            <tbody>{_board_rows_html(rows)}</tbody>
+        </table>
+    </div>
+    """
+
+
+def _default_telegram_board_filter(rows: Iterable[Mapping[str, Any]]) -> str:
+    return "aggressive" if any(str(row.get("section_key") or "") in AGGRESSIVE_SECTION_KEY_SET for row in rows) else "all"
+
+
+def _telegram_board_overview_html(rows: list[dict[str, Any]], filter_label: str) -> str:
+    unique_tickers = _collect_recent_tickers(str(row.get("ticker") or "") for row in rows)
+    aggressive_count = sum(1 for row in rows if str(row.get("section_key") or "") in AGGRESSIVE_SECTION_KEY_SET)
+    qbs_count = sum(1 for row in rows if str(row.get("section_key") or "") in QBS_DISPLAY_NUMBERS)
+    warning_count = sum(1 for row in rows if row.get("has_warning"))
+    items = [
+        ("View", filter_label),
+        ("Rows", f"{len(rows):,}"),
+        ("Tickers", f"{len(unique_tickers):,}"),
+        ("Aggressive", f"{aggressive_count:,}"),
+        ("QBS", f"{qbs_count:,}"),
+        ("Risk", f"{warning_count:,}"),
+    ]
+    metric_html = "".join(
+        f"<div class='cpx-board-stat'><b>{_html_text(label)}</b><strong>{_html_text(value)}</strong></div>"
+        for label, value in items
+    )
+    return (
+        "<div class='cpx-board-dashboard-head'>"
+        "<div>"
+        "<div class='cpx-digest-eyebrow'>Trading Board</div>"
+        "<div class='cpx-board-dashboard-title'>통합 후보 압축표</div>"
+        "<p>Telegram 메시지 섹션과 중복 티커 노출 정책을 유지한 상태로, 다음 거래일 후보를 한 화면에서 비교합니다.</p>"
+        "</div>"
+        f"<div class='cpx-board-stats'>{metric_html}</div>"
+        "</div>"
+    )
 
 
 def _render_telegram_visual_board(digest: TelegramDigest, *, on_select_ticker: Callable[[str], None]) -> None:
@@ -1289,7 +1355,7 @@ def _render_telegram_visual_board(digest: TelegramDigest, *, on_select_ticker: C
         "all": "All",
     }
     option_keys = list(filter_options)
-    default_filter = "aggressive" if any(str(row.get("section_key") or "") in AGGRESSIVE_SECTION_KEY_SET for row in rows) else "all"
+    default_filter = _default_telegram_board_filter(rows)
     filter_key = st.radio(
         "Telegram board filter",
         options=option_keys,
@@ -1304,39 +1370,13 @@ def _render_telegram_visual_board(digest: TelegramDigest, *, on_select_ticker: C
         st.markdown("<div class='cpx-digest-empty'>No board rows.</div>", unsafe_allow_html=True)
         return
 
+    _render_digest_html(_telegram_board_overview_html(rows, filter_options.get(str(filter_key), str(filter_key))))
     if str(filter_key) == "aggressive":
         _render_aggressive_board_table(filtered_rows)
     else:
-        st.markdown(
-            f"""
-            <div class='cpx-board-wrap'>
-                <table class='cpx-board-table'>
-                    <thead>
-                        <tr>
-                            <th>Ticker</th>
-                            <th>Section</th>
-                            <th>Bucket</th>
-                            <th>Price</th>
-                            <th>Today</th>
-                            <th>5D</th>
-                            <th>1M</th>
-                            <th>1Y</th>
-                            <th>High</th>
-                            <th>PUL/QBS</th>
-                            <th>RSI</th>
-                            <th>Vol20</th>
-                            <th>MA20</th>
-                            <th>Entry</th>
-                            <th>Risk</th>
-                        </tr>
-                    </thead>
-                    <tbody>{_board_rows_html(filtered_rows)}</tbody>
-                </table>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        _render_digest_html(_board_table_html(filtered_rows))
     board_tickers = _collect_recent_tickers(str(row.get("ticker") or "") for row in filtered_rows)
+    st.markdown("<div class='cpx-board-action-label'>빠른 분석</div>", unsafe_allow_html=True)
     _render_ticker_button_row(
         board_tickers[:40],
         key_prefix=f"home_telegram_board_{filter_key}",
@@ -1667,12 +1707,166 @@ def _render_telegram_digest_styles() -> None:
             background: rgba(14, 165, 233, .14);
             color: #C8EEFF;
         }}
+        .cpx-digest-summary {{
+            margin: 2px 0 18px;
+            padding: 18px;
+            border-color: rgba(148, 163, 184, .20);
+            background:
+                linear-gradient(180deg, rgba(17, 24, 39, .98), rgba(12, 18, 32, .94));
+        }}
+        .cpx-digest-title {{
+            font-size: 1.18rem;
+            letter-spacing: 0;
+        }}
+        .cpx-digest-subtitle {{
+            max-width: 720px;
+            margin: 6px 0 0;
+            color: var(--sigl-text-muted, #94A3B8);
+            font-size: .80rem;
+            font-weight: 700;
+            line-height: 1.45;
+        }}
+        .cpx-digest-metrics {{
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            gap: 10px;
+        }}
+        .cpx-digest-metric {{
+            min-height: 62px;
+            border-color: rgba(148, 163, 184, .16);
+            background: rgba(255, 255, 255, .045);
+        }}
+        .cpx-board-dashboard-head {{
+            display: flex;
+            justify-content: space-between;
+            gap: 18px;
+            align-items: stretch;
+            margin: 12px 0 10px;
+            padding: 16px;
+            border: 1px solid rgba(148, 163, 184, .18);
+            border-radius: 8px;
+            background: rgba(15, 23, 42, .62);
+        }}
+        .cpx-board-dashboard-title {{
+            margin-top: 4px;
+            color: var(--sigl-text-strong, #F8FAFC);
+            font-size: 1rem;
+            font-weight: 950;
+        }}
+        .cpx-board-dashboard-head p {{
+            max-width: 650px;
+            margin: 6px 0 0;
+            color: var(--sigl-text-muted, #94A3B8);
+            font-size: .78rem;
+            font-weight: 720;
+            line-height: 1.45;
+        }}
+        .cpx-board-stats {{
+            display: grid;
+            grid-template-columns: repeat(3, minmax(88px, 1fr));
+            gap: 8px;
+            min-width: min(460px, 100%);
+        }}
+        .cpx-board-stat {{
+            padding: 9px 10px;
+            border: 1px solid rgba(148, 163, 184, .14);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, .04);
+        }}
+        .cpx-board-stat b {{
+            display: block;
+            color: var(--sigl-text-muted, #94A3B8);
+            font-size: .64rem;
+            font-weight: 900;
+            text-transform: uppercase;
+        }}
+        .cpx-board-stat strong {{
+            display: block;
+            margin-top: 3px;
+            color: var(--sigl-text-strong, #F8FAFC);
+            font-size: .88rem;
+            font-weight: 950;
+            font-variant-numeric: tabular-nums;
+        }}
+        .cpx-board-wrap {{
+            border-color: rgba(148, 163, 184, .18);
+            background: rgba(9, 14, 25, .72);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, .035);
+        }}
+        .cpx-board-table th {{
+            letter-spacing: .02em;
+        }}
+        .cpx-board-table td {{
+            padding: 7px 8px;
+        }}
+        .cpx-board-cell {{
+            justify-content: flex-start;
+        }}
+        .cpx-board-action-label {{
+            margin: 4px 0 8px;
+            color: var(--sigl-text-muted, #94A3B8);
+            font-size: .72rem;
+            font-weight: 900;
+            text-transform: uppercase;
+        }}
+        .cpx-home-recent-shell {{
+            margin-top: 12px;
+            padding: 14px;
+            border: 1px solid rgba(148, 163, 184, .16);
+            border-radius: 8px;
+            background: rgba(15, 23, 42, .46);
+        }}
+        .cpx-home-empty {{
+            margin: 6px 0 18px;
+            padding: 18px;
+            border: 1px solid rgba(246, 195, 94, .22);
+            border-radius: 8px;
+            background: rgba(245, 158, 11, .08);
+            color: var(--sigl-text, #E2E8F0);
+        }}
+        .cpx-home-empty strong {{
+            display: block;
+            color: var(--sigl-text-strong, #F8FAFC);
+            font-size: 1rem;
+            font-weight: 950;
+        }}
+        .cpx-home-empty span {{
+            display: block;
+            margin-top: 6px;
+            color: var(--sigl-text-muted, #94A3B8);
+            font-size: .82rem;
+            font-weight: 720;
+        }}
+        div[data-testid="stRadio"] {{
+            margin: 8px 0 4px;
+        }}
+        div[data-testid="stRadio"] > div {{
+            gap: 8px;
+            flex-wrap: wrap;
+        }}
+        div[data-testid="stRadio"] label {{
+            min-height: 32px;
+            padding: 5px 10px;
+            border: 1px solid rgba(148, 163, 184, .18);
+            border-radius: 999px;
+            background: rgba(148, 163, 184, .07);
+        }}
+        div[data-testid="stRadio"] label:has(input:checked) {{
+            border-color: rgba(142, 164, 255, .46);
+            background: rgba(142, 164, 255, .16);
+        }}
         @media (max-width: 760px) {{
             .cpx-digest-metrics {{
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }}
             .cpx-digest-summary {{
                 padding: 14px;
+            }}
+            .cpx-board-dashboard-head {{
+                display: block;
+            }}
+            .cpx-board-stats {{
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                margin-top: 12px;
             }}
         }}
         </style>
@@ -1681,12 +1875,27 @@ def _render_telegram_digest_styles() -> None:
     )
 
 
-def _render_telegram_summary_card(digest: TelegramDigest) -> None:
+def _digest_source_badge(source: str) -> tuple[str, str]:
+    if source == "remote":
+        return "원격 동기화", "accent"
+    if source == "cache":
+        return "캐시 복구", "warning"
+    if source == "missing":
+        return "연결 필요", "muted"
+    return str(source or "unknown"), "muted"
+
+
+def _render_telegram_summary_card(digest: TelegramDigest, *, source: str = "", digest_result: Mapping[str, Any] | None = None) -> None:
+    source_label, source_tone = _digest_source_badge(source)
+    visible_section_count = len(_visible_telegram_sections(digest))
+    generated_text = digest.generated_at or digest.run_stamp or "--"
     metric_items = [
         ("시장일", digest.market_date or "--"),
+        ("생성", generated_text),
         ("유니버스", f"{digest.universe_count:,}"),
         ("결과", f"{digest.result_count:,}"),
         ("제외", f"{digest.skip_count:,}"),
+        ("섹션", f"{visible_section_count:,}"),
     ]
     metrics_html = "".join(
         f"<div class='cpx-digest-metric'><b>{_html_text(label)}</b><strong>{_html_text(value)}</strong></div>"
@@ -1695,17 +1904,30 @@ def _render_telegram_summary_card(digest: TelegramDigest) -> None:
     badges_html = "".join(
         [
             _badge_html(digest.scan_label or digest.scan_mode or "post-close", "accent"),
-            _badge_html(f"섹션 {len(_visible_telegram_sections(digest))}", "info"),
-            _badge_html(f"생성 {digest.generated_at or digest.run_stamp or '--'}", "muted"),
+            _badge_html(source_label, source_tone),
+            _badge_html("구조 유지", "info"),
+            _badge_html("TTL 900s", "muted"),
         ]
     )
+    config = dict((digest_result or {}).get("config") or {})
+    config_text = " / ".join(
+        part
+        for part in [
+            str(config.get("repo") or "").strip(),
+            str(config.get("branch") or "").strip(),
+            str(config.get("path") or "").strip(),
+        ]
+        if part
+    )
+    subtitle = config_text or "Telegram digest payload를 그대로 사용해 후보를 비교합니다."
     st.markdown(
         f"""
         <div class='cpx-digest-summary'>
             <div class='cpx-digest-summary__top'>
                 <div>
-                    <div class='cpx-digest-eyebrow'>Telegram Message</div>
+                    <div class='cpx-digest-eyebrow'>Telegram Digest Dashboard</div>
                     <div class='cpx-digest-title'>오늘 종목판</div>
+                    <p class='cpx-digest-subtitle'>{_html_text(subtitle)}</p>
                 </div>
                 <div class='cpx-digest-badges'>{badges_html}</div>
             </div>
@@ -1716,7 +1938,7 @@ def _render_telegram_summary_card(digest: TelegramDigest) -> None:
     )
 
 
-def _render_telegram_section_table(section: TelegramSection) -> None:
+def _telegram_section_meta_html(section: TelegramSection) -> str:
     tone = _section_tone(section.key)
     meta_html = "".join(
         [
@@ -1726,7 +1948,11 @@ def _render_telegram_section_table(section: TelegramSection) -> None:
     )
     if section.quality_floor:
         meta_html += f"<span class='cpx-digest-quality'>{_html_text(section.quality_floor)}</span>"
-    st.markdown(f"<div class='cpx-digest-section-meta'>{meta_html}</div>", unsafe_allow_html=True)
+    return f"<div class='cpx-digest-section-meta'>{meta_html}</div>"
+
+
+def _render_telegram_section_table(section: TelegramSection) -> None:
+    st.markdown(_telegram_section_meta_html(section), unsafe_allow_html=True)
 
     if not section.items:
         st.markdown("<div class='cpx-digest-empty'>해당 티커가 없습니다.</div>", unsafe_allow_html=True)
@@ -1952,12 +2178,16 @@ def _render_telegram_message_board(
     visible_sections = _visible_telegram_sections(digest)
 
     _render_telegram_digest_styles()
-    _render_telegram_summary_card(digest)
+    _render_telegram_summary_card(digest, source=source, digest_result=digest_result)
     if digest_result.get("error") and source == "cache":
         st.caption(f"원격 갱신 실패로 마지막 성공 캐시를 표시 중입니다: {digest_result['error']}")
 
     _render_telegram_visual_board(digest, on_select_ticker=on_select_ticker)
 
+    st.markdown(
+        "<div class='cpx-board-action-label' style='margin-top:18px'>섹션별 상세</div>",
+        unsafe_allow_html=True,
+    )
     board_display_index = 1
     for idx, section in enumerate(visible_sections):
         ticker_list = [item.ticker for item in section.items if item.ticker]
@@ -2001,14 +2231,14 @@ def render_home_page(
     digest_result = load_latest_telegram_digest()
     payload = dict(digest_result.get("payload") or {})
     source = str(digest_result.get("source") or "missing")
-    source_badge = "원격 동기화" if source == "remote" else "캐시 복구" if source == "cache" else "연결 필요"
+    source_badge, source_tone = _digest_source_badge(source)
 
     render_section_heading(
-        "텔레그램 종목판",
-        "실제 발송되는 텔레그램 메시지 순서 그대로 후보와 전환/주의 티커를 확인하고 개별 분석으로 이어갑니다.",
+        "Telegram Digest Dashboard",
+        "실제 발송되는 텔레그램 메시지 구조는 유지하고, 후보 비교와 개별 분석 진입을 홈 화면에서 바로 처리합니다.",
         badges=[
             ("홈", "accent"),
-            (source_badge, "warning" if source == "cache" else "muted" if source == "missing" else "accent"),
+            (source_badge, source_tone),
             ("Digest TTL 900s", "muted"),
         ],
         eyebrow="Telegram Digest",
@@ -2016,13 +2246,12 @@ def render_home_page(
     )
 
     if not payload:
-        render_empty_state(
-            "종목판을 아직 불러오지 못했습니다.",
-            str(digest_result.get("error") or "원격 digest가 아직 발행되지 않았습니다."),
-            badges=[
-                ("원격 digest", "warning"),
-                ("캐시 없음", "muted"),
-            ],
+        _render_telegram_digest_styles()
+        _render_digest_html(
+            "<div class='cpx-home-empty'>"
+            "<strong>종목판을 아직 불러오지 못했습니다.</strong>"
+            f"<span>{_html_text(str(digest_result.get('error') or '원격 digest가 아직 발행되지 않았습니다.'))}</span>"
+            "</div>"
         )
     else:
         _render_telegram_message_board(
@@ -2039,10 +2268,12 @@ def render_home_page(
         eyebrow="Recent",
         tight=True,
     )
+    st.markdown("<div class='cpx-home-recent-shell'>", unsafe_allow_html=True)
     if recent:
         _render_ticker_button_row(recent[:10], key_prefix="home_recent", on_select_ticker=on_select_ticker)
     else:
         st.caption("아직 최근 분석 이력이 없습니다.")
+    st.markdown("</div>", unsafe_allow_html=True)
 
     if ti := st.chat_input(chat_input_placeholder):
         parsed = parse_ticker_input(ti)

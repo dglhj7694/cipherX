@@ -12,8 +12,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import yfinance as yf
 from app_ui.pages import (
     render_analysis_message,
-    render_briefing_page,
     render_home_page,
+    render_market_dashboard_page,
     render_market_daily_dashboard,
 )
 from sectors import SECTOR_GROUPS
@@ -94,10 +94,11 @@ _ETF_UNIVERSE_PRESETS = [
 _ETF_UNIVERSE_PRESET_MAP = {item["key"]: item for item in _ETF_UNIVERSE_PRESETS}
 MODE_HOME = "홈"
 MODE_BRIEFING = "브리핑"
-MODE_MARKET_DAILY = MODE_BRIEFING
+MODE_DASHBOARD = "Dashboard"
+MODE_MARKET_DAILY = MODE_DASHBOARD
 MODE_ANALYSIS = "분석"
 MODE_SCANNER = "스캐너"
-_APP_MODE_OPTIONS = [MODE_HOME, MODE_BRIEFING, MODE_ANALYSIS, MODE_SCANNER]
+_APP_MODE_OPTIONS = [MODE_HOME, MODE_DASHBOARD, MODE_ANALYSIS, MODE_SCANNER]
 _QUICK_ANALYSIS_TICKERS = ["NVDA", "TSLA", "AAPL", "GOOGL", "AMZN", "META", "MSFT", "PLTR", "HIMS", "SNDK", "LITE", "COHR", "IREN", "ORCL", "RKLB", "ASTS"]
 CHAT_INPUT_PLACEHOLDER = "티커 입력: AAPL / 005930"
 SCAN_FILTER_PRESETS = list(SCAN_FILTER_PRESET_ORDER)
@@ -245,6 +246,8 @@ def reset_session():
     _reset_session_state(_session_defaults())
 
 init_session()
+if st.session_state.get("_mode") == MODE_BRIEFING:
+    st.session_state["_mode"] = MODE_DASHBOARD
 
 def _scan_tickers():
     return [str(r.get('ticker', '')).strip().upper() for r in st.session_state.get('scan_results', []) if str(r.get('ticker', '')).strip()]
@@ -2232,8 +2235,8 @@ def _build_brand_payload(current_mode, chart_period):
         mode_label = 'SCANNER'
     elif current_mode == MODE_HOME:
         mode_label = 'HOME'
-    elif current_mode == MODE_BRIEFING:
-        mode_label = 'BRIEFING'
+    elif current_mode == MODE_DASHBOARD:
+        mode_label = 'DASHBOARD'
     else:
         mode_label = 'ANALYSIS'
     period_label = _short_period_label(chart_period)
@@ -2310,7 +2313,7 @@ def _build_brand_payload(current_mode, chart_period):
             'status_tone': _resolve_board_tone(mode_label, judgment, es_value),
         }
 
-    if current_mode in {MODE_HOME, MODE_BRIEFING}:
+    if current_mode in {MODE_HOME, MODE_DASHBOARD}:
         if current_mode == MODE_HOME:
             focus = _format_board_code(st.session_state.get('last_ticker'), fallback='WATCHLIST')
             judgment = 'HOME'
@@ -2322,13 +2325,13 @@ def _build_brand_payload(current_mode, chart_period):
             marquee_prefix = 'HOME'
         else:
             focus = _format_board_code(st.session_state.get('last_ticker'), fallback='US CLOSE')
-            judgment = 'BRIEFING'
-            context = 'US CLOSE'
+            judgment = 'DASHBOARD'
+            context = 'MARKET'
             feed_status = 'MARKET_SYNC'
-            recent_label = 'DAILY RECAP'
+            recent_label = 'HEATMAP'
             recent_tone = 'accent'
-            summary = "Macro, breadth, and leadership shifts are staged before the next analysis entry."
-            marquee_prefix = 'BRIEFING'
+            summary = "Briefing, heatmap, and action candidates are staged before the next analysis entry."
+            marquee_prefix = 'DASHBOARD'
         system_status = 'ACTIVE'
         marquee_items = _build_board_marquee([
             f"[ {BRAND_NAME} ] {marquee_prefix}",
@@ -2904,16 +2907,17 @@ elif current_mode == MODE_SCANNER:
         )
 
 # ══════════════════════════════════════════════════════════════
-#  오늘 미국장 모드
+#  Dashboard 모드
 # ══════════════════════════════════════════════════════════════
-elif current_mode == MODE_BRIEFING:
-    market_daily_payload = render_market_daily_dashboard()
-    render_briefing_page(
+elif current_mode == MODE_DASHBOARD:
+    render_market_dashboard_page(
         render_brand_board=_render_brand_board,
         main_board_payload=main_board_payload,
         render_section_heading=_render_section_heading,
-        market_daily_payload=market_daily_payload,
+        render_empty_state=_render_empty_state,
+        render_market_daily_dashboard=render_market_daily_dashboard,
         render_market_daily_action_grid=_render_market_daily_action_grid,
+        scanner_rows=st.session_state.get("scan_results") or [],
         on_select_ticker=_queue_analysis_target,
         chat_input_placeholder=CHAT_INPUT_PLACEHOLDER,
         parse_ticker_input=_parse_analysis_ticker_input,

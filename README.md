@@ -24,7 +24,10 @@
   - shard 실행과 merge 흐름을 지원해 대량 유니버스를 나누어 처리할 수 있습니다.
 
 - **시장 브리핑**
-  - 미국 시장 daily mover, breadth, leadership, 주요 섹션 후보를 Streamlit 브리핑 화면에 표시합니다.
+  - 미국 시장 daily mover, breadth, leadership, 주요 섹션 후보를 Streamlit Dashboard 화면에 표시합니다.
+  - Dashboard는 기존 Market Briefing에 Heatmap, Quant Prediction, Action Candidates를 결합해 scanner/Telegram/market mover 흐름을 한 화면에서 비교합니다.
+  - Heatmap은 Change, 5D, Vol20, ATR, RS, ADX, Signal 기준으로 섹터/종목별 자금 흐름을 Plotly treemap으로 표시합니다.
+  - Quant Prediction은 가격, 거래량, 변동성, 추세, 상대강도, 위험 플래그만 사용해 다음 거래일 `UP / NEUTRAL / DOWN` 확률을 추정하며 LLM/뉴스 판단은 섞지 않습니다.
   - GitHub-hosted latest digest를 불러와 홈 화면의 Telegram digest 후보로 연결합니다.
 
 - **Telegram 알림 자동화**
@@ -32,7 +35,8 @@
   - `telegram_pipeline/`은 digest contract, section selector, formatter, publisher, sender를 담당합니다.
   - 장마감 digest는 QBS, 다음 거래일 공격형 8-PART 후보, 계속 우상향 주도주, 초기 반전 포착, 당일 HULL 매수전환, 5일 상승률 Top30 섹션을 함께 구성합니다.
   - 공격형 8-PART는 프로그램 자체 점수 대신 ATR, 거래량, RS, ADX, HMA/EMA, BB, 고점 거리, 포켓피봇/갭 지표를 사용하며, 같은 종목이 여러 PART에 걸리면 모두 보여줍니다.
-  - 홈 `Telegram Digest / 텔레그램 종목판`은 공격형 8-PART 후보를 기본 압축표로 보여주며 `Today`, `5D`, ATR, Vol20, RS, ADX, MA20, 고점 거리, 근거/주의를 한 화면에서 비교합니다.
+  - 홈 `Telegram Digest Dashboard`는 텔레그램 메시지 구조와 섹션 순서를 유지하면서 상단 요약, 통합 후보 압축표, 섹션별 상세표로 후보를 비교합니다.
+  - 통합 종목판은 공격형 8-PART 후보를 기본 압축표로 보여주며 `Today`, `5D`, ATR, Vol20, RS, ADX, MA20, 고점 거리, 근거/주의를 한 화면에서 비교합니다.
 
 - **배치 산출물**
   - 스캔 결과와 메타데이터를 `artifacts/` 하위에 CSV, JSON, TXT 형태로 저장합니다.
@@ -45,7 +49,7 @@
 - **Streamlit**: 메인 웹 애플리케이션 프레임워크
 - **Plotly**: 차트 렌더링
 - **Custom CSS/theme**: `theme.py`, `branding.py`, `ui_localized.py`
-- **Page modules**: `app_ui/pages/`의 홈, 브리핑, 분석, 시장 daily 화면
+- **Page modules**: `app_ui/pages/`의 홈, Dashboard/Heatmap, 분석, 시장 daily 화면
 
 ### Backend / Core
 
@@ -100,14 +104,23 @@ cipherX/
 ### Streamlit 앱
 
 - `app.py`
-  - 앱 mode, sidebar, session state, 홈/브리핑/분석/스캐너 화면 routing을 담당합니다.
+  - 앱 mode, sidebar, session state, 홈/Dashboard/분석/스캐너 화면 routing을 담당합니다.
   - 개별 종목 분석은 `AnalysisWorkflow.run(AnalysisRequest(...), prompt_builder=build_prompt_text)` 경로를 사용합니다.
 
 - `app_ui/pages/`
-  - `home_page.py`: latest Telegram digest 후보와 quick analysis 진입점
-  - `briefing_page.py`: 시장 브리핑 화면
+  - `home_page.py`: latest Telegram digest dashboard, 통합 후보 압축표, quick analysis 진입점
+  - `market_dashboard_page.py`: Market Briefing, Heatmap, Action Candidates 통합 화면
+  - `briefing_page.py`: 이전 시장 브리핑 wrapper
   - `market_daily_page.py`: daily market dashboard payload
   - `analysis_page.py`: 분석 메시지 rendering wrapper
+
+- `services/market_heatmap_service.py`
+  - scanner rows, Telegram digest, market payload를 Heatmap row contract로 정규화합니다.
+  - 한글 CSV 헤더의 괄호 key를 표준 key로 복원하고 `SECTOR_GROUPS` 기반 섹터 역매핑을 수행합니다.
+
+- `services/quant_prediction_service.py`
+  - scanner rows, Telegram digest, market mover를 Quant Prediction row contract로 정규화합니다.
+  - rule-based v1 모델로 다음 거래일 방향 확률과 근거/위험 플래그를 산출하며, Gemini/뉴스 판단과 분리합니다.
 
 ### 분석 엔진
 
