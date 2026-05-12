@@ -2193,6 +2193,231 @@ p[data-testid="stCaption"]{{
 }}
 .prompt-caption{{color:var(--sigl-text-muted);font-size:.76rem;font-weight:700;margin-bottom:8px}}
 .soft-note{{color:var(--sigl-text-muted);font-size:.8rem;line-height:1.6;margin-top:10px}}
+.sigl-ai-report{{
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+  padding:18px;
+  overflow:hidden;
+}}
+.sigl-ai-report__hero{{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:14px;
+  flex-wrap:wrap;
+  padding-bottom:2px;
+}}
+.sigl-ai-report__eyebrow{{
+  color:var(--sigl-accent);
+  font-size:.72rem;
+  font-weight:900;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  margin-bottom:5px;
+}}
+.sigl-ai-report h3{{
+  margin:0;
+  font-size:1.22rem;
+  line-height:1.22;
+}}
+.sigl-ai-report p{{
+  margin:0;
+  color:var(--sigl-text);
+  line-height:1.62;
+}}
+.sigl-ai-report__hero p{{
+  margin-top:6px;
+  color:var(--sigl-text-muted);
+  font-size:.82rem;
+}}
+.sigl-ai-report__judgment{{
+  min-width:138px;
+  padding:12px 14px;
+  border:1px solid rgba(148,163,184,.18);
+  border-radius:14px;
+  background:rgba(15,23,42,.64);
+  text-align:right;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05);
+}}
+.sigl-ai-report__judgment span{{
+  display:block;
+  color:var(--sigl-text-muted);
+  font-size:.72rem;
+  font-weight:800;
+  margin-bottom:5px;
+}}
+.sigl-ai-report__judgment strong{{
+  display:block;
+  color:var(--sigl-text-strong);
+  font-size:1.16rem;
+  line-height:1.15;
+  word-break:break-word;
+}}
+.sigl-ai-report__judgment--positive{{border-color:rgba(99,217,162,.30);background:rgba(99,217,162,.10)}}
+.sigl-ai-report__judgment--negative{{border-color:rgba(255,143,150,.30);background:rgba(255,143,150,.10)}}
+.sigl-ai-report__judgment--warning{{border-color:rgba(246,195,94,.30);background:rgba(246,195,94,.10)}}
+.sigl-ai-report__judgment--accent{{border-color:rgba(142,164,255,.30);background:rgba(142,164,255,.10)}}
+.sigl-ai-metric-grid,
+.sigl-ai-action-grid{{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+  gap:10px;
+}}
+.sigl-ai-metric{{
+  min-width:0;
+  padding:12px;
+  border:1px solid rgba(148,163,184,.16);
+  border-radius:13px;
+  background:rgba(15,23,42,.54);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+}}
+.sigl-ai-metric span{{
+  display:block;
+  color:var(--sigl-text-muted);
+  font-size:.72rem;
+  font-weight:800;
+  margin-bottom:6px;
+}}
+.sigl-ai-metric strong{{
+  display:block;
+  color:var(--sigl-text-strong);
+  font-size:.94rem;
+  line-height:1.38;
+  word-break:break-word;
+}}
+.sigl-ai-metric--positive{{border-color:rgba(99,217,162,.24)}}
+.sigl-ai-metric--negative{{border-color:rgba(255,143,150,.24)}}
+.sigl-ai-metric--warning{{border-color:rgba(246,195,94,.24)}}
+.sigl-ai-metric--accent{{border-color:rgba(142,164,255,.24)}}
+.sigl-ai-meter{{
+  height:7px;
+  margin-top:10px;
+  overflow:hidden;
+  border-radius:999px;
+  background:rgba(148,163,184,.13);
+}}
+.sigl-ai-meter--compact{{
+  height:5px;
+  margin-top:10px;
+}}
+.sigl-ai-meter__fill{{
+  display:block;
+  height:100%;
+  border-radius:999px;
+}}
+.sigl-ai-meter__fill--positive{{background:linear-gradient(90deg, rgba(99,217,162,.60), rgba(99,217,162,.95))}}
+.sigl-ai-meter__fill--negative{{background:linear-gradient(90deg, rgba(255,143,150,.55), rgba(255,143,150,.95))}}
+.sigl-ai-meter__fill--warning{{background:linear-gradient(90deg, rgba(246,195,94,.55), rgba(246,195,94,.95))}}
+.sigl-ai-meter__fill--accent,
+.sigl-ai-meter__fill--muted{{background:linear-gradient(90deg, rgba(142,164,255,.52), rgba(142,164,255,.94))}}
+.sigl-ai-two-col{{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap:12px;
+}}
+.sigl-ai-panel,
+.sigl-ai-section{{
+  min-width:0;
+  padding:14px;
+  border:1px solid rgba(148,163,184,.14);
+  border-radius:14px;
+  background:rgba(15,23,42,.44);
+}}
+.sigl-ai-panel h4,
+.sigl-ai-section h4{{
+  margin:0 0 10px;
+  font-size:.92rem;
+  font-weight:900;
+}}
+.sigl-ai-section__head{{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-bottom:10px;
+}}
+.sigl-ai-section__head h4{{
+  margin:0;
+}}
+.sigl-ai-section__head span{{
+  color:var(--sigl-text-muted);
+  font-size:.72rem;
+  font-weight:750;
+}}
+.sigl-ai-evidence-grid,
+.sigl-ai-playbook-grid{{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap:10px;
+}}
+.sigl-ai-evidence-card,
+.sigl-ai-playbook-card{{
+  min-width:0;
+  padding:12px;
+  border:1px solid rgba(148,163,184,.14);
+  border-radius:13px;
+  background:rgba(11,16,32,.38);
+}}
+.sigl-ai-evidence-card--positive{{border-color:rgba(99,217,162,.23)}}
+.sigl-ai-evidence-card--negative{{border-color:rgba(255,143,150,.23)}}
+.sigl-ai-evidence-card--warning{{border-color:rgba(246,195,94,.23)}}
+.sigl-ai-evidence-card__top,
+.sigl-ai-playbook-card__top{{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+  margin-bottom:10px;
+}}
+.sigl-ai-evidence-card__top > span:last-child,
+.sigl-ai-playbook-card__top span{{
+  color:var(--sigl-text-muted);
+  font-size:.72rem;
+  font-weight:850;
+  white-space:nowrap;
+}}
+.sigl-ai-evidence-card p,
+.sigl-ai-playbook-card p,
+.sigl-ai-section--reason p,
+.sigl-ai-strategy-summary{{
+  color:var(--sigl-text);
+  font-size:.84rem;
+  line-height:1.68;
+}}
+.sigl-ai-evidence-card__interpretation{{
+  margin-top:8px!important;
+  color:var(--sigl-text-muted)!important;
+}}
+.sigl-ai-playbook-card__top strong{{
+  color:var(--sigl-text-strong);
+  font-size:.9rem;
+}}
+.sigl-ai-playbook-card__rows{{
+  display:grid;
+  grid-template-columns:52px minmax(0, 1fr);
+  gap:7px 9px;
+  margin-top:10px;
+}}
+.sigl-ai-playbook-card__rows span{{
+  color:var(--sigl-text-muted);
+  font-size:.72rem;
+  font-weight:850;
+}}
+.sigl-ai-playbook-card__rows b{{
+  color:var(--sigl-text-strong);
+  font-size:.8rem;
+  line-height:1.45;
+  word-break:break-word;
+}}
+.sigl-ai-empty{{
+  padding:12px;
+  border:1px dashed rgba(148,163,184,.20);
+  border-radius:12px;
+  color:var(--sigl-text-muted);
+  font-size:.82rem;
+}}
 @media (max-width: 980px){{
   .sigl-page-banner__meta{{justify-content:flex-start}}
   .sigl-result-tags{{justify-content:flex-start}}

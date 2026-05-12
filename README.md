@@ -1,5 +1,16 @@
 # $SIGN (Signal)
 
+## 현재 AI / PROMPT TAPE 동작
+
+- 개별 종목 분석을 실행하면 `AnalysisWorkflow.run(..., prompt_builder=build_prompt_text)` 경로에서 최신 OHLCV, 검증된 보조지표, 수급/구조 지표, 시장/상대강도 맥락만 묶은 `PROMPT TAPE`가 생성됩니다.
+- `PROMPT TAPE`에는 프로그램 엔진의 판단, 점수, 전략 후보, 시그널 라벨, 엔진 리스크 태그를 포함하지 않습니다. AI는 보조지표 데이터만으로 독립적인 2차 판단을 내립니다.
+- `최근 60봉 보조지표 테이프`는 Vol, WaveTrend, MACD, MoneyFlow, StochSlow, SqueezeMom, Reversal/Momentum/Flow Pack, ADX/DMI, BB/VWAP, RSI/StochRSI, CMF/OBV/AD, Ichimoku/Mass, Volatility/Liquidity, RS/Acceleration, Position/Structure, HMA/UTBot, VP/POC/RR, FibStructure, MA/EMA, Trendline/Pattern 그룹을 포함합니다. `Objective_*` 내부 엔진 판단/점수 계열은 출력하지 않습니다.
+- 분석 메시지의 `PROMPT TAPE` expander에는 수동 복사용 프롬프트와 `AI분석` 버튼이 함께 표시됩니다.
+- `AI분석` 버튼은 `build_ai_prompt()`로 PROMPT TAPE를 Gemini JSON-only 프롬프트에 감싼 뒤 `services.ai_signal_service.generate_ai_signal_assisted()`를 호출합니다.
+- AI 결과는 기존 분석 카드 안에 직접 덮어쓰지 않고 별도 `리포트` 메시지로 채팅 피드에 추가됩니다. 리포트는 판단/신뢰도/Bull·Bear 점수, 핵심 근거, 리스크, 상세 근거, 반대 근거, 데이터 한계, 진입·무효화·목표, 전략 플레이북을 카드형 UI로 분리해 표시하며 Markdown 원문과 다운로드도 함께 제공합니다.
+- 동시에 원본 분석 메시지의 `meta.ai_signal_assisted`에도 저장되어 세션 내 재렌더와 후속 처리가 가능합니다.
+- Gemini 키가 없으면 버튼 근처의 `AI Key Setup`에서 현재 Streamlit 세션에만 키를 저장할 수 있습니다. 키는 메시지, 리포트, PROMPT TAPE, 로그에 출력하지 않습니다.
+
 `$SIGN (Signal)`은 Streamlit 기반의 주식 분석, 스캐너, 시장 브리핑, Telegram 알림 자동화 애플리케이션입니다. 개별 종목의 기술적 지표와 전략 신호를 분석하고, 섹터/ETF 기반 유니버스 스캔과 GitHub Actions 배치 실행을 통해 Telegram digest와 CSV/JSON 산출물을 생성합니다.
 
 ## 주요 기능
@@ -82,6 +93,7 @@ cipherX/
 ├─ engine_objective.py            # 객관 점수/판단 보조
 ├─ chart.py                       # Plotly 차트와 metadata 생성
 ├─ ai_agent.py                    # AI prompt와 AI 응답 parser
+├─ ai_report.py                   # AI분석 리포트 Markdown/payload helper
 ├─ scanner_filters.py             # scanner preset/filter 로직
 ├─ scanner_csv.py                 # scanner CSV export contract
 ├─ sectors.py                     # 섹터별 티커 그룹
@@ -245,7 +257,10 @@ Streamlit Cloud, GitHub Actions, 로컬 실행 환경에서 아래 값을 설정
 GEMINI_API_KEY 또는 GOOGLE_API_KEY
 TELEGRAM_BOT_TOKEN
 TELEGRAM_CHAT_ID
+
 ```
+
+AI분석 버튼은 Gemini 키를 `runtime_gemini_api_key` 세션 입력값 → Streamlit secrets → 환경변수 순서로 사용합니다. 세션 입력 키는 현재 Streamlit 세션에만 보관되며 PROMPT TAPE나 리포트에는 기록하지 않습니다.
 
 GitHub-hosted digest를 홈 화면에서 불러오는 경우:
 

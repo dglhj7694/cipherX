@@ -61,6 +61,9 @@ def unavailable_ai_result(message: str) -> dict[str, Any]:
         "AI_Bearish_Score": 0,
         "AI_Risk_Flags": [],
         "AI_Key_Drivers": [],
+        "AI_Evidence_Details": [],
+        "AI_Counter_Evidence": [],
+        "AI_Data_Limits": [],
         "AI_Reason": message,
         "AI_Trade_Strategy": "",
         "AI_Entry_Plan": "",
@@ -81,15 +84,16 @@ def generate_ai_signal_assisted(
     prompt: str,
     engine_judgment: str,
     parser: Callable[[str], dict[str, Any]] | Callable[..., dict[str, Any]],
+    client_factory: Callable[[str], Any] | None = None,
 ) -> dict[str, Any]:
     key_state = resolve_ai_key(runtime_key, configured_key, configured_from_secrets)
     if not key_state.available:
         return unavailable_ai_result(
-            "Gemini API 키가 없어 AI 보조 판단을 생성하지 못했습니다. Analysis Workspace의 `AI Key Setup`에서 입력해 주세요."
+            "Gemini API 키가 없어 AI 보조 판단을 생성하지 못했습니다. Analysis Workspace의 AI Key Setup에서 입력해 주세요."
         )
 
     try:
-        model = build_ai_client(key_state.active_key)
+        model = (client_factory or build_ai_client)(key_state.active_key)
         response = model.generate_content(prompt)
         raw_text = str(getattr(response, "text", "") or "").strip()
         return parser(raw_text, engine_judgment=engine_judgment)

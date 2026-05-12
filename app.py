@@ -19,12 +19,17 @@ from app_ui.pages import (
 from sectors import SECTOR_GROUPS
 from bootstrap import build_default_session_state, ensure_session_defaults as _ensure_session_defaults, reset_session_state as _reset_session_state
 from chart import load_chart_figure, serialize_chart_figure
-from config import COMBINED_SCAN_REGISTRY, CTX_KOR, JT
+from config import COMBINED_SCAN_REGISTRY, CTX_KOR, JT, GEMINI_API_KEY, GEMINI_API_KEY_FROM_SECRETS
 from domain import AnalysisRequest
 from infrastructure.etf import FunctionHoldingsProvider, HoldingsProviderRegistry
 from etf_sources import resolve_etf_universe as resolve_shared_etf_universe
 from utils import _valid_fmt, _sf, resolve_analysis_ticker, _compute_cached
-from ai_agent import build_prompt_text, build_ai_prompt
+from ai_agent import build_prompt_text, build_ai_prompt, parse_ai_signal_assisted_response
+from ai_report import (
+    attach_ai_result_to_analysis_message,
+    build_ai_report_message,
+    format_ai_signal_report_html,
+)
 from localization import (
     localize_action_label,
     localize_combo,
@@ -48,6 +53,7 @@ from scanner_filters import (
     has_long_pullback_strategy,
     has_pullback_combo,
 )
+from services.ai_signal_service import generate_ai_signal_assisted
 from workflows import AnalysisWorkflow
 from strategy import build_strategy_payload
 from branding import (
@@ -2971,6 +2977,116 @@ else:
         )
         _render_quick_analysis_grid(key_prefix="analysis_quick")
 
+    def _active_gemini_key_available():
+        return bool(str(st.session_state.get("runtime_gemini_api_key") or "").strip() or str(GEMINI_API_KEY or "").strip())
+
+    def _gemini_key_source_label():
+        if str(st.session_state.get("runtime_gemini_api_key") or "").strip():
+            return "세션 입력"
+        if GEMINI_API_KEY_FROM_SECRETS and str(GEMINI_API_KEY or "").strip():
+            return "Streamlit secret"
+        if str(GEMINI_API_KEY or "").strip():
+            return "환경변수"
+        return "미설정"
+
+    def _render_ai_key_setup(key_prefix):
+        st.info("Gemini API 키가 없으면 AI분석 리포트를 생성할 수 없습니다. 입력한 키는 현재 Streamlit 세션에만 저장됩니다.")
+        key_input = st.text_input(
+            "Gemini API Key",
+            value=str(st.session_state.get("runtime_gemini_api_key_input") or ""),
+            type="password",
+            placeholder="AIza...",
+            key=f"{key_prefix}_gemini_key_input",
+        )
+        col_save, col_clear = st.columns([1, 1])
+        with col_save:
+            if st.button("세션 키 저장", key=f"{key_prefix}_save_gemini_key", type="primary", use_container_width=True):
+                cleaned = str(key_input or "").strip()
+                if not cleaned:
+                    st.warning("저장할 Gemini API 키를 입력해 주세요.")
+                else:
+                    st.session_state.runtime_gemini_api_key = cleaned
+                    st.session_state.runtime_gemini_api_key_input = cleaned
+                    st.session_state.show_runtime_gemini_key_setup = False
+                    st.toast("Gemini API 키를 현재 세션에 저장했습니다.", icon="✅")
+                    st.rerun()
+        with col_clear:
+            if st.button("입력 닫기", key=f"{key_prefix}_close_gemini_key", use_container_width=True):
+                st.session_state.show_runtime_gemini_key_setup = False
+                st.rerun()
+
+    def _run_ai_for_analysis(message_index, message):
+        ticker = str(message.get("ticker") or "").strip().upper()
+        prompt = str(message.get("prompt") or "").strip()
+        meta = dict(message.get("meta") or {})
+        if not ticker or not prompt:
+            st.warning("AI분석에 필요한 티커 또는 PROMPT TAPE가 없습니다. 종목을 다시 분석해 주세요.")
+            return
+        if not _active_gemini_key_available():
+            st.session_state.pending_ai_ticker = ticker
+            st.session_state.pending_ai_prompt = prompt
+            st.session_state.show_runtime_gemini_key_setup = True
+            st.toast("Gemini API 키를 먼저 입력해 주세요.", icon="🔑")
+            return
+
+        engine_judgment = str(meta.get("judgment") or meta.get("action_label") or "").strip()
+        with st.status(f"AI분석 리포트 생성 중 · {ticker}", expanded=True) as status:
+            st.write(f"PROMPT TAPE를 Gemini에 전달합니다. 키 출처: {_gemini_key_source_label()}")
+            ai_result = generate_ai_signal_assisted(
+                runtime_key=st.session_state.get("runtime_gemini_api_key"),
+                configured_key=GEMINI_API_KEY,
+                configured_from_secrets=GEMINI_API_KEY_FROM_SECRETS,
+                prompt=prompt,
+                engine_judgment=engine_judgment,
+                parser=parse_ai_signal_assisted_response,
+            )
+            if not ai_result.get("available"):
+                status.update(label=f"AI분석 실패 · {ticker}", state="error", expanded=True)
+                st.warning(str(ai_result.get("AI_Reason") or "AI분석 결과를 생성하지 못했습니다."))
+                return
+            updated_message = attach_ai_result_to_analysis_message(message, ai_result)
+            st.session_state.messages[message_index] = _normalize_session_message(updated_message)
+            st.session_state.messages.append(
+                _normalize_session_message(
+                    build_ai_report_message(
+                        ticker=ticker,
+                        ai_result=ai_result,
+                        source_analysis_index=message_index,
+                        engine_judgment=engine_judgment,
+                    )
+                )
+            )
+            st.session_state.pending_ai_ticker = None
+            st.session_state.pending_ai_prompt = None
+            st.session_state.show_runtime_gemini_key_setup = False
+            status.update(label=f"AI분석 리포트 생성 완료 · {ticker}", state="complete", expanded=False)
+            st.rerun()
+
+    def _render_ai_analysis_controls(message_index, message):
+        ticker = str(message.get("ticker") or "").strip().upper()
+        meta = dict(message.get("meta") or {})
+        ai_done = bool((meta.get("ai_signal_assisted") or {}).get("available"))
+        key_prefix = f"ai_analysis_{message_index}_{ticker or 'na'}"
+        st.markdown(
+            "<div class='prompt-caption'>AI분석은 위 PROMPT TAPE를 Gemini에 전달해 별도 리포트 메시지로 생성합니다.</div>",
+            unsafe_allow_html=True,
+        )
+        col_run, col_key, col_state = st.columns([1.1, 1.0, 2.2])
+        with col_run:
+            label = "AI분석 다시 실행" if ai_done else "AI분석"
+            if st.button(label, key=f"{key_prefix}_run", type="primary", use_container_width=True):
+                _run_ai_for_analysis(message_index, message)
+        with col_key:
+            if st.button("AI Key Setup", key=f"{key_prefix}_key_setup", use_container_width=True):
+                st.session_state.pending_ai_ticker = ticker
+                st.session_state.pending_ai_prompt = message.get("prompt")
+                st.session_state.show_runtime_gemini_key_setup = True
+        with col_state:
+            status_text = "리포트 생성됨" if ai_done else "리포트 대기"
+            st.caption(f"키 출처: {_gemini_key_source_label()} · {status_text}")
+        if st.session_state.get("show_runtime_gemini_key_setup") and st.session_state.get("pending_ai_ticker") == ticker:
+            _render_ai_key_setup(key_prefix)
+
     for i, msg in enumerate(st.session_state.messages):
         with st.chat_message(msg["role"]):
             if msg.get("type") == "analysis":
@@ -2982,7 +3098,23 @@ else:
                         render_analysis_message(msg, key_prefix=f"analysis_{i}_{msg.get('ticker', 'na')}")
             elif msg.get("type") == "report":
                 with st.expander(f"{msg.get('ticker', '')} 리포트", expanded=i == latest_report_idx):
-                    st.markdown(msg["content"])
+                    ai_result = dict(msg.get("ai_result") or {})
+                    if ai_result:
+                        st.markdown(
+                            _html_block(
+                                format_ai_signal_report_html(
+                                    msg.get("ticker", ""),
+                                    ai_result,
+                                    engine_judgment=msg.get("engine_judgment", ""),
+                                    generated_at=msg.get("generated_at"),
+                                )
+                            ),
+                            unsafe_allow_html=True,
+                        )
+                        with st.expander("Markdown 원문", expanded=False):
+                            st.markdown(msg["content"])
+                    else:
+                        st.markdown(msg["content"])
                 st.download_button(
                     "📥", key=f"dl_{i}",
                     data=msg["content"].encode('utf-8'),
@@ -2999,6 +3131,7 @@ else:
                         unsafe_allow_html=True,
                     )
                     st.code(msg["prompt"], language="markdown")
+                    _render_ai_analysis_controls(i, msg)
 
     def process_ticker(tv, refresh=False):
         raw_tv = str(tv or "").strip().upper()
