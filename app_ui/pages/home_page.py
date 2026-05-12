@@ -14,7 +14,9 @@ from telegram_pipeline.contracts import TelegramCandidate, TelegramDigest, Teleg
 from telegram_pipeline.aggressive_next_day_ranker import AGGRESSIVE_NEXT_DAY_SECTION_KEYS
 from telegram_pipeline.early_reversal_ranker import EARLY_REVERSAL_KEY
 from telegram_pipeline.formatters import (
+    BOARD_DISPLAY_NUMBERS,
     EARLY_REVERSAL_DISPLAY_NUMBER,
+    FIVE_DAY_TOP_DISPLAY_NUMBER,
     HULL_BUY_TURN_DISPLAY_NUMBER,
     QBS_DISPLAY_NUMBERS,
     STEADY_WINNER_DISPLAY_NUMBER,
@@ -22,7 +24,7 @@ from telegram_pipeline.formatters import (
     build_main_message,
 )
 from telegram_pipeline.hull_buy_turn_ranker import HULL_BUY_TURN_KEY
-from telegram_pipeline.selectors import BOARD_MANDATORY_SECTION_KEYS, STEADY_WINNER_SECTION_KEY
+from telegram_pipeline.selectors import BOARD_MANDATORY_SECTION_KEYS, BOARD_SECTION_ORDER, STEADY_WINNER_SECTION_KEY
 from telegram_pipeline.technical_buy_signal_ranker import TECHNICAL_BUY_CLUSTER_KEY
 from theme import FONT_STACK
 
@@ -54,6 +56,13 @@ AGGRESSIVE_TREND_SECTION_KEYS = {
     AGGRESSIVE_NEXT_DAY_SECTION_KEYS[5],
     AGGRESSIVE_NEXT_DAY_SECTION_KEYS[7],
 }
+DECISION_SECTION_KEYS = {
+    *QBS_DISPLAY_NUMBERS.keys(),
+    STEADY_WINNER_SECTION_KEY,
+    EARLY_REVERSAL_KEY,
+    HULL_BUY_TURN_KEY,
+}
+BOARD_TYPE_SECTION_KEYS = set(BOARD_SECTION_ORDER)
 
 
 def _repo_root() -> Path:
@@ -341,7 +350,11 @@ def build_telegram_digest_message(payload: Optional[Mapping[str, Any]]) -> str:
 def _visible_telegram_sections(digest: TelegramDigest) -> list[TelegramSection]:
     mandatory = set(BOARD_MANDATORY_SECTION_KEYS)
     visible: list[TelegramSection] = []
-    for section in digest.sections:
+    section_list = list(digest.sections or [])
+    if digest.section_order:
+        order_index = {str(key): idx for idx, key in enumerate(digest.section_order)}
+        section_list.sort(key=lambda section: (order_index.get(str(section.key), len(order_index)), str(section.key)))
+    for section in section_list:
         if section.key in QBS_DISPLAY_NUMBERS:
             visible.append(section)
             continue
@@ -936,6 +949,8 @@ def _build_telegram_board_rows(
 
 
 def _filter_telegram_board_rows(rows: list[dict[str, Any]], filter_key: str) -> list[dict[str, Any]]:
+    if filter_key == "decision":
+        return [row for row in rows if str(row.get("section_key") or "") in DECISION_SECTION_KEYS]
     if filter_key == "aggressive":
         return [row for row in rows if str(row.get("section_key") or "") in AGGRESSIVE_SECTION_KEY_SET]
     if filter_key == "qbs":
@@ -958,6 +973,8 @@ def _filter_telegram_board_rows(rows: list[dict[str, Any]], filter_key: str) -> 
         return [row for row in rows if row.get("section_key") == HULL_BUY_TURN_KEY]
     if filter_key == "five_day":
         return [row for row in rows if row.get("section_key") == "five_day_top"]
+    if filter_key == "board":
+        return [row for row in rows if str(row.get("section_key") or "") in BOARD_TYPE_SECTION_KEYS]
     if filter_key == "risk":
         return [row for row in rows if bool(row.get("has_warning"))]
     return rows
@@ -1377,6 +1394,8 @@ def _board_table_html(rows: list[dict[str, Any]]) -> str:
 
 def _default_telegram_board_filter(rows: Iterable[Mapping[str, Any]]) -> str:
     row_list = list(rows)
+    if any(str(row.get("section_key") or "") in DECISION_SECTION_KEYS for row in row_list):
+        return "decision"
     if any(str(row.get("section_key") or "") in AGGRESSIVE_SECTION_KEY_SET for row in row_list):
         return "aggressive"
     if any(str(row.get("section_key") or "") == TECHNICAL_BUY_CLUSTER_KEY for row in row_list):
@@ -1386,17 +1405,21 @@ def _default_telegram_board_filter(rows: Iterable[Mapping[str, Any]]) -> str:
 
 def _telegram_board_overview_html(rows: list[dict[str, Any]], filter_label: str) -> str:
     unique_tickers = _collect_recent_tickers(str(row.get("ticker") or "") for row in rows)
+    decision_count = sum(1 for row in rows if str(row.get("section_key") or "") in DECISION_SECTION_KEYS)
     aggressive_count = sum(1 for row in rows if str(row.get("section_key") or "") in AGGRESSIVE_SECTION_KEY_SET)
     qbs_count = sum(1 for row in rows if str(row.get("section_key") or "") in QBS_DISPLAY_NUMBERS)
     technical_count = sum(1 for row in rows if str(row.get("section_key") or "") == TECHNICAL_BUY_CLUSTER_KEY)
+    board_count = sum(1 for row in rows if str(row.get("section_key") or "") in BOARD_TYPE_SECTION_KEYS)
     warning_count = sum(1 for row in rows if row.get("has_warning"))
     items = [
         ("View", filter_label),
         ("Rows", f"{len(rows):,}"),
         ("Tickers", f"{len(unique_tickers):,}"),
+        ("Decision", f"{decision_count:,}"),
         ("Aggressive", f"{aggressive_count:,}"),
         ("QBS", f"{qbs_count:,}"),
         ("Tech", f"{technical_count:,}"),
+        ("Board", f"{board_count:,}"),
         ("Risk", f"{warning_count:,}"),
     ]
     metric_html = "".join(
@@ -1425,14 +1448,16 @@ def _render_telegram_visual_board(digest: TelegramDigest, *, on_select_ticker: C
     if not rows:
         return
     filter_options = {
-        "aggressive": "Aggressive",
+        "decision": "Decision",
         "qbs": "QBS",
         "technical": "Tech Buy",
+        "aggressive": "Aggressive",
+        "board": "Board",
         "entry": "Entry",
         "trend": "Trend",
         "reversal": "Reversal",
         "hull": "HULL",
-        "five_day": "5D",
+        "five_day": "Momentum",
         "risk": "Risk",
         "all": "All",
     }
@@ -2308,24 +2333,46 @@ def _render_telegram_message_board(
         "<div class='cpx-board-action-label' style='margin-top:18px'>섹션별 상세</div>",
         unsafe_allow_html=True,
     )
-    board_display_index = 1
+    board_group_labels = {
+        "decision": "[0] 오늘 의사결정 핵심",
+        "technical": "[1] 기술적 신호 클러스터",
+        "aggressive": "[2] 다음 거래일 공격형 매수 후보",
+        "board": "[3] 매매 유형별 후보 보드",
+        "reference": "[4] 참고 랭킹",
+    }
+    last_group = ""
     for idx, section in enumerate(visible_sections):
         ticker_list = [item.ticker for item in section.items if item.ticker]
         if section.key in QBS_DISPLAY_NUMBERS:
             display_number = QBS_DISPLAY_NUMBERS[section.key]
+            group_key = "decision"
         elif section.key == TECHNICAL_BUY_CLUSTER_KEY:
             display_number = TECHNICAL_BUY_DISPLAY_NUMBER
+            group_key = "technical"
         elif section.key == STEADY_WINNER_SECTION_KEY:
             display_number = STEADY_WINNER_DISPLAY_NUMBER
+            group_key = "decision"
         elif section.key == EARLY_REVERSAL_KEY:
             display_number = EARLY_REVERSAL_DISPLAY_NUMBER
+            group_key = "decision"
         elif section.key == HULL_BUY_TURN_KEY:
             display_number = HULL_BUY_TURN_DISPLAY_NUMBER
+            group_key = "decision"
         elif section.key in AGGRESSIVE_SECTION_KEY_SET:
             display_number = f"PART {AGGRESSIVE_NEXT_DAY_SECTION_KEYS.index(section.key) + 1}"
+            group_key = "aggressive"
+        elif section.key == "five_day_top":
+            display_number = FIVE_DAY_TOP_DISPLAY_NUMBER
+            group_key = "reference"
         else:
-            display_number = str(board_display_index)
-            board_display_index += 1
+            display_number = BOARD_DISPLAY_NUMBERS.get(section.key, "-")
+            group_key = "board" if section.key in BOARD_TYPE_SECTION_KEYS else ""
+        if group_key and group_key != last_group:
+            st.markdown(
+                f"<div class='cpx-board-action-label' style='margin-top:14px'>{_html_text(board_group_labels.get(group_key, group_key))}</div>",
+                unsafe_allow_html=True,
+            )
+            last_group = group_key
         expander_label = f"{display_number}. {section.title or section.key or f'Section {idx + 1}'}"
         with st.expander(expander_label, expanded=idx < 3):
             _render_telegram_section_table(section)

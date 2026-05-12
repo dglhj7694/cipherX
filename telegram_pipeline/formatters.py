@@ -88,10 +88,15 @@ QBS_DISPLAY_NUMBERS: dict[str, str] = {
 
 BOARD_SECTION_KEYS = set(BOARD_SECTION_ORDER)
 FIVE_DAY_TOP_SECTION_KEY = "five_day_top"
-TECHNICAL_BUY_DISPLAY_NUMBER = "0-3"
-STEADY_WINNER_DISPLAY_NUMBER = "0-4"
-EARLY_REVERSAL_DISPLAY_NUMBER = "0-5"
-HULL_BUY_TURN_DISPLAY_NUMBER = "0-6"
+STEADY_WINNER_DISPLAY_NUMBER = "0-3"
+EARLY_REVERSAL_DISPLAY_NUMBER = "0-4"
+HULL_BUY_TURN_DISPLAY_NUMBER = "0-5"
+TECHNICAL_BUY_DISPLAY_NUMBER = "1"
+BOARD_DISPLAY_NUMBERS: dict[str, str] = {
+    section_key: str(index)
+    for index, section_key in enumerate(BOARD_SECTION_ORDER, start=2)
+}
+FIVE_DAY_TOP_DISPLAY_NUMBER = "11"
 AGGRESSIVE_SECTION_KEYS = set(AGGRESSIVE_NEXT_DAY_SECTION_KEYS)
 
 
@@ -654,8 +659,6 @@ def build_post_close_digest(
     section_rows = select_post_close_sections(row_list, target_date=market_date)
 
     sections: list[TelegramSection] = _build_qbs_sections(section_rows, market_date)
-    sections.append(_build_technical_buy_cluster_section(row_list, market_date))
-    sections.extend(_build_aggressive_next_day_sections(row_list, market_date))
     steady_rows = list(section_rows.get(STEADY_WINNER_SECTION_KEY) or [])
     steady_items = [
         _build_candidate(STEADY_WINNER_SECTION_KEY, row, idx, market_date)
@@ -701,6 +704,8 @@ def build_post_close_digest(
             ranked=True,
         )
     )
+    sections.append(_build_technical_buy_cluster_section(row_list, market_date))
+    sections.extend(_build_aggressive_next_day_sections(row_list, market_date))
     qbs_top_tickers = {
         item.ticker
         for section in sections
@@ -750,11 +755,11 @@ def build_post_close_digest(
         generated_at=generated_at.isoformat(),
         section_order=[
             *QBS_OUTPUT_KEYS,
-            TECHNICAL_BUY_CLUSTER_KEY,
-            *AGGRESSIVE_NEXT_DAY_SECTION_KEYS,
             STEADY_WINNER_SECTION_KEY,
             EARLY_REVERSAL_KEY,
             HULL_BUY_TURN_KEY,
+            TECHNICAL_BUY_CLUSTER_KEY,
+            *AGGRESSIVE_NEXT_DAY_SECTION_KEYS,
             *BOARD_SECTION_ORDER,
             FIVE_DAY_TOP_SECTION_KEY,
         ],
@@ -926,7 +931,14 @@ def _qbs_section_block(display_number: str, section: TelegramSection) -> str:
 
 def _aggressive_section_block(section: TelegramSection) -> str:
     descriptor = f"Top {min(section.item_count, AGGRESSIVE_NEXT_DAY_LIMIT)}"
-    lines = [f"## {section.title} ({descriptor})"]
+    title = str(section.title or section.key)
+    if section.key in AGGRESSIVE_NEXT_DAY_SECTION_KEYS:
+        part_number = AGGRESSIVE_NEXT_DAY_SECTION_KEYS.index(section.key) + 1
+        prefix = f"PART {part_number}"
+        if title.startswith(prefix):
+            title = title[len(prefix):].lstrip(" .")
+        title = f"PART {part_number}. {title}"
+    lines = [f"## {title} ({descriptor})"]
     if section.quality_floor:
         lines.append(f"조건: {section.quality_floor}")
     if not section.items:
@@ -979,7 +991,7 @@ def _hull_buy_turn_section_block(section: TelegramSection) -> str:
     return "\n".join(lines)
 
 
-def _section_block(index: int, section: TelegramSection) -> str:
+def _section_block(index: int | str, section: TelegramSection) -> str:
     section_limit = FIVE_DAY_TOP_LIMIT if section.key == FIVE_DAY_TOP_SECTION_KEY else BOARD_SECTION_LIMIT
     descriptor = f"Top {min(section.item_count, section_limit)}"
     lines = [f"## {index}. {section.title} ({descriptor})"]
@@ -996,6 +1008,47 @@ def _section_block(index: int, section: TelegramSection) -> str:
     return "\n".join(lines)
 
 
+MESSAGE_GROUP_HEADERS: dict[str, str] = {
+    "decision": "[0] 오늘 의사결정 핵심",
+    "technical": "[1] 기술적 신호 클러스터",
+    "aggressive": "[2] 다음 거래일 공격형 매수 후보",
+    "board": "[3] 매매 유형별 후보 보드",
+    "reference": "[4] 참고 랭킹",
+}
+MESSAGE_GROUP_DIVIDER = "━━━━━━━━━━━━━━━━━━━━"
+
+
+def _message_group_for_section(section_key: str) -> str:
+    if section_key in QBS_DISPLAY_NUMBERS or section_key in {STEADY_WINNER_SECTION_KEY, EARLY_REVERSAL_KEY, HULL_BUY_TURN_KEY}:
+        return "decision"
+    if section_key == TECHNICAL_BUY_CLUSTER_KEY:
+        return "technical"
+    if section_key in AGGRESSIVE_SECTION_KEYS:
+        return "aggressive"
+    if section_key in BOARD_SECTION_KEYS:
+        return "board"
+    if section_key == FIVE_DAY_TOP_SECTION_KEY:
+        return "reference"
+    return ""
+
+
+def _group_header(group_key: str) -> str:
+    title = MESSAGE_GROUP_HEADERS.get(group_key, "")
+    if not title:
+        return ""
+    return "\n".join([MESSAGE_GROUP_DIVIDER, title, MESSAGE_GROUP_DIVIDER])
+
+
+def _ordered_digest_sections(digest: TelegramDigest) -> list[TelegramSection]:
+    if not digest.section_order:
+        return list(digest.sections or [])
+    order_index = {str(key): idx for idx, key in enumerate(digest.section_order)}
+    return sorted(
+        list(digest.sections or []),
+        key=lambda section: (order_index.get(str(section.key), len(order_index)), str(section.key)),
+    )
+
+
 def build_main_message(digest: TelegramDigest) -> str:
     blocks = [
         "\n".join(
@@ -1008,8 +1061,24 @@ def build_main_message(digest: TelegramDigest) -> str:
         )
     ]
 
-    display_index = 1
-    for section in digest.sections:
+    last_group = ""
+    fallback_display_index = 12
+    for section in _ordered_digest_sections(digest):
+        if section.key not in BOARD_MANDATORY_SECTION_KEYS and section.item_count <= 0 and section.key not in {
+            *QBS_DISPLAY_NUMBERS.keys(),
+            TECHNICAL_BUY_CLUSTER_KEY,
+            *AGGRESSIVE_SECTION_KEYS,
+            STEADY_WINNER_SECTION_KEY,
+            EARLY_REVERSAL_KEY,
+            HULL_BUY_TURN_KEY,
+        }:
+            continue
+        group_key = _message_group_for_section(section.key)
+        if group_key and group_key != last_group:
+            header = _group_header(group_key)
+            if header:
+                blocks.append(header)
+            last_group = group_key
         if section.key in QBS_DISPLAY_NUMBERS:
             blocks.append(_qbs_section_block(QBS_DISPLAY_NUMBERS[section.key], section))
             continue
@@ -1028,10 +1097,13 @@ def build_main_message(digest: TelegramDigest) -> str:
         if section.key == HULL_BUY_TURN_KEY:
             blocks.append(_hull_buy_turn_section_block(section))
             continue
-        if section.key not in BOARD_MANDATORY_SECTION_KEYS and section.item_count <= 0:
-            continue
-        blocks.append(_section_block(display_index, section))
-        display_index += 1
+        display_number = BOARD_DISPLAY_NUMBERS.get(section.key)
+        if section.key == FIVE_DAY_TOP_SECTION_KEY:
+            display_number = FIVE_DAY_TOP_DISPLAY_NUMBER
+        if display_number is None:
+            display_number = str(fallback_display_index)
+            fallback_display_index += 1
+        blocks.append(_section_block(display_number, section))
 
     return "\n\n".join(blocks)
 
