@@ -3,7 +3,7 @@ import json
 import math
 import re
 import textwrap
-from datetime import datetime
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -21,6 +21,7 @@ from localization import (
     localize_regime_label,
     translate_chart_text,
 )
+from telegram_pipeline.startup9_confirm_ranker import evaluate_startup9_confirm
 from theme import PLOTLY_FONT_FAMILY
 
 
@@ -64,6 +65,368 @@ def _summary_change_available(meta):
         value = _safe_float(meta.get("price_change_pct"), float("nan"))
         return math.isfinite(value)
     return bool(flag)
+
+
+def _analysis_target_date(meta):
+    text = _summary_date_text(meta)
+    if text:
+        try:
+            return date.fromisoformat(text[:10])
+        except ValueError:
+            pass
+    try:
+        return datetime.now(ZoneInfo("America/New_York")).date()
+    except Exception:
+        return date.today()
+
+
+_STARTUP9_AXIS_META = [
+    ("startup9_trend_bullish", "Trend Pane Bullish", "추세 패널 강세 정렬"),
+    ("startup9_above_gold_zone", "Above Gold Zone", "MA20/핵심 지지 기준 위"),
+    ("startup9_blue_diamond_entry", "Blue Diamond Entry", "최근 진입 트리거"),
+    ("startup9_no_pink_diamond", "No Pink Diamond", "활성 매도전환 부재"),
+    ("startup9_market_structure_bullish", "Market Structure Bullish", "HH/HL/돌파 구조 개선"),
+    ("startup9_support_hold", "Order Block / Support Hold", "눌림/지지/리테스트 유지"),
+    ("startup9_smart_money_flow", "Smart Money Flow", "수급/거래량/매집 강세"),
+    ("startup9_bullish_reversal", "Bullish Reversal", "상승 다이버전스/반전"),
+    ("startup9_hype_wave_momentum", "Hype-Wave Momentum", "모멘텀/상대강도 가속"),
+]
+
+
+def _startup9_grade_tone(grade):
+    grade_text = str(grade or "").upper()
+    if grade_text == "FULL_BULL":
+        return "positive"
+    if grade_text == "STRONG_BULL":
+        return "accent"
+    if grade_text == "WATCH_BULL":
+        return "warning"
+    return "muted"
+
+
+def _startup9_direction_tone(direction_state):
+    state = str(direction_state or "").upper()
+    if state in {"BULL_ACTIVE", "BULL_RECLAIMED"}:
+        return "positive"
+    if state == "NO_RECENT_TURN":
+        return "accent"
+    if state == "MIXED_SAME_DAY":
+        return "warning"
+    if state == "BEAR_ACTIVE":
+        return "negative"
+    return "muted"
+
+
+def _startup9_token_html(items, tone="muted", empty="특이사항 없음"):
+    values = [str(item or "").strip() for item in list(items or []) if str(item or "").strip()]
+    if not values:
+        return _badge(empty, "muted")
+    return "".join(_badge(item, tone) for item in values)
+
+
+def _render_startup9_confirm_tab(meta):
+    try:
+        result = evaluate_startup9_confirm(dict(meta or {}), _analysis_target_date(meta or {}))
+    except Exception as exc:
+        st.warning(f"Startup9 강세확인을 계산하지 못했습니다: {exc}")
+        return
+
+    grade_tone = _startup9_grade_tone(result.grade)
+    direction_tone = _startup9_direction_tone(result.direction_state)
+    fill_pct = max(0.0, min((result.confirm_count / 9.0) * 100.0, 100.0))
+    ticker = str((meta or {}).get("ticker") or result.ticker or "-").upper()
+    target_date = _analysis_target_date(meta or {}).isoformat()
+    score_text = f"{result.startup9_score:.1f}"
+    summary = result.reason or "-"
+    hard_flags = list(result.hard_exclusions or [])
+    soft_flags = list(result.soft_risk_flags or [])
+    risk_flags = list(result.risk_flags or [])
+
+    axis_cards = []
+    for index, (axis_key, label, description) in enumerate(_STARTUP9_AXIS_META, start=1):
+        passed = bool(result.confirm_map.get(axis_key))
+        tone = "positive" if passed else "muted"
+        state = "충족" if passed else "부족"
+        accent = _tone_color("positive" if passed else "warning")
+        axis_cards.append(
+            f"""
+            <div class="sigl-s9-axis" data-state="{_esc('pass' if passed else 'miss')}" style="--axis-accent:{accent}">
+              <div class="sigl-s9-axis__top">
+                <span class="sigl-s9-axis__num">{index:02d}</span>
+                {_badge(state, tone)}
+              </div>
+              <div class="sigl-s9-axis__label">{_esc(label)}</div>
+              <div class="sigl-s9-axis__desc">{_esc(description)}</div>
+              <div class="sigl-s9-axis__key">{_esc(axis_key)}</div>
+            </div>
+            """
+        )
+
+    hard_panel_tone = "negative" if hard_flags else "positive"
+    soft_panel_tone = "warning" if soft_flags else "muted"
+    risk_panel_tone = "warning" if risk_flags else "positive"
+    no_pink_text = "통과" if result.confirm_map.get("startup9_no_pink_diamond") else "실패"
+
+    html_markup = f"""
+    <style>
+      .sigl-s9-wrap {{
+        display:flex;
+        flex-direction:column;
+        gap:14px;
+      }}
+      .sigl-s9-hero {{
+        border:1px solid rgba(142,164,255,0.22);
+        background:
+          linear-gradient(135deg, rgba(99,217,162,0.12), rgba(142,164,255,0.08)),
+          rgba(15,23,42,0.72);
+        border-radius:14px;
+        padding:18px 18px 16px;
+        box-shadow:0 16px 36px rgba(2,6,23,0.24);
+      }}
+      .sigl-s9-hero__top {{
+        display:flex;
+        justify-content:space-between;
+        gap:16px;
+        align-items:flex-start;
+      }}
+      .sigl-s9-kicker {{
+        margin:0 0 5px;
+        color:#94A3B8;
+        font-size:0.76rem;
+        font-weight:800;
+        text-transform:uppercase;
+        letter-spacing:0;
+      }}
+      .sigl-s9-title {{
+        margin:0;
+        color:#F8FAFC;
+        font-size:1.34rem;
+        line-height:1.25;
+        font-weight:850;
+      }}
+      .sigl-s9-sub {{
+        margin:7px 0 0;
+        color:#CBD5E1;
+        font-size:0.88rem;
+        line-height:1.55;
+      }}
+      .sigl-s9-scorebox {{
+        min-width:148px;
+        text-align:right;
+      }}
+      .sigl-s9-scorebox strong {{
+        display:block;
+        color:{_tone_color(grade_tone)};
+        font-size:2rem;
+        line-height:1;
+        font-weight:900;
+      }}
+      .sigl-s9-scorebox span {{
+        color:#94A3B8;
+        font-size:0.78rem;
+        font-weight:700;
+      }}
+      .sigl-s9-progress {{
+        height:9px;
+        margin-top:16px;
+        border-radius:999px;
+        background:rgba(148,163,184,0.17);
+        overflow:hidden;
+      }}
+      .sigl-s9-progress div {{
+        width:{fill_pct:.1f}%;
+        height:100%;
+        border-radius:999px;
+        background:{_tone_color(grade_tone)};
+      }}
+      .sigl-s9-hero__chips {{
+        display:flex;
+        flex-wrap:wrap;
+        gap:7px;
+        margin-top:12px;
+      }}
+      .sigl-s9-stats {{
+        display:grid;
+        grid-template-columns:repeat(4, minmax(0, 1fr));
+        gap:10px;
+      }}
+      .sigl-s9-section {{
+        border:1px solid rgba(148,163,184,0.14);
+        background:rgba(15,23,42,0.46);
+        border-radius:14px;
+        padding:15px;
+      }}
+      .sigl-s9-section__title {{
+        margin:0 0 10px;
+        color:#F8FAFC;
+        font-size:0.98rem;
+        font-weight:850;
+      }}
+      .sigl-s9-axis-grid {{
+        display:grid;
+        grid-template-columns:repeat(3, minmax(0, 1fr));
+        gap:10px;
+      }}
+      .sigl-s9-axis {{
+        border:1px solid rgba(148,163,184,0.16);
+        border-left:3px solid var(--axis-accent);
+        background:rgba(2,6,23,0.28);
+        border-radius:10px;
+        padding:11px 11px 10px;
+        min-height:122px;
+      }}
+      .sigl-s9-axis[data-state="miss"] {{
+        opacity:0.82;
+      }}
+      .sigl-s9-axis__top {{
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        gap:8px;
+      }}
+      .sigl-s9-axis__num {{
+        color:#94A3B8;
+        font-size:0.72rem;
+        font-weight:900;
+      }}
+      .sigl-s9-axis__label {{
+        margin-top:10px;
+        color:#F8FAFC;
+        font-size:0.92rem;
+        line-height:1.25;
+        font-weight:850;
+      }}
+      .sigl-s9-axis__desc {{
+        margin-top:6px;
+        color:#CBD5E1;
+        font-size:0.78rem;
+        line-height:1.4;
+      }}
+      .sigl-s9-axis__key {{
+        margin-top:9px;
+        color:#64748B;
+        font-size:0.68rem;
+        line-height:1.25;
+        word-break:break-word;
+        font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }}
+      .sigl-s9-two {{
+        display:grid;
+        grid-template-columns:1fr 1fr;
+        gap:10px;
+      }}
+      .sigl-s9-panel {{
+        border:1px solid rgba(148,163,184,0.14);
+        background:rgba(2,6,23,0.24);
+        border-radius:10px;
+        padding:12px;
+      }}
+      .sigl-s9-panel p {{
+        margin:0 0 8px;
+        color:#94A3B8;
+        font-size:0.72rem;
+        font-weight:850;
+      }}
+      .sigl-s9-panel strong {{
+        display:block;
+        margin-bottom:8px;
+        color:#E2E8F0;
+        font-size:0.95rem;
+      }}
+      .sigl-s9-risk-row {{
+        display:grid;
+        grid-template-columns:1fr 1fr 1fr;
+        gap:10px;
+      }}
+      @media (max-width: 900px) {{
+        .sigl-s9-hero__top,
+        .sigl-s9-two,
+        .sigl-s9-risk-row {{
+          display:grid;
+          grid-template-columns:1fr;
+        }}
+        .sigl-s9-scorebox {{
+          text-align:left;
+        }}
+        .sigl-s9-stats,
+        .sigl-s9-axis-grid {{
+          grid-template-columns:1fr;
+        }}
+      }}
+    </style>
+    <div class="sigl-s9-wrap">
+      <div class="sigl-s9-hero">
+        <div class="sigl-s9-hero__top">
+          <div>
+            <p class="sigl-s9-kicker">Startup식 추정 강세확인 · {ticker} · {target_date}</p>
+            <h3 class="sigl-s9-title">9개 독립 축 기준 강세 정렬도</h3>
+            <p class="sigl-s9-sub">공개 자료 기반 추정형 강세확인 모델입니다. 최종 매수판단이 아니라 추세, 구조, 수급, 반전, 모멘텀 축이 얼마나 함께 정렬됐는지 보는 보조 화면입니다.</p>
+          </div>
+          <div class="sigl-s9-scorebox">
+            <strong>{result.confirm_count}/9</strong>
+            <span>S9 Confirm</span>
+          </div>
+        </div>
+        <div class="sigl-s9-progress"><div></div></div>
+        <div class="sigl-s9-hero__chips">
+          {_badge(result.grade or "-", grade_tone)}
+          {_badge(result.profile or "-", "accent")}
+          {_badge(result.direction_state or "-", direction_tone)}
+          {_badge(f"Score {score_text}", "muted")}
+          {_badge(f"No Pink {no_pink_text}", "positive" if no_pink_text == "통과" else "negative")}
+        </div>
+      </div>
+
+      <div class="sigl-s9-stats">
+        {_mini_stat_card("등급", result.grade or "-", grade_tone)}
+        {_mini_stat_card("프로파일", result.profile or "-", "accent")}
+        {_mini_stat_card("방향 상태", result.direction_state or "-", direction_tone)}
+        {_mini_stat_card("정렬 점수", score_text, "muted")}
+      </div>
+
+      <div class="sigl-s9-section">
+        <p class="sigl-s9-section__title">9개 강세확인 축</p>
+        <div class="sigl-s9-axis-grid">{_join_html(axis_cards)}</div>
+      </div>
+
+      <div class="sigl-s9-two">
+        <div class="sigl-s9-panel">
+          <p>충족 신호</p>
+          <strong>{len(result.hits)}개 축 충족</strong>
+          {_startup9_token_html(result.hits, "positive", empty="충족 축 없음")}
+        </div>
+        <div class="sigl-s9-panel">
+          <p>부족 신호</p>
+          <strong>{len(result.missing)}개 축 부족</strong>
+          {_startup9_token_html(result.missing, "warning", empty="부족 축 없음")}
+        </div>
+      </div>
+
+      <div class="sigl-s9-section">
+        <p class="sigl-s9-section__title">한 줄 요약 근거</p>
+        <div class="sigl-summary">{_esc(summary)}</div>
+      </div>
+
+      <div class="sigl-s9-risk-row">
+        <div class="sigl-s9-panel">
+          <p>Hard exclusion</p>
+          <strong style="color:{_tone_color(hard_panel_tone)}">{'제외 조건 있음' if hard_flags else '통과'}</strong>
+          {_startup9_token_html(hard_flags, "negative")}
+        </div>
+        <div class="sigl-s9-panel">
+          <p>Soft risk</p>
+          <strong style="color:{_tone_color(soft_panel_tone)}">{'주의 필요' if soft_flags else '특이사항 없음'}</strong>
+          {_startup9_token_html(soft_flags, "warning")}
+        </div>
+        <div class="sigl-s9-panel">
+          <p>표시 리스크</p>
+          <strong style="color:{_tone_color(risk_panel_tone)}">{len(risk_flags)}개 플래그</strong>
+          {_startup9_token_html(risk_flags, "warning")}
+        </div>
+      </div>
+    </div>
+    """
+    st.markdown(_html_block(html_markup), unsafe_allow_html=True)
 
 
 def _bias_mode_label(value):
@@ -4614,12 +4977,13 @@ def render_analysis(msg, key_prefix="analysis"):
     if not (meta or fig_json):
         return
 
-    tab_chart, tab_judgment, tab_layers, tab_strategies, tab_company = st.tabs(
+    tab_chart, tab_judgment, tab_layers, tab_strategies, tab_startup9, tab_company = st.tabs(
         [
             "\uCC28\uD2B8",
             "\uD310\uB2E8/\uB9AC\uC2A4\uD06C",
             "10\uAC1C \uB808\uC774\uC5B4",
             "\uB9E4\uB9E4\uC804\uB7B5",
+            "Startup9 강세확인",
             "\uAE30\uC5C5 \uC815\uBCF4",
         ]
     )
@@ -4660,6 +5024,10 @@ def render_analysis(msg, key_prefix="analysis"):
     with tab_strategies:
         if meta:
             render_combined_scans(meta)
+
+    with tab_startup9:
+        if meta:
+            _render_startup9_confirm_tab(meta)
 
     with tab_company:
         if meta:

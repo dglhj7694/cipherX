@@ -36,6 +36,16 @@ from .selectors import (
     select_steady_winner_rows,
 )
 from .sender import send_telegram_document, send_telegram_message, send_telegram_messages, split_telegram_message_text
+from .startup9_confirm_ranker import (
+    STARTUP9_CONFIRM_KEY,
+    STARTUP9_CONFIRM_LIMIT,
+    STARTUP9_CONFIRM_QUALITY_FLOOR,
+    STARTUP9_CONFIRM_TITLE,
+    annotate_rows_with_startup9_confirm,
+    evaluate_startup9_confirm,
+    rank_startup9_confirm_candidates,
+    select_startup9_confirm_rows,
+)
 from .technical_buy_signal_ranker import (
     TECHNICAL_BUY_CLUSTER_KEY,
     TECHNICAL_BUY_CLUSTER_LIMIT,
@@ -62,6 +72,14 @@ __all__ = [
     "rank_early_reversal_candidates",
     "HULL_BUY_TURN_KEY",
     "select_hull_buy_turn_rows",
+    "STARTUP9_CONFIRM_KEY",
+    "STARTUP9_CONFIRM_LIMIT",
+    "STARTUP9_CONFIRM_QUALITY_FLOOR",
+    "STARTUP9_CONFIRM_TITLE",
+    "evaluate_startup9_confirm",
+    "annotate_rows_with_startup9_confirm",
+    "rank_startup9_confirm_candidates",
+    "select_startup9_confirm_rows",
     "TECHNICAL_BUY_CLUSTER_KEY",
     "TECHNICAL_BUY_CLUSTER_LIMIT",
     "TECHNICAL_BUY_CLUSTER_QUALITY_FLOOR",

@@ -20,11 +20,13 @@ from telegram_pipeline.formatters import (
     HULL_BUY_TURN_DISPLAY_NUMBER,
     QBS_DISPLAY_NUMBERS,
     STEADY_WINNER_DISPLAY_NUMBER,
+    STARTUP9_CONFIRM_DISPLAY_NUMBER,
     TECHNICAL_BUY_DISPLAY_NUMBER,
     build_main_message,
 )
 from telegram_pipeline.hull_buy_turn_ranker import HULL_BUY_TURN_KEY
 from telegram_pipeline.selectors import BOARD_MANDATORY_SECTION_KEYS, BOARD_SECTION_ORDER, STEADY_WINNER_SECTION_KEY
+from telegram_pipeline.startup9_confirm_ranker import STARTUP9_CONFIRM_KEY
 from telegram_pipeline.technical_buy_signal_ranker import TECHNICAL_BUY_CLUSTER_KEY
 from theme import FONT_STACK
 
@@ -298,6 +300,19 @@ def _candidate_from_payload(item: Mapping[str, Any], *, section_key: str, fallba
         technical_buy_bucket=str(payload.get("technical_buy_bucket") or source_flags.get("technical_buy_bucket") or ""),
         technical_buy_reason=str(payload.get("technical_buy_reason") or source_flags.get("technical_buy_reason") or ""),
         technical_buy_risk_flags=_text_list(payload.get("technical_buy_risk_flags") or source_flags.get("technical_buy_risk_flags")),
+        startup9_confirm_count=_safe_int(
+            payload.get("startup9_confirm_count")
+            if payload.get("startup9_confirm_count") is not None
+            else source_flags.get("startup9_confirm_count")
+        ),
+        startup9_confirm_grade=str(payload.get("startup9_confirm_grade") or source_flags.get("startup9_confirm_grade") or ""),
+        startup9_confirm_hits=_text_list(payload.get("startup9_confirm_hits") or source_flags.get("startup9_confirm_hits")),
+        startup9_confirm_missing=_text_list(payload.get("startup9_confirm_missing") or source_flags.get("startup9_confirm_missing")),
+        startup9_confirm_reason=str(payload.get("startup9_confirm_reason") or source_flags.get("startup9_confirm_reason") or ""),
+        startup9_risk_flags=_text_list(payload.get("startup9_risk_flags") or source_flags.get("startup9_risk_flags")),
+        startup9_score=_optional_float(payload.get("startup9_score") if payload.get("startup9_score") is not None else source_flags.get("startup9_score")),
+        startup9_profile=str(payload.get("startup9_profile") or source_flags.get("startup9_profile") or ""),
+        startup9_direction_state=str(payload.get("startup9_direction_state") or source_flags.get("startup9_direction_state") or ""),
     )
 
 
@@ -359,6 +374,9 @@ def _visible_telegram_sections(digest: TelegramDigest) -> list[TelegramSection]:
             visible.append(section)
             continue
         if section.key == TECHNICAL_BUY_CLUSTER_KEY:
+            visible.append(section)
+            continue
+        if section.key == STARTUP9_CONFIRM_KEY:
             visible.append(section)
             continue
         if section.key == STEADY_WINNER_SECTION_KEY:
@@ -511,6 +529,8 @@ def _section_tone(section_key: str) -> str:
         return "info"
     if key == TECHNICAL_BUY_CLUSTER_KEY:
         return "positive"
+    if key == STARTUP9_CONFIRM_KEY:
+        return "positive"
     if key == EARLY_REVERSAL_KEY:
         return "info"
     if key == HULL_BUY_TURN_KEY:
@@ -561,9 +581,13 @@ def _candidate_tags_html(item: TelegramCandidate) -> str:
         badges.append(_badge_html(tag, "muted"))
     for hit in list(item.technical_buy_hits or [])[:4]:
         badges.append(_badge_html(hit, "accent"))
+    for hit in list(item.startup9_confirm_hits or [])[:4]:
+        badges.append(_badge_html(hit, "accent"))
     for flag in list(item.risk_flags or [])[:3]:
         badges.append(_badge_html(flag, "negative"))
     for flag in list(item.technical_buy_risk_flags or [])[:3]:
+        badges.append(_badge_html(flag, "negative"))
+    for flag in list(item.startup9_risk_flags or [])[:3]:
         badges.append(_badge_html(flag, "negative"))
     return "".join(badges) or _badge_html("reason --", "muted")
 
@@ -637,6 +661,7 @@ def _board_entry_text(item: TelegramCandidate, section_key: str, fallback_entry:
         "qbs_buy_now": "buy_now",
         "qbs_chase_watch": "chase_watch",
         "qbs_pullback_wait": "pullback_wait",
+        STARTUP9_CONFIRM_KEY: "startup9_confirm_watch",
         TECHNICAL_BUY_CLUSTER_KEY: "technical_cluster_watch",
         STEADY_WINNER_SECTION_KEY: "watchlist",
         EARLY_REVERSAL_KEY: "reversal_watch",
@@ -654,6 +679,7 @@ def _board_section_label(section_key: str) -> str:
         "qbs_buy_now": "BUY_NOW",
         "qbs_chase_watch": "CHASE",
         "qbs_pullback_wait": "PULLBACK",
+        STARTUP9_CONFIRM_KEY: "S9",
         TECHNICAL_BUY_CLUSTER_KEY: "TECH BUY",
         STEADY_WINNER_SECTION_KEY: "STEADY",
         EARLY_REVERSAL_KEY: "REVERSAL",
@@ -668,6 +694,8 @@ def _board_bucket_label(item: TelegramCandidate, section_key: str) -> str:
         return _board_section_label(section_key)
     if section_key == "five_day_top":
         return _candidate_status_text(item)
+    if section_key == STARTUP9_CONFIRM_KEY:
+        return str(item.startup9_profile or item.startup9_confirm_grade or item.bucket or item.label or "-").strip() or "-"
     if section_key == TECHNICAL_BUY_CLUSTER_KEY:
         return str(item.technical_buy_bucket or item.bucket or item.label or "-").strip() or "-"
     if section_key == EARLY_REVERSAL_KEY:
@@ -686,6 +714,8 @@ def _board_score_text(item: TelegramCandidate, section_key: str) -> str:
         return _format_ers(item.early_reversal_score)
     if section_key == HULL_BUY_TURN_KEY:
         return "HULL"
+    if section_key == STARTUP9_CONFIRM_KEY:
+        return f"S9 {int(item.startup9_confirm_count or 0)}/9"
     if section_key == TECHNICAL_BUY_CLUSTER_KEY:
         return _format_technical_buy(item.technical_buy_score)
     if section_key in QBS_DISPLAY_NUMBERS:
@@ -711,6 +741,10 @@ def _board_setup_parts(item: TelegramCandidate, *, limit: int = 4) -> list[str]:
         text = str(hit or "").strip()
         if text and text not in parts:
             parts.append(text)
+    for hit in list(item.startup9_confirm_hits or []):
+        text = str(hit or "").strip()
+        if text and text not in parts:
+            parts.append(text)
     return parts[: max(0, int(limit or 0))]
 
 
@@ -726,6 +760,7 @@ def _board_risk_text(item: TelegramCandidate, section_key: str) -> str:
     parts: list[str] = []
     parts.extend(str(flag).strip() for flag in list(item.risk_flags or []) if str(flag or "").strip())
     parts.extend(str(flag).strip() for flag in list(item.technical_buy_risk_flags or []) if str(flag or "").strip())
+    parts.extend(str(flag).strip() for flag in list(item.startup9_risk_flags or []) if str(flag or "").strip())
     if str(section_key or "") in AGGRESSIVE_SECTION_KEY_SET:
         seen: list[str] = []
         for part in parts:
@@ -827,6 +862,9 @@ def _collect_digest_metric_lookup(digest: TelegramDigest) -> dict[str, dict[str,
                 metrics["score_value"] = _first_number(metrics.get("score_value"), item.early_reversal_score)
             elif section.key == HULL_BUY_TURN_KEY:
                 metrics["score"] = _first_text(metrics.get("score"), "HULL")
+            elif section.key == STARTUP9_CONFIRM_KEY:
+                metrics["score"] = _first_text(metrics.get("score"), f"S9 {int(item.startup9_confirm_count or 0)}/9")
+                metrics["score_value"] = _first_number(metrics.get("score_value"), item.startup9_score)
             elif section.key == TECHNICAL_BUY_CLUSTER_KEY and item.technical_buy_score is not None:
                 metrics["score"] = _first_text(metrics.get("score"), _format_technical_buy(item.technical_buy_score))
                 metrics["score_value"] = _first_number(metrics.get("score_value"), item.technical_buy_score)
@@ -853,6 +891,8 @@ def _build_telegram_board_row(
         score_value = item.pul_score
     elif section_key == EARLY_REVERSAL_KEY:
         score_value = item.early_reversal_score
+    elif section_key == STARTUP9_CONFIRM_KEY:
+        score_value = item.startup9_score
     elif section_key == TECHNICAL_BUY_CLUSTER_KEY:
         score_value = item.technical_buy_score
     elif section_key in QBS_DISPLAY_NUMBERS:
@@ -922,6 +962,7 @@ def _build_telegram_board_rows(
     board_section_keys = {
         *QBS_DISPLAY_NUMBERS.keys(),
         *AGGRESSIVE_SECTION_KEY_SET,
+        STARTUP9_CONFIRM_KEY,
         TECHNICAL_BUY_CLUSTER_KEY,
         STEADY_WINNER_SECTION_KEY,
         EARLY_REVERSAL_KEY,
@@ -957,8 +998,10 @@ def _filter_telegram_board_rows(rows: list[dict[str, Any]], filter_key: str) -> 
         return [row for row in rows if str(row.get("section_key") or "") in QBS_DISPLAY_NUMBERS]
     if filter_key == "technical":
         return [row for row in rows if str(row.get("section_key") or "") == TECHNICAL_BUY_CLUSTER_KEY]
+    if filter_key == "startup9":
+        return [row for row in rows if str(row.get("section_key") or "") == STARTUP9_CONFIRM_KEY]
     if filter_key == "entry":
-        entry_keys = {"qbs_buy_now", "qbs_chase_watch", TECHNICAL_BUY_CLUSTER_KEY, HULL_BUY_TURN_KEY, *AGGRESSIVE_ENTRY_SECTION_KEYS}
+        entry_keys = {"qbs_buy_now", "qbs_chase_watch", STARTUP9_CONFIRM_KEY, TECHNICAL_BUY_CLUSTER_KEY, HULL_BUY_TURN_KEY, *AGGRESSIVE_ENTRY_SECTION_KEYS}
         return [row for row in rows if str(row.get("section_key") or "") in entry_keys]
     if filter_key == "trend":
         trend_keys = {STEADY_WINNER_SECTION_KEY, "five_day_top", *AGGRESSIVE_TREND_SECTION_KEYS}
@@ -1378,7 +1421,7 @@ def _board_table_html(rows: list[dict[str, Any]]) -> str:
                     <th>1M</th>
                     <th>1Y</th>
                     <th>High</th>
-                    <th>PUL/QBS/TBS</th>
+                    <th>S9/PUL/QBS/TBS</th>
                     <th>RSI</th>
                     <th>Vol20</th>
                     <th>MA20</th>
@@ -1396,6 +1439,8 @@ def _default_telegram_board_filter(rows: Iterable[Mapping[str, Any]]) -> str:
     row_list = list(rows)
     if any(str(row.get("section_key") or "") in DECISION_SECTION_KEYS for row in row_list):
         return "decision"
+    if any(str(row.get("section_key") or "") == STARTUP9_CONFIRM_KEY for row in row_list):
+        return "startup9"
     if any(str(row.get("section_key") or "") in AGGRESSIVE_SECTION_KEY_SET for row in row_list):
         return "aggressive"
     if any(str(row.get("section_key") or "") == TECHNICAL_BUY_CLUSTER_KEY for row in row_list):
@@ -1408,6 +1453,7 @@ def _telegram_board_overview_html(rows: list[dict[str, Any]], filter_label: str)
     decision_count = sum(1 for row in rows if str(row.get("section_key") or "") in DECISION_SECTION_KEYS)
     aggressive_count = sum(1 for row in rows if str(row.get("section_key") or "") in AGGRESSIVE_SECTION_KEY_SET)
     qbs_count = sum(1 for row in rows if str(row.get("section_key") or "") in QBS_DISPLAY_NUMBERS)
+    startup9_count = sum(1 for row in rows if str(row.get("section_key") or "") == STARTUP9_CONFIRM_KEY)
     technical_count = sum(1 for row in rows if str(row.get("section_key") or "") == TECHNICAL_BUY_CLUSTER_KEY)
     board_count = sum(1 for row in rows if str(row.get("section_key") or "") in BOARD_TYPE_SECTION_KEYS)
     warning_count = sum(1 for row in rows if row.get("has_warning"))
@@ -1418,6 +1464,7 @@ def _telegram_board_overview_html(rows: list[dict[str, Any]], filter_label: str)
         ("Decision", f"{decision_count:,}"),
         ("Aggressive", f"{aggressive_count:,}"),
         ("QBS", f"{qbs_count:,}"),
+        ("S9", f"{startup9_count:,}"),
         ("Tech", f"{technical_count:,}"),
         ("Board", f"{board_count:,}"),
         ("Risk", f"{warning_count:,}"),
@@ -1450,6 +1497,7 @@ def _render_telegram_visual_board(digest: TelegramDigest, *, on_select_ticker: C
     filter_options = {
         "decision": "Decision",
         "qbs": "QBS",
+        "startup9": "Startup9",
         "technical": "Tech Buy",
         "aggressive": "Aggressive",
         "board": "Board",
@@ -2073,6 +2121,44 @@ def _render_telegram_section_table(section: TelegramSection) -> None:
         _render_aggressive_board_table(rows, include_rank=True)
         return
 
+    if section.key == STARTUP9_CONFIRM_KEY:
+        rows = [
+            "<tr>"
+            f"<td class='cpx-digest-rank'>#{item.rank or idx}</td>"
+            f"<td><span class='cpx-digest-ticker'>{_html_text(item.ticker)}</span></td>"
+            f"<td>{_badge_html(f'S9 {int(item.startup9_confirm_count or 0)}/9', 'accent')}</td>"
+            f"<td>{_badge_html(item.startup9_confirm_grade or item.label or '-', _signal_tone(item.startup9_confirm_grade or item.label, section.key))}</td>"
+            f"<td>{_badge_html(item.startup9_profile or item.bucket or '-', 'info')}</td>"
+            f"<td>{_badge_html(_format_float(item.chg_pct, 2, signed=True, suffix='%'), _change_tone(item.chg_pct))}</td>"
+            f"<td>{_badge_html(_format_ratio(item.volume_ratio_20), _volume_tone(item.volume_ratio_20))}</td>"
+            f"<td><div class='cpx-digest-tags'>{_candidate_tags_html(item)}</div></td>"
+            "</tr>"
+            for idx, item in enumerate(section.items, start=1)
+        ]
+        st.markdown(
+            f"""
+            <div class='cpx-digest-table-wrap'>
+                <table class='cpx-digest-table'>
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Ticker</th>
+                            <th>S9</th>
+                            <th>Grade</th>
+                            <th>Profile</th>
+                            <th>Today</th>
+                            <th>Vol20</th>
+                            <th>Reason/Risk</th>
+                        </tr>
+                    </thead>
+                    <tbody>{''.join(rows)}</tbody>
+                </table>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+
     if section.key == TECHNICAL_BUY_CLUSTER_KEY:
         rows = [
             "<tr>"
@@ -2335,10 +2421,11 @@ def _render_telegram_message_board(
     )
     board_group_labels = {
         "decision": "[0] 오늘 의사결정 핵심",
-        "technical": "[1] 기술적 신호 클러스터",
-        "aggressive": "[2] 다음 거래일 공격형 매수 후보",
-        "board": "[3] 매매 유형별 후보 보드",
-        "reference": "[4] 참고 랭킹",
+        "startup9": "[1] Startup식 9개 강세확인 Top 20",
+        "technical": "[2] 기술적 매수시그널 클러스터",
+        "aggressive": "[3] 다음 거래일 공격형 매수 후보 8-PART",
+        "board": "[4] 매매 유형별 후보 보드",
+        "reference": "[5] 참고 랭킹",
     }
     last_group = ""
     for idx, section in enumerate(visible_sections):
@@ -2346,6 +2433,9 @@ def _render_telegram_message_board(
         if section.key in QBS_DISPLAY_NUMBERS:
             display_number = QBS_DISPLAY_NUMBERS[section.key]
             group_key = "decision"
+        elif section.key == STARTUP9_CONFIRM_KEY:
+            display_number = STARTUP9_CONFIRM_DISPLAY_NUMBER
+            group_key = "startup9"
         elif section.key == TECHNICAL_BUY_CLUSTER_KEY:
             display_number = TECHNICAL_BUY_DISPLAY_NUMBER
             group_key = "technical"

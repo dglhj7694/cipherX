@@ -39,6 +39,15 @@ class TelegramCandidate:
     technical_buy_bucket: str = ""
     technical_buy_reason: str = ""
     technical_buy_risk_flags: list[str] = field(default_factory=list)
+    startup9_confirm_count: int = 0
+    startup9_confirm_grade: str = ""
+    startup9_confirm_hits: list[str] = field(default_factory=list)
+    startup9_confirm_missing: list[str] = field(default_factory=list)
+    startup9_confirm_reason: str = ""
+    startup9_risk_flags: list[str] = field(default_factory=list)
+    startup9_score: float | None = None
+    startup9_profile: str = ""
+    startup9_direction_state: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

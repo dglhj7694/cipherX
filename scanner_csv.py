@@ -109,6 +109,13 @@ SCANNER_CSV_FIELD_SPECS: tuple[dict[str, str], ...] = (
     {"group": "탐지", "key": "detected_signal_total_count", "label": "탐지시그널총수", "type": "number", "description": "탐지 시그널 총개수", "rule": "combo/transition/core 전체", "example": "9"},
     {"group": "탐지", "key": "detected_buy_signal_latest_date", "label": "매수탐지최근일", "type": "date", "description": "매수 방향 탐지 시그널 중 가장 최근 날짜", "rule": "최근 5봉 기준 direction=buy", "example": "2026-04-14"},
     {"group": "탐지", "key": "detected_signal_latest_date", "label": "탐지최근일", "type": "date", "description": "탐지 시그널 중 가장 최근 날짜", "rule": "최근 5봉 기준", "example": "2026-04-14"},
+    {"group": "Startup9", "key": "startup9_confirm_count", "label": "S9강세확인수", "type": "number", "description": "Startup식 추정 강세확인 충족 축 수", "rule": "9개 독립 강세 축 중 충족 개수", "example": "8"},
+    {"group": "Startup9", "key": "startup9_confirm_grade", "label": "S9등급", "type": "text", "description": "Startup식 추정 강세확인 등급", "rule": "8~9 FULL_BULL, 6~7 STRONG_BULL, 4~5 WATCH_BULL, 0~3 WEAK", "example": "FULL_BULL"},
+    {"group": "Startup9", "key": "startup9_confirm_hits", "label": "S9충족신호", "type": "text", "description": "충족한 Startup9 강세확인 축", "rule": "축 라벨을 +로 결합", "example": "Trend Pane Bullish+Smart Money Flow"},
+    {"group": "Startup9", "key": "startup9_confirm_missing", "label": "S9부족신호", "type": "text", "description": "미충족 Startup9 강세확인 축", "rule": "축 라벨을 +로 결합", "example": "Bullish Divergence / Reversal"},
+    {"group": "Startup9", "key": "startup9_confirm_reason", "label": "S9근거", "type": "text", "description": "Startup9 한 줄 요약 근거", "rule": "profile / direction / top confirms", "example": "TREND_CONTINUATION / BULL_ACTIVE / Trend Pane Bullish + Smart Money Flow"},
+    {"group": "Startup9", "key": "startup9_risk_flags", "label": "S9리스크", "type": "text", "description": "Startup9 hard exclusion 및 soft risk 태그", "rule": "flags joined with + or 특이사항 없음", "example": "rsi_hot+ma20_extended"},
+    {"group": "Startup9", "key": "startup9_score", "label": "S9점수", "type": "number", "description": "Startup9 후보 정렬 보조 점수", "rule": "confirm_count*10 + volume/ADX/RS bonus - risk penalty", "example": "83.5"},
 )
 
 

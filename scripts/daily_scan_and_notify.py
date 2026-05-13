@@ -50,6 +50,7 @@ from strategy import build_strategy_payload
 from etf_sources import resolve_etf_universe
 from telegram_pipeline import (
     annotate_rows_with_qbs,
+    annotate_rows_with_startup9_confirm,
     annotate_rows_with_technical_buy,
     build_post_close_digest,
     build_post_close_message_texts,
@@ -245,6 +246,15 @@ POST_CLOSE_TECHNICAL_BUY_FIELD_SPECS: tuple[dict[str, str], ...] = (
     {"group": "technical_buy", "key": "technical_buy_bucket", "label": "TechnicalBuyBucket", "type": "text", "description": "Technical buy candidate type", "rule": "dominant signal family or 혼합형", "example": "추세전환형"},
     {"group": "technical_buy", "key": "technical_buy_reason", "label": "TechnicalBuyReason", "type": "text", "description": "Compact reason for technical buy cluster selection", "rule": "bucket + top hits + volume context", "example": "추세전환형 / TK골든 + DMI강세교차 / Vol20 x1.82"},
     {"group": "technical_buy", "key": "technical_buy_risk_flags", "label": "TechnicalBuyRiskFlags", "type": "text", "description": "Risk flags attached to technical buy cluster candidate", "rule": "flags joined with + or 특이사항 없음", "example": "extended_day+ma20_extended"},
+)
+POST_CLOSE_STARTUP9_FIELD_SPECS: tuple[dict[str, str], ...] = (
+    {"group": "Startup9", "key": "startup9_confirm_count", "label": "S9ConfirmCount", "type": "number", "description": "Startup식 추정 강세확인 충족 축 수", "rule": "9 independent confirm axes", "example": "8"},
+    {"group": "Startup9", "key": "startup9_confirm_grade", "label": "S9Grade", "type": "text", "description": "Startup식 추정 강세확인 등급", "rule": "FULL_BULL/STRONG_BULL/WATCH_BULL/WEAK", "example": "FULL_BULL"},
+    {"group": "Startup9", "key": "startup9_confirm_hits", "label": "S9Hits", "type": "text", "description": "Startup9 충족 축", "rule": "axis labels joined with +", "example": "Trend Pane Bullish+Smart Money Flow"},
+    {"group": "Startup9", "key": "startup9_confirm_missing", "label": "S9Missing", "type": "text", "description": "Startup9 미충족 축", "rule": "axis labels joined with +", "example": "Bullish Divergence / Reversal"},
+    {"group": "Startup9", "key": "startup9_confirm_reason", "label": "S9Reason", "type": "text", "description": "Startup9 한 줄 요약 근거", "rule": "profile / direction / top confirms", "example": "TREND_CONTINUATION / BULL_ACTIVE / Trend Pane Bullish"},
+    {"group": "Startup9", "key": "startup9_risk_flags", "label": "S9RiskFlags", "type": "text", "description": "Startup9 hard/soft risk flags", "rule": "flags joined with + or 특이사항 없음", "example": "rsi_hot+ma20_extended"},
+    {"group": "Startup9", "key": "startup9_score", "label": "S9Score", "type": "number", "description": "Startup9 후보 정렬 보조 점수", "rule": "confirm_count*10 + volume/ADX/RS bonus - risk penalty", "example": "83.5"},
 )
 EARLY_SESSION_CORE_TOP_N = 20
 EARLY_SESSION_EXTENDED_SECTION_TOTAL = 10
@@ -3403,6 +3413,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
         )
         csv_rows = annotate_rows_with_qbs(csv_rows, target_date=latest_session_date)
         csv_rows = annotate_rows_with_technical_buy(csv_rows, target_date=latest_session_date)
+        csv_rows = annotate_rows_with_startup9_confirm(csv_rows, target_date=latest_session_date)
         csv_path = write_scan_csv(
             csv_rows,
             out_dir=out_dir,
@@ -3412,6 +3423,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
                 *POST_CLOSE_FINAL_ENTRY_FIELD_SPECS,
                 *POST_CLOSE_QBS_FIELD_SPECS,
                 *POST_CLOSE_TECHNICAL_BUY_FIELD_SPECS,
+                *POST_CLOSE_STARTUP9_FIELD_SPECS,
             ],
         )
         rows_path = write_scan_rows_json(csv_rows, out_dir=out_dir, run_label=run_label)
@@ -3520,6 +3532,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
         )
         csv_rows = annotate_rows_with_qbs(csv_rows, target_date=latest_session_date)
         csv_rows = annotate_rows_with_technical_buy(csv_rows, target_date=latest_session_date)
+        csv_rows = annotate_rows_with_startup9_confirm(csv_rows, target_date=latest_session_date)
         csv_path = write_scan_csv(
             csv_rows,
             out_dir=out_dir,
@@ -3529,6 +3542,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
                 *POST_CLOSE_FINAL_ENTRY_FIELD_SPECS,
                 *POST_CLOSE_QBS_FIELD_SPECS,
                 *POST_CLOSE_TECHNICAL_BUY_FIELD_SPECS,
+                *POST_CLOSE_STARTUP9_FIELD_SPECS,
             ],
         )
         rows_path = write_scan_rows_json(csv_rows, out_dir=out_dir, run_label=run_label)

@@ -17,6 +17,7 @@ from telegram_pipeline import (
     EARLY_REVERSAL_KEY,
     HULL_BUY_TURN_KEY,
     STEADY_WINNER_SECTION_KEY,
+    STARTUP9_CONFIRM_KEY,
     TECHNICAL_BUY_CLUSTER_KEY,
     TelegramCandidate,
     annotate_rows_with_qbs,
@@ -280,6 +281,7 @@ class TelegramPipelineTests(unittest.TestCase):
                 STEADY_WINNER_SECTION_KEY,
                 EARLY_REVERSAL_KEY,
                 HULL_BUY_TURN_KEY,
+                STARTUP9_CONFIRM_KEY,
                 TECHNICAL_BUY_CLUSTER_KEY,
                 *AGGRESSIVE_NEXT_DAY_SECTION_KEYS,
                 "confluence",
@@ -307,6 +309,7 @@ class TelegramPipelineTests(unittest.TestCase):
             and key
             not in {
                 "five_day_top",
+                STARTUP9_CONFIRM_KEY,
                 TECHNICAL_BUY_CLUSTER_KEY,
                 STEADY_WINNER_SECTION_KEY,
                 EARLY_REVERSAL_KEY,
@@ -1047,7 +1050,7 @@ class TelegramPipelineTests(unittest.TestCase):
         item = section_map[EARLY_REVERSAL_KEY].items[0]
 
         self.assertEqual(
-            digest.section_order[:7],
+            digest.section_order[:8],
             [
                 "qbs_buy_now",
                 "qbs_chase_watch",
@@ -1055,6 +1058,7 @@ class TelegramPipelineTests(unittest.TestCase):
                 STEADY_WINNER_SECTION_KEY,
                 EARLY_REVERSAL_KEY,
                 HULL_BUY_TURN_KEY,
+                STARTUP9_CONFIRM_KEY,
                 TECHNICAL_BUY_CLUSTER_KEY,
             ],
         )
@@ -1295,7 +1299,7 @@ class TelegramPipelineTests(unittest.TestCase):
         items = section_map[HULL_BUY_TURN_KEY].items
 
         self.assertEqual(
-            digest.section_order[:7],
+            digest.section_order[:8],
             [
                 "qbs_buy_now",
                 "qbs_chase_watch",
@@ -1303,6 +1307,7 @@ class TelegramPipelineTests(unittest.TestCase):
                 STEADY_WINNER_SECTION_KEY,
                 EARLY_REVERSAL_KEY,
                 HULL_BUY_TURN_KEY,
+                STARTUP9_CONFIRM_KEY,
                 TECHNICAL_BUY_CLUSTER_KEY,
             ],
         )
@@ -1531,11 +1536,12 @@ class TelegramPipelineTests(unittest.TestCase):
         steady_03 = message.index("## 0-3. ")
         early_04 = message.index("## 0-4. ")
         hull_05 = message.index("## 0-5. ")
-        tech_1 = message.index("## 1. ")
+        startup_1 = message.index("## 1. ")
+        tech_2 = message.index("## 2. ")
         aggressive_1 = message.index("## PART 1.")
         aggressive_8 = message.index("## PART 8.")
-        normal_2 = message.index("## 2. ")
-        self.assertTrue(qbs_0 < qbs_01 < qbs_02 < steady_03 < early_04 < hull_05 < tech_1 < aggressive_1 < aggressive_8 < normal_2)
+        normal_4 = message.index("## 4. ")
+        self.assertTrue(qbs_0 < qbs_01 < qbs_02 < steady_03 < early_04 < hull_05 < startup_1 < tech_2 < aggressive_1 < aggressive_8 < normal_4)
         self.assertIn("QBS", message)
 
     def test_aggressive_message_contains_conditions_and_core_metrics(self):
@@ -1581,6 +1587,7 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertIn("## 0-4. ", message)
         self.assertIn("## 0-5. ", message)
         self.assertIn("## 1. ", message)
+        self.assertIn("## 2. ", message)
         self.assertGreaterEqual(message.count("- 해당 없음"), 3)
 
     def test_chunk_split_keeps_qbs_before_existing_sections(self):
@@ -1607,9 +1614,10 @@ class TelegramPipelineTests(unittest.TestCase):
             < joined.index("## 0-4. ")
             < joined.index("## 0-5. ")
             < joined.index("## 1. ")
+            < joined.index("## 2. ")
             < joined.index("## PART 1.")
             < joined.index("## PART 8.")
-            < joined.index("## 2. ")
+            < joined.index("## 4. ")
         )
 
     def test_message_lines_show_board_label_change_volume_reason_and_risk(self):
@@ -1693,9 +1701,9 @@ class TelegramPipelineTests(unittest.TestCase):
         )
         message = build_post_close_message_texts(digest)[0]
 
-        self.assertIn("## 9. 단기 급등 / 추격주의 후보", message)
+        self.assertIn("## 11. 단기 급등 / 추격주의 후보", message)
         self.assertIn("FIVE | CHASE_RISK | +1.00% | x1.45 | 5D", message)
-        self.assertIn("## 11. 5일 상승률 Top30 (Top 1)", message)
+        self.assertIn("## 13. 5일 상승률 Top30 (Top 1)", message)
         self.assertIn("티커 | 5일 상승률 | RSI | Vol20 | MA20이격 | 상태", message)
         self.assertIn("FIVE | +17.42% | RSI 68.2 | x1.45 | +9.0% | 강한상승/거래량동반", message)
         self.assertEqual(digest.section_map()["five_day_top"].items[0].chg_pct, 17.42)
@@ -2453,7 +2461,7 @@ class HomeDigestLoaderTests(unittest.TestCase):
         self.assertIn("## 0-3. 계속 우상향 주도주 Top 30", message)
         self.assertIn("## 0-4. 초기 반전 포착 Top 20", message)
         self.assertIn("## 0-5. 당일 HULL 매수전환", message)
-        self.assertIn("## 10. 매도전환 / 위험 후보", message)
+        self.assertIn("## 12. 매도전환 / 위험 후보", message)
         self.assertIn("AAPL", message)
         self.assertIn("META | PUL 78", message)
         self.assertIn("MELI | ERS 84", message)
