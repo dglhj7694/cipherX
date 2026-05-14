@@ -253,8 +253,8 @@ class DailyScanResilienceTests(unittest.TestCase):
     def test_daily_scan_workflow_schedule_guard_and_shards(self):
         workflow_text = Path(".github/workflows/daily_scan_notify.yml").read_text(encoding="utf-8")
         self.assertNotIn('cron: "5 20,21 * * 1-5"', workflow_text)
-        self.assertGreaterEqual(workflow_text.count("shard_index: [0, 1, 2, 3, 4, 5, 6, 7]"), 2)
-        self.assertGreaterEqual(workflow_text.count("--shard-count 8"), 2)
+        self.assertGreaterEqual(workflow_text.count("shard_index: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]"), 2)
+        self.assertGreaterEqual(workflow_text.count("--shard-count 12"), 2)
         self.assertGreaterEqual(workflow_text.count('--run-stamp "$RUN_STAMP"'), 4)
         self.assertGreaterEqual(workflow_text.count("RUN_STAMP: ${{ github.run_id }}-${{ github.run_attempt }}"), 4)
 
