@@ -21,6 +21,7 @@ from scripts.daily_scan_and_notify import (
     RUSSELL2000_UNIVERSE_ITEMS,
     ScanRunResult,
     _compute_post_close_row_metrics,
+    _decode_github_contents_digest,
     _with_early_session_gap_momentum_scores,
     _with_early_session_inflow_scores,
     _with_post_close_final_top20_scores,
@@ -1932,6 +1933,24 @@ class DailyScanNotifyTests(unittest.TestCase):
             self.assertTrue(latest["briefing_refs"]["combined_universe"])
             self.assertEqual(latest["briefing_refs"]["universe_profiles"], ["default", "russell2000"])
             self.assertEqual(latest["briefing_refs"]["dedup_removed_count"], 1)
+
+    def test_decode_github_contents_digest_falls_back_to_blob_when_content_empty(self):
+        blob_payload = {
+            "content": "eyJzZWN0aW9ucyI6W10sImJyaWVmaW5nX3JlZnMiOnsiY29tYmluZWRfdW5pdmVyc2UiOnRydWV9fQ==",
+            "encoding": "base64",
+        }
+        response = MagicMock()
+        response.json.return_value = blob_payload
+        response.raise_for_status.return_value = None
+        with patch("scripts.daily_scan_and_notify.requests.get", return_value=response) as mock_get:
+            decoded = _decode_github_contents_digest(
+                {"content": "", "git_url": "https://api.github.com/repos/owner/repo/git/blobs/abc"},
+                headers={"Authorization": "Bearer token"},
+            )
+
+        self.assertEqual(decoded["sections"], [])
+        self.assertTrue(decoded["briefing_refs"]["combined_universe"])
+        mock_get.assert_called_once()
 
     def test_run_early_session_writes_relaxed_volume_threshold_and_pullback_raw_count(self):
         from datetime import timedelta, timezone

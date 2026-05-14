@@ -3350,6 +3350,34 @@ def _post_close_extra_field_specs(*, include_combined_source: bool = False) -> l
     return specs
 
 
+def _decode_github_contents_digest(
+    payload: Mapping[str, Any],
+    *,
+    headers: Mapping[str, str],
+    timeout: int = 20,
+) -> dict[str, Any]:
+    encoded = str(dict(payload or {}).get("content") or "").strip()
+    if encoded:
+        return dict(json.loads(base64.b64decode(encoded).decode("utf-8")))
+
+    git_url = str(dict(payload or {}).get("git_url") or "").strip()
+    if git_url:
+        blob_response = requests.get(git_url, headers=dict(headers), timeout=timeout)
+        blob_response.raise_for_status()
+        blob_payload = blob_response.json()
+        blob_content = str(blob_payload.get("content") or "").strip()
+        if blob_content:
+            return dict(json.loads(base64.b64decode(blob_content).decode("utf-8")))
+
+    download_url = str(dict(payload or {}).get("download_url") or "").strip()
+    if download_url:
+        raw_response = requests.get(download_url, headers=dict(headers), timeout=timeout)
+        raw_response.raise_for_status()
+        return dict(raw_response.json())
+
+    raise RuntimeError("published digest content is empty")
+
+
 def _verify_published_digest_latest(*, require_combined: bool = False) -> dict[str, Any]:
     token = str(os.getenv("DIGEST_PUBLISH_TOKEN") or os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN") or "").strip()
     repo_full_name = str(os.getenv("DIGEST_PUBLISH_REPO") or os.getenv("GITHUB_REPOSITORY") or "").strip()
@@ -3371,10 +3399,7 @@ def _verify_published_digest_latest(*, require_combined: bool = False) -> dict[s
             response = requests.get(url, headers=headers, params={"ref": branch}, timeout=20)
             response.raise_for_status()
             payload = response.json()
-            encoded = str(payload.get("content") or "")
-            if not encoded:
-                raise RuntimeError("published digest content is empty")
-            digest = json.loads(base64.b64decode(encoded).decode("utf-8"))
+            digest = _decode_github_contents_digest(payload, headers=headers, timeout=20)
             if not isinstance(digest, dict) or not isinstance(digest.get("sections"), list):
                 raise RuntimeError("published digest sections are missing")
             if require_combined and not bool(dict(digest.get("briefing_refs") or {}).get("combined_universe")):
