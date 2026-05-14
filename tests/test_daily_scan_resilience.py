@@ -26,6 +26,7 @@ class DailyScanResilienceTests(unittest.TestCase):
             "summary_limit": 0,
             "bias_mode": "default",
             "skip_telegram": True,
+            "skip_digest_publish": False,
             "dry_run": False,
             "shard_count": 2,
             "shard_index": 0,
@@ -259,12 +260,28 @@ class DailyScanResilienceTests(unittest.TestCase):
 
         self.assertRegex(
             workflow_text,
-            r"merge_and_notify:\s+name:\s+merge-and-notify[\s\S]*?needs:\s+[\s\S]*?-\s+scan_shard\s+if:\s+\$\{\{\s*always\(\)\s*&&",
+            r"merge_and_notify:\s+name:\s+merge-default-artifacts[\s\S]*?needs:\s+[\s\S]*?-\s+scan_shard\s+if:\s+\$\{\{\s*always\(\)\s*&&",
         )
         self.assertRegex(
             workflow_text,
-            r"extended_merge_and_notify:\s+name:\s+extended-merge-and-notify[\s\S]*?needs:\s+[\s\S]*?-\s+extended_scan_shard\s+if:\s+\$\{\{\s*always\(\)\s*&&",
+            r"extended_merge_and_notify:\s+name:\s+merge-russell2000-artifacts[\s\S]*?needs:\s+[\s\S]*?-\s+extended_scan_shard\s+if:\s+\$\{\{\s*always\(\)\s*&&",
         )
+        self.assertIn("combine_and_notify:", workflow_text)
+        self.assertIn("--combine-final-dirs", workflow_text)
+        self.assertGreaterEqual(workflow_text.count("--skip-digest-publish"), 2)
+        self.assertGreaterEqual(workflow_text.count("--skip-telegram"), 4)
+        self.assertRegex(
+            workflow_text,
+            r"combine_and_notify:\s+name:\s+combine-and-notify[\s\S]*?DIGEST_PUBLISH_REPO:\s+\$\{\{\s*github\.repository\s*\}\}[\s\S]*?DIGEST_PUBLISH_BRANCH:\s+telegram-digest[\s\S]*?DIGEST_PUBLISH_PATH:\s+post_close",
+        )
+        self.assertRegex(
+            workflow_text,
+            r"merge_and_notify:[\s\S]*?env:\s+PYTHONPATH:[\s\S]*?RUN_STAMP:[\s\S]*?steps:",
+        )
+        merge_block = re.search(r"merge_and_notify:[\s\S]*?extended_scan_shard:", workflow_text)
+        self.assertIsNotNone(merge_block)
+        self.assertNotIn("DIGEST_PUBLISH_REPO", merge_block.group(0))
+        self.assertNotIn("TELEGRAM_BOT_TOKEN", merge_block.group(0))
 
     def test_daily_scan_workflow_uses_schedule_event_for_dst_guard(self):
         workflow_text = Path(".github/workflows/daily_scan_notify.yml").read_text(encoding="utf-8")

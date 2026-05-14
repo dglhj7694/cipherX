@@ -110,6 +110,14 @@ def _contents_api_url(repo: str, path: str) -> str:
     return f"https://api.github.com/repos/{repo}/contents/{path.lstrip('/')}"
 
 
+def _validated_digest_payload(payload: Any) -> dict[str, Any]:
+    if not isinstance(payload, dict) or not payload:
+        raise RuntimeError("GitHub digest content is empty")
+    if "sections" not in payload or not isinstance(payload.get("sections"), list):
+        raise RuntimeError("GitHub digest sections are missing")
+    return dict(payload)
+
+
 def fetch_digest_from_github(
     *,
     repo: str,
@@ -139,11 +147,18 @@ def fetch_digest_from_github(
         if not encoded:
             raise RuntimeError("GitHub digest content is empty")
         decoded = base64.b64decode(encoded).decode("utf-8")
-        return dict(json.loads(decoded))
+        try:
+            return _validated_digest_payload(json.loads(decoded))
+        except ValueError as exc:
+            raise RuntimeError("GitHub digest content is empty or invalid JSON") from exc
 
     response = session.get(_raw_digest_url(repo, branch, path), timeout=timeout_sec)
     response.raise_for_status()
-    return dict(response.json())
+    try:
+        payload = response.json()
+    except ValueError as exc:
+        raise RuntimeError("GitHub digest content is empty or invalid JSON") from exc
+    return _validated_digest_payload(payload)
 
 
 @st.cache_data(ttl=DIGEST_CACHE_TTL_SEC, show_spinner=False)
@@ -2040,6 +2055,25 @@ def _digest_source_badge(source: str) -> tuple[str, str]:
     return str(source or "unknown"), "muted"
 
 
+def _telegram_summary_badges_html(digest: TelegramDigest, *, source_label: str, source_tone: str) -> str:
+    refs = dict(digest.briefing_refs or {})
+    badges = [
+        _badge_html(digest.scan_label or digest.scan_mode or "post-close", "accent"),
+        _badge_html(source_label, source_tone),
+        _badge_html("구조 유지", "info"),
+        _badge_html("TTL 900s", "muted"),
+    ]
+    if bool(refs.get("combined_universe")):
+        badges.append(_badge_html("통합", "positive"))
+    profiles = _text_list(refs.get("universe_profiles"))
+    if profiles:
+        badges.append(_badge_html("+".join(profiles), "info"))
+    dedup_removed = _safe_int(refs.get("dedup_removed_count"), 0)
+    if dedup_removed > 0:
+        badges.append(_badge_html(f"중복제거 {dedup_removed}", "warning"))
+    return "".join(badges)
+
+
 def _render_telegram_summary_card(digest: TelegramDigest, *, source: str = "", digest_result: Mapping[str, Any] | None = None) -> None:
     source_label, source_tone = _digest_source_badge(source)
     visible_section_count = len(_visible_telegram_sections(digest))
@@ -2056,14 +2090,7 @@ def _render_telegram_summary_card(digest: TelegramDigest, *, source: str = "", d
         f"<div class='cpx-digest-metric'><b>{_html_text(label)}</b><strong>{_html_text(value)}</strong></div>"
         for label, value in metric_items
     )
-    badges_html = "".join(
-        [
-            _badge_html(digest.scan_label or digest.scan_mode or "post-close", "accent"),
-            _badge_html(source_label, source_tone),
-            _badge_html("구조 유지", "info"),
-            _badge_html("TTL 900s", "muted"),
-        ]
-    )
+    badges_html = _telegram_summary_badges_html(digest, source_label=source_label, source_tone=source_tone)
     config = dict((digest_result or {}).get("config") or {})
     config_text = " / ".join(
         part

@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 import argparse
+import base64
 import bisect
 import hashlib
 import json
@@ -256,6 +257,11 @@ POST_CLOSE_STARTUP9_FIELD_SPECS: tuple[dict[str, str], ...] = (
     {"group": "Startup9", "key": "startup9_risk_flags", "label": "S9RiskFlags", "type": "text", "description": "Startup9 hard/soft risk flags", "rule": "flags joined with + or 특이사항 없음", "example": "rsi_hot+ma20_extended"},
     {"group": "Startup9", "key": "startup9_score", "label": "S9Score", "type": "number", "description": "Startup9 후보 정렬 보조 점수", "rule": "confirm_count*10 + volume/ADX/RS bonus - risk penalty", "example": "83.5"},
 )
+POST_CLOSE_COMBINED_SOURCE_FIELD_SPECS: tuple[dict[str, str], ...] = (
+    {"group": "combined", "key": "source_universe_profiles", "label": "UniverseProfiles", "type": "text", "description": "Universe profiles containing this ticker in the final combined scan", "rule": "profile names joined with +", "example": "default+russell2000"},
+    {"group": "combined", "key": "source_universe_hit_count", "label": "UniverseHitCount", "type": "number", "description": "Number of source universe profiles containing this ticker", "rule": "unique profile count", "example": "2"},
+)
+POST_CLOSE_COMBINED_SCAN_LABEL = "통합 장마감 스캔"
 EARLY_SESSION_CORE_TOP_N = 20
 EARLY_SESSION_EXTENDED_SECTION_TOTAL = 10
 EARLY_SESSION_INDEX_TITLES = {
@@ -3079,7 +3085,7 @@ def send_telegram_message(token: str, chat_id: str, text: str, *, chunk_size: in
             print(f"[ERROR] Failed to send Telegram message chunk {chunk_idx}/{len(chunks)} after 3 attempts. Last error: {last_error}")
 
 
-def send_telegram_document(token: str, chat_id: str, file_path: Path, caption: str = "") -> None:
+def send_telegram_document(token: str, chat_id: str, file_path: Path, caption: str = "") -> bool:
     success = False
     last_error = ""
     for attempt in range(1, 4):
@@ -3106,6 +3112,7 @@ def send_telegram_document(token: str, chat_id: str, file_path: Path, caption: s
             
     if not success:
         print(f"[ERROR] Failed to send Telegram document {file_path.name} after 3 attempts. Last error: {last_error}")
+    return success
 
 
 def parse_args() -> argparse.Namespace:
@@ -3119,7 +3126,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--shard-count", type=int, default=1, help="Total number of shards")
     parser.add_argument("--shard-index", type=int, default=0, help="Current shard index")
     parser.add_argument("--merge-dir", default="", help="Directory that contains shard artifacts to merge")
+    parser.add_argument(
+        "--combine-final-dirs",
+        nargs="+",
+        default=[],
+        help="Post-close mode: final artifact directories to combine before one Telegram/digest publish",
+    )
     parser.add_argument("--run-stamp", default="", help="Shared batch id for shard/merge grouping")
+    parser.add_argument("--skip-digest-publish", action="store_true", help="Skip publishing the post-close digest JSON")
     parser.add_argument(
         "--universe-profile",
         default="default",
@@ -3254,12 +3268,14 @@ def _send_telegram_if_enabled(
         print("[SCAN] Sending Telegram summary...")
         send_telegram_message(token, chat_id, summary_text)
     print("[SCAN] Sending Telegram CSV...")
-    send_telegram_document(
+    sent = send_telegram_document(
         token,
         chat_id,
         csv_path,
         caption=f"{scan_label} CSV ({run_at_kst.strftime('%Y-%m-%d %H:%M')} KST)",
     )
+    if not sent:
+        raise RuntimeError(f"Telegram CSV send failed: {csv_path}")
     print("[SCAN] Telegram notification completed.")
 
 
@@ -3283,6 +3299,8 @@ def _build_post_close_digest_bundle(
     result_count: int,
     skip_count: int,
     publish_enabled: bool,
+    digest_metadata: Mapping[str, Any] | None = None,
+    publish_required: bool = False,
 ) -> dict[str, Any]:
     digest = build_post_close_digest(
         rows,
@@ -3294,6 +3312,8 @@ def _build_post_close_digest_bundle(
         result_count=result_count,
         skip_count=skip_count,
     )
+    if digest_metadata:
+        digest.briefing_refs.update(dict(digest_metadata))
     message_texts = build_post_close_message_texts(digest)
     summary_text = "\n\n".join(message_texts)
     summary_path = out_dir / f"trend_turn_summary_{run_label}.txt"
@@ -3305,6 +3325,8 @@ def _build_post_close_digest_bundle(
         publish_status = publish_digest_if_configured(digest, enabled=publish_enabled)
     except Exception as exc:
         publish_status = {"ok": False, "skipped": False, "reason": "publish_error", "detail": str(exc)}
+    if publish_required and not bool(publish_status.get("ok", False)):
+        raise RuntimeError(f"Digest publish failed: {publish_status}")
 
     return {
         "digest": digest,
@@ -3314,6 +3336,324 @@ def _build_post_close_digest_bundle(
         "local_paths": local_paths,
         "publish_status": publish_status,
     }
+
+
+def _post_close_extra_field_specs(*, include_combined_source: bool = False) -> list[dict[str, str]]:
+    specs: list[dict[str, str]] = []
+    if include_combined_source:
+        specs.extend(dict(spec) for spec in POST_CLOSE_COMBINED_SOURCE_FIELD_SPECS)
+    specs.extend(dict(spec) for spec in POST_CLOSE_LATEST_SESSION_FIELD_SPECS)
+    specs.extend(dict(spec) for spec in POST_CLOSE_FINAL_ENTRY_FIELD_SPECS)
+    specs.extend(dict(spec) for spec in POST_CLOSE_QBS_FIELD_SPECS)
+    specs.extend(dict(spec) for spec in POST_CLOSE_TECHNICAL_BUY_FIELD_SPECS)
+    specs.extend(dict(spec) for spec in POST_CLOSE_STARTUP9_FIELD_SPECS)
+    return specs
+
+
+def _verify_published_digest_latest(*, require_combined: bool = False) -> dict[str, Any]:
+    token = str(os.getenv("DIGEST_PUBLISH_TOKEN") or os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN") or "").strip()
+    repo_full_name = str(os.getenv("DIGEST_PUBLISH_REPO") or os.getenv("GITHUB_REPOSITORY") or "").strip()
+    branch = str(os.getenv("DIGEST_PUBLISH_BRANCH") or "telegram-digest").strip()
+    base_path = str(os.getenv("DIGEST_PUBLISH_PATH") or "post_close").strip("/\\")
+    latest_path = f"{base_path}/latest.json"
+    if not token or not repo_full_name:
+        raise RuntimeError("DIGEST_PUBLISH_TOKEN and DIGEST_PUBLISH_REPO are required to verify published digest")
+
+    url = f"https://api.github.com/repos/{repo_full_name}/contents/{latest_path}"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "cipherX-daily-scan-digest-verify",
+    }
+    last_error = ""
+    for attempt in range(1, 6):
+        try:
+            response = requests.get(url, headers=headers, params={"ref": branch}, timeout=20)
+            response.raise_for_status()
+            payload = response.json()
+            encoded = str(payload.get("content") or "")
+            if not encoded:
+                raise RuntimeError("published digest content is empty")
+            digest = json.loads(base64.b64decode(encoded).decode("utf-8"))
+            if not isinstance(digest, dict) or not isinstance(digest.get("sections"), list):
+                raise RuntimeError("published digest sections are missing")
+            if require_combined and not bool(dict(digest.get("briefing_refs") or {}).get("combined_universe")):
+                raise RuntimeError("published digest is not the combined universe digest")
+            return {
+                "ok": True,
+                "repo_full_name": repo_full_name,
+                "branch": branch,
+                "latest_remote_path": latest_path,
+                "section_count": len(digest.get("sections") or []),
+            }
+        except Exception as exc:
+            last_error = str(exc)
+            if attempt < 5:
+                time.sleep(3)
+    raise RuntimeError(f"Failed to verify published digest latest.json: {last_error}")
+
+
+def _ordered_profile_names(values: Iterable[Any]) -> list[str]:
+    preferred_order = {"default": 0, "russell2000": 1}
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for value in values or []:
+        text = str(value or "").strip().lower()
+        if not text:
+            continue
+        text = _normalize_universe_profile(text)
+        if text in seen:
+            continue
+        seen.add(text)
+        ordered.append(text)
+    return sorted(ordered, key=lambda item: (preferred_order.get(item, 99), ordered.index(item)))
+
+
+def _find_post_close_final_meta(final_dir: Path, *, run_stamp: str = "") -> Path:
+    requested_run_stamp = str(run_stamp or "").strip()
+    candidates = [
+        path
+        for path in sorted(Path(final_dir).glob("**/run_meta_*_merged.json"))
+        if "_combined_" not in path.name
+        and (not requested_run_stamp or _extract_run_stamp(path.name) == requested_run_stamp)
+    ]
+    if not candidates:
+        suffix = f" for run_stamp={requested_run_stamp}" if requested_run_stamp else ""
+        raise RuntimeError(f"No merged run_meta artifact found in {final_dir}{suffix}")
+    return max(candidates, key=lambda path: (str(_extract_run_stamp(path.name) or ""), str(path)))
+
+
+def _find_post_close_final_rows(final_dir: Path, meta_path: Path) -> Path:
+    expected_name = meta_path.name.replace("run_meta_", "scan_rows_", 1)
+    candidates = [
+        path
+        for path in sorted(Path(final_dir).glob(f"**/{expected_name}"))
+        if "_combined_" not in path.name
+    ]
+    if not candidates:
+        raise RuntimeError(f"No merged scan_rows artifact {expected_name} found in {final_dir}")
+    return candidates[0]
+
+
+def _load_post_close_final_artifact(final_dir: Path, *, run_stamp: str = "") -> dict[str, Any]:
+    meta_path = _find_post_close_final_meta(final_dir, run_stamp=run_stamp)
+    rows_path = _find_post_close_final_rows(final_dir, meta_path)
+    meta_payload = _load_json_file(meta_path)
+    rows_payload = _load_json_file(rows_path)
+    if not isinstance(meta_payload, dict):
+        raise RuntimeError(f"Invalid run_meta payload: {meta_path}")
+    if not isinstance(rows_payload, list):
+        raise RuntimeError(f"Invalid scan_rows payload: {rows_path}")
+
+    merged_payload = dict(meta_payload.get("merged_payload") or {})
+    merge_ready = bool(meta_payload.get("merge_ready", merged_payload.get("merge_ready", False)))
+    merge_block_reason = str(meta_payload.get("merge_block_reason") or merged_payload.get("merge_block_reason") or "").strip()
+    profiles = _ordered_profile_names(
+        [
+            meta_payload.get("universe_profile"),
+            *(merged_payload.get("universe_profiles") or []),
+        ]
+    )
+    if not profiles:
+        profiles = ["default"]
+    return {
+        "final_dir": str(final_dir),
+        "meta_path": str(meta_path),
+        "rows_path": str(rows_path),
+        "meta": meta_payload,
+        "rows": [dict(row or {}) for row in rows_payload if isinstance(row, dict)],
+        "profiles": profiles,
+        "primary_profile": profiles[0],
+        "merge_ready": merge_ready,
+        "merge_block_reason": merge_block_reason,
+        "universe_count": int(_safe_float(merged_payload.get("universe_count", meta_payload.get("universe_count", 0)))),
+        "skip_count": int(_safe_float(merged_payload.get("skip_count_sum", meta_payload.get("skip_count", 0)))),
+        "run_stamp": str(meta_payload.get("run_stamp") or _extract_run_stamp(meta_path.name) or "").strip(),
+    }
+
+
+def _combine_post_close_rows_with_sources(artifacts: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    groups: dict[str, dict[str, Any]] = {}
+    source_row_count = 0
+    for artifact in artifacts or []:
+        profiles = _ordered_profile_names(artifact.get("profiles") or [artifact.get("primary_profile")])
+        profile_priority = 1 if "default" in profiles else 0
+        for row in list(artifact.get("rows") or []):
+            row_dict = dict(row or {})
+            ticker = str(row_dict.get("ticker") or "").strip().upper()
+            if not ticker:
+                continue
+            source_row_count += 1
+            group = groups.setdefault(ticker, {"profiles": [], "candidates": []})
+            group["profiles"] = _ordered_profile_names([*list(group.get("profiles") or []), *profiles])
+            group["candidates"].append(
+                {
+                    "row": row_dict,
+                    "profiles": profiles,
+                    "sort_key": (
+                        _safe_float(row_dict.get("scan_score", 0.0)),
+                        profile_priority,
+                        _safe_float(row_dict.get("strength", 0.0)),
+                        _safe_float(row_dict.get("latest_sig_ts", 0.0)),
+                    ),
+                }
+            )
+
+    combined_rows: list[dict[str, Any]] = []
+    for ticker, group in groups.items():
+        candidates = list(group.get("candidates") or [])
+        if not candidates:
+            continue
+        selected = max(candidates, key=lambda item: item["sort_key"])
+        profiles = _ordered_profile_names(group.get("profiles") or [])
+        row_dict = dict(selected["row"])
+        row_dict["ticker"] = ticker
+        row_dict["source_universe_profiles"] = "+".join(profiles)
+        row_dict["source_universe_hit_count"] = len(profiles)
+        combined_rows.append(row_dict)
+
+    combined_rows.sort(key=_row_sort_key)
+    return {
+        "rows": combined_rows,
+        "source_row_count": source_row_count,
+        "dedup_removed_count": max(0, source_row_count - len(combined_rows)),
+    }
+
+
+def _run_post_close_combined(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: Path) -> int:
+    run_stamp = _resolve_cli_run_stamp(args, run_at_kst=run_at_kst)
+    final_dirs = [Path(path).expanduser().resolve() for path in list(getattr(args, "combine_final_dirs", []) or [])]
+    if len(final_dirs) < 2:
+        raise RuntimeError("--combine-final-dirs requires at least two final artifact directories")
+
+    print(f"[COMBINE] Loading final artifacts: {len(final_dirs)} dirs")
+    artifacts = [_load_post_close_final_artifact(final_dir, run_stamp=run_stamp) for final_dir in final_dirs]
+    blocked = [
+        artifact
+        for artifact in artifacts
+        if not bool(artifact.get("merge_ready", False))
+    ]
+    if blocked:
+        details = [
+            f"{artifact.get('primary_profile')}:{artifact.get('merge_block_reason') or 'not_ready'}"
+            for artifact in blocked
+        ]
+        raise RuntimeError(f"Cannot combine incomplete post-close artifacts: {', '.join(details)}")
+
+    combined_payload = _combine_post_close_rows_with_sources(artifacts)
+    combined_rows = list(combined_payload.get("rows") or [])
+    latest_session_date = _last_us_market_session_date(run_at_kst)
+    scan_mode = "post_close"
+    run_label = f"{run_stamp}_combined_merged"
+    source_profiles = _ordered_profile_names(
+        profile
+        for artifact in artifacts
+        for profile in list(artifact.get("profiles") or [])
+    )
+    source_universe_count_sum = sum(int(_safe_float(artifact.get("universe_count", 0))) for artifact in artifacts)
+    skip_count_sum = sum(int(_safe_float(artifact.get("skip_count", 0))) for artifact in artifacts)
+
+    csv_rows = _with_latest_session_buy_turn_flags(combined_rows, target_date=latest_session_date)
+    csv_rows = _with_post_close_cross_section_metrics(csv_rows, enabled=True)
+    csv_rows = _with_post_close_setup_scores(csv_rows)
+    csv_rows = _with_post_close_final_top20_scores(
+        csv_rows,
+        run_at_kst=run_at_kst,
+        scan_mode=scan_mode,
+        top_n=FINAL_TOP_LIMIT,
+    )
+    csv_rows = annotate_rows_with_qbs(csv_rows, target_date=latest_session_date)
+    csv_rows = annotate_rows_with_technical_buy(csv_rows, target_date=latest_session_date)
+    csv_rows = annotate_rows_with_startup9_confirm(csv_rows, target_date=latest_session_date)
+
+    csv_path = write_scan_csv(
+        csv_rows,
+        out_dir=out_dir,
+        run_label=run_label,
+        extra_field_specs=_post_close_extra_field_specs(include_combined_source=True),
+    )
+    rows_path = write_scan_rows_json(csv_rows, out_dir=out_dir, run_label=run_label)
+    publish_enabled = bool(not args.dry_run and not getattr(args, "skip_digest_publish", False))
+    digest_metadata = {
+        "combined_universe": True,
+        "universe_profiles": source_profiles,
+        "dedup_removed_count": int(combined_payload.get("dedup_removed_count", 0)),
+        "source_row_count": int(combined_payload.get("source_row_count", 0)),
+        "source_universe_count_sum": source_universe_count_sum,
+        "combined_result_count": len(csv_rows),
+        "source_artifacts": [
+            {
+                "profile": artifact.get("primary_profile"),
+                "profiles": list(artifact.get("profiles") or []),
+                "meta_path": artifact.get("meta_path"),
+                "rows_path": artifact.get("rows_path"),
+                "universe_count": artifact.get("universe_count"),
+                "result_count": len(list(artifact.get("rows") or [])),
+            }
+            for artifact in artifacts
+        ],
+    }
+    digest_bundle = _build_post_close_digest_bundle(
+        rows=csv_rows,
+        out_dir=out_dir,
+        run_stamp=run_stamp,
+        run_label=run_label,
+        run_at_kst=run_at_kst,
+        market_date=latest_session_date,
+        scan_label=POST_CLOSE_COMBINED_SCAN_LABEL,
+        universe_count=source_universe_count_sum,
+        result_count=len(csv_rows),
+        skip_count=skip_count_sum,
+        publish_enabled=publish_enabled,
+        publish_required=publish_enabled,
+        digest_metadata=digest_metadata,
+    )
+    published_digest_verify = _verify_published_digest_latest(require_combined=True) if publish_enabled else {
+        "ok": False,
+        "skipped": True,
+        "reason": "publish_disabled",
+    }
+    summary_text = str(digest_bundle["summary_text"])
+    summary_path = Path(digest_bundle["summary_path"])
+    message_texts = list(digest_bundle.get("message_texts") or [])
+    meta_payload = {
+        "run_at_kst": run_at_kst.isoformat(),
+        "run_stamp": run_stamp,
+        "mode": "combined_merge",
+        "scan_mode": scan_mode,
+        "universe_profile": "combined",
+        "universe_profiles": source_profiles,
+        "source_universe_count_sum": source_universe_count_sum,
+        "source_row_count": int(combined_payload.get("source_row_count", 0)),
+        "dedup_removed_count": int(combined_payload.get("dedup_removed_count", 0)),
+        "result_count": len(csv_rows),
+        "skip_count": skip_count_sum,
+        "csv_path": str(csv_path),
+        "rows_path": str(rows_path),
+        "summary_path": str(summary_path),
+        "telegram_digest_latest_path": str(digest_bundle["local_paths"]["latest_path"]),
+        "telegram_digest_versioned_path": str(digest_bundle["local_paths"]["versioned_path"]),
+        "digest_publish_status": dict(digest_bundle.get("publish_status") or {}),
+        "published_digest_verify": dict(published_digest_verify),
+        "source_artifacts": digest_metadata["source_artifacts"],
+    }
+    write_json(meta_payload, out_dir=out_dir, filename=f"run_meta_{run_label}.json")
+    print(f"[COMBINE] CSV saved: {csv_path}")
+    print(f"[COMBINE] Summary saved: {summary_path}")
+    print(
+        f"[COMBINE] Completed: source_rows={meta_payload['source_row_count']} "
+        f"combined={len(csv_rows)} dedup_removed={meta_payload['dedup_removed_count']}"
+    )
+
+    _send_telegram_if_enabled(
+        args,
+        summary_text=summary_text,
+        csv_path=csv_path,
+        scan_label=POST_CLOSE_COMBINED_SCAN_LABEL,
+        run_at_kst=run_at_kst,
+        message_texts=message_texts,
+    )
+    return 0
 
 
 def _build_early_session_sections(
@@ -3454,7 +3794,12 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
             universe_count=int(_safe_float(merged_payload.get("universe_count", 0))),
             result_count=len(merged_rows),
             skip_count=int(_safe_float(merged_payload.get("skip_count_sum", 0))),
-            publish_enabled=bool(merge_ready and universe_profile == "default" and not args.dry_run),
+            publish_enabled=bool(
+                merge_ready
+                and universe_profile == "default"
+                and not args.dry_run
+                and not getattr(args, "skip_digest_publish", False)
+            ),
         )
         summary_text = str(digest_bundle["summary_text"])
         summary_path = Path(digest_bundle["summary_path"])
@@ -3595,7 +3940,11 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
                 universe_count=len(tickers),
                 result_count=len(scan_result.rows),
                 skip_count=len(scan_result.skips),
-                publish_enabled=bool(universe_profile == "default" and not args.dry_run),
+                publish_enabled=bool(
+                    universe_profile == "default"
+                    and not args.dry_run
+                    and not getattr(args, "skip_digest_publish", False)
+                ),
             )
             summary_text = str(digest_bundle["summary_text"])
             summary_path = Path(digest_bundle["summary_path"])
@@ -4081,6 +4430,10 @@ def main() -> int:
 
     print(f"[MAIN] scan_mode={scan_mode}")
 
+    if list(getattr(args, "combine_final_dirs", []) or []):
+        if scan_mode != "post_close":
+            raise RuntimeError("--combine-final-dirs is only supported with --scan-mode post_close")
+        return _run_post_close_combined(args, run_at_kst=run_at_kst, out_dir=out_dir)
     if scan_mode == "pre_market":
         return _run_pre_market(args, run_at_kst=run_at_kst, out_dir=out_dir)
     elif scan_mode == "early_session":

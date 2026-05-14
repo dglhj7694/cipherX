@@ -1816,6 +1816,26 @@ class TelegramPipelineTests(unittest.TestCase):
         mock_single_send.assert_not_called()
         mock_document.assert_called_once()
 
+    def test_send_telegram_if_enabled_raises_when_csv_document_fails(self):
+        args = SimpleNamespace(dry_run=False, skip_telegram=False)
+        with patch.dict(
+            "os.environ",
+            {"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_CHAT_ID": "chat"},
+            clear=False,
+        ), patch("scripts.daily_scan_and_notify.send_digest_telegram_messages"), patch(
+            "scripts.daily_scan_and_notify.send_telegram_document",
+            return_value=False,
+        ):
+            with self.assertRaises(RuntimeError):
+                _send_telegram_if_enabled(
+                    args,
+                    summary_text="legacy summary",
+                    csv_path=Path("C:/tmp/scan.csv"),
+                    scan_label="post-close default",
+                    run_at_kst=self.generated_at,
+                    message_texts=["main board"],
+                )
+
 
 class HomeDigestLoaderTests(unittest.TestCase):
     def test_extract_section_candidates_reads_items_contract(self):
@@ -2517,6 +2537,53 @@ class HomeDigestLoaderTests(unittest.TestCase):
             self.assertEqual(second["source"], "cache")
             self.assertEqual(second["payload"]["market_date"], "2026-04-23")
             self.assertIn("network down", second["error"])
+
+    def test_home_digest_summary_badges_show_combined_metadata(self):
+        payload = {
+            "scan_label": "통합 장마감 스캔",
+            "market_date": "2026-04-23",
+            "briefing_refs": {
+                "combined_universe": True,
+                "universe_profiles": ["default", "russell2000"],
+                "dedup_removed_count": 7,
+            },
+            "sections": [
+                {"key": "final_top", "items": [{"ticker": "AAPL"}]},
+            ],
+        }
+        digest = home_page.telegram_digest_from_payload(payload)
+        badges_html = home_page._telegram_summary_badges_html(digest, source_label="원격 동기화", source_tone="accent")
+
+        self.assertIn("통합", badges_html)
+        self.assertIn("default+russell2000", badges_html)
+        self.assertIn("중복제거 7", badges_html)
+
+    def test_fetch_digest_from_github_reports_empty_or_invalid_latest(self):
+        with self.assertRaisesRegex(RuntimeError, "empty"):
+            home_page._validated_digest_payload({})
+
+        with self.assertRaisesRegex(RuntimeError, "sections"):
+            home_page._validated_digest_payload({"market_date": "2026-04-23"})
+
+    def test_load_latest_telegram_digest_cache_fallback_mentions_empty_remote(self):
+        payload = {
+            "market_date": "2026-04-23",
+            "sections": [
+                {"key": "final_top", "items": [{"ticker": "AAPL"}]},
+            ],
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cache_path = Path(temp_dir) / "digest.json"
+            home_page.write_digest_cache(payload, cache_path=cache_path)
+            with patch(
+                "app_ui.pages.home_page.resolve_github_digest_config",
+                return_value={"repo": "owner/repo", "branch": "telegram-digest", "path": "post_close/latest.json", "token": ""},
+            ), patch("app_ui.pages.home_page._fetch_digest_cached", side_effect=RuntimeError("GitHub digest content is empty")):
+                result = load_latest_telegram_digest(cache_path=cache_path)
+
+        self.assertEqual(result["source"], "cache")
+        self.assertEqual(result["payload"]["market_date"], "2026-04-23")
+        self.assertIn("GitHub digest content is empty", result["error"])
 
 
 if __name__ == "__main__":

@@ -28,6 +28,7 @@ from scripts.daily_scan_and_notify import (
     _with_post_close_setup_scores,
     _last_us_market_session_date,
     _run_post_close,
+    _run_post_close_combined,
     _run_early_session,
     _with_latest_session_buy_turn_flags,
     build_post_close_transition_summary,
@@ -1841,6 +1842,96 @@ class DailyScanNotifyTests(unittest.TestCase):
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
             self.assertEqual(meta["telegram_skipped_reason"], "requires_merge_for_ranked_post_close_summary")
             self.assertTrue(Path(meta["summary_path"]).exists())
+
+    def test_run_post_close_combined_dedupes_profiles_and_writes_latest_digest(self):
+        run_stamp = "batch-combined"
+
+        def _row(ticker, score, rs_ratio=1.0):
+            return {
+                "ticker": ticker,
+                "price": 100.0,
+                "chg_value": 1.0,
+                "chg": 1.0,
+                "scan_score": score,
+                "strength": score / 10.0,
+                "latest_sig_ts": score,
+                "es": score,
+                "volume_ratio_20": 1.2,
+                "rs_ratio": rs_ratio,
+                "ret20_pct": score,
+                "ret60_pct": score,
+                "ret120_pct": score,
+                "thin_trade_risk": False,
+                "latest_bar_date": "2026-04-21",
+                "utbot_buy_last_date": "N/A",
+                "hull_turn_bull_last_date": "N/A",
+                "utbot_sell_last_date": "N/A",
+                "hull_turn_bear_last_date": "N/A",
+            }
+
+        def _write_final(final_dir: Path, profile: str, rows: list[dict], universe_count: int):
+            final_dir.mkdir(parents=True, exist_ok=True)
+            (final_dir / f"scan_rows_{run_stamp}_merged.json").write_text(json.dumps(rows), encoding="utf-8")
+            (final_dir / f"run_meta_{run_stamp}_merged.json").write_text(
+                json.dumps(
+                    {
+                        "run_stamp": run_stamp,
+                        "mode": "merge",
+                        "scan_mode": "post_close",
+                        "universe_profile": profile,
+                        "merge_ready": True,
+                        "merged_payload": {
+                            "merge_ready": True,
+                            "universe_profiles": [profile],
+                            "universe_count": universe_count,
+                            "skip_count_sum": 2,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            default_dir = root / "default"
+            russell_dir = root / "russell2000"
+            out_dir = root / "combined"
+            _write_final(default_dir, "default", [_row("AAA", 10.0, 1.2)], 100)
+            _write_final(russell_dir, "russell2000", [_row("AAA", 8.0, 1.1), _row("BBB", 7.0, 1.0)], 200)
+
+            args = SimpleNamespace(
+                combine_final_dirs=[str(default_dir), str(russell_dir)],
+                run_stamp=run_stamp,
+                dry_run=True,
+                skip_telegram=True,
+                skip_digest_publish=True,
+            )
+            result = _run_post_close_combined(
+                args,
+                run_at_kst=datetime(2026, 4, 22, 6, 15, 0, tzinfo=KST),
+                out_dir=out_dir,
+            )
+
+            self.assertEqual(result, 0)
+            rows = json.loads((out_dir / f"scan_rows_{run_stamp}_combined_merged.json").read_text(encoding="utf-8"))
+            by_ticker = {row["ticker"]: row for row in rows}
+            self.assertEqual(sorted(by_ticker), ["AAA", "BBB"])
+            self.assertEqual(by_ticker["AAA"]["source_universe_profiles"], "default+russell2000")
+            self.assertEqual(by_ticker["AAA"]["source_universe_hit_count"], 2)
+            self.assertEqual(float(by_ticker["AAA"]["scan_score"]), 10.0)
+
+            meta = json.loads((out_dir / f"run_meta_{run_stamp}_combined_merged.json").read_text(encoding="utf-8"))
+            self.assertEqual(meta["mode"], "combined_merge")
+            self.assertEqual(meta["universe_profiles"], ["default", "russell2000"])
+            self.assertEqual(meta["source_universe_count_sum"], 300)
+            self.assertEqual(meta["source_row_count"], 3)
+            self.assertEqual(meta["dedup_removed_count"], 1)
+
+            latest = json.loads((out_dir / "telegram_digest" / "post_close" / "latest.json").read_text(encoding="utf-8"))
+            self.assertEqual(latest["scan_label"], "통합 장마감 스캔")
+            self.assertTrue(latest["briefing_refs"]["combined_universe"])
+            self.assertEqual(latest["briefing_refs"]["universe_profiles"], ["default", "russell2000"])
+            self.assertEqual(latest["briefing_refs"]["dedup_removed_count"], 1)
 
     def test_run_early_session_writes_relaxed_volume_threshold_and_pullback_raw_count(self):
         from datetime import timedelta, timezone
