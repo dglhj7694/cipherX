@@ -46,21 +46,17 @@ AGGRESSIVE_SECTION_SHORT_LABELS = {
     AGGRESSIVE_NEXT_DAY_SECTION_KEYS[5]: "P6 압축",
     AGGRESSIVE_NEXT_DAY_SECTION_KEYS[6]: "P7 갭추격",
     AGGRESSIVE_NEXT_DAY_SECTION_KEYS[7]: "P8 신고가",
-    AGGRESSIVE_NEXT_DAY_SECTION_KEYS[8]: "P9 기관매집",
-    AGGRESSIVE_NEXT_DAY_SECTION_KEYS[9]: "P10 5D Top",
 }
 AGGRESSIVE_ENTRY_SECTION_KEYS = {
     AGGRESSIVE_NEXT_DAY_SECTION_KEYS[0],
     AGGRESSIVE_NEXT_DAY_SECTION_KEYS[2],
     AGGRESSIVE_NEXT_DAY_SECTION_KEYS[4],
     AGGRESSIVE_NEXT_DAY_SECTION_KEYS[6],
-    AGGRESSIVE_NEXT_DAY_SECTION_KEYS[8],
 }
 AGGRESSIVE_TREND_SECTION_KEYS = {
     AGGRESSIVE_NEXT_DAY_SECTION_KEYS[1],
     AGGRESSIVE_NEXT_DAY_SECTION_KEYS[5],
     AGGRESSIVE_NEXT_DAY_SECTION_KEYS[7],
-    AGGRESSIVE_NEXT_DAY_SECTION_KEYS[9],
 }
 DECISION_SECTION_KEYS = {
     *QBS_DISPLAY_NUMBERS.keys(),
@@ -69,11 +65,6 @@ DECISION_SECTION_KEYS = {
     HULL_BUY_TURN_KEY,
 }
 BOARD_TYPE_SECTION_KEYS = set(BOARD_SECTION_ORDER)
-VOLATILITY_FILTER_OPTIONS: dict[str, tuple[str, float | None]] = {
-    "high": ("고변동만 (ATR >= 4%)", 4.0),
-    "ultra": ("초고변동만 (ATR >= 6%)", 6.0),
-    "all": ("전체 보기", None),
-}
 
 
 def _repo_root() -> Path:
@@ -542,7 +533,7 @@ def _section_tone(section_key: str) -> str:
     if key in AGGRESSIVE_SECTION_KEY_SET:
         if key in {AGGRESSIVE_NEXT_DAY_SECTION_KEYS[3], AGGRESSIVE_NEXT_DAY_SECTION_KEYS[6]}:
             return "warning"
-        if key in {AGGRESSIVE_NEXT_DAY_SECTION_KEYS[5], AGGRESSIVE_NEXT_DAY_SECTION_KEYS[7], AGGRESSIVE_NEXT_DAY_SECTION_KEYS[9]}:
+        if key in {AGGRESSIVE_NEXT_DAY_SECTION_KEYS[5], AGGRESSIVE_NEXT_DAY_SECTION_KEYS[7]}:
             return "info"
         return "positive"
     if key in {"qbs_chase_watch", "chase_risk"}:
@@ -1039,29 +1030,12 @@ def _filter_telegram_board_rows(rows: list[dict[str, Any]], filter_key: str) -> 
     if filter_key == "hull":
         return [row for row in rows if row.get("section_key") == HULL_BUY_TURN_KEY]
     if filter_key == "five_day":
-        return [
-            row
-            for row in rows
-            if row.get("section_key") == "five_day_top"
-            or str(row.get("section_key") or "") == AGGRESSIVE_NEXT_DAY_SECTION_KEYS[9]
-        ]
+        return [row for row in rows if row.get("section_key") == "five_day_top"]
     if filter_key == "board":
         return [row for row in rows if str(row.get("section_key") or "") in BOARD_TYPE_SECTION_KEYS]
     if filter_key == "risk":
         return [row for row in rows if bool(row.get("has_warning"))]
     return rows
-
-
-def _filter_rows_by_volatility(rows: list[dict[str, Any]], volatility_key: str) -> list[dict[str, Any]]:
-    _label, minimum_atr = VOLATILITY_FILTER_OPTIONS.get(str(volatility_key or ""), VOLATILITY_FILTER_OPTIONS["high"])
-    if minimum_atr is None:
-        return list(rows)
-    filtered: list[dict[str, Any]] = []
-    for row in rows:
-        atr = _optional_float(row.get("atr"))
-        if atr is not None and atr >= minimum_atr:
-            filtered.append(row)
-    return filtered
 
 
 BOARD_REQUIRED_NUMERIC_FIELDS: tuple[str, ...] = (
@@ -1561,25 +1535,12 @@ def _render_telegram_visual_board(digest: TelegramDigest, *, on_select_ticker: C
         key="home_telegram_digest_board_filter_v2",
         label_visibility="collapsed",
     )
-    volatility_keys = list(VOLATILITY_FILTER_OPTIONS)
-    volatility_key = st.radio(
-        "Volatility filter",
-        options=volatility_keys,
-        index=volatility_keys.index("high"),
-        format_func=lambda key: VOLATILITY_FILTER_OPTIONS.get(str(key), ("", None))[0],
-        horizontal=True,
-        key="home_telegram_digest_volatility_filter_v1",
-        label_visibility="collapsed",
-    )
     filtered_rows = _filter_telegram_board_rows(rows, str(filter_key))
-    filtered_rows = _filter_rows_by_volatility(filtered_rows, str(volatility_key))
     if not filtered_rows:
-        st.markdown("<div class='cpx-digest-empty'>No board rows after filters.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='cpx-digest-empty'>No board rows.</div>", unsafe_allow_html=True)
         return
 
-    filter_label = filter_options.get(str(filter_key), str(filter_key))
-    volatility_label = VOLATILITY_FILTER_OPTIONS.get(str(volatility_key), VOLATILITY_FILTER_OPTIONS["high"])[0]
-    _render_digest_html(_telegram_board_overview_html(filtered_rows, f"{filter_label} · {volatility_label}"))
+    _render_digest_html(_telegram_board_overview_html(rows, filter_options.get(str(filter_key), str(filter_key))))
     if str(filter_key) == "aggressive":
         _render_aggressive_board_table(filtered_rows)
     else:
@@ -2489,7 +2450,7 @@ def _render_telegram_message_board(
         "decision": "[0] 오늘 의사결정 핵심",
         "startup9": "[1] Startup식 9개 강세확인 Top 20",
         "technical": "[2] 기술적 매수시그널 클러스터",
-        "aggressive": "[3] 다음 거래일 공격형 매수 후보 10-PART",
+        "aggressive": "[3] 다음 거래일 공격형 매수 후보 8-PART",
         "board": "[4] 매매 유형별 후보 보드",
         "reference": "[5] 참고 랭킹",
     }

@@ -11,7 +11,6 @@ from app_ui.pages import home_page
 from app_ui.pages.home_page import extract_section_candidates, load_latest_telegram_digest
 from scripts.daily_scan_and_notify import _build_post_close_digest_bundle, _send_telegram_if_enabled
 from telegram_pipeline import (
-    AGGRESSIVE_FIVE_DAY_TOP_LIMIT,
     AGGRESSIVE_NEXT_DAY_LIMIT,
     AGGRESSIVE_NEXT_DAY_SECTION_KEYS,
     BOARD_SECTION_LIMIT,
@@ -419,74 +418,6 @@ class TelegramPipelineTests(unittest.TestCase):
 
         self.assertEqual(len(sections[AGGRESSIVE_NEXT_DAY_SECTION_KEYS[3]]), AGGRESSIVE_NEXT_DAY_LIMIT)
 
-    def test_aggressive_part9_uses_flow_metrics_without_program_scores(self):
-        score_only = self._aggressive_trend_row(
-            "SCORE",
-            final_entry_score=999.0,
-            scan_score=999.0,
-            es=99.0,
-            volume_ratio_20=1.0,
-            cmf=-0.02,
-            obv_slope=-0.1,
-            pocket_pivot_recent=False,
-            days_since_pocket_pivot=99,
-            rs_rank_vs_index=45.0,
-            ret20_percentile=50.0,
-            dist_sma20_pct=4.0,
-        )
-        flow = self._aggressive_trend_row(
-            "FLOW",
-            final_entry_score=0.0,
-            scan_score=0.0,
-            es=0.0,
-            chg=2.5,
-            chg_5d=7.5,
-            atr_pct=4.5,
-            volume_ratio_20=1.7,
-            cmf=0.14,
-            obv_slope=0.45,
-            pocket_pivot_recent=True,
-            days_since_pocket_pivot=2,
-            rs_rank_vs_index=72.0,
-            ret20_percentile=75.0,
-            dist_sma20_pct=6.0,
-        )
-
-        sections = select_aggressive_next_day_sections([score_only, flow], target_date=self.market_date)
-        part9_tickers = [row["ticker"] for row in sections[AGGRESSIVE_NEXT_DAY_SECTION_KEYS[8]]]
-
-        self.assertEqual(part9_tickers, ["FLOW"])
-
-    def test_aggressive_part10_is_top30_by_five_day_then_metrics(self):
-        rows = [
-            self._aggressive_trend_row(
-                f"F{i:02d}",
-                chg=2.0,
-                chg_5d=40.0 - i,
-                atr_pct=4.0 + (i % 3),
-                volume_ratio_20=1.0 + (i / 100.0),
-                rs_rank_vs_index=60.0 + i,
-                dist_sma20_pct=5.0,
-            )
-            for i in range(32)
-        ]
-        rows.extend(
-            [
-                self._aggressive_trend_row("ZERO", chg=1.0, chg_5d=0.0, atr_pct=9.0, dist_sma20_pct=5.0),
-                self._aggressive_trend_row("NEG", chg=1.0, chg_5d=-1.0, atr_pct=9.0, dist_sma20_pct=5.0),
-                self._aggressive_trend_row("TIEA", chg=1.0, chg_5d=50.0, atr_pct=5.0, volume_ratio_20=1.1, rs_rank_vs_index=80.0, scan_score=999.0, dist_sma20_pct=5.0),
-                self._aggressive_trend_row("TIEB", chg=1.0, chg_5d=50.0, atr_pct=8.0, volume_ratio_20=1.0, rs_rank_vs_index=70.0, scan_score=0.0, dist_sma20_pct=5.0),
-            ]
-        )
-
-        sections = select_aggressive_next_day_sections(rows, target_date=self.market_date)
-        part10_items = sections[AGGRESSIVE_NEXT_DAY_SECTION_KEYS[9]]
-
-        self.assertEqual(len(part10_items), AGGRESSIVE_FIVE_DAY_TOP_LIMIT)
-        self.assertEqual([row["ticker"] for row in part10_items[:2]], ["TIEB", "TIEA"])
-        self.assertNotIn("ZERO", [row["ticker"] for row in part10_items])
-        self.assertNotIn("NEG", [row["ticker"] for row in part10_items])
-
     def test_qbs_scores_confluence_above_single_buy_turn(self):
         confluence = self._row("ALPHA")
         single_buy = self._row(
@@ -775,7 +706,6 @@ class TelegramPipelineTests(unittest.TestCase):
                 f"T{i:02d}",
                 final_entry_score=500 - i,
                 chg_5d=5.0 - (i * 0.01),
-                atr_pct=4.5,
                 scan_score=300 - i,
                 hma_ema_risk_to_ema50_pct=1.0 + i * 0.05,
             )
@@ -797,15 +727,7 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertEqual(section_map[STEADY_WINNER_SECTION_KEY].item_count, 20)
         self.assertEqual(section_map["confluence"].item_count, BOARD_SECTION_LIMIT)
         self.assertEqual(section_map["five_day_top"].item_count, 30)
-        self.assertEqual(section_map[AGGRESSIVE_NEXT_DAY_SECTION_KEYS[9]].item_count, AGGRESSIVE_FIVE_DAY_TOP_LIMIT)
-        self.assertTrue(
-            all(
-                section.item_count <= BOARD_SECTION_LIMIT
-                for key, section in section_map.items()
-                if not key.startswith("qbs_")
-                and key not in {"five_day_top", AGGRESSIVE_NEXT_DAY_SECTION_KEYS[9]}
-            )
-        )
+        self.assertTrue(all(section.item_count <= BOARD_SECTION_LIMIT for key, section in section_map.items() if not key.startswith("qbs_") and key != "five_day_top"))
 
     def test_five_day_top_section_keeps_top30_sorted_and_positive_only(self):
         rows = [
@@ -1635,7 +1557,7 @@ class TelegramPipelineTests(unittest.TestCase):
         )
         message = build_post_close_message_texts(digest)[0]
 
-        self.assertIn("## PART 2. 추세 지속 / 꾸준상승", message)
+        self.assertIn("## PART 2. 강추세 지속형", message)
         self.assertIn("조건:", message)
         self.assertIn("SNDK", message)
         self.assertIn("ATR", message)
@@ -2139,7 +2061,7 @@ class HomeDigestLoaderTests(unittest.TestCase):
             "sections": [
                 {
                     "key": part2_key,
-                    "title": "PART 2 추세 지속 / 꾸준상승",
+                    "title": "PART 2 강추세 지속형",
                     "item_count": 1,
                     "ranked": True,
                     "quality_floor": "조건: strong trend",
@@ -2241,22 +2163,6 @@ class HomeDigestLoaderTests(unittest.TestCase):
         self.assertEqual([row["section_key"] for row in home_page._filter_telegram_board_rows(board_rows, "entry")], [part7_key, "qbs_buy_now"])
         self.assertEqual([row["section_key"] for row in home_page._filter_telegram_board_rows(board_rows, "risk")], [part2_key, part7_key])
 
-    def test_home_volatility_filter_defaults_to_high_atr_rows_only(self):
-        rows = [
-            {"ticker": "LOW", "atr": 3.9},
-            {"ticker": "HIGH", "atr": 4.0},
-            {"ticker": "ULTRA", "atr": 6.1},
-            {"ticker": "MISS", "atr": None},
-        ]
-
-        high_rows = home_page._filter_rows_by_volatility(rows, "high")
-        ultra_rows = home_page._filter_rows_by_volatility(rows, "ultra")
-        all_rows = home_page._filter_rows_by_volatility(rows, "all")
-
-        self.assertEqual([row["ticker"] for row in high_rows], ["HIGH", "ULTRA"])
-        self.assertEqual([row["ticker"] for row in ultra_rows], ["ULTRA"])
-        self.assertEqual([row["ticker"] for row in all_rows], ["LOW", "HIGH", "ULTRA", "MISS"])
-
     def test_home_digest_dashboard_helpers_preserve_structure_and_render_html(self):
         part2_key = AGGRESSIVE_NEXT_DAY_SECTION_KEYS[1]
         part7_key = AGGRESSIVE_NEXT_DAY_SECTION_KEYS[6]
@@ -2266,7 +2172,7 @@ class HomeDigestLoaderTests(unittest.TestCase):
             "sections": [
                 {
                     "key": part2_key,
-                    "title": "PART 2 추세 지속 / 꾸준상승",
+                    "title": "PART 2 강추세 지속형",
                     "item_count": 1,
                     "ranked": True,
                     "quality_floor": "조건: strong trend",

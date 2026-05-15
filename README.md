@@ -46,13 +46,13 @@
   - scheduled script가 scan/briefing 결과를 Telegram message와 CSV document로 발송합니다.
   - `telegram_pipeline/`은 digest contract, section selector, formatter, publisher, sender를 담당합니다.
   - Daily Scan Notify는 기본 유니버스와 Russell2000 확장 유니버스를 각각 shard/merge한 뒤, 마지막 combine 단계에서 중복 티커를 제거한 통합 CSV 1개만 Telegram으로 보냅니다.
-  - 장마감 digest는 `[0] 오늘 의사결정 핵심`, `[1] Startup식 9개 강세확인 Top 20`, `[2] 기술적 매수시그널 클러스터`, `[3] 다음 거래일 공격형 매수 후보 10-PART`, `[4] 매매 유형별 후보 보드`, `[5] 참고 랭킹` 흐름으로 구성합니다.
+  - 장마감 digest는 `[0] 오늘 의사결정 핵심`, `[1] Startup식 9개 강세확인 Top 20`, `[2] 기술적 매수시그널 클러스터`, `[3] 다음 거래일 공격형 매수 후보 8-PART`, `[4] 매매 유형별 후보 보드`, `[5] 참고 랭킹` 흐름으로 구성합니다.
   - 최종 통합 digest는 `dglhj7694/cipherX` 저장소의 `telegram-digest` 브랜치 `post_close/latest.json`에 publish되며 홈 `Telegram Digest Dashboard`의 오늘 종목판이 이 파일을 기본 source of truth로 읽습니다.
   - Startup식 추정 강세확인은 9개 독립 축 중 6개 이상, 최근 매도전환 없음, 유동성 통과를 기본 Top20 조건으로 사용하며 hard exclusion과 soft risk를 분리해 표시합니다.
   - 기술적 매수시그널 클러스터는 0번대 최종 매수 판단 섹션과 Startup9 섹션 뒤에 있는 후보 발굴 섹션이며, 최근 5봉의 UTBot/Hull/TK/DMI/ADX/MACD/Stoch/수급/스퀴즈/눌림/신고가/캔들 반전 신호를 점수화합니다.
-  - 공격형 10-PART는 프로그램 자체 점수/라벨 계열을 배제하고 ATR, 거래량, RS, ADX, HMA/EMA, BB, 고점 거리, CMF/OBV, 포켓피봇/갭/압축 지표를 사용하며, 같은 종목이 여러 PART에 걸리면 모두 보여줍니다.
+  - 공격형 8-PART는 프로그램 자체 점수 대신 ATR, 거래량, RS, ADX, HMA/EMA, BB, 고점 거리, 포켓피봇/갭 지표를 사용하며, 같은 종목이 여러 PART에 걸리면 모두 보여줍니다.
   - 홈 `Telegram Digest Dashboard`는 텔레그램 메시지 구조와 섹션 순서를 유지하면서 상단 요약, 통합 후보 압축표, 섹션별 상세표로 후보를 비교합니다.
-  - 통합 종목판은 공격형 10-PART 후보를 기본 압축표로 보여주며 `Today`, `5D`, ATR, Vol20, RS, ADX, MA20, 고점 거리, 근거/주의를 한 화면에서 비교합니다. 홈 화면의 변동성 라디오는 기본 `고변동만 (ATR >= 4%)`, `초고변동만 (ATR >= 6%)`, `전체 보기`를 제공하며 표시 rows에만 적용됩니다.
+  - 통합 종목판은 공격형 8-PART 후보를 기본 압축표로 보여주며 `Today`, `5D`, ATR, Vol20, RS, ADX, MA20, 고점 거리, 근거/주의를 한 화면에서 비교합니다.
 
 - **배치 산출물**
   - 스캔 결과와 메타데이터를 `artifacts/` 하위에 CSV, JSON, TXT 형태로 저장합니다.
@@ -189,7 +189,7 @@ cipherX/
   - 방향 전환은 최근 hard buy/sell 신호의 날짜와 timestamp를 시간순으로 해석해 `BULL_ACTIVE`, `BULL_RECLAIMED`, `BEAR_ACTIVE`, `MIXED_SAME_DAY`, `NO_RECENT_TURN`으로 분리합니다.
 
 - `telegram_pipeline/aggressive_next_day_ranker.py`
-  - 다음 거래일 공격형 매수 후보를 초기 전환, 추세 지속, 눌림목 재진입, 초고변동 위성, 포켓피봇/거래량 선행, 압축 후 발사 대기, 갭업 추격, 신고가 근처 돌파 대기, 기관매집 흔적, 5일 상승률 Top30까지 10개 PART로 선별합니다.
+  - 다음 거래일 공격형 매수 후보를 초기 전환, 강추세 지속, 눌림목 재진입, 초고변동 위성, 포켓피봇/거래량 선행, 압축 후 발사 대기, 갭업 추격, 신고가 근처 돌파 대기 8개 PART로 선별합니다.
   - 각 PART는 Top20까지 독립 표시하며, 같은 종목이 여러 PART에 걸리면 중복 제거하지 않고 모두 보여줍니다.
 
 - `telegram_pipeline/early_reversal_ranker.py`
@@ -199,7 +199,7 @@ cipherX/
   - `hull_buy_turn` 섹션의 당일 HULL 매수전환 후보를 선별하고 태그/리스크를 부여합니다.
 
 - `telegram_pipeline/formatters.py`
-  - Telegram message text를 구성하며 QBS와 `steady_winner`/`early_reversal`/`hull_buy_turn`을 0번대 의사결정 핵심으로 묶고, `startup9_confirm`, `technical_buy_cluster`, 다음 거래일 공격형 10-PART, 상세 보드, `five_day_top` 순서를 고정합니다.
+  - Telegram message text를 구성하며 QBS와 `steady_winner`/`early_reversal`/`hull_buy_turn`을 0번대 의사결정 핵심으로 묶고, `startup9_confirm`, `technical_buy_cluster`, 다음 거래일 공격형 8-PART, 상세 보드, `five_day_top` 순서를 고정합니다.
 
 - `telegram_pipeline/sender.py`
   - Telegram `sendMessage`, `sendDocument` 호출과 message chunking을 담당합니다.

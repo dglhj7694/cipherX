@@ -1,6 +1,5 @@
 from .contracts import TelegramCandidate, TelegramDigest, TelegramSection
 from .aggressive_next_day_ranker import (
-    AGGRESSIVE_FIVE_DAY_TOP_LIMIT,
     AGGRESSIVE_NEXT_DAY_LIMIT,
     AGGRESSIVE_NEXT_DAY_QUALITY_FLOORS,
     AGGRESSIVE_NEXT_DAY_SECTION_KEYS,
@@ -61,7 +60,6 @@ __all__ = [
     "TelegramCandidate",
     "TelegramDigest",
     "TelegramSection",
-    "AGGRESSIVE_FIVE_DAY_TOP_LIMIT",
     "AGGRESSIVE_NEXT_DAY_LIMIT",
     "AGGRESSIVE_NEXT_DAY_QUALITY_FLOORS",
     "AGGRESSIVE_NEXT_DAY_SECTION_KEYS",

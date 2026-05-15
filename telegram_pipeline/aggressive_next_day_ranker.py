@@ -6,7 +6,6 @@ from typing import Any, Callable, Iterable, Mapping
 from .rankers import is_truthy, safe_float, same_session_sell_turn
 
 AGGRESSIVE_NEXT_DAY_LIMIT = 20
-AGGRESSIVE_FIVE_DAY_TOP_LIMIT = 30
 
 AGGRESSIVE_PART_1_KEY = "aggressive_initial_turn"
 AGGRESSIVE_PART_2_KEY = "aggressive_strong_trend"
@@ -16,8 +15,6 @@ AGGRESSIVE_PART_5_KEY = "aggressive_pocket_pivot_volume"
 AGGRESSIVE_PART_6_KEY = "aggressive_compression_launch"
 AGGRESSIVE_PART_7_KEY = "aggressive_gap_chase"
 AGGRESSIVE_PART_8_KEY = "aggressive_near_high_breakout"
-AGGRESSIVE_PART_9_KEY = "aggressive_institutional_accumulation"
-AGGRESSIVE_PART_10_KEY = "aggressive_five_day_top"
 
 AGGRESSIVE_NEXT_DAY_SECTION_KEYS: tuple[str, ...] = (
     AGGRESSIVE_PART_1_KEY,
@@ -28,26 +25,22 @@ AGGRESSIVE_NEXT_DAY_SECTION_KEYS: tuple[str, ...] = (
     AGGRESSIVE_PART_6_KEY,
     AGGRESSIVE_PART_7_KEY,
     AGGRESSIVE_PART_8_KEY,
-    AGGRESSIVE_PART_9_KEY,
-    AGGRESSIVE_PART_10_KEY,
 )
 
 AGGRESSIVE_NEXT_DAY_SECTION_TITLES: dict[str, str] = {
-    AGGRESSIVE_PART_1_KEY: "PART 1 초기 전환형 / 막 방향 튼 종목",
-    AGGRESSIVE_PART_2_KEY: "PART 2 추세 지속 / 꾸준상승",
+    AGGRESSIVE_PART_1_KEY: "PART 1 초기 전환형",
+    AGGRESSIVE_PART_2_KEY: "PART 2 강추세 지속형",
     AGGRESSIVE_PART_3_KEY: "PART 3 눌림목 재진입형",
     AGGRESSIVE_PART_4_KEY: "PART 4 초고변동 위성형",
     AGGRESSIVE_PART_5_KEY: "PART 5 포켓피봇 / 거래량 선행형",
     AGGRESSIVE_PART_6_KEY: "PART 6 압축 후 발사 대기형",
     AGGRESSIVE_PART_7_KEY: "PART 7 갭업 후 실패 없는 추격형",
     AGGRESSIVE_PART_8_KEY: "PART 8 신고가 근처 돌파 대기형",
-    AGGRESSIVE_PART_9_KEY: "PART 9 기관매집 흔적",
-    AGGRESSIVE_PART_10_KEY: "PART 10 5일 상승률 Top30",
 }
 
 AGGRESSIVE_NEXT_DAY_QUALITY_FLOORS: dict[str, str] = {
     AGGRESSIVE_PART_1_KEY: (
-        "공통필터 + UTBot/HULL D+3 이내/MA20 회복/higher-low 중 1개 + "
+        "공통필터 + UTBot/HULL D+3 이내/MA20 재탈환/higher-low 중 1개 + "
         "5D -8~+15%, MA20 -5~+10%, Z<=2.1, %B<=1.08 + CMF/OBV/거래량 확인"
     ),
     AGGRESSIVE_PART_2_KEY: (
@@ -55,19 +48,19 @@ AGGRESSIVE_NEXT_DAY_QUALITY_FLOORS: dict[str, str] = {
         "RS>=85 또는 Ret20Pctile>=90 + 5D>=8%, Ret20>=15% + 거래량/CMF/OBV"
     ),
     AGGRESSIVE_PART_3_KEY: (
-        "공통필터 + 상승추세, RS>=55 + 눌림 구간 + higher-low/MA20 회복 + "
+        "공통필터 + 상승추세, RS>=55 + 눌림/재진입/higher-low + "
         "20D 고점 -12~-0.8% 또는 swing -15~-2%, MA20 -6~+8%, 0.2~3.5 ATR 눌림"
     ),
     AGGRESSIVE_PART_4_KEY: (
-        "공통필터 + ATR>=8 또는 ATR>=6+큰 변동 + 양봉/상승 + Vol20>=1.2 + "
+        "공통필터 + ATR>=8 또는 ATR>=6+큰 변동 + 양봉 + Vol20>=1.2/확장 + "
         "CMF/OBV 양호 + RS>=70 또는 Ret20Pctile>=75"
     ),
     AGGRESSIVE_PART_5_KEY: (
-        "공통필터 + 포켓피봇 recent/D+5 또는 Vol20>=1.5+OBV/CMF + "
-        "MA20 -8~+25%, 추세/RS/수익률 확인"
+        "공통필터 + 포켓피봇 candidate/recent/D+5 또는 Vol20>=1.5+OBV/CMF + "
+        "MA20 -8~+25%, ATR 필터 + 추세/RS/수익률 확인"
     ),
     AGGRESSIVE_PART_6_KEY: (
-        "공통필터 + NR7/Inside/3WT/ATR수축/거래량 안정 중 2개 + "
+        "공통필터 + NR7/Inside/3WT/ATR수축/거래량건조 중 2개 + "
         "%B 0.35~0.95, MA20 -6~+8%, 20D 고점 -10~-0.5%, RS>=50, 당일 +8% 미만"
     ),
     AGGRESSIVE_PART_7_KEY: (
@@ -76,14 +69,7 @@ AGGRESSIVE_NEXT_DAY_QUALITY_FLOORS: dict[str, str] = {
     ),
     AGGRESSIVE_PART_8_KEY: (
         "공통필터 + 52W/20D 고점 3% 이내 + RS>=75 또는 Ret20Pctile>=80 + "
-        "HMA20/60 양호 + Vol20>=0.8 또는 안정 거래 + 당일 <=12%, MA20<=25%"
-    ),
-    AGGRESSIVE_PART_9_KEY: (
-        "공통필터 + dollar volume 충분 + Vol20 확장 + CMF/OBV 동반 + "
-        "포켓피봇 recent/D+5 또는 반복 수급 흔적"
-    ),
-    AGGRESSIVE_PART_10_KEY: (
-        "공통필터 + 5D 상승률 양수 + chg_5d, ATR, Vol20, RS 순 정렬; Top30"
+        "HMA20/60 양호 + Vol20>=0.8 또는 dry-up + 당일 <=12%, MA20<=25%"
     ),
 }
 
@@ -166,15 +152,7 @@ def _relative_strength_ok(row: Mapping[str, Any], *, rs: float, ret20_percentile
     return bool(_number(row, "rs_rank_vs_index") >= rs or _number(row, "ret20_percentile") >= ret20_percentile)
 
 
-def _has_recent_pocket_pivot(row: Mapping[str, Any]) -> bool:
-    return bool(
-        is_truthy(row.get("pocket_pivot_recent"))
-        or _number(row, "days_since_pocket_pivot", default=999.0) <= 5.0
-    )
-
-
 def _compression_count(row: Mapping[str, Any]) -> int:
-    volume_ratio = _number(row, "volume_ratio_20", default=999.0)
     return int(
         sum(
             [
@@ -182,8 +160,10 @@ def _compression_count(row: Mapping[str, Any]) -> int:
                 is_truthy(row.get("inside_day_flag")),
                 is_truthy(row.get("three_weeks_tight")),
                 is_truthy(row.get("atr_contracting")),
-                volume_ratio <= 1.0,
-                is_truthy(row.get("tight_close_near_high_3d")),
+                _number(row, "volume_dry_up_score") >= 10.0,
+                _number(row, "volume_dry_up_score_3") >= 10.0,
+                _number(row, "volume_dry_up_score_5") >= 10.0,
+                _number(row, "volume_dry_up_score_10") >= 10.0,
             ]
         )
     )
@@ -194,21 +174,6 @@ def _near_high(row: Mapping[str, Any]) -> bool:
         is_truthy(row.get("near_52w_high_2pct"))
         or _number(row, "drawdown_from_52w_high_pct", default=-999.0) >= -3.0
         or -3.0 <= _number(row, "breakout_dist_20d_high_pct", default=-999.0) <= 0.5
-    )
-
-
-def _institutional_flow_count(row: Mapping[str, Any]) -> int:
-    return int(
-        sum(
-            [
-                _number(row, "volume_ratio_20") >= 1.25,
-                _number(row, "volume_ratio_20") >= 1.6,
-                _number(row, "cmf") > 0.05,
-                _number(row, "obv_slope") > 0.1,
-                _has_recent_pocket_pivot(row),
-                is_truthy(row.get("volume_bullish")),
-            ]
-        )
     )
 
 
@@ -239,6 +204,11 @@ def _part_2(row: Mapping[str, Any], target_date: date) -> bool:
     return bool(
         _number(row, "atr_pct") >= 4.0
         and _is_uptrend(row)
+        and (
+            is_truthy(row.get("bull_strength_recent"))
+            or is_truthy(row.get("strong_trend_persistent"))
+            or _number(row, "ret20_percentile") >= 90.0
+        )
         and _number(row, "adx") >= 25.0
         and _number(row, "hma20_slope_pct") >= 0.8
         and _number(row, "hma60_slope_pct") >= 0.5
@@ -256,21 +226,19 @@ def _part_3(row: Mapping[str, Any], target_date: date) -> bool:
         -12.0 <= _number(row, "drawdown_from_20d_high_pct") <= -0.8
         or -15.0 <= _number(row, "pullback_from_swing_high_pct") <= -2.0
     )
-    reentry_trigger = bool(
-        is_truthy(row.get("first_higher_low_pivot2"))
-        or is_truthy(row.get("first_close_above_ma20_after_5bars"))
-        or _number(row, "cmf") > 0.05
-        or _number(row, "obv_slope") > 0.1
-    )
     return bool(
         _is_uptrend(row)
         and _number(row, "rs_rank_vs_index") >= 55.0
         and _number(row, "hma60_slope_pct") > 0.0
-        and reentry_trigger
+        and (
+            is_truthy(row.get("pullback_ready"))
+            or is_truthy(row.get("pullback_reentry"))
+            or is_truthy(row.get("first_higher_low_pivot2"))
+        )
         and pullback_zone
         and -6.0 <= _number(row, "dist_sma20_pct", "ma20_dist_pct") <= 8.0
         and 0.2 <= _number(row, "pullback_atr_multiple") <= 3.5
-        and _number(row, "volume_ratio_20") <= 1.3
+        and (_number(row, "volume_dry_up_score") >= 5.0 or _number(row, "volume_ratio_20") <= 1.1)
         and (_number(row, "obv_slope") >= 0.0 or _number(row, "cmf") >= 0.0)
         and _number(row, "chg_5d") <= 15.0
     )
@@ -286,7 +254,7 @@ def _part_4(row: Mapping[str, Any], target_date: date) -> bool:
     return bool(
         high_volatility
         and _number(row, "chg") > 0.0
-        and _number(row, "volume_ratio_20") >= 1.2
+        and (_number(row, "volume_ratio_20") >= 1.2 or _number(row, "volume_expansion_score") >= 25.0)
         and (_number(row, "obv_slope") > 0.0 or _number(row, "cmf") > 0.0)
         and _relative_strength_ok(row, rs=70.0, ret20_percentile=75.0)
     )
@@ -295,7 +263,11 @@ def _part_4(row: Mapping[str, Any], target_date: date) -> bool:
 def _part_5(row: Mapping[str, Any], target_date: date) -> bool:
     if not _is_common_eligible(row, target_date):
         return False
-    pocket_pivot = _has_recent_pocket_pivot(row)
+    pocket_pivot = bool(
+        is_truthy(row.get("pocket_pivot_candidate"))
+        or is_truthy(row.get("pocket_pivot_recent"))
+        or _number(row, "days_since_pocket_pivot", default=999.0) <= 5.0
+    )
     volume_lead = bool(
         _number(row, "volume_ratio_20") >= 1.5
         and _number(row, "obv_slope") > 0.2
@@ -303,7 +275,7 @@ def _part_5(row: Mapping[str, Any], target_date: date) -> bool:
     )
     return bool(
         (pocket_pivot or volume_lead)
-        and (_number(row, "volume_ratio_20") >= 1.0 or pocket_pivot)
+        and (_number(row, "volume_ratio_20") >= 1.0 or _number(row, "volume_expansion_score") >= 20.0 or pocket_pivot)
         and _number(row, "obv_slope") >= 0.0
         and _number(row, "cmf") >= 0.0
         and -8.0 <= _number(row, "dist_sma20_pct", "ma20_dist_pct") <= 25.0
@@ -324,7 +296,6 @@ def _part_6(row: Mapping[str, Any], target_date: date) -> bool:
             or -8.0 <= _number(row, "breakout_dist_20d_high_pct") <= -0.5
         )
         and (_number(row, "cmf") >= 0.0 or _number(row, "obv_slope") >= 0.0)
-        and _number(row, "volume_ratio_20") <= 1.15
         and _number(row, "chg") < 8.0
     )
 
@@ -352,30 +323,10 @@ def _part_8(row: Mapping[str, Any], target_date: date) -> bool:
         and _relative_strength_ok(row, rs=75.0, ret20_percentile=80.0)
         and _number(row, "hma20_slope_pct") > 0.0
         and _number(row, "hma60_slope_pct") >= 0.0
-        and _number(row, "volume_ratio_20") >= 0.8
+        and (_number(row, "volume_ratio_20") >= 0.8 or _number(row, "volume_dry_up_score") >= 5.0)
         and _number(row, "chg") <= 12.0
         and _number(row, "dist_sma20_pct", "ma20_dist_pct") <= 25.0
     )
-
-
-def _part_9(row: Mapping[str, Any], target_date: date) -> bool:
-    if not _is_common_eligible(row, target_date):
-        return False
-    return bool(
-        _number(row, "dollar_volume_20") >= 50_000_000.0
-        and _number(row, "volume_ratio_20") >= 1.1
-        and _number(row, "cmf") > 0.0
-        and _number(row, "obv_slope") > 0.0
-        and _institutional_flow_count(row) >= 3
-        and -8.0 <= _number(row, "dist_sma20_pct", "ma20_dist_pct") <= 22.0
-        and (_number(row, "rs_rank_vs_index") >= 50.0 or _number(row, "ret20_percentile") >= 60.0)
-    )
-
-
-def _part_10(row: Mapping[str, Any], target_date: date) -> bool:
-    if not _is_common_eligible(row, target_date):
-        return False
-    return bool(_number(row, "chg_5d") > 0.0)
 
 
 def _sort_part_1(row: Mapping[str, Any]) -> tuple[Any, ...]:
@@ -383,7 +334,6 @@ def _sort_part_1(row: Mapping[str, Any]) -> tuple[Any, ...]:
     return (
         -turn_count,
         -int(is_truthy(row.get("first_close_above_ma20_after_5bars"))),
-        -int(is_truthy(row.get("first_higher_low_pivot2"))),
         -_number(row, "rs_rank_vs_index"),
         -_number(row, "volume_ratio_20"),
         -_number(row, "atr_pct"),
@@ -405,11 +355,10 @@ def _sort_part_2(row: Mapping[str, Any]) -> tuple[Any, ...]:
 
 def _sort_part_3(row: Mapping[str, Any]) -> tuple[Any, ...]:
     return (
-        -int(is_truthy(row.get("first_close_above_ma20_after_5bars"))),
-        -int(is_truthy(row.get("first_higher_low_pivot2"))),
+        -int(is_truthy(row.get("pullback_reentry"))),
         -_number(row, "rs_rank_vs_index"),
         abs(_number(row, "dist_sma20_pct", "ma20_dist_pct")),
-        _number(row, "volume_ratio_20"),
+        -_number(row, "volume_dry_up_score"),
         _ticker(row),
     )
 
@@ -417,9 +366,9 @@ def _sort_part_3(row: Mapping[str, Any]) -> tuple[Any, ...]:
 def _sort_part_4(row: Mapping[str, Any]) -> tuple[Any, ...]:
     return (
         -_number(row, "atr_pct"),
+        -_number(row, "volume_expansion_score"),
         -_number(row, "chg_5d"),
         -_number(row, "chg"),
-        -_number(row, "volume_ratio_20"),
         -_number(row, "rs_rank_vs_index"),
         _ticker(row),
     )
@@ -427,8 +376,9 @@ def _sort_part_4(row: Mapping[str, Any]) -> tuple[Any, ...]:
 
 def _sort_part_5(row: Mapping[str, Any]) -> tuple[Any, ...]:
     return (
-        -int(_has_recent_pocket_pivot(row)),
+        -int(is_truthy(row.get("pocket_pivot_candidate"))),
         _number(row, "days_since_pocket_pivot", default=999.0),
+        -_number(row, "pocket_pivot_gate_count"),
         -_number(row, "volume_ratio_20"),
         -_number(row, "obv_slope"),
         -_number(row, "cmf"),
@@ -438,10 +388,16 @@ def _sort_part_5(row: Mapping[str, Any]) -> tuple[Any, ...]:
 
 
 def _sort_part_6(row: Mapping[str, Any]) -> tuple[Any, ...]:
+    dry_up = max(
+        _number(row, "volume_dry_up_score"),
+        _number(row, "volume_dry_up_score_3"),
+        _number(row, "volume_dry_up_score_5"),
+        _number(row, "volume_dry_up_score_10"),
+    )
     return (
         -_compression_count(row),
         -_number(row, "rs_rank_vs_index"),
-        _number(row, "volume_ratio_20", default=999.0),
+        -dry_up,
         abs(_number(row, "breakout_dist_20d_high_pct")),
         _ticker(row),
     )
@@ -468,28 +424,6 @@ def _sort_part_8(row: Mapping[str, Any]) -> tuple[Any, ...]:
     )
 
 
-def _sort_part_9(row: Mapping[str, Any]) -> tuple[Any, ...]:
-    return (
-        -_institutional_flow_count(row),
-        -_number(row, "volume_ratio_20"),
-        -_number(row, "cmf"),
-        -_number(row, "obv_slope"),
-        -_number(row, "dollar_volume_20"),
-        -_number(row, "rs_rank_vs_index"),
-        _ticker(row),
-    )
-
-
-def _sort_part_10(row: Mapping[str, Any]) -> tuple[Any, ...]:
-    return (
-        -_number(row, "chg_5d"),
-        -_number(row, "atr_pct"),
-        -_number(row, "volume_ratio_20"),
-        -_number(row, "rs_rank_vs_index"),
-        _ticker(row),
-    )
-
-
 _SELECTORS: dict[str, _Selector] = {
     AGGRESSIVE_PART_1_KEY: _part_1,
     AGGRESSIVE_PART_2_KEY: _part_2,
@@ -499,8 +433,6 @@ _SELECTORS: dict[str, _Selector] = {
     AGGRESSIVE_PART_6_KEY: _part_6,
     AGGRESSIVE_PART_7_KEY: _part_7,
     AGGRESSIVE_PART_8_KEY: _part_8,
-    AGGRESSIVE_PART_9_KEY: _part_9,
-    AGGRESSIVE_PART_10_KEY: _part_10,
 }
 
 _SORT_KEYS: dict[str, _SortKey] = {
@@ -512,8 +444,6 @@ _SORT_KEYS: dict[str, _SortKey] = {
     AGGRESSIVE_PART_6_KEY: _sort_part_6,
     AGGRESSIVE_PART_7_KEY: _sort_part_7,
     AGGRESSIVE_PART_8_KEY: _sort_part_8,
-    AGGRESSIVE_PART_9_KEY: _sort_part_9,
-    AGGRESSIVE_PART_10_KEY: _sort_part_10,
 }
 
 
@@ -539,14 +469,12 @@ def _aggressive_tags(row: Mapping[str, Any], section_key: str) -> list[str]:
         _unique_append(tags, "compression")
     if _near_high(row):
         _unique_append(tags, "near-high")
-    if section_key == AGGRESSIVE_PART_5_KEY and _has_recent_pocket_pivot(row):
+    if section_key == AGGRESSIVE_PART_5_KEY and (
+        is_truthy(row.get("pocket_pivot_candidate")) or is_truthy(row.get("pocket_pivot_recent"))
+    ):
         _unique_append(tags, "pocket")
     if section_key == AGGRESSIVE_PART_7_KEY:
         _unique_append(tags, "gap")
-    if section_key == AGGRESSIVE_PART_9_KEY:
-        _unique_append(tags, "accumulation")
-    if section_key == AGGRESSIVE_PART_10_KEY:
-        _unique_append(tags, "5D")
     return tags[:6]
 
 
@@ -566,8 +494,6 @@ def _risk_flags(row: Mapping[str, Any], section_key: str) -> list[str]:
         _unique_append(flags, "satellite_size")
     if section_key == AGGRESSIVE_PART_7_KEY:
         _unique_append(flags, "gap_chase")
-    if section_key == AGGRESSIVE_PART_10_KEY and _number(row, "chg_5d") >= 20.0:
-        _unique_append(flags, "five_day_chase")
     return flags
 
 
@@ -584,12 +510,6 @@ def _decorate(row: Mapping[str, Any], section_key: str) -> dict[str, Any]:
     row_dict["entry_type"] = str(row_dict.get("entry_type") or "aggressive_next_day_watch")
     row_dict["compression_count"] = _compression_count(row_dict)
     return row_dict
-
-
-def _section_limit(section_key: str, limit: int) -> int:
-    if section_key == AGGRESSIVE_PART_10_KEY:
-        return AGGRESSIVE_FIVE_DAY_TOP_LIMIT
-    return max(0, int(limit or 0))
 
 
 def _select_section(
@@ -615,7 +535,7 @@ def _select_section(
             best_by_ticker[ticker] = decorated
     selected = list(best_by_ticker.values())
     selected.sort(key=sort_key)
-    return selected[: _section_limit(section_key, limit)]
+    return selected[: max(0, int(limit or 0))]
 
 
 def select_aggressive_next_day_sections(
