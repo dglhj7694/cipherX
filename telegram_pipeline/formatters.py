@@ -5,6 +5,7 @@ from datetime import date, datetime
 from typing import Any, Iterable, Mapping
 
 from .aggressive_next_day_ranker import (
+    AGGRESSIVE_FIVE_DAY_TOP_LIMIT,
     AGGRESSIVE_NEXT_DAY_LIMIT,
     AGGRESSIVE_NEXT_DAY_QUALITY_FLOORS,
     AGGRESSIVE_NEXT_DAY_SECTION_KEYS,
@@ -1032,7 +1033,8 @@ def _qbs_section_block(display_number: str, section: TelegramSection) -> str:
 
 
 def _aggressive_section_block(section: TelegramSection) -> str:
-    descriptor = f"Top {min(section.item_count, AGGRESSIVE_NEXT_DAY_LIMIT)}"
+    section_limit = AGGRESSIVE_FIVE_DAY_TOP_LIMIT if section.key == AGGRESSIVE_NEXT_DAY_SECTION_KEYS[-1] else AGGRESSIVE_NEXT_DAY_LIMIT
+    descriptor = f"Top {min(section.item_count, section_limit)}"
     title = str(section.title or section.key)
     if section.key in AGGRESSIVE_NEXT_DAY_SECTION_KEYS:
         part_number = AGGRESSIVE_NEXT_DAY_SECTION_KEYS.index(section.key) + 1
@@ -1126,7 +1128,7 @@ MESSAGE_GROUP_HEADERS: dict[str, str] = {
     "decision": "[0] 오늘 의사결정 핵심",
     "startup9": "[1] Startup식 9개 강세확인 Top 20",
     "technical": "[2] 기술적 매수시그널 클러스터",
-    "aggressive": "[3] 다음 거래일 공격형 매수 후보 8-PART",
+    "aggressive": "[3] 다음 거래일 공격형 매수 후보 10-PART",
     "board": "[4] 매매 유형별 후보 보드",
     "reference": "[5] 참고 랭킹",
 }
