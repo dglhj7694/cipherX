@@ -22,6 +22,7 @@ from scripts.daily_scan_and_notify import (
     ScanRunResult,
     _compute_post_close_row_metrics,
     _decode_github_contents_digest,
+    _post_close_extra_field_specs,
     _with_early_session_gap_momentum_scores,
     _with_early_session_inflow_scores,
     _with_post_close_final_top20_scores,
@@ -49,6 +50,7 @@ from scripts.daily_scan_and_notify import (
     select_us_session_hull_bear_rows,
     select_us_session_turn_rows,
     send_telegram_message,
+    scan_universe,
     split_telegram_message_text,
     split_tickers_for_shard,
     write_scan_csv,
@@ -1612,6 +1614,55 @@ class DailyScanNotifyTests(unittest.TestCase):
         first = split_tickers_for_shard(tickers, shard_count=4, shard_index=0)
         second = split_tickers_for_shard(tickers, shard_count=4, shard_index=0)
         self.assertEqual(first, second)
+
+    def test_scan_universe_keeps_failed_tickers_as_skipped_rows(self):
+        def _fake_worker(ticker, *, bias_mode, history_period="2y"):
+            if ticker == "BAD":
+                return {
+                    "ok": False,
+                    "ticker": "BAD",
+                    "skip_reason": "missing_frame",
+                    "detail": "no frame returned",
+                    "elapsed_sec": 0.01,
+                }
+            return {
+                "ok": True,
+                "ticker": ticker,
+                "row": {
+                    "ticker": ticker,
+                    "scan_status": "ok",
+                    "price": 10.0,
+                    "scan_score": 5.0,
+                    "strength": 1.0,
+                    "latest_sig_ts": 1.0,
+                },
+                "elapsed_sec": 0.02,
+            }
+
+        with patch("scripts.daily_scan_and_notify._scan_ticker_worker", side_effect=_fake_worker):
+            result = scan_universe(["AAA", "BAD"], max_workers=2, bias_mode="default")
+
+        by_ticker = {row["ticker"]: row for row in result.rows}
+        self.assertEqual(sorted(by_ticker), ["AAA", "BAD"])
+        self.assertEqual(by_ticker["AAA"]["scan_status"], "ok")
+        self.assertEqual(by_ticker["BAD"]["scan_status"], "skipped")
+        self.assertEqual(by_ticker["BAD"]["scan_skip_reason"], "missing_frame")
+        self.assertEqual(result.perf["row_count"], 2)
+        self.assertEqual(result.perf["match_count"], 1)
+        self.assertEqual(result.perf["skip_count"], 1)
+
+    def test_write_scan_csv_dedupes_duplicate_extra_field_keys(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = write_scan_csv(
+                [{"ticker": "AAA", "scan_status": "ok", "bearish_gap_failure": False}],
+                out_dir=Path(temp_dir),
+                run_label="dedupe",
+                extra_field_specs=_post_close_extra_field_specs(include_combined_source=True),
+            )
+            header = next(csv.reader(io.StringIO(path.read_text(encoding="utf-8-sig"))))
+
+        self.assertEqual(len(header), len(set(header)))
+        self.assertEqual(sum(1 for column in header if column.endswith("(bearish_gap_failure)")), 1)
 
     def test_merge_shard_scan_rows_dedupes_and_sorts(self):
         with tempfile.TemporaryDirectory() as temp_dir:

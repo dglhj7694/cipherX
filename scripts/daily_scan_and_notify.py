@@ -261,6 +261,11 @@ POST_CLOSE_COMBINED_SOURCE_FIELD_SPECS: tuple[dict[str, str], ...] = (
     {"group": "combined", "key": "source_universe_profiles", "label": "UniverseProfiles", "type": "text", "description": "Universe profiles containing this ticker in the final combined scan", "rule": "profile names joined with +", "example": "default+russell2000"},
     {"group": "combined", "key": "source_universe_hit_count", "label": "UniverseHitCount", "type": "number", "description": "Number of source universe profiles containing this ticker", "rule": "unique profile count", "example": "2"},
 )
+SCAN_STATUS_FIELD_SPECS: tuple[dict[str, str], ...] = (
+    {"group": "scan", "key": "scan_status", "label": "ScanStatus", "type": "text", "description": "Ticker scan outcome", "rule": "ok or skipped", "example": "ok"},
+    {"group": "scan", "key": "scan_skip_reason", "label": "ScanSkipReason", "type": "text", "description": "Reason a ticker was kept as a skipped CSV row", "rule": "empty when scan_status=ok", "example": "missing_frame"},
+    {"group": "scan", "key": "scan_skip_detail", "label": "ScanSkipDetail", "type": "text", "description": "Short detail for skipped ticker rows", "rule": "truncated diagnostic text", "example": "no frame returned"},
+)
 POST_CLOSE_COMBINED_SCAN_LABEL = "통합 장마감 스캔"
 EARLY_SESSION_CORE_TOP_N = 20
 EARLY_SESSION_EXTENDED_SECTION_TOTAL = 10
@@ -406,6 +411,27 @@ def _dedupe_rows_by_ticker(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, 
     deduped = list(best_by_ticker.values())
     deduped.sort(key=_row_sort_key)
     return deduped
+
+
+def _is_skipped_scan_row(row: Mapping[str, Any]) -> bool:
+    return str((row or {}).get("scan_status") or "").strip().lower() == "skipped"
+
+
+def _count_analyzed_rows(rows: Iterable[Mapping[str, Any]]) -> int:
+    return sum(1 for row in rows or [] if not _is_skipped_scan_row(row))
+
+
+def _unique_field_specs(specs: Iterable[Mapping[str, str]]) -> list[dict[str, str]]:
+    unique: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for spec in specs or []:
+        spec_dict = dict(spec or {})
+        key = str(spec_dict.get("key") or "").strip()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        unique.append(spec_dict)
+    return unique
 
 
 def _recent_frame_flag(frame: Any, column: str, window: int = 5) -> bool:
@@ -964,6 +990,8 @@ def _coerce_optional_float(value: Any) -> float | None:
 def _percentile_map_for_key(rows: list[dict[str, Any]], source_key: str) -> dict[int, float]:
     values: list[tuple[int, float]] = []
     for idx, row in enumerate(rows):
+        if _is_skipped_scan_row(row):
+            continue
         number = _coerce_optional_float(row.get(source_key))
         if number is None:
             continue
@@ -1167,6 +1195,124 @@ def _compute_signal_frame(ticker: str, *, bias_mode: str, history_period: str = 
         return None
     indicator_frame = compute_indicators(history)
     return detect_all_signals(indicator_frame, bias_mode=resolve_bias_mode(bias_mode))
+
+
+def _build_skipped_scan_row(
+    ticker: Any,
+    *,
+    reason: Any,
+    detail: Any = "",
+    scan_source: str = "daily_batch",
+) -> dict[str, Any]:
+    symbol = str(ticker or "").strip().upper()
+    skip_reason = str(reason or "unknown").strip() or "unknown"
+    skip_detail = str(detail or "").strip()[:220]
+    row: dict[str, Any] = {
+        "ticker": symbol,
+        "scan_status": "skipped",
+        "scan_skip_reason": skip_reason,
+        "scan_skip_detail": skip_detail,
+        "scan_source": scan_source,
+        "scan_latency_sec": 0.0,
+        "price": "",
+        "chg_value": "",
+        "chg": "",
+        "chg_5d": "",
+        "session_open": "",
+        "session_prev_close": "",
+        "session_gap_pct": "",
+        "scans": [],
+        "transitions": [],
+        "multi_sig": False,
+        "multi_cnt": 0,
+        "multi_buy": 0,
+        "multi_sell": 0,
+        "multi_neutral": 0,
+        "multi_imb": 0,
+        "multi_hits": [],
+        "jg_key": "SKIPPED",
+        "jg": "스캔 제외",
+        "cf": 0.0,
+        "es": 0.0,
+        "strategies": [],
+        "top_strategy": None,
+        "strategy_conflict_level": "N/A",
+        "strategy_bias": "N/A",
+        "strategy_active_count": 0,
+        "ctx": "N/A",
+        "ba": 0,
+        "sa": 0,
+        "buy_total": 0.0,
+        "sell_total": 0.0,
+        "scan_score": -999999.0,
+        "strength": 0.0,
+        "latest_sig": "없음",
+        "latest_sig_ts": 0.0,
+        "reason": skip_detail or skip_reason,
+        "action": "스캔 제외",
+        "volume_ratio_20": "",
+        "volume_ratio_50": "",
+        "volume_oscillator": "",
+        "dollar_volume_20": "",
+        "volume_surge": False,
+        "volume_abnormal": False,
+        "volume_bullish": False,
+        "thin_trade_risk": False,
+        "bearish_gap_failure": False,
+        "bull_turn_recent": False,
+        "uptrend_or_pullback": False,
+        "pullback_ready": False,
+        "bull_strength_recent": False,
+        "uptrend_persistent": False,
+        "strong_trend_persistent": False,
+        "pullback_reentry": False,
+        "low_conflict_bullish": False,
+        "utbot_buy_recent": False,
+        "utbot_buy_last_date": "없음",
+        "utbot_sell_recent": False,
+        "utbot_sell_last_date": "없음",
+        "hull_turn_bull_recent": False,
+        "hull_turn_bull_last_date": "없음",
+        "hull_turn_bear_recent": False,
+        "hull_turn_bear_last_date": "없음",
+        "latest_bar_date": "N/A",
+        "new_52w_high": False,
+        "new_52w_closing_high": False,
+        "detected_combo_count": 0,
+        "detected_combo_summary": "없음",
+        "detected_transition_count": 0,
+        "detected_transition_summary": "없음",
+        "detected_core_count": 0,
+        "detected_core_summary": "없음",
+        "detected_signal_total_count": 0,
+        "detected_buy_signal_latest_date": "없음",
+        "detected_signal_latest_date": "없음",
+        "detected_signals": [],
+        "watch_buy_plus": False,
+        "buy_combo_present": False,
+    }
+    row.update(_compute_post_close_row_metrics(None))
+    for key in (
+        "drawdown_from_52w_high_pct",
+        "drawdown_from_20d_high_pct",
+        "pullback_from_swing_high_pct",
+        "zscore20",
+        "bb_percent_b",
+        "atr_pct",
+        "pullback_atr_multiple",
+        "dist_vwap_pct",
+        "dist_bb_mid_pct",
+        "dist_bb_upper_pct",
+        "breakout_dist_20d_high_pct",
+        "breakout_dist_channel_up_pct",
+        "ret20_pct",
+        "ret60_pct",
+        "ret120_pct",
+        "ret252_pct",
+        "rs_ratio",
+    ):
+        row[key] = ""
+    return row
 
 
 def _build_scanner_row(ticker: str, *, bias_mode: str, recent_window: int = 5, history_period: str = "2y") -> dict[str, Any]:
@@ -1385,6 +1531,9 @@ def _build_scanner_row(ticker: str, *, bias_mode: str, recent_window: int = 5, h
 
         row = {
             "ticker": ticker,
+            "scan_status": "ok",
+            "scan_skip_reason": "",
+            "scan_skip_detail": "",
             "price": _safe_float(current_close),
             "chg_value": chg_value,
             "chg": chg_pct,
@@ -1506,21 +1655,36 @@ def scan_universe(tickers: list[str], *, max_workers: int, bias_mode: str, histo
             try:
                 payload = future.result()
             except Exception as exc:
-                skip_reasons.append({"ticker": done_ticker, "reason": "future_error", "detail": str(exc)[:220]})
+                detail = str(exc)[:220]
+                skip_reasons.append({"ticker": done_ticker, "reason": "future_error", "detail": detail})
+                results.append(_build_skipped_scan_row(done_ticker, reason="future_error", detail=detail))
                 continue
             if payload.get("ok") and isinstance(payload.get("row"), dict):
                 row = dict(payload["row"])
+                row["scan_status"] = str(row.get("scan_status") or "ok")
+                row["scan_skip_reason"] = str(row.get("scan_skip_reason") or "")
+                row["scan_skip_detail"] = str(row.get("scan_skip_detail") or "")
                 row["scan_source"] = "daily_batch"
                 row["scan_latency_sec"] = _safe_float(payload.get("elapsed_sec", 0))
                 results.append(row)
                 ticker_latencies.append(_safe_float(payload.get("elapsed_sec", 0)))
             else:
+                skip_reason = str(payload.get("skip_reason") or "unknown")
+                skip_detail = str(payload.get("detail") or "")[:220]
+                skipped_ticker = str(payload.get("ticker") or done_ticker)
                 skip_reasons.append(
                     {
-                        "ticker": str(payload.get("ticker") or done_ticker),
-                        "reason": str(payload.get("skip_reason") or "unknown"),
-                        "detail": str(payload.get("detail") or "")[:220],
+                        "ticker": skipped_ticker,
+                        "reason": skip_reason,
+                        "detail": skip_detail,
                     }
+                )
+                results.append(
+                    _build_skipped_scan_row(
+                        skipped_ticker,
+                        reason=skip_reason,
+                        detail=skip_detail,
+                    )
                 )
     scan_seconds = _safe_float(time.perf_counter() - scan_started)
 
@@ -1535,7 +1699,8 @@ def scan_universe(tickers: list[str], *, max_workers: int, bias_mode: str, histo
         "sort_seconds": sort_seconds,
         "total_seconds": _safe_float(time.perf_counter() - run_started),
         "ticker_count": len(tickers),
-        "match_count": len(results),
+        "row_count": len(results),
+        "match_count": _count_analyzed_rows(results),
         "skip_count": len(skip_reasons),
         "avg_row_seconds": _safe_float(sum(ticker_latencies) / len(ticker_latencies)) if ticker_latencies else 0.0,
     }
@@ -1552,7 +1717,7 @@ def write_scan_csv(
     out_dir.mkdir(parents=True, exist_ok=True)
     output_path = out_dir / f"scanner_full_{run_label}.csv"
     if extra_field_specs:
-        field_specs = [*scanner_csv_field_specs(), *[dict(spec) for spec in extra_field_specs]]
+        field_specs = _unique_field_specs([*scanner_csv_field_specs(), *[dict(spec) for spec in extra_field_specs]])
         payload = scanner_rows_to_csv_bytes(rows, field_specs=field_specs)
     else:
         payload = scanner_rows_to_csv_bytes(rows)
@@ -3340,6 +3505,7 @@ def _build_post_close_digest_bundle(
 
 def _post_close_extra_field_specs(*, include_combined_source: bool = False) -> list[dict[str, str]]:
     specs: list[dict[str, str]] = []
+    specs.extend(dict(spec) for spec in SCAN_STATUS_FIELD_SPECS)
     if include_combined_source:
         specs.extend(dict(spec) for spec in POST_CLOSE_COMBINED_SOURCE_FIELD_SPECS)
     specs.extend(dict(spec) for spec in POST_CLOSE_LATEST_SESSION_FIELD_SPECS)
@@ -3590,6 +3756,8 @@ def _run_post_close_combined(args: argparse.Namespace, *, run_at_kst: datetime, 
     csv_rows = annotate_rows_with_qbs(csv_rows, target_date=latest_session_date)
     csv_rows = annotate_rows_with_technical_buy(csv_rows, target_date=latest_session_date)
     csv_rows = annotate_rows_with_startup9_confirm(csv_rows, target_date=latest_session_date)
+    analyzed_count = _count_analyzed_rows(csv_rows)
+    csv_row_count = len(csv_rows)
 
     csv_path = write_scan_csv(
         csv_rows,
@@ -3605,7 +3773,8 @@ def _run_post_close_combined(args: argparse.Namespace, *, run_at_kst: datetime, 
         "dedup_removed_count": int(combined_payload.get("dedup_removed_count", 0)),
         "source_row_count": int(combined_payload.get("source_row_count", 0)),
         "source_universe_count_sum": source_universe_count_sum,
-        "combined_result_count": len(csv_rows),
+        "combined_result_count": analyzed_count,
+        "combined_csv_row_count": csv_row_count,
         "source_artifacts": [
             {
                 "profile": artifact.get("primary_profile"),
@@ -3613,7 +3782,8 @@ def _run_post_close_combined(args: argparse.Namespace, *, run_at_kst: datetime, 
                 "meta_path": artifact.get("meta_path"),
                 "rows_path": artifact.get("rows_path"),
                 "universe_count": artifact.get("universe_count"),
-                "result_count": len(list(artifact.get("rows") or [])),
+                "result_count": _count_analyzed_rows(list(artifact.get("rows") or [])),
+                "csv_row_count": len(list(artifact.get("rows") or [])),
             }
             for artifact in artifacts
         ],
@@ -3627,7 +3797,7 @@ def _run_post_close_combined(args: argparse.Namespace, *, run_at_kst: datetime, 
         market_date=latest_session_date,
         scan_label=POST_CLOSE_COMBINED_SCAN_LABEL,
         universe_count=source_universe_count_sum,
-        result_count=len(csv_rows),
+        result_count=analyzed_count,
         skip_count=skip_count_sum,
         publish_enabled=publish_enabled,
         publish_required=publish_enabled,
@@ -3651,7 +3821,8 @@ def _run_post_close_combined(args: argparse.Namespace, *, run_at_kst: datetime, 
         "source_universe_count_sum": source_universe_count_sum,
         "source_row_count": int(combined_payload.get("source_row_count", 0)),
         "dedup_removed_count": int(combined_payload.get("dedup_removed_count", 0)),
-        "result_count": len(csv_rows),
+        "result_count": analyzed_count,
+        "csv_row_count": csv_row_count,
         "skip_count": skip_count_sum,
         "csv_path": str(csv_path),
         "rows_path": str(rows_path),
@@ -3667,7 +3838,8 @@ def _run_post_close_combined(args: argparse.Namespace, *, run_at_kst: datetime, 
     print(f"[COMBINE] Summary saved: {summary_path}")
     print(
         f"[COMBINE] Completed: source_rows={meta_payload['source_row_count']} "
-        f"combined={len(csv_rows)} dedup_removed={meta_payload['dedup_removed_count']}"
+        f"csv_rows={csv_row_count} analyzed={analyzed_count} "
+        f"dedup_removed={meta_payload['dedup_removed_count']}"
     )
 
     _send_telegram_if_enabled(
@@ -3779,17 +3951,13 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
         csv_rows = annotate_rows_with_qbs(csv_rows, target_date=latest_session_date)
         csv_rows = annotate_rows_with_technical_buy(csv_rows, target_date=latest_session_date)
         csv_rows = annotate_rows_with_startup9_confirm(csv_rows, target_date=latest_session_date)
+        analyzed_count = _count_analyzed_rows(csv_rows)
+        csv_row_count = len(csv_rows)
         csv_path = write_scan_csv(
             csv_rows,
             out_dir=out_dir,
             run_label=run_label,
-            extra_field_specs=[
-                *POST_CLOSE_LATEST_SESSION_FIELD_SPECS,
-                *POST_CLOSE_FINAL_ENTRY_FIELD_SPECS,
-                *POST_CLOSE_QBS_FIELD_SPECS,
-                *POST_CLOSE_TECHNICAL_BUY_FIELD_SPECS,
-                *POST_CLOSE_STARTUP9_FIELD_SPECS,
-            ],
+            extra_field_specs=_post_close_extra_field_specs(),
         )
         rows_path = write_scan_rows_json(csv_rows, out_dir=out_dir, run_label=run_label)
 
@@ -3817,7 +3985,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
             market_date=latest_session_date,
             scan_label=scan_label,
             universe_count=int(_safe_float(merged_payload.get("universe_count", 0))),
-            result_count=len(merged_rows),
+            result_count=analyzed_count,
             skip_count=int(_safe_float(merged_payload.get("skip_count_sum", 0))),
             publish_enabled=bool(
                 merge_ready
@@ -3841,7 +4009,8 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
             "expected_shard_count": int(_safe_float(merged_payload.get("expected_shard_count", 0))),
             "found_shard_count": int(_safe_float(merged_payload.get("found_shard_count", 0))),
             "missing_shard_indices": missing_shard_indices,
-            "result_count": len(merged_rows),
+            "result_count": analyzed_count,
+            "csv_row_count": csv_row_count,
             "detected_turn_count": len(detected_turn_rows),
             "trend_turn_count": len(turn_rows),
             "pullback_reentry_count": len(pullback_rows),
@@ -3887,7 +4056,8 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
 
         scan_result = scan_universe(tickers, max_workers=int(args.max_workers), bias_mode=str(args.bias_mode))
         print(
-            f"[SCAN] Completed: results={len(scan_result.rows)} "
+            f"[SCAN] Completed: rows={len(scan_result.rows)} "
+            f"analyzed={_count_analyzed_rows(scan_result.rows)} "
             f"skips={len(scan_result.skips)} total_sec={_safe_float(scan_result.perf.get('total_seconds', 0)):.1f}"
         )
 
@@ -3903,17 +4073,13 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
         csv_rows = annotate_rows_with_qbs(csv_rows, target_date=latest_session_date)
         csv_rows = annotate_rows_with_technical_buy(csv_rows, target_date=latest_session_date)
         csv_rows = annotate_rows_with_startup9_confirm(csv_rows, target_date=latest_session_date)
+        analyzed_count = _count_analyzed_rows(csv_rows)
+        csv_row_count = len(csv_rows)
         csv_path = write_scan_csv(
             csv_rows,
             out_dir=out_dir,
             run_label=run_label,
-            extra_field_specs=[
-                *POST_CLOSE_LATEST_SESSION_FIELD_SPECS,
-                *POST_CLOSE_FINAL_ENTRY_FIELD_SPECS,
-                *POST_CLOSE_QBS_FIELD_SPECS,
-                *POST_CLOSE_TECHNICAL_BUY_FIELD_SPECS,
-                *POST_CLOSE_STARTUP9_FIELD_SPECS,
-            ],
+            extra_field_specs=_post_close_extra_field_specs(),
         )
         rows_path = write_scan_rows_json(csv_rows, out_dir=out_dir, run_label=run_label)
         detected_turn_rows = select_us_session_turn_rows(csv_rows, run_at_kst=run_at_kst, scan_mode=scan_mode)
@@ -3933,7 +4099,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
                 turn_rows,
                 run_at_kst=run_at_kst,
                 universe_count=len(tickers),
-                result_count=len(scan_result.rows),
+                result_count=analyzed_count,
                 skip_count=len(scan_result.skips),
                 scan_label=scan_label,
                 detected_turn_count=len(detected_turn_rows),
@@ -3963,7 +4129,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
                 market_date=latest_session_date,
                 scan_label=scan_label,
                 universe_count=len(tickers),
-                result_count=len(scan_result.rows),
+                result_count=analyzed_count,
                 skip_count=len(scan_result.skips),
                 publish_enabled=bool(
                     universe_profile == "default"
@@ -3989,7 +4155,8 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
             "etf_errors": list(universe_payload.get("etf_errors") or []),
             "performance": scan_result.perf,
             "skip_reasons": scan_result.skips,
-            "result_count": len(scan_result.rows),
+            "result_count": analyzed_count,
+            "csv_row_count": csv_row_count,
             "detected_turn_count": len(detected_turn_rows),
             "trend_turn_count": len(turn_rows),
             "pullback_reentry_count": len(pullback_rows),
@@ -4212,6 +4379,8 @@ def _run_early_session(args: argparse.Namespace, *, run_at_kst: datetime, out_di
             cross_section_enabled=True,
         )
         csv_rows = list(sections_payload.get("rows") or [])
+        analyzed_count = _count_analyzed_rows(csv_rows)
+        csv_row_count = len(csv_rows)
         detected_turn_rows = list(sections_payload.get("detected_turn_rows") or [])
         turn_rows = list(sections_payload.get("turn_rows") or [])
         pullback_rows = list(sections_payload.get("pullback_rows") or [])
@@ -4232,6 +4401,7 @@ def _run_early_session(args: argparse.Namespace, *, run_at_kst: datetime, out_di
             out_dir=out_dir,
             run_label=run_label,
             extra_field_specs=[
+                *SCAN_STATUS_FIELD_SPECS,
                 *EARLY_SESSION_LATEST_SESSION_FIELD_SPECS,
                 *POST_CLOSE_FINAL_ENTRY_FIELD_SPECS,
                 *EARLY_SESSION_EXTRA_FIELD_SPECS,
@@ -4242,7 +4412,7 @@ def _run_early_session(args: argparse.Namespace, *, run_at_kst: datetime, out_di
             turn_rows,
             run_at_kst=run_at_kst,
             universe_count=int(_safe_float(merged_payload.get("universe_count", 0))),
-            result_count=len(csv_rows),
+            result_count=analyzed_count,
             skip_count=int(_safe_float(merged_payload.get("skip_count_sum", 0))),
             scan_label=scan_label,
             detected_turn_count=len(detected_turn_rows),
@@ -4280,7 +4450,8 @@ def _run_early_session(args: argparse.Namespace, *, run_at_kst: datetime, out_di
             "expected_shard_count": int(_safe_float(merged_payload.get("expected_shard_count", 0))),
             "found_shard_count": int(_safe_float(merged_payload.get("found_shard_count", 0))),
             "missing_shard_indices": missing_shard_indices,
-            "result_count": len(csv_rows),
+            "result_count": analyzed_count,
+            "csv_row_count": csv_row_count,
             "detected_turn_count": len(detected_turn_rows),
             "trend_turn_count": len(turn_rows),
             "pullback_detected_raw_count": pullback_detected_raw_count,
@@ -4331,7 +4502,8 @@ def _run_early_session(args: argparse.Namespace, *, run_at_kst: datetime, out_di
             history_period=history_period,
         )
         print(
-            f"[EARLY_SESSION] Completed: results={len(scan_result.rows)} "
+            f"[EARLY_SESSION] Completed: rows={len(scan_result.rows)} "
+            f"analyzed={_count_analyzed_rows(scan_result.rows)} "
             f"skips={len(scan_result.skips)} total_sec={_safe_float(scan_result.perf.get('total_seconds', 0)):.1f}"
         )
 
@@ -4343,6 +4515,8 @@ def _run_early_session(args: argparse.Namespace, *, run_at_kst: datetime, out_di
             cross_section_enabled=shard_count <= 1,
         )
         csv_rows = list(sections_payload.get("rows") or [])
+        analyzed_count = _count_analyzed_rows(csv_rows)
+        csv_row_count = len(csv_rows)
         detected_turn_rows = list(sections_payload.get("detected_turn_rows") or [])
         turn_rows = list(sections_payload.get("turn_rows") or [])
         pullback_rows = list(sections_payload.get("pullback_rows") or [])
@@ -4363,6 +4537,7 @@ def _run_early_session(args: argparse.Namespace, *, run_at_kst: datetime, out_di
             out_dir=out_dir,
             run_label=run_label,
             extra_field_specs=[
+                *SCAN_STATUS_FIELD_SPECS,
                 *EARLY_SESSION_LATEST_SESSION_FIELD_SPECS,
                 *POST_CLOSE_FINAL_ENTRY_FIELD_SPECS,
                 *EARLY_SESSION_EXTRA_FIELD_SPECS,
@@ -4373,7 +4548,7 @@ def _run_early_session(args: argparse.Namespace, *, run_at_kst: datetime, out_di
             turn_rows,
             run_at_kst=run_at_kst,
             universe_count=len(tickers),
-            result_count=len(csv_rows),
+            result_count=analyzed_count,
             skip_count=len(scan_result.skips),
             scan_label=scan_label,
             detected_turn_count=len(detected_turn_rows),
@@ -4411,7 +4586,8 @@ def _run_early_session(args: argparse.Namespace, *, run_at_kst: datetime, out_di
                 "etf_errors": list(universe_payload.get("etf_errors") or []),
                 "performance": scan_result.perf,
                 "skip_reasons": scan_result.skips,
-                "result_count": len(csv_rows),
+                "result_count": analyzed_count,
+                "csv_row_count": csv_row_count,
                 "detected_turn_count": len(detected_turn_rows),
                 "trend_turn_count": len(turn_rows),
                 "pullback_detected_raw_count": pullback_detected_raw_count,
