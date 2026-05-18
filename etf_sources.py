@@ -5,6 +5,24 @@ import yfinance as yf
 from infrastructure.etf import FunctionHoldingsProvider, HoldingsProviderRegistry
 
 _SCAN_SYMBOL_PATTERN = re.compile(r"\b[A-Z]{1,6}(?:[.-][A-Z0-9]{1,4})?\b")
+_ISHARES_PRODUCTS = {
+    "IGV": {
+        "product_id": "239771",
+        "url": "https://www.ishares.com/us/products/239771/ishares-north-american-techsoftware-etf",
+    },
+    "EUSA": {
+        "product_id": "239693",
+        "url": "https://www.ishares.com/us/products/239693/ishares-msci-usa-etf",
+    },
+    "IWB": {
+        "product_id": "239707",
+        "url": "https://www.ishares.com/us/products/239707/ishares-russell-1000-etf",
+    },
+    "IWM": {
+        "product_id": "239710",
+        "url": "https://www.ishares.com/us/products/239710/ishares-russell-2000-etf",
+    },
+}
 
 
 def _build_etf_payload(symbol, tickers, source_label, as_of=""):
@@ -109,16 +127,18 @@ def _fetch_ishares_holdings(symbol):
     import io
     import requests
 
-    page_map = {
-        "IGV": "https://www.ishares.com/us/products/239771/ishares-north-american-techsoftware-etf",
-        "EUSA": "https://www.ishares.com/us/products/239693/ishares-msci-usa-etf",
-        "IWB": "https://www.ishares.com/us/products/239707/ishares-russell-1000-etf",
-        "IWM": "https://www.ishares.com/us/products/239710/ishares-russell-2000-etf",
-    }
-    page_url = page_map.get(symbol)
-    if not page_url:
+    product = _ISHARES_PRODUCTS.get(symbol)
+    if not product:
         return {"symbol": symbol, "tickers": [], "note": "", "error": "지원하지 않는 iShares ETF입니다.", "as_of": ""}
 
+    try:
+        api_payload = _fetch_ishares_product_data_holdings(symbol, str(product.get("product_id") or ""))
+    except Exception as exc:
+        api_payload = {"symbol": symbol, "tickers": [], "note": "", "error": str(exc), "as_of": ""}
+    if api_payload.get("tickers"):
+        return api_payload
+
+    page_url = str(product.get("url") or "")
     page_text = requests.get(page_url, timeout=20, headers={"User-Agent": "Mozilla/5.0"}).text
     match = re.search(
         rf'href="([^"]*fileType=csv[^"]*fileName={symbol}_holdings[^"]*dataType=fund)"',
@@ -126,7 +146,9 @@ def _fetch_ishares_holdings(symbol):
         flags=re.I,
     )
     if not match:
-        return {"symbol": symbol, "tickers": [], "note": "", "error": "iShares CSV 링크를 찾지 못했습니다.", "as_of": ""}
+        api_error = str(api_payload.get("error") or "").strip()
+        detail = f"iShares product-data API 실패: {api_error}; " if api_error else ""
+        return {"symbol": symbol, "tickers": [], "note": "", "error": f"{detail}iShares CSV 링크를 찾지 못했습니다.", "as_of": ""}
 
     csv_url = requests.compat.urljoin("https://www.ishares.com", match.group(1))
     raw_csv = requests.get(csv_url, timeout=20, headers={"User-Agent": "Mozilla/5.0"}).content
@@ -153,6 +175,58 @@ def _fetch_ishares_holdings(symbol):
     if not tickers:
         return {"symbol": symbol, "tickers": [], "note": "", "error": "iShares holdings CSV에서 티커를 찾지 못했습니다.", "as_of": as_of}
     return _build_etf_payload(symbol, tickers, "iShares 공식 CSV", as_of)
+
+
+def _fetch_ishares_product_data_holdings(symbol, product_id):
+    symbol = str(symbol or "").strip().upper()
+    product_id = str(product_id or "").strip()
+    if not symbol or not product_id:
+        return {"symbol": symbol, "tickers": [], "note": "", "error": "iShares product id가 비어 있습니다.", "as_of": ""}
+
+    import requests
+
+    params = {
+        "appSubType": "ISHARES",
+        "appType": "PRODUCT_PAGE",
+        "component": "holdings",
+        "locale": "en_US",
+        "portfolioId": product_id,
+        "targetSite": "us-ishares",
+        "userType": "individual",
+        "excludeContent": "true",
+        "includeConfig": "true",
+    }
+    url = "https://www.blackrock.com/varnish-api/blk-one01-product-data/product-data/api/v2/get-product-data"
+    response = requests.get(
+        url,
+        params=params,
+        timeout=30,
+        headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"},
+    )
+    response.raise_for_status()
+    payload = response.json()
+    data_points = (
+        payload.get("componentsByNameMap", {})
+        .get("holdings", {})
+        .get("containersByNameMap", {})
+        .get("all", {})
+        .get("dataPointsByNameMap", {})
+    )
+    ticker_values = data_points.get("ticker", {}).get("value") or data_points.get("ticker", {}).get("formattedValue") or []
+    tickers = []
+    for raw_ticker in ticker_values:
+        ticker = str(raw_ticker or "").strip().upper().replace(".", "-")
+        if ticker in {"", "-", "--", "USD", "$USD", "CASH"}:
+            continue
+        if _SCAN_SYMBOL_PATTERN.fullmatch(ticker):
+            tickers.append(ticker)
+
+    as_of_point = data_points.get("asOfDate", {})
+    as_of = str(as_of_point.get("formattedValue") or as_of_point.get("value") or "").strip()
+    tickers = list(dict.fromkeys(tickers))
+    if not tickers:
+        return {"symbol": symbol, "tickers": [], "note": "", "error": "iShares product-data API에서 티커를 찾지 못했습니다.", "as_of": as_of}
+    return _build_etf_payload(symbol, tickers, "iShares product-data API", as_of)
 
 
 def _fetch_alpha_architect_holdings(symbol):

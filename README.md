@@ -47,6 +47,7 @@
   - `telegram_pipeline/`은 digest contract, section selector, formatter, publisher, sender를 담당합니다.
   - Daily Scan Notify는 기본 유니버스와 Russell2000 확장 유니버스를 각각 shard/merge한 뒤, 마지막 combine 단계에서 중복 티커를 제거한 통합 CSV 1개만 Telegram으로 보냅니다.
   - 통합 CSV는 분석 성공 티커뿐 아니라 데이터 없음/계산 실패 티커도 `scan_status=skipped`, `scan_skip_reason`, `scan_skip_detail` 행으로 남겨 최종 중복 제거 후 전체 유니버스 티커를 추적할 수 있게 합니다.
+  - iShares 계열 IWB/EUSA/IWM 유니버스는 현재 iShares/BlackRock product-data API의 전체 holdings 배열을 우선 사용하고, 실패 시에만 Yahoo Finance 상위 보유 fallback으로 내려갑니다.
   - 장마감 digest는 `[0] 오늘 의사결정 핵심`, `[1] Startup식 9개 강세확인 Top 20`, `[2] 기술적 매수시그널 클러스터`, `[3] 다음 거래일 공격형 매수 후보 8-PART`, `[4] 매매 유형별 후보 보드`, `[5] 참고 랭킹` 흐름으로 구성합니다.
   - 최종 통합 digest는 `dglhj7694/cipherX` 저장소의 `telegram-digest` 브랜치 `post_close/latest.json`에 publish되며 홈 `Telegram Digest Dashboard`의 오늘 종목판이 이 파일을 기본 source of truth로 읽습니다.
   - Startup식 추정 강세확인은 9개 독립 축 중 6개 이상, 최근 매도전환 없음, 유동성 통과를 기본 Top20 조건으로 사용하며 hard exclusion과 soft risk를 분리해 표시합니다.
@@ -214,6 +215,7 @@ cipherX/
   - 장마감/프리마켓/장초반 scan, shard merge, 통합 장마감 combine, Telegram notify, CSV/JSON artifact 생성을 담당합니다.
   - 장마감 combine 모드는 default/Russell2000 final artifact를 합쳐 중복 티커를 제거하고 통합 digest를 `telegram-digest/post_close/latest.json`에 publish합니다.
   - Daily scan CSV는 skipped 티커를 버리지 않고 상태/사유 컬럼으로 보존하며, digest의 `result_count`는 분석 성공 티커 수, `csv_row_count`는 CSV 전체 행 수로 기록합니다.
+  - ETF 유니버스 생성은 iShares product-data API, Wikipedia index table, 운용사 holdings, Yahoo fallback 순서로 구성종목을 수집합니다.
 
 - `scripts/realtime_premarket_scan.py`
   - 프리마켓/실시간 성격의 scan과 Telegram 알림을 담당합니다.
