@@ -50,8 +50,10 @@ from sectors import SECTOR_GROUPS
 from strategy import build_strategy_payload
 from etf_sources import resolve_etf_universe
 from telegram_pipeline import (
+    SCAN_TAXONOMY_TABS,
     annotate_rows_with_qbs,
     annotate_rows_with_startup9_confirm,
+    annotate_rows_with_scan_taxonomy,
     annotate_rows_with_technical_buy,
     build_post_close_digest,
     build_post_close_message_texts,
@@ -256,6 +258,26 @@ POST_CLOSE_STARTUP9_FIELD_SPECS: tuple[dict[str, str], ...] = (
     {"group": "Startup9", "key": "startup9_confirm_reason", "label": "S9Reason", "type": "text", "description": "Startup9 한 줄 요약 근거", "rule": "profile / direction / top confirms", "example": "TREND_CONTINUATION / BULL_ACTIVE / Trend Pane Bullish"},
     {"group": "Startup9", "key": "startup9_risk_flags", "label": "S9RiskFlags", "type": "text", "description": "Startup9 hard/soft risk flags", "rule": "flags joined with + or 특이사항 없음", "example": "rsi_hot+ma20_extended"},
     {"group": "Startup9", "key": "startup9_score", "label": "S9Score", "type": "number", "description": "Startup9 후보 정렬 보조 점수", "rule": "confirm_count*10 + volume/ADX/RS bonus - risk penalty", "example": "83.5"},
+)
+POST_CLOSE_SCAN_TAXONOMY_FIELD_SPECS: tuple[dict[str, str], ...] = (
+    {"group": "taxonomy", "key": "scan_action_label", "label": "ScanActionLabel", "type": "text", "description": "13-tab primary action label", "rule": "taxonomy primary action", "example": "STRONG_BUY_NOW"},
+    {"group": "taxonomy", "key": "scan_taxonomy_primary", "label": "ScanTaxonomyPrimary", "type": "text", "description": "Primary 13-tab key", "rule": "highest priority matched taxonomy tab", "example": "buy_now"},
+    {"group": "taxonomy", "key": "scan_taxonomy_primary_title", "label": "ScanTaxonomyPrimaryTitle", "type": "text", "description": "Primary 13-tab title", "rule": "localized title for primary tab", "example": "지금매수"},
+    {"group": "taxonomy", "key": "scan_taxonomy_matches", "label": "ScanTaxonomyMatches", "type": "text", "description": "All matched 13-tab keys", "rule": "matched taxonomy keys joined with +", "example": "buy_now+pullback+accumulation"},
+    {"group": "taxonomy", "key": "scan_taxonomy_reason", "label": "ScanTaxonomyReason", "type": "text", "description": "Primary taxonomy reason", "rule": "compact reason tags", "example": "상승추세+눌림지지+거래량"},
+    {"group": "taxonomy", "key": "scan_taxonomy_risk_flags", "label": "ScanTaxonomyRiskFlags", "type": "text", "description": "Risk flags used by taxonomy", "rule": "flags joined with +", "example": "sell_turn+gap_failure"},
+    *(
+        {
+            "group": "taxonomy_tab",
+            "key": tab.csv_key,
+            "label": f"ScanTab{tab.key}",
+            "type": "bool",
+            "description": f"Matched taxonomy tab: {tab.title}",
+            "rule": f"{tab.title} taxonomy predicate",
+            "example": "Y",
+        }
+        for tab in SCAN_TAXONOMY_TABS
+    ),
 )
 POST_CLOSE_COMBINED_SOURCE_FIELD_SPECS: tuple[dict[str, str], ...] = (
     {"group": "combined", "key": "source_universe_profiles", "label": "UniverseProfiles", "type": "text", "description": "Universe profiles containing this ticker in the final combined scan", "rule": "profile names joined with +", "example": "default+russell2000"},
@@ -3513,6 +3535,7 @@ def _post_close_extra_field_specs(*, include_combined_source: bool = False) -> l
     specs.extend(dict(spec) for spec in POST_CLOSE_QBS_FIELD_SPECS)
     specs.extend(dict(spec) for spec in POST_CLOSE_TECHNICAL_BUY_FIELD_SPECS)
     specs.extend(dict(spec) for spec in POST_CLOSE_STARTUP9_FIELD_SPECS)
+    specs.extend(dict(spec) for spec in POST_CLOSE_SCAN_TAXONOMY_FIELD_SPECS)
     return specs
 
 
@@ -3756,6 +3779,7 @@ def _run_post_close_combined(args: argparse.Namespace, *, run_at_kst: datetime, 
     csv_rows = annotate_rows_with_qbs(csv_rows, target_date=latest_session_date)
     csv_rows = annotate_rows_with_technical_buy(csv_rows, target_date=latest_session_date)
     csv_rows = annotate_rows_with_startup9_confirm(csv_rows, target_date=latest_session_date)
+    csv_rows = annotate_rows_with_scan_taxonomy(csv_rows, target_date=latest_session_date)
     analyzed_count = _count_analyzed_rows(csv_rows)
     csv_row_count = len(csv_rows)
 
@@ -3951,6 +3975,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
         csv_rows = annotate_rows_with_qbs(csv_rows, target_date=latest_session_date)
         csv_rows = annotate_rows_with_technical_buy(csv_rows, target_date=latest_session_date)
         csv_rows = annotate_rows_with_startup9_confirm(csv_rows, target_date=latest_session_date)
+        csv_rows = annotate_rows_with_scan_taxonomy(csv_rows, target_date=latest_session_date)
         analyzed_count = _count_analyzed_rows(csv_rows)
         csv_row_count = len(csv_rows)
         csv_path = write_scan_csv(
@@ -4073,6 +4098,7 @@ def _run_post_close(args: argparse.Namespace, *, run_at_kst: datetime, out_dir: 
         csv_rows = annotate_rows_with_qbs(csv_rows, target_date=latest_session_date)
         csv_rows = annotate_rows_with_technical_buy(csv_rows, target_date=latest_session_date)
         csv_rows = annotate_rows_with_startup9_confirm(csv_rows, target_date=latest_session_date)
+        csv_rows = annotate_rows_with_scan_taxonomy(csv_rows, target_date=latest_session_date)
         analyzed_count = _count_analyzed_rows(csv_rows)
         csv_row_count = len(csv_rows)
         csv_path = write_scan_csv(

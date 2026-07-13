@@ -10,6 +10,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from app_ui.components.beginner_trade_guide import render_beginner_trade_guide
 from company_details import render_company_details
 from chart import load_chart_figure, serialize_chart_figure
 from config import COMMITTEE_NAMES, CONTEXT_WEIGHTS, CTX_LABELS
@@ -4968,7 +4969,7 @@ def render_audit_panel(audit):
                 )
 
 
-def render_analysis(msg, key_prefix="analysis"):
+def render_analysis(msg, key_prefix="analysis", allow_plan_save=False):
     meta = msg.get("meta")
     fig_json = msg.get("fig_json")
     audit = msg.get("audit")
@@ -4977,16 +4978,27 @@ def render_analysis(msg, key_prefix="analysis"):
     if not (meta or fig_json):
         return
 
-    tab_chart, tab_judgment, tab_layers, tab_strategies, tab_startup9, tab_company = st.tabs(
+    tab_beginner, tab_chart, tab_judgment, tab_layers, tab_strategies, tab_startup9, tab_audit, tab_company = st.tabs(
         [
+            "초보자 가이드",
             "\uCC28\uD2B8",
             "\uD310\uB2E8/\uB9AC\uC2A4\uD06C",
             "10\uAC1C \uB808\uC774\uC5B4",
             "\uB9E4\uB9E4\uC804\uB7B5",
             "Startup9 강세확인",
+            "성과/검증",
             "\uAE30\uC5C5 \uC815\uBCF4",
         ]
     )
+
+    with tab_beginner:
+        if meta:
+            render_beginner_trade_guide(
+                meta,
+                audit=audit,
+                key_prefix=f"{key_prefix}_beginner",
+                allow_plan_save=bool(allow_plan_save),
+            )
 
     with tab_chart:
         if fig_json:
@@ -5028,6 +5040,9 @@ def render_analysis(msg, key_prefix="analysis"):
     with tab_startup9:
         if meta:
             _render_startup9_confirm_tab(meta)
+
+    with tab_audit:
+        render_audit_panel(audit)
 
     with tab_company:
         if meta:

@@ -353,19 +353,21 @@ def _quant_summary_html(payload: Mapping[str, Any]) -> str:
         ("Tickers", f"{int(summary.get('ticker_count') or len(rows)):,}"),
         ("UP", f"{int(summary.get('up_count') or 0):,}"),
         ("Neutral", f"{int(summary.get('neutral_count') or 0):,}"),
-        ("Avg Up", _format_float(summary.get("average_up_probability"), 1, suffix="%")),
+        ("Avg Up Score", _format_float(summary.get("average_up_probability"), 1)),
     ]
     stats_html = "".join(
         f"<div class='sigl-quant-stat'><b>{html.escape(label)}</b><strong>{html.escape(str(value))}</strong></div>"
         for label, value in stats
     )
     note = str(dict(payload or {}).get("note") or "")
+    score_notice = "규칙 기반 신호를 0~100으로 정규화한 방향 점수이며, 통계적으로 보정된 확률이 아닙니다."
+    note_text = " · ".join(part for part in (note, score_notice) if part)
     return (
         "<div class='sigl-quant-head'>"
         "<div>"
         "<div class='sigl-dashboard-note' style='margin:0 0 4px'>Next Session</div>"
         "<div class='sigl-quant-title'>Quant Prediction</div>"
-        f"<p>{html.escape(note)}</p>"
+        f"<p>{html.escape(note_text)}</p>"
         "</div>"
         f"<div class='sigl-quant-stats'>{stats_html}</div>"
         "</div>"
@@ -381,9 +383,9 @@ def _quant_rows_html(rows: Iterable[Mapping[str, Any]]) -> str:
             "<tr>"
             f"<td>{_quant_cell(row.get('ticker'), 'accent')}</td>"
             f"<td>{_quant_cell(label, tone)}</td>"
-            f"<td>{_quant_cell(_format_float(row.get('up_probability'), 1, suffix='%'), tone)}</td>"
-            f"<td>{_quant_cell(_format_float(row.get('down_probability'), 1, suffix='%'), 'negative' if label == 'DOWN' else 'muted')}</td>"
-            f"<td>{_quant_cell(_format_float(row.get('confidence'), 1, suffix='%'), tone)}</td>"
+            f"<td>{_quant_cell(_format_float(row.get('up_probability'), 1), tone)}</td>"
+            f"<td>{_quant_cell(_format_float(row.get('down_probability'), 1), 'negative' if label == 'DOWN' else 'muted')}</td>"
+            f"<td>{_quant_cell(_format_float(row.get('confidence'), 1), tone)}</td>"
             f"<td>{_quant_cell(_format_float(row.get('chg'), 2, signed=True, suffix='%'), 'positive' if (_optional_float(row.get('chg')) or 0) > 0 else 'negative' if (_optional_float(row.get('chg')) or 0) < 0 else 'muted')}</td>"
             f"<td>{_quant_cell(_format_float(row.get('chg_5d'), 2, signed=True, suffix='%'), 'positive' if (_optional_float(row.get('chg_5d')) or 0) > 0 else 'negative' if (_optional_float(row.get('chg_5d')) or 0) < 0 else 'muted')}</td>"
             f"<td>{_quant_cell(_format_float(row.get('atr_pct'), 1, suffix='%'), 'warning' if (_optional_float(row.get('atr_pct')) or 0) >= 12 else 'muted')}</td>"
@@ -406,7 +408,7 @@ def _render_quant_prediction(
     if not rows:
         render_empty_state(
             "Quant Prediction 데이터가 없습니다",
-            "scanner 결과, Telegram digest, market mover 중 하나가 있어야 다음 거래일 확률 추정표를 만들 수 있습니다.",
+            "scanner 결과, Telegram digest, market mover 중 하나가 있어야 다음 거래일 방향 점수표를 만들 수 있습니다.",
             badges=[("Quant", "warning"), ("No Data", "muted")],
             tone="warning",
         )
@@ -419,7 +421,7 @@ def _render_quant_prediction(
         "<div class='sigl-quant-table-wrap'>"
         "<table class='sigl-quant-table'>"
         "<thead><tr>"
-        "<th>Ticker</th><th>Label</th><th>Up</th><th>Down</th><th>Confidence</th>"
+        "<th>Ticker</th><th>Label</th><th>Up Score</th><th>Down Score</th><th>Signal Strength</th>"
         "<th>Today</th><th>5D</th><th>ATR</th><th>Vol20</th><th>RS</th><th>ADX</th>"
         "<th>Reason</th><th>Risk</th>"
         "</tr></thead>"
@@ -598,8 +600,8 @@ def render_market_dashboard_page(
 
     render_section_heading(
         "Quant Prediction",
-        "가격, 거래량, 변동성, 추세, 상대강도 기반으로 다음 거래일 방향 확률을 추정합니다. 뉴스/LLM 판단은 섞지 않습니다.",
-        badges=[("Rule v1", "accent"), ("No LLM", "muted"), ("Top 20", "positive")],
+        "가격, 거래량, 변동성, 추세, 상대강도 기반의 다음 거래일 방향 점수입니다. 통계적 확률은 아니며 뉴스/LLM 판단을 섞지 않습니다.",
+        badges=[("Rule Score v1", "accent"), ("No LLM", "muted"), ("Top 20", "positive")],
         eyebrow="Prediction",
         tight=True,
     )

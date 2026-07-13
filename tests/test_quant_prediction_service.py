@@ -1,5 +1,6 @@
 import unittest
 
+from app_ui.pages.market_dashboard_page import _quant_rows_html, _quant_summary_html
 from services.quant_prediction_service import build_quant_prediction_payload
 
 
@@ -142,6 +143,20 @@ class QuantPredictionServiceTests(unittest.TestCase):
         self.assertIn(market_result["rows"][0]["prediction_label"], {"UP", "NEUTRAL", "DOWN"})
         self.assertEqual(empty_result["source"], "empty")
         self.assertEqual(empty_result["rows"], [])
+
+    def test_presentation_identifies_values_as_scores_not_calibrated_probabilities(self):
+        payload = build_quant_prediction_payload(
+            scanner_rows=[{"ticker": "AAPL", "chg": 1.2, "chg_5d": 3.5}],
+            telegram_payload={},
+            market_payload={},
+        )
+
+        summary_html = _quant_summary_html(payload)
+        rows_html = _quant_rows_html(payload["rows"])
+
+        self.assertIn("Avg Up Score", summary_html)
+        self.assertIn("통계적으로 보정된 확률이 아닙니다", summary_html)
+        self.assertNotIn("%", rows_html.split("</td>", 5)[2])
 
 
 if __name__ == "__main__":

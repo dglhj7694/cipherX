@@ -2,8 +2,16 @@ _tmp_test.txt
 tests/test_trendlines.py
 BRAND_GUIDE.md
 
-# Local Streamlit digest cache
-artifacts/app_cache/
+# Generated scan, briefing, digest, and local cache artifacts
+artifacts/
+
+# Local secrets and credential exports
+.env
+.env.*
+.streamlit/secrets.toml
+client_secret*.json
+service_account*.json
+token.json
 
 # Python bytecode caches
 __pycache__/

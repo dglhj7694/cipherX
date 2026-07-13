@@ -16,6 +16,18 @@ from .final_buy_ranker import annotate_rows_with_qbs, build_final_buy_sections
 from .formatters import build_post_close_digest, build_post_close_message_texts
 from .hull_buy_turn_ranker import HULL_BUY_TURN_KEY, select_hull_buy_turn_rows
 from .publisher import publish_digest_if_configured, publish_digest_to_github, write_local_digest_artifacts
+from .scan_taxonomy import (
+    SCAN_TAXONOMY_LIMIT,
+    SCAN_TAXONOMY_OUTPUT_KEYS,
+    SCAN_TAXONOMY_QUALITY_FLOORS,
+    SCAN_TAXONOMY_SECTION_ORDER,
+    SCAN_TAXONOMY_SECTION_TITLES,
+    SCAN_TAXONOMY_TAB_FIELD_KEYS,
+    SCAN_TAXONOMY_TABS,
+    annotate_rows_with_scan_taxonomy,
+    evaluate_scan_taxonomy,
+    select_scan_taxonomy_sections,
+)
 from .selectors import (
     BOARD_MANDATORY_SECTION_KEYS,
     BOARD_QUALITY_FLOORS,
@@ -93,6 +105,16 @@ __all__ = [
     "write_local_digest_artifacts",
     "publish_digest_to_github",
     "publish_digest_if_configured",
+    "SCAN_TAXONOMY_LIMIT",
+    "SCAN_TAXONOMY_OUTPUT_KEYS",
+    "SCAN_TAXONOMY_QUALITY_FLOORS",
+    "SCAN_TAXONOMY_SECTION_ORDER",
+    "SCAN_TAXONOMY_SECTION_TITLES",
+    "SCAN_TAXONOMY_TAB_FIELD_KEYS",
+    "SCAN_TAXONOMY_TABS",
+    "annotate_rows_with_scan_taxonomy",
+    "evaluate_scan_taxonomy",
+    "select_scan_taxonomy_sections",
     "CORE_QUALITY_FLOORS",
     "CORE_SECTION_ORDER",
     "CORE_SECTION_TITLES",

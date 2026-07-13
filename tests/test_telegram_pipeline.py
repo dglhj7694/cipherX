@@ -16,6 +16,7 @@ from telegram_pipeline import (
     BOARD_SECTION_LIMIT,
     EARLY_REVERSAL_KEY,
     HULL_BUY_TURN_KEY,
+    SCAN_TAXONOMY_SECTION_ORDER,
     STEADY_WINNER_SECTION_KEY,
     STARTUP9_CONFIRM_KEY,
     TECHNICAL_BUY_CLUSTER_KEY,
@@ -278,6 +279,7 @@ class TelegramPipelineTests(unittest.TestCase):
                 "qbs_buy_now",
                 "qbs_chase_watch",
                 "qbs_pullback_wait",
+                *SCAN_TAXONOMY_SECTION_ORDER,
                 STEADY_WINNER_SECTION_KEY,
                 EARLY_REVERSAL_KEY,
                 HULL_BUY_TURN_KEY,
@@ -315,10 +317,44 @@ class TelegramPipelineTests(unittest.TestCase):
                 EARLY_REVERSAL_KEY,
                 HULL_BUY_TURN_KEY,
                 *AGGRESSIVE_NEXT_DAY_SECTION_KEYS,
+                *SCAN_TAXONOMY_SECTION_ORDER,
             }
             for item in section_map[key].items
         ]
         self.assertEqual(len(general_tickers), len(set(general_tickers)))
+
+    def test_scan_taxonomy_sections_limit_top20_and_allow_duplicates(self):
+        rows = [
+            self._row(
+                f"TX{i:02d}",
+                final_entry_score=120.0 - i,
+                pocket_pivot_candidate=True,
+                cmf=0.2,
+                obv_slope=0.5,
+                volume_ratio_20=1.8,
+                pullback_ready=True,
+                detected_signals=[{"key": "Hammer", "dir": "buy"}, {"key": "MA20_Support", "dir": "buy"}],
+            )
+            for i in range(25)
+        ]
+        digest = build_post_close_digest(
+            rows,
+            run_stamp="20260424_050000",
+            generated_at=self.generated_at,
+            market_date=self.market_date,
+            scan_label="post-close default",
+            universe_count=25,
+            result_count=25,
+            skip_count=0,
+        )
+        section_map = digest.section_map()
+        buy_now = section_map["scan_taxonomy_buy_now"].items
+        accumulation = section_map["scan_taxonomy_accumulation"].items
+
+        self.assertEqual(len(buy_now), 20)
+        self.assertEqual(len(accumulation), 20)
+        self.assertEqual(buy_now[0].ticker, "TX00")
+        self.assertIn("TX00", {item.ticker for item in accumulation})
 
     def _aggressive_trend_row(self, ticker: str, **overrides):
         row = self._row(
@@ -1049,19 +1085,18 @@ class TelegramPipelineTests(unittest.TestCase):
         section_map = digest.section_map()
         item = section_map[EARLY_REVERSAL_KEY].items[0]
 
-        self.assertEqual(
-            digest.section_order[:8],
-            [
-                "qbs_buy_now",
-                "qbs_chase_watch",
-                "qbs_pullback_wait",
-                STEADY_WINNER_SECTION_KEY,
-                EARLY_REVERSAL_KEY,
-                HULL_BUY_TURN_KEY,
-                STARTUP9_CONFIRM_KEY,
-                TECHNICAL_BUY_CLUSTER_KEY,
-            ],
-        )
+        expected_prefix = [
+            "qbs_buy_now",
+            "qbs_chase_watch",
+            "qbs_pullback_wait",
+            *SCAN_TAXONOMY_SECTION_ORDER,
+            STEADY_WINNER_SECTION_KEY,
+            EARLY_REVERSAL_KEY,
+            HULL_BUY_TURN_KEY,
+            STARTUP9_CONFIRM_KEY,
+            TECHNICAL_BUY_CLUSTER_KEY,
+        ]
+        self.assertEqual(digest.section_order[: len(expected_prefix)], expected_prefix)
         self.assertEqual(item.ticker, "MELI")
         self.assertEqual(item.reversal_phase, "CONFIRMED")
         self.assertEqual(item.reversal_type, "MIXED_REVERSAL")
@@ -1298,19 +1333,18 @@ class TelegramPipelineTests(unittest.TestCase):
         section_map = digest.section_map()
         items = section_map[HULL_BUY_TURN_KEY].items
 
-        self.assertEqual(
-            digest.section_order[:8],
-            [
-                "qbs_buy_now",
-                "qbs_chase_watch",
-                "qbs_pullback_wait",
-                STEADY_WINNER_SECTION_KEY,
-                EARLY_REVERSAL_KEY,
-                HULL_BUY_TURN_KEY,
-                STARTUP9_CONFIRM_KEY,
-                TECHNICAL_BUY_CLUSTER_KEY,
-            ],
-        )
+        expected_prefix = [
+            "qbs_buy_now",
+            "qbs_chase_watch",
+            "qbs_pullback_wait",
+            *SCAN_TAXONOMY_SECTION_ORDER,
+            STEADY_WINNER_SECTION_KEY,
+            EARLY_REVERSAL_KEY,
+            HULL_BUY_TURN_KEY,
+            STARTUP9_CONFIRM_KEY,
+            TECHNICAL_BUY_CLUSTER_KEY,
+        ]
+        self.assertEqual(digest.section_order[: len(expected_prefix)], expected_prefix)
         self.assertEqual({item.ticker for item in items}, {"DATE", "FLAG"})
         self.assertTrue(all(item.bucket == "HULL_BUY_TURN" for item in items))
 
@@ -1533,6 +1567,8 @@ class TelegramPipelineTests(unittest.TestCase):
         qbs_0 = message.index("## 0. ")
         qbs_01 = message.index("## 0-1. ")
         qbs_02 = message.index("## 0-2. ")
+        taxonomy_1 = message.index("## T1. ")
+        taxonomy_13 = message.index("## T13. ")
         steady_03 = message.index("## 0-3. ")
         early_04 = message.index("## 0-4. ")
         hull_05 = message.index("## 0-5. ")
@@ -1541,7 +1577,7 @@ class TelegramPipelineTests(unittest.TestCase):
         aggressive_1 = message.index("## PART 1.")
         aggressive_8 = message.index("## PART 8.")
         normal_4 = message.index("## 4. ")
-        self.assertTrue(qbs_0 < qbs_01 < qbs_02 < steady_03 < early_04 < hull_05 < startup_1 < tech_2 < aggressive_1 < aggressive_8 < normal_4)
+        self.assertTrue(qbs_0 < qbs_01 < qbs_02 < taxonomy_1 < taxonomy_13 < steady_03 < early_04 < hull_05 < startup_1 < tech_2 < aggressive_1 < aggressive_8 < normal_4)
         self.assertIn("QBS", message)
 
     def test_aggressive_message_contains_conditions_and_core_metrics(self):
@@ -1581,6 +1617,8 @@ class TelegramPipelineTests(unittest.TestCase):
         self.assertIn("## 0. ", message)
         self.assertIn("## 0-1. ", message)
         self.assertIn("## 0-2. ", message)
+        self.assertIn("## T1. ", message)
+        self.assertIn("## T13. ", message)
         self.assertIn("## PART 1.", message)
         self.assertIn("## PART 8.", message)
         self.assertIn("## 0-3. ", message)
@@ -2162,6 +2200,61 @@ class HomeDigestLoaderTests(unittest.TestCase):
         self.assertEqual([row["section_key"] for row in home_page._filter_telegram_board_rows(board_rows, "trend")], [part2_key])
         self.assertEqual([row["section_key"] for row in home_page._filter_telegram_board_rows(board_rows, "entry")], [part7_key, "qbs_buy_now"])
         self.assertEqual([row["section_key"] for row in home_page._filter_telegram_board_rows(board_rows, "risk")], [part2_key, part7_key])
+
+    def test_telegram_board_rows_include_scan_taxonomy_filters(self):
+        payload = {
+            "version": "2.0",
+            "section_order": ["scan_taxonomy_buy_now", "scan_taxonomy_accumulation"],
+            "sections": [
+                {
+                    "key": "scan_taxonomy_buy_now",
+                    "title": "지금매수",
+                    "item_count": 1,
+                    "ranked": True,
+                    "items": [
+                        {
+                            "ticker": "TSLA",
+                            "price": 210.0,
+                            "chg_pct": 2.4,
+                            "volume_ratio_20": 1.8,
+                            "section_key": "scan_taxonomy_buy_now",
+                            "rank": 1,
+                            "label": "STRONG_BUY_NOW",
+                            "reason": "상승추세+눌림지지+거래량",
+                            "source_flags": {"scan_action_label": "STRONG_BUY_NOW", "rs_rank_vs_index": 88},
+                        }
+                    ],
+                },
+                {
+                    "key": "scan_taxonomy_accumulation",
+                    "title": "기관매집",
+                    "item_count": 1,
+                    "ranked": True,
+                    "items": [
+                        {
+                            "ticker": "TSLA",
+                            "price": 210.0,
+                            "chg_pct": 2.4,
+                            "volume_ratio_20": 1.8,
+                            "section_key": "scan_taxonomy_accumulation",
+                            "rank": 1,
+                            "label": "ACCUMULATION",
+                            "reason": "PocketPivot+CMF+",
+                        }
+                    ],
+                },
+            ],
+        }
+
+        digest = home_page.telegram_digest_from_payload(payload)
+        board_rows = home_page._build_telegram_board_rows(digest)
+        taxonomy_rows = home_page._filter_telegram_board_rows(board_rows, "taxonomy")
+        buy_now_rows = home_page._filter_telegram_board_rows(board_rows, "scan_taxonomy_buy_now")
+
+        self.assertEqual([row["section_key"] for row in taxonomy_rows], ["scan_taxonomy_buy_now", "scan_taxonomy_accumulation"])
+        self.assertEqual([row["ticker"] for row in taxonomy_rows], ["TSLA", "TSLA"])
+        self.assertEqual(buy_now_rows[0]["section"], "지금매수")
+        self.assertEqual(buy_now_rows[0]["entry"], "STRONG_BUY_NOW")
 
     def test_home_digest_dashboard_helpers_preserve_structure_and_render_html(self):
         part2_key = AGGRESSIVE_NEXT_DAY_SECTION_KEYS[1]

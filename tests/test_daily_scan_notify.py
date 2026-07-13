@@ -17,6 +17,7 @@ from scripts.daily_scan_and_notify import (
     POST_CLOSE_FINAL_ENTRY_FIELD_SPECS,
     POST_CLOSE_LATEST_SESSION_FIELD_SPECS,
     POST_CLOSE_QBS_FIELD_SPECS,
+    POST_CLOSE_SCAN_TAXONOMY_FIELD_SPECS,
     POST_CLOSE_TECHNICAL_BUY_FIELD_SPECS,
     RUSSELL2000_UNIVERSE_ITEMS,
     ScanRunResult,
@@ -55,7 +56,7 @@ from scripts.daily_scan_and_notify import (
     split_tickers_for_shard,
     write_scan_csv,
 )
-from telegram_pipeline import annotate_rows_with_qbs, annotate_rows_with_technical_buy
+from telegram_pipeline import annotate_rows_with_qbs, annotate_rows_with_scan_taxonomy, annotate_rows_with_technical_buy
 
 
 class DailyScanNotifyTests(unittest.TestCase):
@@ -322,6 +323,47 @@ class DailyScanNotifyTests(unittest.TestCase):
         self.assertIn("sell_turn", by_ticker["SELLX"]["QBSRiskFlags(qbs_risk_flags)"])
         self.assertEqual(by_ticker["BLANK"]["QBSBucket(qbs_bucket)"], "")
         self.assertEqual(by_ticker["BLANK"]["QBSScore(qbs_score)"], "")
+
+    def test_write_scan_csv_post_close_scan_taxonomy_columns(self):
+        target_date = datetime(2026, 4, 23).date()
+        rows = annotate_rows_with_scan_taxonomy(
+            [
+                {
+                    "ticker": "ALPHA",
+                    "scan_status": "ok",
+                    "uptrend_persistent": True,
+                    "pullback_ready": True,
+                    "volume_ratio_20": 1.8,
+                    "utbot_buy_last_date": target_date.isoformat(),
+                    "detected_signals": [{"key": "Hammer", "dir": "buy"}],
+                },
+                {"ticker": "SKIP", "scan_status": "skipped", "scan_skip_reason": "missing_frame"},
+            ],
+            target_date=target_date,
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            csv_path = write_scan_csv(
+                rows,
+                out_dir=Path(temp_dir),
+                run_label="post_close_taxonomy",
+                extra_field_specs=[
+                    *POST_CLOSE_LATEST_SESSION_FIELD_SPECS,
+                    *POST_CLOSE_SCAN_TAXONOMY_FIELD_SPECS,
+                ],
+            )
+            csv_rows = list(csv.DictReader(io.StringIO(csv_path.read_text(encoding="utf-8-sig"))))
+
+        first_row = csv_rows[0]
+        self.assertIn("ScanActionLabel(scan_action_label)", first_row)
+        self.assertIn("ScanTaxonomyPrimary(scan_taxonomy_primary)", first_row)
+        self.assertIn("ScanTabbuy_now(scan_tab_buy_now)", first_row)
+
+        by_ticker = {row["티커(ticker)"]: row for row in csv_rows}
+        self.assertEqual(by_ticker["ALPHA"]["ScanActionLabel(scan_action_label)"], "STRONG_BUY_NOW")
+        self.assertEqual(by_ticker["ALPHA"]["ScanTabbuy_now(scan_tab_buy_now)"], "Y")
+        self.assertEqual(by_ticker["SKIP"]["ScanActionLabel(scan_action_label)"], "")
+        self.assertEqual(by_ticker["SKIP"]["ScanTabbuy_now(scan_tab_buy_now)"], "N")
 
     def test_write_scan_csv_post_close_technical_buy_columns(self):
         target_date = datetime(2026, 4, 23).date()

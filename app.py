@@ -16,8 +16,14 @@ from app_ui.pages import (
     render_market_dashboard_page,
     render_market_daily_dashboard,
 )
+from app_ui.components import render_trade_plan_workspace
 from sectors import SECTOR_GROUPS
-from bootstrap import build_default_session_state, ensure_session_defaults as _ensure_session_defaults, reset_session_state as _reset_session_state
+from bootstrap import (
+    build_default_session_state,
+    clear_session_namespace as _clear_session_namespace,
+    ensure_session_defaults as _ensure_session_defaults,
+    reset_session_state as _reset_session_state,
+)
 from chart import load_chart_figure, serialize_chart_figure
 from config import COMBINED_SCAN_REGISTRY, CTX_KOR, JT, GEMINI_API_KEY, GEMINI_API_KEY_FROM_SECRETS
 from domain import AnalysisRequest
@@ -249,6 +255,8 @@ def init_session():
 
 
 def reset_session():
+    _clear_session_namespace("trade_plan_ui_")
+    _clear_session_namespace("trade_plan_sensitive_")
     _reset_session_state(_session_defaults())
 
 init_session()
@@ -2940,6 +2948,7 @@ else:
     report_indices = [i for i, msg in enumerate(st.session_state.messages) if msg.get("type") == "report"]
     latest_analysis_idx = analysis_indices[-1] if analysis_indices else None
     latest_report_idx = report_indices[-1] if report_indices else None
+    latest_analysis_message = st.session_state.messages[latest_analysis_idx] if latest_analysis_idx is not None else None
 
     if analysis_indices:
         _render_section_heading(
@@ -2963,6 +2972,12 @@ else:
             eyebrow="Workspace",
             tight=True,
         )
+
+    render_trade_plan_workspace(
+        current_meta=(latest_analysis_message or {}).get("meta"),
+        current_audit=(latest_analysis_message or {}).get("audit"),
+        on_select_ticker=_queue_analysis_target,
+    )
 
     if not st.session_state.last_ticker:
         _render_section_heading(
@@ -3092,10 +3107,18 @@ else:
             if msg.get("type") == "analysis":
                 is_latest_analysis = i == latest_analysis_idx
                 if is_latest_analysis:
-                    render_analysis_message(msg, key_prefix=f"analysis_{i}_{msg.get('ticker', 'na')}")
+                    render_analysis_message(
+                        msg,
+                        key_prefix=f"analysis_{i}_{msg.get('ticker', 'na')}",
+                        allow_plan_save=True,
+                    )
                 else:
                     with st.expander(f"{msg.get('ticker', '')} 지난 분석", expanded=False):
-                        render_analysis_message(msg, key_prefix=f"analysis_{i}_{msg.get('ticker', 'na')}")
+                        render_analysis_message(
+                            msg,
+                            key_prefix=f"analysis_{i}_{msg.get('ticker', 'na')}",
+                            allow_plan_save=False,
+                        )
             elif msg.get("type") == "report":
                 with st.expander(f"{msg.get('ticker', '')} 리포트", expanded=i == latest_report_idx):
                     ai_result = dict(msg.get("ai_result") or {})

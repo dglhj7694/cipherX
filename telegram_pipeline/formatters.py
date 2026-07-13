@@ -46,6 +46,15 @@ from .rankers import (
     same_session_buy_turn,
     same_session_sell_turn,
 )
+from .scan_taxonomy import (
+    SCAN_TAXONOMY_LIMIT,
+    SCAN_TAXONOMY_QUALITY_FLOORS,
+    SCAN_TAXONOMY_SECTION_ORDER,
+    SCAN_TAXONOMY_SECTION_TITLES,
+    SCAN_TAXONOMY_TAB_BY_SECTION,
+    annotate_rows_with_scan_taxonomy,
+    select_scan_taxonomy_sections,
+)
 from .selectors import (
     BOARD_MANDATORY_SECTION_KEYS,
     BOARD_QUALITY_FLOORS,
@@ -95,6 +104,7 @@ QBS_DISPLAY_NUMBERS: dict[str, str] = {
 }
 
 BOARD_SECTION_KEYS = set(BOARD_SECTION_ORDER)
+SCAN_TAXONOMY_SECTION_KEYS = set(SCAN_TAXONOMY_SECTION_ORDER)
 FIVE_DAY_TOP_SECTION_KEY = "five_day_top"
 STEADY_WINNER_DISPLAY_NUMBER = "0-3"
 EARLY_REVERSAL_DISPLAY_NUMBER = "0-4"
@@ -107,6 +117,10 @@ BOARD_DISPLAY_NUMBERS: dict[str, str] = {
 }
 FIVE_DAY_TOP_DISPLAY_NUMBER = "13"
 AGGRESSIVE_SECTION_KEYS = set(AGGRESSIVE_NEXT_DAY_SECTION_KEYS)
+SCAN_TAXONOMY_DISPLAY_NUMBERS: dict[str, str] = {
+    section_key: f"T{index}"
+    for index, section_key in enumerate(SCAN_TAXONOMY_SECTION_ORDER, start=1)
+}
 
 
 def _signed(value: Any, decimals: int = 2) -> str:
@@ -364,6 +378,9 @@ def _build_new_52w_high_reason(row: Mapping[str, Any]) -> str:
 def _candidate_label(section_key: str) -> str:
     if section_key in AGGRESSIVE_SECTION_KEYS:
         return str(AGGRESSIVE_NEXT_DAY_SECTION_TITLES.get(section_key, section_key))
+    if section_key in SCAN_TAXONOMY_SECTION_KEYS:
+        tab = SCAN_TAXONOMY_TAB_BY_SECTION.get(section_key)
+        return str(tab.action_label if tab else section_key)
     return {
         "confluence": "CONFLUENCE",
         "entry_now": "ENTRY",
@@ -394,6 +411,8 @@ def _candidate_label(section_key: str) -> str:
 def _candidate_reason(section_key: str, row: Mapping[str, Any], target_date: date) -> str:
     if section_key in AGGRESSIVE_SECTION_KEYS:
         return str(row.get("aggressive_reason") or "-")
+    if section_key in SCAN_TAXONOMY_SECTION_KEYS:
+        return str(row.get("scan_taxonomy_reason") or "-")
     if section_key == STARTUP9_CONFIRM_KEY:
         return str(row.get("startup9_confirm_reason") or "-")
     if section_key == TECHNICAL_BUY_CLUSTER_KEY:
@@ -512,6 +531,12 @@ def _candidate_source_flags(section_key: str, row: Mapping[str, Any], target_dat
         "startup9_missing_keys": _text_list(row.get("startup9_missing_keys")) if section_key == STARTUP9_CONFIRM_KEY else [],
         "startup9_hard_exclusions": _text_list(row.get("startup9_hard_exclusions")) if section_key == STARTUP9_CONFIRM_KEY else [],
         "startup9_soft_risk_flags": _text_list(row.get("startup9_soft_risk_flags")) if section_key == STARTUP9_CONFIRM_KEY else [],
+        "scan_action_label": str(row.get("scan_action_label") or ""),
+        "scan_taxonomy_primary": str(row.get("scan_taxonomy_primary") or ""),
+        "scan_taxonomy_primary_title": str(row.get("scan_taxonomy_primary_title") or ""),
+        "scan_taxonomy_matches": str(row.get("scan_taxonomy_matches") or ""),
+        "scan_taxonomy_reason": str(row.get("scan_taxonomy_reason") or ""),
+        "scan_taxonomy_risk_flags": str(row.get("scan_taxonomy_risk_flags") or ""),
         "label": _candidate_label(section_key),
         "membership": list(row.get("source_membership") or []),
         "membership_count": int(safe_float(row.get("membership_count", 0.0))),
@@ -531,6 +556,8 @@ def _build_candidate(section_key: str, row: Mapping[str, Any], rank: int, target
     startup9_hits = _text_list(row.get("startup9_confirm_hits")) if section_key == STARTUP9_CONFIRM_KEY else []
     startup9_missing = _text_list(row.get("startup9_confirm_missing")) if section_key == STARTUP9_CONFIRM_KEY else []
     startup9_risk_tags = _text_list(row.get("startup9_risk_flags")) if section_key == STARTUP9_CONFIRM_KEY else []
+    taxonomy_tags = _text_list(row.get("scan_taxonomy_tags")) if section_key in SCAN_TAXONOMY_SECTION_KEYS else []
+    taxonomy_risk_tags = _text_list(row.get("scan_taxonomy_risk_flags")) if section_key in SCAN_TAXONOMY_SECTION_KEYS else []
     if technical_risk_tags == ["특이사항 없음"]:
         technical_risk_tags = []
     if startup9_risk_tags == ["특이사항 없음"]:
@@ -545,6 +572,7 @@ def _build_candidate(section_key: str, row: Mapping[str, Any], rank: int, target
         rank=rank,
         label=str(
             row.get("aggressive_label")
+            or (row.get("scan_action_label") if section_key in SCAN_TAXONOMY_SECTION_KEYS else None)
             or (row.get("startup9_confirm_grade") if section_key == STARTUP9_CONFIRM_KEY else None)
             or row.get("technical_buy_bucket")
             or row.get("pul_bucket")
@@ -557,6 +585,7 @@ def _build_candidate(section_key: str, row: Mapping[str, Any], rank: int, target
         source_flags=_candidate_source_flags(section_key, row, target_date),
         bucket=str(
             row.get("aggressive_bucket")
+            or (row.get("scan_action_label") if section_key in SCAN_TAXONOMY_SECTION_KEYS else None)
             or (row.get("startup9_profile") if section_key == STARTUP9_CONFIRM_KEY else None)
             or row.get("technical_buy_bucket")
             or row.get("pul_bucket")
@@ -566,6 +595,7 @@ def _build_candidate(section_key: str, row: Mapping[str, Any], rank: int, target
         ),
         tags=list(
             row.get("aggressive_tags")
+            or taxonomy_tags
             or startup9_hits
             or technical_hits
             or row.get("pul_tags")
@@ -575,6 +605,7 @@ def _build_candidate(section_key: str, row: Mapping[str, Any], rank: int, target
             or []
         ),
         risk_flags=aggressive_risk_tags
+        or taxonomy_risk_tags
         or startup9_risk_tags
         or technical_risk_tags
         or steady_risk_tags
@@ -732,9 +763,24 @@ def build_post_close_digest(
 ) -> TelegramDigest:
     row_list = [dict(row or {}) for row in (rows or [])]
     row_list = annotate_rows_with_startup9_confirm(row_list, target_date=market_date)
+    row_list = annotate_rows_with_scan_taxonomy(row_list, target_date=market_date)
     section_rows = select_post_close_sections(row_list, target_date=market_date)
 
     sections: list[TelegramSection] = _build_qbs_sections(section_rows, market_date)
+    taxonomy_rows = select_scan_taxonomy_sections(row_list, target_date=market_date)
+    for section_key in SCAN_TAXONOMY_SECTION_ORDER:
+        row_items = list(taxonomy_rows.get(section_key) or [])
+        items = [_build_candidate(section_key, row, idx, market_date) for idx, row in enumerate(row_items, start=1)]
+        sections.append(
+            TelegramSection(
+                key=section_key,
+                title=SCAN_TAXONOMY_SECTION_TITLES[section_key],
+                items=items,
+                item_count=len(items),
+                quality_floor=SCAN_TAXONOMY_QUALITY_FLOORS[section_key],
+                ranked=True,
+            )
+        )
     steady_rows = list(section_rows.get(STEADY_WINNER_SECTION_KEY) or [])
     steady_items = [
         _build_candidate(STEADY_WINNER_SECTION_KEY, row, idx, market_date)
@@ -832,6 +878,7 @@ def build_post_close_digest(
         generated_at=generated_at.isoformat(),
         section_order=[
             *QBS_OUTPUT_KEYS,
+            *SCAN_TAXONOMY_SECTION_ORDER,
             STEADY_WINNER_SECTION_KEY,
             EARLY_REVERSAL_KEY,
             HULL_BUY_TURN_KEY,
@@ -1124,6 +1171,7 @@ def _section_block(index: int | str, section: TelegramSection) -> str:
 
 MESSAGE_GROUP_HEADERS: dict[str, str] = {
     "decision": "[0] 오늘 의사결정 핵심",
+    "taxonomy": "[0-T] 13탭 구조 분류",
     "startup9": "[1] Startup식 9개 강세확인 Top 20",
     "technical": "[2] 기술적 매수시그널 클러스터",
     "aggressive": "[3] 다음 거래일 공격형 매수 후보 8-PART",
@@ -1136,6 +1184,8 @@ MESSAGE_GROUP_DIVIDER = "━━━━━━━━━━━━━━━━━━�
 def _message_group_for_section(section_key: str) -> str:
     if section_key in QBS_DISPLAY_NUMBERS or section_key in {STEADY_WINNER_SECTION_KEY, EARLY_REVERSAL_KEY, HULL_BUY_TURN_KEY}:
         return "decision"
+    if section_key in SCAN_TAXONOMY_SECTION_KEYS:
+        return "taxonomy"
     if section_key == STARTUP9_CONFIRM_KEY:
         return "startup9"
     if section_key == TECHNICAL_BUY_CLUSTER_KEY:
@@ -1183,6 +1233,7 @@ def build_main_message(digest: TelegramDigest) -> str:
     for section in _ordered_digest_sections(digest):
         if section.key not in BOARD_MANDATORY_SECTION_KEYS and section.item_count <= 0 and section.key not in {
             *QBS_DISPLAY_NUMBERS.keys(),
+            *SCAN_TAXONOMY_SECTION_KEYS,
             STARTUP9_CONFIRM_KEY,
             TECHNICAL_BUY_CLUSTER_KEY,
             *AGGRESSIVE_SECTION_KEYS,
@@ -1208,6 +1259,9 @@ def build_main_message(digest: TelegramDigest) -> str:
             continue
         if section.key in AGGRESSIVE_SECTION_KEYS:
             blocks.append(_aggressive_section_block(section))
+            continue
+        if section.key in SCAN_TAXONOMY_DISPLAY_NUMBERS:
+            blocks.append(_section_block(SCAN_TAXONOMY_DISPLAY_NUMBERS[section.key], section))
             continue
         if section.key == STEADY_WINNER_SECTION_KEY:
             blocks.append(_steady_winner_section_block(section))

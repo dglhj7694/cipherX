@@ -25,6 +25,7 @@ from telegram_pipeline.formatters import (
     build_main_message,
 )
 from telegram_pipeline.hull_buy_turn_ranker import HULL_BUY_TURN_KEY
+from telegram_pipeline.scan_taxonomy import SCAN_TAXONOMY_SECTION_ORDER, SCAN_TAXONOMY_SECTION_TITLES
 from telegram_pipeline.selectors import BOARD_MANDATORY_SECTION_KEYS, BOARD_SECTION_ORDER, STEADY_WINNER_SECTION_KEY
 from telegram_pipeline.startup9_confirm_ranker import STARTUP9_CONFIRM_KEY
 from telegram_pipeline.technical_buy_signal_ranker import TECHNICAL_BUY_CLUSTER_KEY
@@ -65,6 +66,7 @@ DECISION_SECTION_KEYS = {
     HULL_BUY_TURN_KEY,
 }
 BOARD_TYPE_SECTION_KEYS = set(BOARD_SECTION_ORDER)
+SCAN_TAXONOMY_SECTION_KEY_SET = set(SCAN_TAXONOMY_SECTION_ORDER)
 
 
 def _repo_root() -> Path:
@@ -403,6 +405,9 @@ def _visible_telegram_sections(digest: TelegramDigest) -> list[TelegramSection]:
         if section.key == HULL_BUY_TURN_KEY:
             visible.append(section)
             continue
+        if section.key in SCAN_TAXONOMY_SECTION_KEY_SET:
+            visible.append(section)
+            continue
         if section.key in mandatory or section.item_count > 0:
             visible.append(section)
     return visible
@@ -530,6 +535,14 @@ def _technical_buy_tone(value: Any) -> str:
 
 def _section_tone(section_key: str) -> str:
     key = str(section_key or "")
+    if key in SCAN_TAXONOMY_SECTION_KEY_SET:
+        if key.endswith("_avoid"):
+            return "negative"
+        if key.endswith("_speculative_satellite") or key.endswith("_gap_and_go"):
+            return "warning"
+        if key.endswith("_wait") or key.endswith("_rise_ready") or key.endswith("_pre_breakout"):
+            return "info"
+        return "positive"
     if key in AGGRESSIVE_SECTION_KEY_SET:
         if key in {AGGRESSIVE_NEXT_DAY_SECTION_KEYS[3], AGGRESSIVE_NEXT_DAY_SECTION_KEYS[6]}:
             return "warning"
@@ -555,9 +568,9 @@ def _section_tone(section_key: str) -> str:
 
 def _signal_tone(label: str, section_key: str) -> str:
     text = str(label or "").upper()
-    if "SELL" in text or "RISK" in text:
+    if "SELL" in text or "RISK" in text or "AVOID" in text:
         return "negative"
-    if "CHASE" in text:
+    if "CHASE" in text or "SATELLITE" in text:
         return "warning"
     if "PULLBACK" in text or "WAIT" in text:
         return "info"
@@ -672,6 +685,8 @@ def _board_entry_text(item: TelegramCandidate, section_key: str, fallback_entry:
         return explicit
     if str(section_key or "") in AGGRESSIVE_SECTION_KEY_SET:
         return "aggressive_next_day_watch"
+    if str(section_key or "") in SCAN_TAXONOMY_SECTION_KEY_SET:
+        return str((item.source_flags or {}).get("scan_action_label") or item.label or "taxonomy_watch")
     defaults = {
         "qbs_buy_now": "buy_now",
         "qbs_chase_watch": "chase_watch",
@@ -690,6 +705,8 @@ def _board_section_label(section_key: str) -> str:
     key = str(section_key or "")
     if key in AGGRESSIVE_SECTION_SHORT_LABELS:
         return AGGRESSIVE_SECTION_SHORT_LABELS[key]
+    if key in SCAN_TAXONOMY_SECTION_TITLES:
+        return SCAN_TAXONOMY_SECTION_TITLES[key]
     labels = {
         "qbs_buy_now": "BUY_NOW",
         "qbs_chase_watch": "CHASE",
@@ -723,6 +740,8 @@ def _board_bucket_label(item: TelegramCandidate, section_key: str) -> str:
 def _board_score_text(item: TelegramCandidate, section_key: str) -> str:
     if str(section_key or "") in AGGRESSIVE_SECTION_KEY_SET:
         return "AGG"
+    if str(section_key or "") in SCAN_TAXONOMY_SECTION_KEY_SET:
+        return "TAB"
     if section_key == STEADY_WINNER_SECTION_KEY:
         return _format_pul(item.pul_score)
     if section_key == EARLY_REVERSAL_KEY:
@@ -976,6 +995,7 @@ def _build_telegram_board_rows(
 ) -> list[dict[str, Any]]:
     board_section_keys = {
         *QBS_DISPLAY_NUMBERS.keys(),
+        *SCAN_TAXONOMY_SECTION_KEY_SET,
         *AGGRESSIVE_SECTION_KEY_SET,
         STARTUP9_CONFIRM_KEY,
         TECHNICAL_BUY_CLUSTER_KEY,
@@ -1007,6 +1027,10 @@ def _build_telegram_board_rows(
 def _filter_telegram_board_rows(rows: list[dict[str, Any]], filter_key: str) -> list[dict[str, Any]]:
     if filter_key == "decision":
         return [row for row in rows if str(row.get("section_key") or "") in DECISION_SECTION_KEYS]
+    if filter_key == "taxonomy":
+        return [row for row in rows if str(row.get("section_key") or "") in SCAN_TAXONOMY_SECTION_KEY_SET]
+    if filter_key in SCAN_TAXONOMY_SECTION_KEY_SET:
+        return [row for row in rows if str(row.get("section_key") or "") == filter_key]
     if filter_key == "aggressive":
         return [row for row in rows if str(row.get("section_key") or "") in AGGRESSIVE_SECTION_KEY_SET]
     if filter_key == "qbs":
@@ -1454,6 +1478,8 @@ def _default_telegram_board_filter(rows: Iterable[Mapping[str, Any]]) -> str:
     row_list = list(rows)
     if any(str(row.get("section_key") or "") in DECISION_SECTION_KEYS for row in row_list):
         return "decision"
+    if any(str(row.get("section_key") or "") in SCAN_TAXONOMY_SECTION_KEY_SET for row in row_list):
+        return "taxonomy"
     if any(str(row.get("section_key") or "") == STARTUP9_CONFIRM_KEY for row in row_list):
         return "startup9"
     if any(str(row.get("section_key") or "") in AGGRESSIVE_SECTION_KEY_SET for row in row_list):
@@ -1467,6 +1493,7 @@ def _telegram_board_overview_html(rows: list[dict[str, Any]], filter_label: str)
     unique_tickers = _collect_recent_tickers(str(row.get("ticker") or "") for row in rows)
     decision_count = sum(1 for row in rows if str(row.get("section_key") or "") in DECISION_SECTION_KEYS)
     aggressive_count = sum(1 for row in rows if str(row.get("section_key") or "") in AGGRESSIVE_SECTION_KEY_SET)
+    taxonomy_count = sum(1 for row in rows if str(row.get("section_key") or "") in SCAN_TAXONOMY_SECTION_KEY_SET)
     qbs_count = sum(1 for row in rows if str(row.get("section_key") or "") in QBS_DISPLAY_NUMBERS)
     startup9_count = sum(1 for row in rows if str(row.get("section_key") or "") == STARTUP9_CONFIRM_KEY)
     technical_count = sum(1 for row in rows if str(row.get("section_key") or "") == TECHNICAL_BUY_CLUSTER_KEY)
@@ -1477,6 +1504,7 @@ def _telegram_board_overview_html(rows: list[dict[str, Any]], filter_label: str)
         ("Rows", f"{len(rows):,}"),
         ("Tickers", f"{len(unique_tickers):,}"),
         ("Decision", f"{decision_count:,}"),
+        ("13Tabs", f"{taxonomy_count:,}"),
         ("Aggressive", f"{aggressive_count:,}"),
         ("QBS", f"{qbs_count:,}"),
         ("S9", f"{startup9_count:,}"),
@@ -1511,6 +1539,7 @@ def _render_telegram_visual_board(digest: TelegramDigest, *, on_select_ticker: C
         return
     filter_options = {
         "decision": "Decision",
+        "taxonomy": "13 Tabs",
         "qbs": "QBS",
         "startup9": "Startup9",
         "technical": "Tech Buy",
@@ -1524,6 +1553,8 @@ def _render_telegram_visual_board(digest: TelegramDigest, *, on_select_ticker: C
         "risk": "Risk",
         "all": "All",
     }
+    for section_key in SCAN_TAXONOMY_SECTION_ORDER:
+        filter_options[section_key] = SCAN_TAXONOMY_SECTION_TITLES.get(section_key, section_key)
     option_keys = list(filter_options)
     default_filter = _default_telegram_board_filter(rows)
     filter_key = st.radio(

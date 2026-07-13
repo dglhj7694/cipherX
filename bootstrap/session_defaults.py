@@ -14,6 +14,8 @@ def build_default_session_state(initial_messages: list[dict[str, Any]], default_
         "runtime_gemini_api_key": "",
         "runtime_gemini_api_key_input": "",
         "show_runtime_gemini_key_setup": False,
+        "_trade_plans_v1": [],
+        "_trade_plan_pending_delete_id": None,
         "messages": [dict(item) for item in initial_messages],
         "pending_ai_ticker": None,
         "pending_ai_prompt": None,
@@ -56,3 +58,13 @@ def reset_session_state(defaults: dict[str, Any]) -> None:
             st.session_state[key] = dict(value)
         else:
             st.session_state[key] = value
+
+
+def clear_session_namespace(prefix: str, state: Any | None = None) -> int:
+    """Delete dynamic widget keys under one explicit namespace."""
+
+    target = st.session_state if state is None else state
+    keys = [key for key in list(target.keys()) if str(key).startswith(str(prefix))]
+    for key in keys:
+        del target[key]
+    return len(keys)
